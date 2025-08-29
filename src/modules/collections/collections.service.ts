@@ -134,10 +134,10 @@ export class CollectionsService {
       },
       select: {
         idMember: true,
-        pseudo: true,
-        email: true,
-        avatarUrl: true,
-        createdAt: true,
+        memberName: true,
+        emailAddress: true,
+        avatar: true,
+        dateRegistered: true,
         _count: {
           select: {
             animeCollections: {
