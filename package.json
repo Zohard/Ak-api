@@ -6,8 +6,9 @@
   "private": true,
   "license": "UNLICENSED",
   "scripts": {
-    "build": "nest build && tsc api/index.ts --outDir dist/api --target es2020 --module commonjs --moduleResolution node --esModuleInterop --allowSyntheticDefaultImports --experimentalDecorators --emitDecoratorMetadata --skipLibCheck",
-    "vercel-build": "npm run build",
+    "build": "nest build",
+    "build:vercel": "nest build",
+    "vercel-build": "npm run build:vercel",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "nest start",
     "start:dev": "nest start --watch",
