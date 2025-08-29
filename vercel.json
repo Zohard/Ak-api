@@ -19,5 +19,11 @@
     "dist/main.js": {
       "maxDuration": 30
     }
+  },
+  "git": {
+    "deploymentEnabled": {
+      "main": true,
+      "develop": false
+    }
   }
 }
