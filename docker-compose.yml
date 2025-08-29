@@ -1,0 +1,76 @@
+version: '3.8'
+
+services:
+  # NestJS API Service
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: anime-kun-nestjs-api
+    restart: unless-stopped
+    ports:
+      - "3003:3003"
+    environment:
+      - NODE_ENV=development
+      - DATABASE_URL=postgresql://anime_user:anime_password@host.docker.internal:5432/anime_kun
+      - JWT_SECRET=anime-kun-jwt-secret-key-2024
+      - JWT_EXPIRES_IN=15m
+      - JWT_REFRESH_EXPIRES_IN=30d
+      - PORT=3003
+      - FRONTEND_URL=http://localhost:3000
+      - FORUM_URL=http://localhost:8083
+      - SESSION_SECRET=anime-kun-session-secret-key-2024
+    volumes:
+      - ./src:/app/src:ro
+      - ./prisma:/app/prisma:ro
+      - ak9project_nestjs_uploads:/app/uploads
+    depends_on:
+      - postgres
+    networks:
+      - anime-kun-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3003/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # PostgreSQL Database (for standalone testing)
+  postgres:
+    image: postgres:16-alpine
+    container_name: anime-kun-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: anime_kun
+      POSTGRES_USER: anime_user
+      POSTGRES_PASSWORD: anime_password
+    ports:
+      - "5433:5432"  # Different port to avoid conflict with host PostgreSQL
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./prisma/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    networks:
+      - anime-kun-network
+
+  # Redis (for future caching and sessions)
+  redis:
+    image: redis:7-alpine
+    container_name: anime-kun-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - anime-kun-network
+    command: redis-server --appendonly yes
+
+volumes:
+  postgres_data:
+  redis_data:
+  ak9project_nestjs_uploads:
+    external: true
+
+networks:
+  anime-kun-network:
+    driver: bridge

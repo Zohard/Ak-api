@@ -1,0 +1,479 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// SMF Members (Users)
+model SmfMember {
+  idMember         Int      @id @map("id_member")
+  memberName       String   @map("member_name") @db.VarChar(80)
+  realName         String?  @map("real_name") @db.VarChar(255)
+  emailAddress     String   @map("email_address") @db.VarChar(255)
+  passwd           String   @db.VarChar(64)
+  passwordSalt     String?  @map("password_salt") @db.VarChar(255)
+  posts            Int      @default(0)
+  dateRegistered   Int      @map("date_registered")
+  lastLogin        Int?     @map("last_login")
+  idGroup          Int      @map("id_group") @default(0)
+  avatar           String?  @db.Text
+  signature        String?  @db.Text
+  personalText     String?  @map("personal_text") @db.Text
+  location         String?  @db.VarChar(255)
+  websiteTitle     String?  @map("website_title") @db.VarChar(255)
+  websiteUrl       String?  @map("website_url") @db.VarChar(255)
+  birthdate        DateTime? @db.Date
+  nbCritiques      Int      @default(0) @map("nb_critiques")
+  nbSynopsis       Int      @default(0) @map("nb_synopsis")
+  nbContributions  Int      @default(0) @map("nb_contributions")
+  experience       Int      @default(0)
+
+  // Relations
+  refreshTokens    AkRefreshToken[]
+  passwordResetTokens AkPasswordResetToken[]
+  reviews          AkCritique[]
+  adminAuditLogs   AdminAuditLog[]
+  wpPosts          WpPost[]
+  animeCollections CollectionAnime[] @relation("UserAnimeCollection")
+  mangaCollections CollectionManga[] @relation("UserMangaCollection")
+
+  @@map("smf_members")
+}
+
+// Refresh Tokens
+model AkRefreshToken {
+  id          Int       @id @default(autoincrement())
+  token       String    @unique @db.VarChar(255)
+  userId      Int       @map("user_id")
+  expiresAt   DateTime  @map("expires_at") @db.Timestamptz
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  isRevoked   Boolean   @default(false) @map("is_revoked")
+  deviceInfo  Json?     @map("device_info") @db.JsonB
+  ipAddress   String?   @map("ip_address") @db.Inet
+  userAgent   String?   @map("user_agent") @db.Text
+
+  // Relations
+  user        SmfMember @relation(fields: [userId], references: [idMember], onDelete: Cascade)
+
+  @@map("ak_refresh_tokens")
+}
+
+// Password Reset Tokens
+model AkPasswordResetToken {
+  id          Int       @id @default(autoincrement())
+  token       String    @unique @db.VarChar(255)
+  userId      Int       @map("user_id")
+  email       String    @db.VarChar(255)
+  expiresAt   DateTime  @map("expires_at") @db.Timestamptz
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  usedAt      DateTime? @map("used_at") @db.Timestamptz
+  isUsed      Boolean   @default(false) @map("is_used")
+  ipAddress   String?   @map("ip_address") @db.Inet
+  userAgent   String?   @map("user_agent") @db.Text
+
+  // Relations
+  user        SmfMember @relation(fields: [userId], references: [idMember], onDelete: Cascade)
+
+  @@map("ak_password_reset_tokens")
+}
+
+// Animes
+model AkAnime {
+  idAnime      Int       @id @map("id_anime")
+  niceUrl      String?   @map("nice_url") @db.VarChar(255)
+  titre        String    @db.VarChar(255)
+  titreOrig    String?   @map("titre_orig") @db.Text
+  annee        Int?
+  nbEp         Int?      @map("nb_ep")
+  image        String?   @db.VarChar(255)
+  studio       String?   @db.VarChar(100)
+  dateAjout    DateTime? @map("date_ajout") @db.Timestamptz
+  synopsis     String?   @db.Text
+  statut       Int       @default(0)
+  realisateur  String?   @db.VarChar(255)
+  nbReviews    Int?      @default(0) @map("nb_reviews")
+  moyenneNotes Float?    @default(0) @map("moyennenotes") @db.Real
+
+  // Relations
+  reviews      AkCritique[]
+  episodes     AkAnimesEpisode[]
+  businessRelations AkBusinessToAnime[]
+  userCollections CollectionAnime[] @relation("UserAnimeList")
+
+  @@map("ak_animes")
+}
+
+// Anime Episodes
+model AkAnimesEpisode {
+  idEpisode    Int       @id @map("id_episode")
+  idAnime      Int       @map("id_anime")
+  numero       Int
+  titre        String?   @db.VarChar(255)
+  resume       String?   @db.Text
+  dateAjout    DateTime? @map("date_ajout") @db.Timestamptz
+
+  // Relations
+  anime        AkAnime   @relation(fields: [idAnime], references: [idAnime], onDelete: Cascade)
+
+  @@map("ak_animes_episodes")
+}
+
+// Mangas
+model AkManga {
+  idManga              Int       @id @map("id_manga")
+  niceUrl              String?   @map("nice_url") @db.VarChar(255)
+  titre                String    @db.Text
+  auteur               String?   @db.Text
+  annee                String?   @db.VarChar(4)
+  origine              String?   @db.VarChar(255)
+  titreOrig            String?   @map("titre_orig") @db.Text
+  titreFr              String?   @map("titre_fr") @db.Text
+  titresAlternatifs    String?   @map("titres_alternatifs") @db.Text
+  licence              Int?      @default(0)
+  nbVolumes            String?   @map("nb_volumes") @db.VarChar(255)
+  nbVol                Int?      @map("nb_vol")
+  statutVol            String?   @map("statut_vol") @db.VarChar(255)
+  synopsis             String?   @db.Text
+  image                String?   @db.VarChar(255)
+  editeur              String?   @db.VarChar(255)
+  isbn                 String?   @db.VarChar(255)
+  precisions           String?   @db.Text
+  tags                 String?   @db.Text
+  nbClics              Int?      @default(0) @map("nb_clics")
+  nbClicsDay           Int?      @default(0) @map("nb_clics_day")
+  nbClicsWeek          Int?      @default(0) @map("nb_clics_week")
+  nbClicsMonth         Int?      @default(0) @map("nb_clics_month")
+  nbReviews            Int?      @default(0) @map("nb_reviews")
+  label                Int?      @default(0)
+  moyenneNotes         Float?    @default(0) @map("moyennenotes") @db.Real
+  lienForum            Int?      @default(0) @map("lienforum")
+  statut               Int       @default(0)
+  ficheComplete        Int?      @default(0) @map("fiche_complete")
+  dateAjout            DateTime? @map("date_ajout") @db.Timestamptz
+  dateModification     Int?      @map("date_modification")
+  latestCache          Int?      @map("latest_cache")
+  classementPopularite Int?      @map("classement_popularite")
+  variationPopularite  String?   @map("variation_popularite") @db.Text
+
+  // Relations
+  reviews              AkCritique[]
+  businessRelations    AkBusinessToManga[]
+  userCollections      CollectionManga[] @relation("UserMangaList")
+
+  @@map("ak_mangas")
+}
+
+// Business entities (Studios, Authors, Publishers, etc.)
+model AkBusiness {
+  idBusiness            Int       @id @default(autoincrement()) @map("id_business")
+  niceUrl               String?   @map("nice_url") @db.VarChar(255)
+  type                  String?   @db.VarChar(255)
+  denomination          String?   @db.VarChar(255)
+  autresDenominations   String?   @map("autres_denominations") @db.Text
+  image                 String?   @db.VarChar(255)
+  date                  String?   @db.VarChar(255)
+  origine               String?   @db.VarChar(255)
+  siteOfficiel          String?   @map("site_officiel") @db.VarChar(255)
+  notes                 String?   @db.Text
+  relations             Int?      @default(-1)
+  nbClics               Int?      @default(0) @map("nb_clics")
+  nbClicsDay            Int?      @map("nb_clics_day")
+  nbClicsWeek           Int?      @map("nb_clics_week")
+  nbClicsMonth          Int?      @map("nb_clics_month")
+  statut                Int       @default(1)
+  dateAjout             DateTime? @map("date_ajout") @db.Timestamptz
+  dateModification      Int?      @map("date_modification")
+  latestCache           Int?      @map("latest_cache")
+
+  // Relations
+  animeRelations        AkBusinessToAnime[] @relation("BusinessToAnime")
+  mangaRelations        AkBusinessToManga[] @relation("BusinessToManga")
+
+  @@map("ak_business")
+}
+
+// Business to Anime Relations
+model AkBusinessToAnime {
+  idRelation  Int       @id @default(autoincrement()) @map("id_relation")
+  idAnime     Int?      @map("id_anime")
+  idBusiness  Int?      @map("id_business")
+  type        String?   @db.VarChar(100)
+  precisions  String?   @db.Text
+  doublon     Int?      @db.SmallInt
+
+  // Relations
+  anime       AkAnime?  @relation(fields: [idAnime], references: [idAnime], onDelete: Cascade)
+  business    AkBusiness? @relation("BusinessToAnime", fields: [idBusiness], references: [idBusiness], onDelete: Cascade)
+
+  @@map("ak_business_to_animes")
+}
+
+// Business to Manga Relations
+model AkBusinessToManga {
+  idRelation  Int       @id @default(autoincrement()) @map("id_relation")
+  idManga     Int?      @map("id_manga")
+  idBusiness  Int?      @map("id_business")
+  type        String?   @db.VarChar(100)
+  precisions  String?   @db.Text
+  doublon     Int?      @db.SmallInt
+
+  // Relations
+  manga       AkManga?  @relation(fields: [idManga], references: [idManga], onDelete: Cascade)
+  business    AkBusiness? @relation("BusinessToManga", fields: [idBusiness], references: [idBusiness], onDelete: Cascade)
+
+  @@map("ak_business_to_mangas")
+}
+
+// Reviews/Critiques
+model AkCritique {
+  idCritique   Int       @id @map("id_critique")
+  niceUrl      String?   @map("nice_url") @db.VarChar(255)
+  titre        String?   @db.Text
+  critique     String?   @db.Text
+  notation     Int?      @default(0)
+  dateCritique DateTime? @map("date_critique") @db.Timestamp
+  statut       Int       @default(0)
+  questions    String?   @db.Text
+  acceptImages Int?      @map("accept_images")
+  evaluation   String?   @db.Text
+  idMembre     Int       @default(0) @map("id_membre")
+  idAnime      Int       @default(0) @map("id_anime")
+  idManga      Int       @default(0) @map("id_manga")
+  idOst        Int       @default(0) @map("id_ost")
+  idJeu        Int       @default(0) @map("id_jeu")
+  causeSuppr   String?   @map("cause_suppr") @db.Text
+  nbClics      Int?      @map("nb_clics")
+  nbClicsDay   Int?      @default(0) @map("nb_clics_day")
+  nbClicsWeek  Int?      @map("nb_clics_week")
+  nbClicsMonth Int?      @map("nb_clics_month")
+  nbCarac      Int?      @map("nb_carac")
+  popularite   Float?    @db.Real
+  classementPopularite Int? @map("classement_popularite")
+  variationPopularite String? @map("variation_popularite") @db.Text
+
+  // Relations
+  membre       SmfMember @relation(fields: [idMembre], references: [idMember], onDelete: Cascade)
+  anime        AkAnime?  @relation(fields: [idAnime], references: [idAnime], onDelete: Cascade)
+  manga        AkManga?  @relation(fields: [idManga], references: [idManga], onDelete: Cascade)
+
+  @@map("ak_critique")
+}
+
+// Content Relations (Anime/Manga to Anime/Manga)
+model AkFicheToFiche {
+  idRelation      Int      @id @default(autoincrement()) @map("id_relation")
+  idFicheDepart   String   @map("id_fiche_depart") @db.VarChar(50)
+  idAnime         Int?     @map("id_anime")
+  idManga         Int?     @map("id_manga")
+  typeRelation    String?  @map("type_relation") @db.VarChar(50)
+  
+  @@map("ak_fiche_to_fiche")
+}
+
+// Admin Audit Log
+model AdminAuditLog {
+  id          Int       @id @default(autoincrement())
+  adminId     Int       @map("admin_id")
+  action      String    @db.VarChar(100)
+  targetType  String    @map("target_type") @db.VarChar(50)
+  targetId    Int?      @map("target_id")
+  reason      String?   @db.Text
+  metadata    Json?     @db.JsonB
+  ipAddress   String?   @map("ip_address") @db.Inet
+  userAgent   String?   @map("user_agent") @db.Text
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  // Relations
+  admin       SmfMember @relation(fields: [adminId], references: [idMember], onDelete: Cascade)
+
+  @@map("admin_audit_log")
+}
+
+// Articles System Models
+
+// WordPress Posts (Webzine Articles)
+model WpPost {
+  ID                    BigInt    @id @default(autoincrement())
+  postAuthor           Int       @map("post_author")
+  postDate             DateTime  @map("post_date") @db.Timestamp
+  postDateGmt          DateTime  @map("post_date_gmt") @db.Timestamp
+  postContent          String?   @map("post_content") @db.Text
+  postTitle            String    @map("post_title") @db.Text
+  postExcerpt          String?   @map("post_excerpt") @db.Text
+  postStatus           String    @map("post_status") @db.VarChar(20) @default("publish")
+  commentStatus        String    @map("comment_status") @db.VarChar(20) @default("open")
+  pingStatus           String    @map("ping_status") @db.VarChar(20) @default("open")
+  postPassword         String    @map("post_password") @db.VarChar(255) @default("")
+  postName             String    @map("post_name") @db.VarChar(200) @default("")
+  toPing               String?   @map("to_ping") @db.Text
+  pinged               String?   @db.Text
+  postModified         DateTime  @map("post_modified") @db.Timestamp
+  postModifiedGmt      DateTime  @map("post_modified_gmt") @db.Timestamp
+  postContentFiltered  String?   @map("post_content_filtered") @db.Text
+  postParent           Int       @map("post_parent") @default(0)
+  guid                 String    @db.VarChar(255) @default("")
+  menuOrder            Int       @map("menu_order") @default(0)
+  postType             String    @map("post_type") @db.VarChar(20) @default("post")
+  postMimeType         String    @map("post_mime_type") @db.VarChar(100) @default("")
+  commentCount         Int       @map("comment_count") @default(0)
+
+  // Relations
+  author               SmfMember @relation(fields: [postAuthor], references: [idMember], onDelete: Cascade)
+  comments             WpComment[]
+  postMeta             WpPostMeta[]
+  termRelationships    WpTermRelationship[]
+
+  @@map("wp_posts")
+}
+
+// WordPress Comments
+model WpComment {
+  commentID           BigInt    @id @default(autoincrement()) @map("comment_ID")
+  commentPostID       BigInt    @map("comment_post_ID")
+  commentAuthor       String?   @map("comment_author") @db.Text
+  commentAuthorEmail  String?   @map("comment_author_email") @db.VarChar(100)
+  commentAuthorUrl    String?   @map("comment_author_url") @db.VarChar(200)
+  commentAuthorIP     String?   @map("comment_author_ip") @db.VarChar(100)
+  commentDate         DateTime  @map("comment_date") @db.Timestamp
+  commentDateGmt      DateTime  @map("comment_date_gmt") @db.Timestamp
+  commentContent      String?   @map("comment_content") @db.Text
+  commentKarma        Int       @map("comment_karma") @default(0)
+  commentApproved     String    @map("comment_approved") @db.VarChar(20) @default("1")
+  commentAgent        String?   @map("comment_agent") @db.VarChar(255)
+  commentType         String?   @map("comment_type") @db.VarChar(20) @default("comment")
+  commentParent       BigInt    @map("comment_parent") @default(0)
+  userId              Int       @map("user_id") @default(0)
+
+  // Relations
+  post                WpPost    @relation(fields: [commentPostID], references: [ID], onDelete: Cascade)
+
+  @@map("wp_comments")
+}
+
+// WordPress Post Meta
+model WpPostMeta {
+  metaId              BigInt    @id @default(autoincrement()) @map("meta_id")
+  postId              BigInt    @map("post_id")
+  metaKey             String?   @map("meta_key") @db.VarChar(255)
+  metaValue           String?   @map("meta_value") @db.Text
+
+  // Relations
+  post                WpPost    @relation(fields: [postId], references: [ID], onDelete: Cascade)
+
+  @@map("wp_postmeta")
+}
+
+// WordPress Terms (Categories/Tags)
+model WpTerm {
+  termId              Int       @id @default(autoincrement()) @map("term_id")
+  name                String    @db.VarChar(200)
+  slug                String    @db.VarChar(200)
+  termGroup           Int       @map("term_group") @default(0)
+
+  // Relations
+  termTaxonomies      WpTermTaxonomy[]
+
+  @@map("wp_terms")
+}
+
+// WordPress Term Taxonomy
+model WpTermTaxonomy {
+  termTaxonomyId      Int       @id @default(autoincrement()) @map("term_taxonomy_id")
+  termId              Int       @map("term_id")
+  taxonomy            String    @db.VarChar(32)
+  description         String?   @db.Text
+  parent              Int       @default(0)
+  count               Int       @default(0)
+
+  // Relations
+  term                WpTerm    @relation(fields: [termId], references: [termId], onDelete: Cascade)
+  termRelationships   WpTermRelationship[]
+
+  @@map("wp_term_taxonomy")
+}
+
+// WordPress Term Relationships
+model WpTermRelationship {
+  objectId            BigInt    @map("object_id")
+  termTaxonomyId      Int       @map("term_taxonomy_id")
+  termOrder           Int       @map("term_order") @default(0)
+
+  // Relations
+  post                WpPost    @relation(fields: [objectId], references: [ID], onDelete: Cascade)
+  termTaxonomy        WpTermTaxonomy @relation(fields: [termTaxonomyId], references: [termTaxonomyId], onDelete: Cascade)
+
+  @@id([objectId, termTaxonomyId])
+  @@map("wp_term_relationships")
+}
+
+// WordPress Users
+model WpUser {
+  ID                  BigInt    @id @default(autoincrement()) @map("ID")
+  userLogin           String    @unique @map("user_login") @db.VarChar(60)
+  userPass            String    @map("user_pass") @db.VarChar(255)
+  userNicename        String    @map("user_nicename") @db.VarChar(50)
+  userEmail           String    @map("user_email") @db.VarChar(100)
+  userUrl             String?   @map("user_url") @db.VarChar(100)
+  userRegistered      DateTime  @map("user_registered") @db.Timestamp
+  userActivationKey   String?   @map("user_activation_key") @db.VarChar(255)
+  userStatus          Int       @map("user_status") @default(0)
+  displayName         String    @map("display_name") @db.VarChar(250)
+
+  // Relations
+
+  @@map("wp_users")
+}
+
+// Adapted Existing Collections (now support named collections)
+model CollectionAnime {
+  idCollection     Int       @id @default(autoincrement()) @map("id_collection")
+  type             Int       @default(0)
+  idMembre         Int       @default(0) @map("id_membre")
+  idAnime          Int       @default(0) @map("id_anime")
+  evaluation       Int       @map("evaluation") @db.SmallInt
+  notes            String?   @db.Text
+  doublon          Int?      @default(0) @db.SmallInt
+  
+  // New fields for named collections
+  collectionName   String?   @map("collection_name") @db.VarChar(100)
+  isPublic         Boolean   @default(true) @map("is_public")
+  createdAt        DateTime? @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime? @default(now()) @map("updated_at") @db.Timestamptz
+
+  // Relations
+  user             SmfMember @relation("UserAnimeCollection", fields: [idMembre], references: [idMember], onDelete: Cascade)
+  anime            AkAnime   @relation("UserAnimeList", fields: [idAnime], references: [idAnime], onDelete: Cascade)
+
+  @@map("collection_animes")
+}
+
+model CollectionManga {
+  idCollection     Int       @id @default(autoincrement()) @map("id_collection")
+  type             Int       @default(0)
+  idMembre         Int       @default(0) @map("id_membre")
+  idManga          Int       @default(0) @map("id_manga")
+  evaluation       Int       @map("evaluation") @db.SmallInt
+  notes            String?   @db.Text
+  doublon          Int?      @default(0) @db.SmallInt
+  
+  // New fields for named collections
+  collectionName   String?   @map("collection_name") @db.VarChar(100)
+  isPublic         Boolean   @default(true) @map("is_public")
+  createdAt        DateTime? @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime? @default(now()) @map("updated_at") @db.Timestamptz
+
+  // Relations
+  user             SmfMember @relation("UserMangaCollection", fields: [idMembre], references: [idMember], onDelete: Cascade)
+  manga            AkManga   @relation("UserMangaList", fields: [idManga], references: [idManga], onDelete: Cascade)
+
+  @@map("collection_mangas")
+}
+
+
