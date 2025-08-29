@@ -133,7 +133,7 @@ export class CollectionsService {
         ]
       },
       select: {
-        id: true,
+        idMember: true,
         pseudo: true,
         email: true,
         avatarUrl: true,
