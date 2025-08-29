@@ -179,7 +179,7 @@ export class CollectionsService {
 
     // Transform data to include collection summaries
     const users = await Promise.all(
-      usersWithPublicCollections.map(async (user) => {
+      usersWithPublicCollections.map(async (user: any) => {
         // Get collection type counts
         const animeCounts = await this.prisma.collectionAnime.groupBy({
           by: ['type'],
