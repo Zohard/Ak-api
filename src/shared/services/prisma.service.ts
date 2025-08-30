@@ -40,7 +40,11 @@ export class PrismaService
       }
     } catch (e) {
       // If URL parsing fails, fall back to the original value
-      this.logger.warn('Failed to normalize DATABASE_URL for serverless pooling');
+      // Avoid using `this` before `super()`; use static Logger
+      Logger.warn(
+        'Failed to normalize DATABASE_URL for serverless pooling',
+        PrismaService.name,
+      );
     }
 
     super({
