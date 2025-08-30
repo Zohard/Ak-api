@@ -55,11 +55,11 @@ export class PrismaService
           this.logger.debug(`Query: ${e.query} - Duration: ${e.duration}ms`);
         });
 
-        this.$on('error', (e) => {
+        this.$on('error', (e: any) => {
           this.logger.error(`Database error: ${e.message}`);
         });
 
-        this.$on('warn', (e) => {
+        this.$on('warn', (e: any) => {
           this.logger.warn(`Database warning: ${e.message}`);
         });
 
