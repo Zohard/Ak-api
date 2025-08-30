@@ -1,5 +1,5 @@
 import { Injectable, OnModuleInit, OnModuleDestroy, Logger } from '@nestjs/common';
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, Prisma } from '@prisma/client';
 
 @Injectable()
 export class PrismaService
@@ -34,8 +34,6 @@ export class PrismaService
         },
       ],
       // Optimize for Supabase connection pooling
-      connectionPoolTimeout: 20000, // 20 seconds
-      connectionLimit: 10, // Reduced for better stability
       transactionOptions: {
         timeout: 10000, // 10 seconds
       },
@@ -51,15 +49,15 @@ export class PrismaService
         this.logger.log('Database connected successfully');
         
         // Set up query logging
-        this.$on('query', (e) => {
+        this.$on('query', (e: Prisma.QueryEvent) => {
           this.logger.debug(`Query: ${e.query} - Duration: ${e.duration}ms`);
         });
 
-        this.$on('error', (e: any) => {
+        this.$on('error', (e: Prisma.LogEvent) => {
           this.logger.error(`Database error: ${e.message}`);
         });
 
-        this.$on('warn', (e: any) => {
+        this.$on('warn', (e: Prisma.LogEvent) => {
           this.logger.warn(`Database warning: ${e.message}`);
         });
 
