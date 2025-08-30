@@ -9,10 +9,44 @@ export class PrismaService
   private readonly logger = new Logger(PrismaService.name);
 
   constructor() {
+    // Prepare a serverless-friendly connection string for Supabase pgBouncer
+    // and disable prepared statements when using a pooled connection.
+    const originalUrl = process.env.DATABASE_URL || '';
+    let effectiveUrl = originalUrl;
+
+    try {
+      if (originalUrl) {
+        const u = new URL(originalUrl);
+        const isSupabase = u.hostname.includes('supabase.com');
+        const isPooler = u.hostname.includes('pooler');
+
+        if (isSupabase && isPooler) {
+          const params = u.searchParams;
+          // Ensure TLS is enabled on Vercel/Supabase
+          if (!params.has('sslmode')) params.set('sslmode', 'require');
+          // Tell Prisma we are behind pgBouncer (disables prepared statements)
+          if (!params.has('pgbouncer')) params.set('pgbouncer', 'true');
+          // Limit connections per lambda instance
+          if (!params.has('connection_limit')) params.set('connection_limit', '1');
+          // Keep pool wait reasonable for serverless
+          if (!params.has('pool_timeout')) params.set('pool_timeout', '5');
+
+          u.search = params.toString();
+          effectiveUrl = u.toString();
+
+          // Extra safety: make sure prepared statements are disabled
+          process.env.PRISMA_DISABLE_PREPARED_STATEMENTS = 'true';
+        }
+      }
+    } catch (e) {
+      // If URL parsing fails, fall back to the original value
+      this.logger.warn('Failed to normalize DATABASE_URL for serverless pooling');
+    }
+
     super({
       datasources: {
         db: {
-          url: process.env.DATABASE_URL,
+          url: effectiveUrl,
         },
       },
       log: [
