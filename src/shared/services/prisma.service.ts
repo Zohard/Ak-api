@@ -26,10 +26,10 @@ export class PrismaService
           if (!params.has('sslmode')) params.set('sslmode', 'require');
           // Tell Prisma we are behind pgBouncer (disables prepared statements)
           if (!params.has('pgbouncer')) params.set('pgbouncer', 'true');
-          // Limit connections per lambda instance
-          if (!params.has('connection_limit')) params.set('connection_limit', '1');
+          // Optimize connections for serverless with better limits
+          if (!params.has('connection_limit')) params.set('connection_limit', '5');
           // Keep pool wait reasonable for serverless
-          if (!params.has('pool_timeout')) params.set('pool_timeout', '5');
+          if (!params.has('pool_timeout')) params.set('pool_timeout', '10');
 
           u.search = params.toString();
           effectiveUrl = u.toString();
@@ -117,6 +117,26 @@ export class PrismaService
   async onModuleDestroy() {
     await this.$disconnect();
     this.logger.log('Database disconnected');
+  }
+
+  // Override disconnect to handle graceful shutdown
+  async disconnect() {
+    try {
+      await this.$disconnect();
+      this.logger.log('Prisma client disconnected gracefully');
+    } catch (error) {
+      this.logger.error('Error during Prisma disconnect:', error.message);
+    }
+  }
+
+  // Add connection pool management
+  async ensureConnection(): Promise<void> {
+    try {
+      await this.$queryRaw`SELECT 1`;
+    } catch (error) {
+      this.logger.warn('Connection lost, attempting to reconnect...');
+      await this.$connect();
+    }
   }
 
   // Add a health check method
