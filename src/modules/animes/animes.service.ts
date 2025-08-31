@@ -386,18 +386,18 @@ export class AnimesService extends BaseContentService<
         take: limit,
         include: {
           reviews: {
-          take: 2,
-          orderBy: { dateCritique: 'desc' },
-          include: {
-            membre: {
-              select: {
-                idMember: true,
-                memberName: true,
+            take: 2,
+            orderBy: { dateCritique: 'desc' },
+            include: {
+              membre: {
+                select: {
+                  idMember: true,
+                  memberName: true,
+                },
               },
             },
           },
         },
-      },
     });
 
     const result = {
