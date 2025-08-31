@@ -38,6 +38,26 @@ export class CollectionQueryDto {
   @IsBoolean()
   isPublic?: boolean;
 
+  @ApiPropertyOptional({
+    example: 'anime',
+    description: 'Filter by media type',
+    enum: ['anime', 'manga'],
+  })
+  @IsOptional()
+  @IsString()
+  @IsIn(['anime', 'manga'])
+  mediaType?: 'anime' | 'manga';
+
+  @ApiPropertyOptional({
+    example: 'watching',
+    description: 'Filter by collection type',
+    enum: ['watching', 'completed', 'on-hold', 'dropped', 'plan-to-watch'],
+  })
+  @IsOptional()
+  @IsString()
+  @IsIn(['watching', 'completed', 'on-hold', 'dropped', 'plan-to-watch'])
+  type?: string;
+
   @ApiPropertyOptional({ example: 'createdAt', description: 'Field to sort by', enum: ['name', 'createdAt', 'updatedAt', 'itemCount'] })
   @IsOptional()
   @IsString()

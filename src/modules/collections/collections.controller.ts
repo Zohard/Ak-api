@@ -9,17 +9,141 @@ import {
   UseGuards,
   ParseIntPipe,
   Request,
+  HttpCode,
+  HttpStatus,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam, ApiQuery } from '@nestjs/swagger';
 import { CollectionsService } from './collections.service';
 import { AddAnimeToCollectionDto } from './dto/add-anime-to-collection.dto';
 import { AddMangaToCollectionDto } from './dto/add-manga-to-collection.dto';
+import { AddToCollectionDto } from './dto/add-to-collection.dto';
+import { CreateCollectionDto } from './dto/create-collection.dto';
+import { CollectionQueryDto } from './dto/collection-query.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 
 @ApiTags('collections')
 @Controller('collections')
 export class CollectionsController {
   constructor(private readonly collectionsService: CollectionsService) {}
+
+  @Post()
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Créer une nouvelle collection' })
+  @ApiResponse({ status: 201, description: 'Collection créée avec succès' })
+  @ApiResponse({ status: 401, description: 'Authentification requise' })
+  async createCollection(
+    @Body() createCollectionDto: CreateCollectionDto,
+    @Request() req,
+  ) {
+    return this.collectionsService.createCollection(
+      req.user.id,
+      createCollectionDto,
+    );
+  }
+
+  @Get('my')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Récupérer mes collections' })
+  @ApiResponse({ status: 200, description: 'Liste des collections utilisateur' })
+  async getMyCollections(@Query() query: CollectionQueryDto, @Request() req) {
+    return this.collectionsService.getUserCollections(req.user.id, query);
+  }
+
+  @Post('add')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Ajouter un anime/manga à une collection' })
+  @ApiResponse({ status: 201, description: 'Ajouté à la collection avec succès' })
+  @ApiResponse({ status: 404, description: 'Média non trouvé' })
+  @ApiResponse({ status: 409, description: 'Déjà dans la collection' })
+  async addToCollection(
+    @Body() addToCollectionDto: AddToCollectionDto,
+    @Request() req,
+  ) {
+    return this.collectionsService.addToCollection(
+      req.user.id,
+      addToCollectionDto,
+    );
+  }
+
+  @Get('items')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Récupérer les éléments de mes collections' })
+  @ApiQuery({
+    name: 'mediaType',
+    required: false,
+    enum: ['anime', 'manga'],
+    description: 'Filtrer par type de média',
+  })
+  @ApiQuery({
+    name: 'type',
+    required: false,
+    enum: ['watching', 'completed', 'on-hold', 'dropped', 'plan-to-watch'],
+    description: 'Filtrer par type de collection',
+  })
+  @ApiResponse({ status: 200, description: 'Liste des éléments de collection' })
+  async getCollectionItems(@Query() query: CollectionQueryDto, @Request() req) {
+    return this.collectionsService.getCollectionItems(req.user.id, query);
+  }
+
+  @Delete('remove/:mediaType/:mediaId')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Retirer un anime/manga de toutes mes collections' })
+  @ApiParam({
+    name: 'mediaType',
+    enum: ['anime', 'manga'],
+    description: 'Type de média',
+  })
+  @ApiParam({
+    name: 'mediaId',
+    type: 'number',
+    description: 'ID du média',
+  })
+  @ApiResponse({ status: 204, description: 'Retiré de la collection' })
+  @ApiResponse({ status: 404, description: 'Média non trouvé dans les collections' })
+  async removeFromCollection(
+    @Param('mediaType') mediaType: 'anime' | 'manga',
+    @Param('mediaId', ParseIntPipe) mediaId: number,
+    @Request() req,
+  ) {
+    return this.collectionsService.removeFromCollection(
+      req.user.id,
+      mediaId,
+      mediaType,
+    );
+  }
+
+  @Get('check/:mediaType/:mediaId')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Vérifier si un anime/manga est dans mes collections' })
+  @ApiParam({
+    name: 'mediaType',
+    enum: ['anime', 'manga'],
+    description: 'Type de média',
+  })
+  @ApiParam({
+    name: 'mediaId',
+    type: 'number',
+    description: 'ID du média',
+  })
+  @ApiResponse({ status: 200, description: 'Statut de présence dans les collections' })
+  async checkInCollection(
+    @Param('mediaType') mediaType: 'anime' | 'manga',
+    @Param('mediaId', ParseIntPipe) mediaId: number,
+    @Request() req,
+  ) {
+    return this.collectionsService.isInCollection(
+      req.user.id,
+      mediaId,
+      mediaType,
+    );
+  }
 
   @Get()
   @ApiOperation({ summary: 'Get user collections by userId' })
