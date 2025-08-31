@@ -31,6 +31,7 @@ async function bootstrap() {
       'http://localhost:3001', // Frontend prod  
       'http://localhost:3003', // Frontend dev alternate port
       configService.get('FRONTEND_URL'),
+      configService.get('CORS_ORIGIN'),
     ].filter(Boolean),
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'HEAD', 'PATCH'],
