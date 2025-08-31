@@ -29,7 +29,7 @@ async function bootstrap() {
     origin: [
       'http://localhost:3000', // Frontend dev
       'http://localhost:3001', // Frontend prod  
-      'http://localhost:3004', // Frontend dev alternate port
+      'http://localhost:3003', // Frontend dev alternate port
       configService.get('FRONTEND_URL'),
     ].filter(Boolean),
     credentials: true,
@@ -52,8 +52,21 @@ async function bootstrap() {
   // Setup Swagger documentation
   setupSwagger(app);
 
-  const port = configService.get('PORT') || 3004;
+  const port = configService.get('PORT') || 3003;
   await app.listen(port, '0.0.0.0');
+
+  // Graceful shutdown handling
+  process.on('SIGTERM', async () => {
+    console.log('SIGTERM received, shutting down gracefully...');
+    await app.close();
+    process.exit(0);
+  });
+
+  process.on('SIGINT', async () => {
+    console.log('SIGINT received, shutting down gracefully...');
+    await app.close();
+    process.exit(0);
+  });
 
   console.log(
     `🚀 Anime-Kun NestJS API v3.0 running on http://localhost:${port}`,
