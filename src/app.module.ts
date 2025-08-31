@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { CacheModule } from '@nestjs/cache-manager';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './modules/auth/auth.module';
@@ -17,8 +18,10 @@ import { SeasonsModule } from './modules/seasons/seasons.module';
 import { ForumsModule } from './modules/forums/forums.module';
 import { CollectionsModule } from './modules/collections/collections.module';
 import { PrismaService } from './shared/services/prisma.service';
+import { CacheService } from './shared/services/cache.service';
 import databaseConfig from './config/database.config';
 import jwtConfig from './config/jwt.config';
+import { cacheConfig } from './config/cache.config';
 
 @Module({
   imports: [
@@ -26,6 +29,10 @@ import jwtConfig from './config/jwt.config';
       isGlobal: true,
       load: [databaseConfig, jwtConfig],
       envFilePath: '.env',
+    }),
+    CacheModule.registerAsync({
+      isGlobal: true,
+      useFactory: cacheConfig,
     }),
     AuthModule,
     UsersModule,
@@ -43,6 +50,6 @@ import jwtConfig from './config/jwt.config';
     CollectionsModule,
   ],
   controllers: [AppController],
-  providers: [AppService, PrismaService],
+  providers: [AppService, PrismaService, CacheService],
 })
 export class AppModule {}

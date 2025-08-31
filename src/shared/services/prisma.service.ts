@@ -149,4 +149,51 @@ export class PrismaService
       return false;
     }
   }
+
+  // Graceful query execution with retry logic for connection errors
+  async executeWithRetry<T>(
+    operation: () => Promise<T>,
+    maxRetries: number = 3,
+  ): Promise<T> {
+    let lastError: any;
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        return await operation();
+      } catch (error: any) {
+        lastError = error;
+        
+        // Check if it's a connection-related error
+        if (
+          error.code === 'P2024' || // Connection timeout
+          error.code === 'P2034' || // Transaction failed
+          error.message?.includes('Max client connections reached') ||
+          error.message?.includes('connection') ||
+          error.message?.includes('FATAL')
+        ) {
+          this.logger.warn(`Database operation failed (attempt ${attempt}/${maxRetries}):`, error.message);
+          
+          if (attempt < maxRetries) {
+            // Exponential backoff
+            const delay = Math.pow(2, attempt - 1) * 1000;
+            await new Promise(resolve => setTimeout(resolve, delay));
+            
+            // Try to reconnect
+            try {
+              await this.$disconnect();
+              await this.$connect();
+            } catch (reconnectError) {
+              this.logger.error('Failed to reconnect:', reconnectError);
+            }
+            
+            continue;
+          }
+        }
+        
+        throw error;
+      }
+    }
+    
+    throw lastError;
+  }
 }
