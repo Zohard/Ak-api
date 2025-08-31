@@ -398,7 +398,8 @@ export class AnimesService extends BaseContentService<
             },
           },
         },
-    });
+      })
+    );
 
     const result = {
       topAnimes: animes.map(this.formatAnime),
