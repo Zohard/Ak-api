@@ -27,7 +27,7 @@ export class PrismaService
           // Tell Prisma we are behind pgBouncer (disables prepared statements)
           if (!params.has('pgbouncer')) params.set('pgbouncer', 'true');
           // Optimize connections for serverless with better limits
-          if (!params.has('connection_limit')) params.set('connection_limit', '5');
+          if (!params.has('connection_limit')) params.set('connection_limit', '3');
           // Keep pool wait reasonable for serverless
           if (!params.has('pool_timeout')) params.set('pool_timeout', '10');
 
