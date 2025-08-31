@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from './prisma.service';
+import { CacheService } from './cache.service';
 
 export interface SearchResult {
   id: number;
@@ -29,7 +30,10 @@ export interface UnifiedSearchQuery {
 
 @Injectable()
 export class UnifiedSearchService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly cacheService: CacheService,
+  ) {}
 
   async search(searchQuery: UnifiedSearchQuery): Promise<{
     results: SearchResult[];
@@ -39,6 +43,18 @@ export class UnifiedSearchService {
     suggestions?: string[];
   }> {
     const startTime = Date.now();
+
+    // Create cache key from search parameters
+    const cacheKey = this.createSearchCacheKey(searchQuery);
+    
+    // Try to get from cache first
+    const cached = await this.cacheService.getSearchResult(cacheKey, 'unified');
+    if (cached) {
+      return {
+        ...cached,
+        searchTime: Date.now() - startTime, // Update search time
+      };
+    }
 
     const {
       query,
@@ -102,7 +118,7 @@ export class UnifiedSearchService {
     const finalResults = sortedResults.slice(0, limit);
     const searchTime = Date.now() - startTime;
 
-    return {
+    const result = {
       results: finalResults,
       total: finalResults.length,
       breakdown: {
@@ -111,6 +127,11 @@ export class UnifiedSearchService {
       },
       searchTime,
     };
+
+    // Cache the result (shorter TTL for search results)
+    await this.cacheService.setSearchResult(cacheKey, 'unified', result, 180); // 3 minutes
+
+    return result;
   }
 
   async getRecommendations(
@@ -141,18 +162,22 @@ export class UnifiedSearchService {
     limit: number,
   ): Promise<SearchResult[]> {
     if (type === 'anime') {
-      const animes = await this.prisma.akAnime.findMany({
-        where: { statut: 1 },
-        orderBy: { dateAjout: 'desc' },
-        take: limit,
-      });
+      const animes = await this.prisma.executeWithRetry(() =>
+        this.prisma.akAnime.findMany({
+          where: { statut: 1 },
+          orderBy: { dateAjout: 'desc' },
+          take: limit,
+        })
+      );
       return animes.map(this.formatAnimeResult.bind(this));
     } else {
-      const mangas = await this.prisma.akManga.findMany({
-        where: { statut: 1 },
-        orderBy: { dateAjout: 'desc' },
-        take: limit,
-      });
+      const mangas = await this.prisma.executeWithRetry(() =>
+        this.prisma.akManga.findMany({
+          where: { statut: 1 },
+          orderBy: { dateAjout: 'desc' },
+          take: limit,
+        })
+      );
       return mangas.map(this.formatMangaResult.bind(this));
     }
   }
@@ -185,11 +210,13 @@ export class UnifiedSearchService {
   }
 
   private async searchAnimes(conditions: any, limit: number) {
-    return this.prisma.akAnime.findMany({
-      where: conditions,
-      orderBy: [{ dateAjout: 'desc' }],
-      take: Math.ceil(limit / 2), // Split limit between animes and mangas
-    });
+    return this.prisma.executeWithRetry(() =>
+      this.prisma.akAnime.findMany({
+        where: conditions,
+        orderBy: [{ dateAjout: 'desc' }],
+        take: Math.ceil(limit / 2), // Split limit between animes and mangas
+      })
+    );
   }
 
   private async searchMangas(conditions: any, limit: number) {
@@ -328,19 +355,28 @@ export class UnifiedSearchService {
     type: 'anime' | 'manga' | 'all' = 'all',
     limit = 10,
   ): Promise<string[]> {
+    // Try cache first
+    const cacheKey = `autocomplete_${query}_${type}_${limit}`;
+    const cached = await this.cacheService.get<string[]>(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
     const suggestions: string[] = [];
 
     try {
       if (type === 'all' || type === 'anime') {
-        const animeTitles = await this.prisma.akAnime.findMany({
-          where: {
-            titre: { contains: query, mode: 'insensitive' },
-            statut: 1,
-          },
-          select: { titre: true },
-          take: Math.ceil(limit / (type === 'all' ? 2 : 1)),
-          orderBy: { moyenneNotes: 'desc' },
-        });
+        const animeTitles = await this.prisma.executeWithRetry(() =>
+          this.prisma.akAnime.findMany({
+            where: {
+              titre: { contains: query, mode: 'insensitive' },
+              statut: 1,
+            },
+            select: { titre: true },
+            take: Math.ceil(limit / (type === 'all' ? 2 : 1)),
+            orderBy: { moyenneNotes: 'desc' },
+          })
+        );
         suggestions.push(...animeTitles.map((a) => a.titre));
       }
 
@@ -360,7 +396,12 @@ export class UnifiedSearchService {
       console.warn('Failed to get autocomplete suggestions:', error.message);
     }
 
-    return suggestions.slice(0, limit);
+    const result = suggestions.slice(0, limit);
+    
+    // Cache autocomplete results for 5 minutes
+    await this.cacheService.set(cacheKey, result, 300);
+
+    return result;
   }
 
   // Get popular search terms
@@ -423,5 +464,24 @@ export class UnifiedSearchService {
         topSearches: [],
       };
     }
+  }
+
+  // Helper method to create cache keys for search
+  private createSearchCacheKey(searchQuery: UnifiedSearchQuery): string {
+    const {
+      query = '',
+      type = 'all',
+      limit = 20,
+      minRating = 0,
+      yearFrom = '',
+      yearTo = '',
+      genre = '',
+      sortBy = 'relevance',
+      sortOrder = 'desc',
+      tags = [],
+      status = 'all',
+    } = searchQuery;
+
+    return `search_${query}_${type}_${limit}_${minRating}_${yearFrom}_${yearTo}_${genre}_${sortBy}_${sortOrder}_${tags.join(',')}_${status}`;
   }
 }

@@ -4,6 +4,7 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { PrismaService } from '../../shared/services/prisma.service';
+import { CacheService } from '../../shared/services/cache.service';
 import { BaseContentService } from '../../shared/services/base-content.service';
 import { CreateAnimeDto } from './dto/create-anime.dto';
 import { UpdateAnimeDto } from './dto/update-anime.dto';
@@ -17,7 +18,10 @@ export class AnimesService extends BaseContentService<
   UpdateAnimeDto,
   AnimeQueryDto
 > {
-  constructor(prisma: PrismaService) {
+  constructor(
+    prisma: PrismaService,
+    private readonly cacheService: CacheService,
+  ) {
     super(prisma);
   }
 
@@ -107,6 +111,15 @@ export class AnimesService extends BaseContentService<
       includeReviews,
       includeEpisodes,
     } = query;
+
+    // Create cache key from query parameters
+    const cacheKey = this.createCacheKey(query);
+    
+    // Try to get from cache first
+    const cached = await this.cacheService.getAnimeList(cacheKey);
+    if (cached) {
+      return cached;
+    }
 
     const skip = ((page || 1) - 1) * (limit || 20);
 
@@ -201,17 +214,21 @@ export class AnimesService extends BaseContentService<
     }
 
     const [animes, total] = await Promise.all([
-      this.prisma.akAnime.findMany({
-        where,
-        skip,
-        take: limit,
-        orderBy,
-        include,
-      }),
-      this.prisma.akAnime.count({ where }),
+      this.prisma.executeWithRetry(() =>
+        this.prisma.akAnime.findMany({
+          where,
+          skip,
+          take: limit,
+          orderBy,
+          include,
+        })
+      ),
+      this.prisma.executeWithRetry(() =>
+        this.prisma.akAnime.count({ where })
+      ),
     ]);
 
-    return {
+    const result = {
       animes: animes.map(this.formatAnime),
       pagination: {
         page,
@@ -220,9 +237,22 @@ export class AnimesService extends BaseContentService<
         totalPages: Math.ceil(total / (limit || 20)),
       },
     };
+
+    // Cache the result (TTL based on query complexity)
+    const ttl = search || genre ? 180 : 300; // 3 mins for search, 5 mins for general lists
+    await this.cacheService.setAnimeList(cacheKey, result, ttl);
+
+    return result;
   }
 
   async findOne(id: number, includeReviews = false, includeEpisodes = false) {
+    // Try to get from cache first
+    const cacheKey = `${id}_${includeReviews}_${includeEpisodes}`;
+    const cached = await this.cacheService.getAnime(parseInt(cacheKey.replace(/[^0-9]/g, '')));
+    if (cached && cached.includeReviews === includeReviews && cached.includeEpisodes === includeEpisodes) {
+      return cached.data;
+    }
+
     const include: any = {};
 
     if (includeReviews) {
@@ -255,7 +285,17 @@ export class AnimesService extends BaseContentService<
       throw new NotFoundException('Anime introuvable');
     }
 
-    return this.formatAnime(anime);
+    const formattedAnime = this.formatAnime(anime);
+    
+    // Cache the result
+    const cacheData = {
+      data: formattedAnime,
+      includeReviews,
+      includeEpisodes,
+    };
+    await this.cacheService.setAnime(id, cacheData, 600); // 10 minutes
+
+    return formattedAnime;
   }
 
   async update(
@@ -298,6 +338,9 @@ export class AnimesService extends BaseContentService<
       },
     });
 
+    // Invalidate caches after update
+    await this.invalidateAnimeCache(id);
+
     return this.formatAnime(updatedAnime);
   }
 
@@ -321,18 +364,28 @@ export class AnimesService extends BaseContentService<
       where: { idAnime: id },
     });
 
+    // Invalidate caches after removal
+    await this.invalidateAnimeCache(id);
+
     return { message: 'Anime supprimé avec succès' };
   }
 
   async getTopAnimes(limit = 10) {
-    const animes = await this.prisma.akAnime.findMany({
-      where: {
-        statut: 1,
-      },
-      orderBy: [{ dateAjout: 'desc' }],
-      take: limit,
-      include: {
-        reviews: {
+    // Try to get from cache first
+    const cached = await this.cacheService.getTopContent('anime', limit);
+    if (cached) {
+      return cached;
+    }
+
+    const animes = await this.prisma.executeWithRetry(() =>
+      this.prisma.akAnime.findMany({
+        where: {
+          statut: 1,
+        },
+        orderBy: [{ dateAjout: 'desc' }],
+        take: limit,
+        include: {
+          reviews: {
           take: 2,
           orderBy: { dateCritique: 'desc' },
           include: {
@@ -347,10 +400,15 @@ export class AnimesService extends BaseContentService<
       },
     });
 
-    return {
+    const result = {
       topAnimes: animes.map(this.formatAnime),
       generatedAt: new Date().toISOString(),
     };
+
+    // Cache for 15 minutes
+    await this.cacheService.setTopContent('anime', limit, result, 900);
+
+    return result;
   }
 
   async getRandomAnime() {
@@ -545,4 +603,31 @@ export class AnimesService extends BaseContentService<
       ...otherFields,
     };
   }
+
+  // Cache helper methods
+  private createCacheKey(query: AnimeQueryDto): string {
+    const {
+      page = 1,
+      limit = 20,
+      search = '',
+      studio = '',
+      annee = '',
+      statut = '',
+      genre = '',
+      sortBy = 'dateAjout',
+      sortOrder = 'desc',
+      includeReviews = false,
+      includeEpisodes = false,
+    } = query;
+
+    return `${page}_${limit}_${search}_${studio}_${annee}_${statut}_${genre}_${sortBy}_${sortOrder}_${includeReviews}_${includeEpisodes}`;
+  }
+
+  // Cache invalidation methods
+  async invalidateAnimeCache(id: number): Promise<void> {
+    await this.cacheService.invalidateAnime(id);
+    // Also invalidate related caches
+    await this.cacheService.invalidateSearchCache();
+  }
+
 }
