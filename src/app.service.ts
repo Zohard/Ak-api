@@ -26,4 +26,22 @@ export class AppService {
       };
     }
   }
+
+  async getAkTags() {
+    const tags = await this.prisma.$queryRaw`
+      SELECT 
+        id_tag,
+        tag_name,
+        tag_nice_url,
+        description,
+        categorie
+      FROM ak_tags
+      ORDER BY categorie, tag_name
+    `;
+
+    return {
+      tags,
+      count: Array.isArray(tags) ? tags.length : 0,
+    };
+  }
 }
