@@ -17,6 +17,7 @@ import { ArticlesModule } from './modules/articles/articles.module';
 import { SeasonsModule } from './modules/seasons/seasons.module';
 import { ForumsModule } from './modules/forums/forums.module';
 import { CollectionsModule } from './modules/collections/collections.module';
+import { ListsModule } from './modules/lists/lists.module';
 import { PrismaService } from './shared/services/prisma.service';
 import { CacheService } from './shared/services/cache.service';
 import databaseConfig from './config/database.config';
@@ -48,6 +49,7 @@ import { cacheConfig } from './config/cache.config';
     SeasonsModule,
     ForumsModule,
     CollectionsModule,
+    ListsModule,
   ],
   controllers: [AppController],
   providers: [AppService, PrismaService, CacheService],
