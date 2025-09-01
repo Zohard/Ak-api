@@ -62,6 +62,16 @@ export class CollectionsService {
       ...mangaCollections.map(c => c.type)
     ]);
 
+    // Get status counts for meta
+    const statusCounts = {
+      completed: 0,
+      watching: 0,
+      planned: 0,
+      dropped: 0,
+    };
+
+    let totalCount = 0;
+
     for (const type of allTypes) {
       const animeCount = await this.prisma.collectionAnime.count({
         where: { idMembre: userId, type }
@@ -69,6 +79,24 @@ export class CollectionsService {
       const mangaCount = await this.prisma.collectionManga.count({
         where: { idMembre: userId, type }
       });
+      const typeTotal = animeCount + mangaCount;
+      totalCount += typeTotal;
+
+      // Map type to status name for counts
+      switch (type) {
+        case 1:
+          statusCounts.completed = typeTotal;
+          break;
+        case 2:
+          statusCounts.watching = typeTotal;
+          break;
+        case 3:
+          statusCounts.planned = typeTotal;
+          break;
+        case 4:
+          statusCounts.dropped = typeTotal;
+          break;
+      }
       
       collections.push({
         id: type,
@@ -78,7 +106,7 @@ export class CollectionsService {
         userId,
         animeCount,
         mangaCount,
-        totalCount: animeCount + mangaCount,
+        totalCount: typeTotal,
         createdAt: new Date(),
         updatedAt: new Date(),
       });
@@ -89,6 +117,10 @@ export class CollectionsService {
 
     return {
       data: paginatedCollections,
+      meta: {
+        totalCount,
+        statusCounts,
+      },
       pagination: {
         page,
         limit,
@@ -319,12 +351,19 @@ export class CollectionsService {
       ]);
 
       if (mediaType === 'anime') {
+        // Calculate status counts for anime
+        const statusCounts = await this.getStatusCounts(userId, 'anime', collectionType);
+
         return {
           data: animes.map(a => ({
             ...a,
             mediaType: 'anime',
             collectionName: this.getCollectionNameByTypeId(a.type),
           })),
+          meta: {
+            totalCount: animeTotal,
+            statusCounts,
+          },
           pagination: {
             page,
             limit,
@@ -376,12 +415,19 @@ export class CollectionsService {
       ]);
 
       if (mediaType === 'manga') {
+        // Calculate status counts for manga
+        const statusCounts = await this.getStatusCounts(userId, 'manga', collectionType);
+
         return {
           data: mangas.map(m => ({
             ...m,
             mediaType: 'manga',
             collectionName: this.getCollectionNameByTypeId(m.type),
           })),
+          meta: {
+            totalCount: mangaTotal,
+            statusCounts,
+          },
           pagination: {
             page,
             limit,
@@ -443,8 +489,15 @@ export class CollectionsService {
 
     const paginatedData = combined.slice(skip, skip + limit);
 
+    // Calculate status counts for combined data
+    const statusCounts = await this.getStatusCounts(userId, 'both', collectionType);
+
     return {
       data: paginatedData,
+      meta: {
+        totalCount: combined.length,
+        statusCounts,
+      },
       pagination: {
         page,
         limit,
@@ -533,10 +586,10 @@ export class CollectionsService {
     const isOwnCollection = currentUserId === userId;
     
     const collectionTypes = [
-      { type: 1, name: 'Completed', description: 'Completed items' },
-      { type: 2, name: 'Plan to Watch', description: 'Items planned to be watched/read' },
-      { type: 3, name: 'Watching', description: 'Currently watching/reading items' },
-      { type: 4, name: 'Dropped', description: 'Dropped items' }
+      { type: 1, name: 'Terminé', description: 'Completed items' },
+      { type: 2, name: 'En cours', description: 'Currently watching/reading items' },
+      { type: 3, name: 'Planifié', description: 'Items planned to be watched/read' },
+      { type: 4, name: 'Abandonné', description: 'Dropped items' }
     ];
 
     // Get counts for each collection type
@@ -580,10 +633,16 @@ export class CollectionsService {
       };
     });
 
+    // Calculate overall status counts
+    const statusCounts = await this.getStatusCounts(userId, 'both');
+    const overallTotalCount = collections.reduce((sum, col) => sum + col.totalCount, 0);
+
     return {
       data: collections,
       meta: {
         total: collections.length,
+        totalCount: overallTotalCount,
+        statusCounts,
         page: 1,
         limit: collections.length,
         totalPages: 1,
@@ -724,10 +783,10 @@ export class CollectionsService {
         });
 
         const collectionTypes = [
-          { type: 1, name: 'Completed' },
-          { type: 2, name: 'Plan to Watch' },
-          { type: 3, name: 'Watching' },
-          { type: 4, name: 'Dropped' }
+          { type: 1, name: 'Terminé' },
+          { type: 2, name: 'En cours' },
+          { type: 3, name: 'Planifié' },
+          { type: 4, name: 'Abandonné' }
         ];
 
         const collections = collectionTypes.map(collectionType => {
@@ -784,10 +843,10 @@ export class CollectionsService {
     const isOwnCollection = currentUserId === userId;
     
     const collectionTypes = {
-      1: { name: 'Completed', description: 'Completed items' },
-      2: { name: 'Plan to Watch', description: 'Items planned to be watched/read' },
-      3: { name: 'Watching', description: 'Currently watching/reading items' },
-      4: { name: 'Dropped', description: 'Dropped items' }
+      1: { name: 'Terminé', description: 'Completed items' },
+      2: { name: 'En cours', description: 'Currently watching/reading items' },
+      3: { name: 'Planifié', description: 'Items planned to be watched/read' },
+      4: { name: 'Abandonné', description: 'Dropped items' }
     };
 
     const collectionInfo = collectionTypes[type];
@@ -1125,11 +1184,10 @@ export class CollectionsService {
 
   private getCollectionNameByType(type: string): string {
     const typeMap: Record<string, string> = {
-      'watching': 'En cours',
       'completed': 'Terminé',
-      'on-hold': 'En pause',
+      'watching': 'En cours',
+      'planned': 'Planifié',
       'dropped': 'Abandonné',
-      'plan-to-watch': 'Prévu',
     };
 
     return typeMap[type] || 'Ma collection';
@@ -1137,11 +1195,10 @@ export class CollectionsService {
 
   private getCollectionTypeFromName(type: string): number {
     const typeMap: Record<string, number> = {
-      'watching': 1,
-      'completed': 2,
-      'on-hold': 3,
+      'completed': 1,
+      'watching': 2,
+      'planned': 3,
       'dropped': 4,
-      'plan-to-watch': 5,
     };
 
     return typeMap[type] || 0;
@@ -1150,11 +1207,10 @@ export class CollectionsService {
   private getCollectionNameByTypeId(typeId: number): string {
     const typeMap: Record<number, string> = {
       0: 'Ma collection',
-      1: 'En cours',
-      2: 'Terminé',
-      3: 'En pause',
+      1: 'Terminé',
+      2: 'En cours',
+      3: 'Planifié',
       4: 'Abandonné',
-      5: 'Prévu',
     };
 
     return typeMap[typeId] || 'Ma collection';
@@ -1163,21 +1219,89 @@ export class CollectionsService {
   private getCollectionTypeNames(): Record<number, string> {
     return {
       0: 'Ma collection',
-      1: 'En cours',
-      2: 'Terminé',
-      3: 'En pause',
+      1: 'Terminé',
+      2: 'En cours',
+      3: 'Planifié',
       4: 'Abandonné',
-      5: 'Prévu',
     };
   }
 
   private getCollectionName(type: number): string {
     switch (type) {
-      case 1: return 'Plan to Watch';
-      case 2: return 'Watching';
-      case 3: return 'Completed';
-      case 4: return 'Dropped';
+      case 1: return 'Terminé';
+      case 2: return 'En cours';
+      case 3: return 'Planifié';
+      case 4: return 'Abandonné';
       default: return 'Unknown';
     }
+  }
+
+  private async getStatusCounts(
+    userId: number,
+    mediaType: 'anime' | 'manga' | 'both',
+    collectionType?: number,
+  ) {
+    const statusCounts = {
+      completed: 0,
+      watching: 0,
+      planned: 0,
+      dropped: 0,
+    };
+
+    if (mediaType === 'anime' || mediaType === 'both') {
+      const animeWhere: any = { idMembre: userId };
+      if (collectionType !== undefined) {
+        animeWhere.type = collectionType;
+      }
+
+      const animeCounts = await Promise.all([
+        this.prisma.collectionAnime.count({
+          where: { ...animeWhere, type: 1 },
+        }), // completed
+        this.prisma.collectionAnime.count({
+          where: { ...animeWhere, type: 2 },
+        }), // watching
+        this.prisma.collectionAnime.count({
+          where: { ...animeWhere, type: 3 },
+        }), // planned
+        this.prisma.collectionAnime.count({
+          where: { ...animeWhere, type: 4 },
+        }), // dropped
+      ]);
+
+      statusCounts.completed += animeCounts[0];
+      statusCounts.watching += animeCounts[1];
+      statusCounts.planned += animeCounts[2];
+      statusCounts.dropped += animeCounts[3];
+    }
+
+    if (mediaType === 'manga' || mediaType === 'both') {
+      const mangaWhere: any = { idMembre: userId };
+      if (collectionType !== undefined) {
+        mangaWhere.type = collectionType;
+      }
+
+      const mangaCounts = await Promise.all([
+        this.prisma.collectionManga.count({
+          where: { ...mangaWhere, type: 1 },
+        }), // completed
+        this.prisma.collectionManga.count({
+          where: { ...mangaWhere, type: 2 },
+        }), // watching
+        this.prisma.collectionManga.count({
+          where: { ...mangaWhere, type: 3 },
+        }), // planned
+        this.prisma.collectionManga.count({
+          where: { ...mangaWhere, type: 4 },
+        }), // dropped
+      ]);
+
+      statusCounts.completed += mangaCounts[0];
+      statusCounts.watching += mangaCounts[1];
+      statusCounts.planned += mangaCounts[2];
+      statusCounts.dropped += mangaCounts[3];
+    }
+
+    return statusCounts;
   }
 }
