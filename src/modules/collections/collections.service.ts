@@ -32,12 +32,12 @@ export class CollectionsService {
     const [animeCollections, mangaCollections] = await Promise.all([
       this.prisma.collectionAnime.findMany({
         where: { idMembre: userId },
-        select: { type: true, collectionName: true },
+        select: { type: true },
         distinct: ['type'],
       }),
       this.prisma.collectionManga.findMany({
         where: { idMembre: userId },
-        select: { type: true, collectionName: true },
+        select: { type: true },
         distinct: ['type'],
       }),
     ]);
@@ -156,7 +156,6 @@ export class CollectionsService {
               type: collectionType,
               evaluation: normalizedRating,
               notes: notes || null,
-              collectionName: this.getCollectionNameByType(type),
               isPublic: true,
               updatedAt: new Date(),
             },
@@ -178,7 +177,6 @@ export class CollectionsService {
             type: collectionType,
             evaluation: normalizedRating,
             notes: notes || null,
-            collectionName: this.getCollectionNameByType(type),
             isPublic: true,
           },
           include: {
@@ -205,7 +203,6 @@ export class CollectionsService {
             type: collectionType,
             evaluation: normalizedRating,
             notes: notes || null,
-            collectionName: this.getCollectionNameByType(type),
             isPublic: true,
             updatedAt: new Date(),
           },
@@ -227,7 +224,6 @@ export class CollectionsService {
           type: collectionType,
           evaluation: normalizedRating,
           notes: notes || null,
-          collectionName: this.getCollectionNameByType(type),
           isPublic: true,
         },
         include: {
@@ -252,7 +248,6 @@ export class CollectionsService {
               type: collectionType,
               evaluation: normalizedRating,
               notes: notes || null,
-              collectionName: this.getCollectionNameByType(type),
               isPublic: true,
               updatedAt: new Date(),
             },
@@ -272,7 +267,6 @@ export class CollectionsService {
               type: collectionType,
               evaluation: normalizedRating,
               notes: notes || null,
-              collectionName: this.getCollectionNameByType(type),
               isPublic: true,
               updatedAt: new Date(),
             },
@@ -358,7 +352,6 @@ export class CollectionsService {
           data: animes.map(a => ({
             ...a,
             mediaType: 'anime',
-            collectionName: this.getCollectionNameByTypeId(a.type),
           })),
           meta: {
             totalCount: animeTotal,
@@ -422,7 +415,6 @@ export class CollectionsService {
           data: mangas.map(m => ({
             ...m,
             mediaType: 'manga',
-            collectionName: this.getCollectionNameByTypeId(m.type),
           })),
           meta: {
             totalCount: mangaTotal,
@@ -483,8 +475,8 @@ export class CollectionsService {
     ]);
 
     const combined = [
-      ...animes.map(a => ({ ...a, mediaType: 'anime', collectionName: this.getCollectionNameByTypeId(a.type) })),
-      ...mangas.map(m => ({ ...m, mediaType: 'manga', collectionName: this.getCollectionNameByTypeId(m.type) })),
+      ...animes.map(a => ({ ...a, mediaType: 'anime' })),
+      ...mangas.map(m => ({ ...m, mediaType: 'manga' })),
     ].sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
 
     const paginatedData = combined.slice(skip, skip + limit);
@@ -547,7 +539,6 @@ export class CollectionsService {
         },
         select: {
           type: true,
-          collectionName: true,
           evaluation: true,
           notes: true,
         },
@@ -561,7 +552,6 @@ export class CollectionsService {
         },
         select: {
           type: true,
-          collectionName: true,
           evaluation: true,
           notes: true,
         },
@@ -573,7 +563,7 @@ export class CollectionsService {
       inCollection,
       collections: collections.map(c => ({
         type: c.type,
-        name: c.collectionName || this.getCollectionNameByTypeId(c.type),
+        name: this.getCollectionNameByTypeId(c.type),
         rating: c.evaluation,
         notes: c.notes,
       })),
@@ -979,7 +969,6 @@ export class CollectionsService {
         idAnime: addAnimeDto.animeId,
         evaluation: addAnimeDto.rating || 0,
         notes: addAnimeDto.notes || null,
-        collectionName: this.getCollectionName(type),
         isPublic: true
       },
       include: {
@@ -1127,7 +1116,6 @@ export class CollectionsService {
         idManga: addMangaDto.mangaId,
         evaluation: addMangaDto.rating || 0,
         notes: addMangaDto.notes || null,
-        collectionName: this.getCollectionName(type),
         isPublic: true
       },
       include: {
