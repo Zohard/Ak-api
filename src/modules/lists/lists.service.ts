@@ -151,7 +151,7 @@ export class ListsService {
 
   async like(id: number, userId: number) {
     const list = await this.getById(id);
-    if (list.idMembre === userId) throw new ForbiddenException('Cannot vote on your own list');
+    if (list.id_membre === userId) throw new ForbiddenException('Cannot vote on your own list');
 
     const likes = new Set(this.parseVotes(list.jaime));
     const dislikes = new Set(this.parseVotes(list.jaimepas));
@@ -169,7 +169,7 @@ export class ListsService {
 
   async dislike(id: number, userId: number) {
     const list = await this.getById(id);
-    if (list.idMembre === userId) throw new ForbiddenException('Cannot vote on your own list');
+    if (list.id_membre === userId) throw new ForbiddenException('Cannot vote on your own list');
 
     const likes = new Set(this.parseVotes(list.jaime));
     const dislikes = new Set(this.parseVotes(list.jaimepas));
