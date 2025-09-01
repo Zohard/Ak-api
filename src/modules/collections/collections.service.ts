@@ -85,10 +85,10 @@ export class CollectionsService {
       // Map type to status name for counts
       switch (type) {
         case 1:
-          statusCounts.completed = typeTotal;
+          statusCounts.watching = typeTotal;
           break;
         case 2:
-          statusCounts.watching = typeTotal;
+          statusCounts.completed = typeTotal;
           break;
         case 3:
           statusCounts.planned = typeTotal;
@@ -1245,10 +1245,10 @@ export class CollectionsService {
       const animeCounts = await Promise.all([
         this.prisma.collectionAnime.count({
           where: { ...animeWhere, type: 1 },
-        }), // completed
+        }), // watching
         this.prisma.collectionAnime.count({
           where: { ...animeWhere, type: 2 },
-        }), // watching
+        }), // completed
         this.prisma.collectionAnime.count({
           where: { ...animeWhere, type: 3 },
         }), // planned
@@ -1257,8 +1257,8 @@ export class CollectionsService {
         }), // dropped
       ]);
 
-      statusCounts.completed += animeCounts[0];
-      statusCounts.watching += animeCounts[1];
+      statusCounts.watching += animeCounts[0];
+      statusCounts.completed += animeCounts[1];
       statusCounts.planned += animeCounts[2];
       statusCounts.dropped += animeCounts[3];
     }
@@ -1272,10 +1272,10 @@ export class CollectionsService {
       const mangaCounts = await Promise.all([
         this.prisma.collectionManga.count({
           where: { ...mangaWhere, type: 1 },
-        }), // completed
+        }), // watching
         this.prisma.collectionManga.count({
           where: { ...mangaWhere, type: 2 },
-        }), // watching
+        }), // completed
         this.prisma.collectionManga.count({
           where: { ...mangaWhere, type: 3 },
         }), // planned
@@ -1284,8 +1284,8 @@ export class CollectionsService {
         }), // dropped
       ]);
 
-      statusCounts.completed += mangaCounts[0];
-      statusCounts.watching += mangaCounts[1];
+      statusCounts.watching += mangaCounts[0];
+      statusCounts.completed += mangaCounts[1];
       statusCounts.planned += mangaCounts[2];
       statusCounts.dropped += mangaCounts[3];
     }
