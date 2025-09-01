@@ -27,9 +27,9 @@ export class PrismaService
           // Tell Prisma we are behind pgBouncer (disables prepared statements)
           if (!params.has('pgbouncer')) params.set('pgbouncer', 'true');
           // Optimize connections for serverless with better limits
-          if (!params.has('connection_limit')) params.set('connection_limit', '3');
+          if (!params.has('connection_limit')) params.set('connection_limit', '10');
           // Keep pool wait reasonable for serverless
-          if (!params.has('pool_timeout')) params.set('pool_timeout', '10');
+          if (!params.has('pool_timeout')) params.set('pool_timeout', '20');
 
           u.search = params.toString();
           effectiveUrl = u.toString();
@@ -135,7 +135,14 @@ export class PrismaService
       await this.$queryRaw`SELECT 1`;
     } catch (error) {
       this.logger.warn('Connection lost, attempting to reconnect...');
-      await this.$connect();
+      try {
+        await this.$disconnect();
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        await this.$connect();
+      } catch (reconnectError) {
+        this.logger.error('Failed to reconnect:', reconnectError);
+        throw reconnectError;
+      }
     }
   }
 
