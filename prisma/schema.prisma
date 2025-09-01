@@ -232,6 +232,29 @@ model AkBusinessToManga {
   @@map("ak_business_to_mangas")
 }
 
+// User Lists/Tops
+model AkListesTop {
+  idListe       Int       @id @default(autoincrement()) @map("id_liste")
+  titre         String?   @db.Text
+  presentation  String?   @db.Text
+  type          String?   @db.VarChar(10) // 'liste' | 'top'
+  animeOrManga  String?   @map("anime_or_manga") @db.VarChar(10) // 'anime' | 'manga'
+  jsonData      String?   @map("json_data") @db.Text // JSON string of IDs e.g. ["173","65",...]
+  jsonDataCom   String?   @map("json_data_com") @db.Text // Comments per item
+  jaime         String?   @db.Text // CSV user IDs
+  jaimepas      String?   @db.Text // CSV user IDs
+  popularite    Float?    @db.Real
+  nbClics       Int       @default(0) @map("nb_clics")
+  statut        Int       @default(0) // 0=draft,1=published
+  idMembre      Int       @map("id_membre")
+  dateCreation  DateTime? @map("date_creation") @db.Timestamp
+
+  // Relations
+  membre        SmfMember @relation(fields: [idMembre], references: [idMember], onDelete: Cascade)
+
+  @@map("ak_listes_top")
+}
+
 // Reviews/Critiques
 model AkCritique {
   idCritique   Int       @id @default(autoincrement()) @map("id_critique")
@@ -476,5 +499,4 @@ model CollectionManga {
 
   @@map("collection_mangas")
 }
-
 
