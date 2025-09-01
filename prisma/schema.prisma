@@ -43,6 +43,7 @@ model SmfMember {
   wpPosts          WpPost[]
   animeCollections CollectionAnime[] @relation("UserAnimeCollection")
   mangaCollections CollectionManga[] @relation("UserMangaCollection")
+  listesTop        AkListesTop[]
 
   @@map("smf_members")
 }
@@ -499,4 +500,3 @@ model CollectionManga {
 
   @@map("collection_mangas")
 }
-
