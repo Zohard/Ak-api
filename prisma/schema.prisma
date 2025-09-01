@@ -234,7 +234,7 @@ model AkBusinessToManga {
 
 // Reviews/Critiques
 model AkCritique {
-  idCritique   Int       @id @map("id_critique")
+  idCritique   Int       @id @default(autoincrement()) @map("id_critique")
   niceUrl      String?   @map("nice_url") @db.VarChar(255)
   titre        String?   @db.Text
   critique     String?   @db.Text
