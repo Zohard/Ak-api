@@ -35,4 +35,33 @@ export class AppController {
   async getHealth() {
     return this.appService.getHealth();
   }
+
+  @Get('ak-tags')
+  @ApiOperation({ summary: 'Get all AK tags with tag names' })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'List of all AK tags with their names and metadata',
+    schema: {
+      type: 'object',
+      properties: {
+        tags: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              id_tag: { type: 'integer' },
+              tag_name: { type: 'string' },
+              tag_nice_url: { type: 'string' },
+              description: { type: 'string' },
+              categorie: { type: 'string' }
+            }
+          }
+        },
+        count: { type: 'integer' }
+      }
+    }
+  })
+  async getAkTags() {
+    return this.appService.getAkTags();
+  }
 }
