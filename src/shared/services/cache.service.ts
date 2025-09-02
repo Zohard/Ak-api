@@ -8,16 +8,19 @@ export class CacheService {
 
   constructor(
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
-  ) {}
+  ) {
+    this.logger.log('🚀 CacheService initialized');
+  }
 
   // Generic get method
   async get<T>(key: string): Promise<T | undefined> {
     try {
+      this.logger.log(`🔍 Checking cache for key: ${key}`);
       const value = await this.cacheManager.get<T>(key);
       if (value) {
-        this.logger.debug(`Cache hit for key: ${key}`);
+        this.logger.log(`✅ Cache HIT for key: ${key}`);
       } else {
-        this.logger.debug(`Cache miss for key: ${key}`);
+        this.logger.log(`❌ Cache MISS for key: ${key}`);
       }
       return value;
     } catch (error) {
@@ -29,10 +32,11 @@ export class CacheService {
   // Generic set method
   async set<T>(key: string, value: T, ttl?: number): Promise<void> {
     try {
+      this.logger.log(`💾 Attempting to cache key: ${key}, TTL: ${ttl || 'default'}`);
       await this.cacheManager.set(key, value, ttl);
-      this.logger.debug(`Cache set for key: ${key}, TTL: ${ttl || 'default'}`);
+      this.logger.log(`✅ Successfully cached key: ${key}`);
     } catch (error) {
-      this.logger.error(`Cache set error for key ${key}:`, error);
+      this.logger.error(`❌ Cache set error for key ${key}:`, error);
     }
   }
 
