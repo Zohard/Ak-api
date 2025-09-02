@@ -11,8 +11,8 @@ export class CreateListDto {
   presentation?: string;
 
   @IsString()
-  @IsIn(['liste', 'top'])
-  type: 'liste' | 'top';
+  @IsIn(['liste', 'top', 'top1'])
+  type: 'liste' | 'top' | 'top1';
 
   @IsString()
   @IsIn(['anime', 'manga'])

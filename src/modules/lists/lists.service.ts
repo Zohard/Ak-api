@@ -22,7 +22,7 @@ export class ListsService {
     return Number(((ratio * 0.7) + (viewsWeight * 0.3)).toFixed(4));
   }
 
-  async getUserLists(userId: number, type?: 'liste' | 'top', mediaType?: 'anime' | 'manga') {
+  async getUserLists(userId: number, type?: 'liste' | 'top' | 'top1', mediaType?: 'anime' | 'manga') {
     const rows = await this.prisma.akListesTop.findMany({
       where: {
         idMembre: userId,

@@ -63,7 +63,7 @@ export class ReviewsService {
         idMembre: userId,
         idAnime,
         idManga,
-        dateCritique: Math.floor(Date.now() / 1000),
+        dateCritique: new Date(),
       } as any,
       include: {
         membre: {
