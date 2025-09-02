@@ -1,28 +1,47 @@
-import { Injectable, Logger, Inject } from '@nestjs/common';
-import { CACHE_MANAGER } from '@nestjs/cache-manager';
-import type { Cache } from 'cache-manager';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import Redis from 'ioredis';
 
 @Injectable()
-export class CacheService {
+export class CacheService implements OnModuleInit {
   private readonly logger = new Logger(CacheService.name);
+  private redis: Redis;
 
-  constructor(
-    @Inject(CACHE_MANAGER) private cacheManager: Cache,
-  ) {
-    this.logger.log('🚀 CacheService initialized');
+  async onModuleInit() {
+    const redisUrl = process.env.REDIS_URL;
+    
+    if (redisUrl) {
+      this.logger.log('🔧 Initializing Redis connection');
+      this.redis = new Redis(redisUrl, {
+        tls: { rejectUnauthorized: false },
+        maxRetriesPerRequest: 3,
+        retryDelayOnFailover: 100,
+        connectTimeout: 10000,
+        lazyConnect: true
+      });
+      
+      this.redis.on('connect', () => this.logger.log('✅ Redis connected'));
+      this.redis.on('error', (err) => this.logger.error('❌ Redis error:', err));
+      
+      this.logger.log('🚀 CacheService initialized with Redis');
+    } else {
+      this.logger.warn('⚠️  No REDIS_URL found - caching disabled');
+    }
   }
 
   // Generic get method
   async get<T>(key: string): Promise<T | undefined> {
+    if (!this.redis) return undefined;
+    
     try {
       this.logger.log(`🔍 Checking cache for key: ${key}`);
-      const value = await this.cacheManager.get<T>(key);
+      const value = await this.redis.get(key);
       if (value) {
         this.logger.log(`✅ Cache HIT for key: ${key}`);
+        return JSON.parse(value) as T;
       } else {
         this.logger.log(`❌ Cache MISS for key: ${key}`);
+        return undefined;
       }
-      return value;
     } catch (error) {
       this.logger.error(`Cache get error for key ${key}:`, error);
       return undefined;
@@ -30,10 +49,13 @@ export class CacheService {
   }
 
   // Generic set method
-  async set<T>(key: string, value: T, ttl?: number): Promise<void> {
+  async set<T>(key: string, value: T, ttl: number = 300): Promise<void> {
+    if (!this.redis) return;
+    
     try {
-      this.logger.log(`💾 Attempting to cache key: ${key}, TTL: ${ttl || 'default'}`);
-      await this.cacheManager.set(key, value, ttl);
+      this.logger.log(`💾 Attempting to cache key: ${key}, TTL: ${ttl}s`);
+      const serialized = JSON.stringify(value);
+      await this.redis.setex(key, ttl, serialized);
       this.logger.log(`✅ Successfully cached key: ${key}`);
     } catch (error) {
       this.logger.error(`❌ Cache set error for key ${key}:`, error);
@@ -42,8 +64,10 @@ export class CacheService {
 
   // Delete specific key
   async del(key: string): Promise<void> {
+    if (!this.redis) return;
+    
     try {
-      await this.cacheManager.del(key);
+      await this.redis.del(key);
       this.logger.debug(`Cache deleted for key: ${key}`);
     } catch (error) {
       this.logger.error(`Cache delete error for key ${key}:`, error);
@@ -52,10 +76,15 @@ export class CacheService {
 
   // Clear cache by pattern (useful for invalidating related keys)
   async delByPattern(pattern: string): Promise<void> {
+    if (!this.redis) return;
+    
     try {
-      // This is a basic implementation - Redis store would have better pattern support
       this.logger.debug(`Cache pattern delete requested for: ${pattern}`);
-      // For now, we'll implement specific invalidation methods
+      const keys = await this.redis.keys(pattern);
+      if (keys.length > 0) {
+        await this.redis.del(...keys);
+        this.logger.debug(`Deleted ${keys.length} keys matching pattern: ${pattern}`);
+      }
     } catch (error) {
       this.logger.error(`Cache pattern delete error for pattern ${pattern}:`, error);
     }
@@ -154,6 +183,8 @@ export class CacheService {
 
   // Health check method
   async isHealthy(): Promise<boolean> {
+    if (!this.redis) return false;
+    
     try {
       const testKey = 'health_check';
       const testValue = Date.now().toString();
