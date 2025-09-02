@@ -23,15 +23,13 @@ async function testRedis() {
     console.log('All keys in Redis:', keys);
     console.log('Total keys count:', keys.length);
     
-    // Check for all possible key patterns that Keyv might use
+    // Check for all possible key patterns
     const patterns = [
       'anime*',           // Direct anime keys
-      'cache:*',          // Prefixed cache keys  
-      'keyv:*',           // Keyv namespace
+      'manga*',           // Direct manga keys
       '*anime*',          // Contains anime
+      '*manga*',          // Contains manga
       '*list*',           // Contains list
-      'namespace:*',      // Keyv namespace pattern
-      'default:*',        // Default namespace
     ];
     
     for (const pattern of patterns) {

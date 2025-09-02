@@ -2,10 +2,11 @@ import { Module } from '@nestjs/common';
 import { MangasService } from './mangas.service';
 import { MangasController } from './mangas.controller';
 import { PrismaService } from '../../shared/services/prisma.service';
+import { CacheService } from '../../shared/services/cache.service';
 
 @Module({
   controllers: [MangasController],
-  providers: [MangasService, PrismaService],
+  providers: [MangasService, PrismaService, CacheService],
   exports: [MangasService],
 })
 export class MangasModule {}
