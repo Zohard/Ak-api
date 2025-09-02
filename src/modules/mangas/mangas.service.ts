@@ -4,6 +4,7 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { PrismaService } from '../../shared/services/prisma.service';
+import { CacheService } from '../../shared/services/cache.service';
 import { BaseContentService } from '../../shared/services/base-content.service';
 import { CreateMangaDto } from './dto/create-manga.dto';
 import { UpdateMangaDto } from './dto/update-manga.dto';
@@ -17,7 +18,10 @@ export class MangasService extends BaseContentService<
   UpdateMangaDto,
   MangaQueryDto
 > {
-  constructor(prisma: PrismaService) {
+  constructor(
+    prisma: PrismaService,
+    private readonly cacheService: CacheService,
+  ) {
     super(prisma);
   }
 
@@ -96,6 +100,15 @@ export class MangasService extends BaseContentService<
       sortOrder = 'desc',
       includeReviews = false,
     } = query;
+
+    // Create cache key from query parameters
+    const cacheKey = this.createCacheKey(query);
+    
+    // Try to get from cache first
+    const cached = await this.cacheService.getMangaList(cacheKey);
+    if (cached) {
+      return cached;
+    }
 
     const skip = ((page || 1) - 1) * (limit || 20);
 
@@ -178,7 +191,7 @@ export class MangasService extends BaseContentService<
       this.prisma.akManga.count({ where }),
     ]);
 
-    return {
+    const result = {
       mangas: mangas.map(this.formatManga),
       pagination: {
         page,
@@ -187,9 +200,22 @@ export class MangasService extends BaseContentService<
         totalPages: Math.ceil(total / (limit || 20)),
       },
     };
+
+    // Cache the result (TTL based on query complexity)
+    const ttl = search || genre ? 180 : 300; // 3 mins for search, 5 mins for general lists
+    await this.cacheService.setMangaList(cacheKey, result, ttl);
+
+    return result;
   }
 
   async findOne(id: number, includeReviews = false) {
+    // Try to get from cache first
+    const cacheKey = `${id}_${includeReviews}`;
+    const cached = await this.cacheService.getManga(parseInt(cacheKey.replace(/[^0-9]/g, '')));
+    if (cached && cached.includeReviews === includeReviews) {
+      return cached.data;
+    }
+
     const include: any = {};
 
     if (includeReviews) {
@@ -216,7 +242,16 @@ export class MangasService extends BaseContentService<
       throw new NotFoundException('Manga introuvable');
     }
 
-    return this.formatManga(manga);
+    const formattedManga = this.formatManga(manga);
+    
+    // Cache the result
+    const cacheData = {
+      data: formattedManga,
+      includeReviews,
+    };
+    await this.cacheService.setManga(id, cacheData, 600); // 10 minutes
+
+    return formattedManga;
   }
 
   async update(
@@ -242,7 +277,24 @@ export class MangasService extends BaseContentService<
     const updatedManga = await this.prisma.akManga.update({
       where: { idManga: id },
       data: updateMangaDto,
+      include: {
+        reviews: {
+          include: {
+            membre: {
+              select: {
+                idMember: true,
+                memberName: true,
+              },
+            },
+          },
+          take: 3,
+          orderBy: { dateCritique: 'desc' },
+        },
+      },
     });
+
+    // Invalidate caches after update
+    await this.invalidateMangaCache(id);
 
     return this.formatManga(updatedManga);
   }
@@ -266,22 +318,52 @@ export class MangasService extends BaseContentService<
       where: { idManga: id },
     });
 
+    // Invalidate caches after removal
+    await this.invalidateMangaCache(id);
+
     return { message: 'Manga supprimé avec succès' };
   }
 
   async getTopMangas(limit = 10) {
-    const mangas = await this.prisma.akManga.findMany({
-      where: {
-        statut: 1,
-      },
-      orderBy: [{ dateAjout: 'desc' }],
-      take: limit,
-    });
+    // Try to get from cache first
+    const cached = await this.cacheService.getTopContent('manga', limit);
+    if (cached) {
+      return cached;
+    }
 
-    return {
+    const mangas = await this.prisma.executeWithRetry(() =>
+      this.prisma.akManga.findMany({
+        where: {
+          statut: 1,
+        },
+        orderBy: [{ dateAjout: 'desc' }],
+        take: limit,
+        include: {
+          reviews: {
+            take: 2,
+            orderBy: { dateCritique: 'desc' },
+            include: {
+              membre: {
+                select: {
+                  idMember: true,
+                  memberName: true,
+                },
+              },
+            },
+          },
+        },
+      })
+    );
+
+    const result = {
       topMangas: mangas.map(this.formatManga),
       generatedAt: new Date().toISOString(),
     };
+
+    // Cache for 15 minutes
+    await this.cacheService.setTopContent('manga', limit, result, 900);
+
+    return result;
   }
 
   // Use inherited autocomplete() method
@@ -452,5 +534,30 @@ export class MangasService extends BaseContentService<
       image: image ? `/api/media/serve/manga/${image}` : null,
       ...otherFields,
     };
+  }
+
+  // Cache helper methods
+  private createCacheKey(query: MangaQueryDto): string {
+    const {
+      page = 1,
+      limit = 20,
+      search = '',
+      auteur = '',
+      annee = '',
+      statut = '',
+      genre = '',
+      sortBy = 'dateAjout',
+      sortOrder = 'desc',
+      includeReviews = false,
+    } = query;
+
+    return `${page}_${limit}_${search}_${auteur}_${annee}_${statut}_${genre}_${sortBy}_${sortOrder}_${includeReviews}`;
+  }
+
+  // Cache invalidation methods
+  async invalidateMangaCache(id: number): Promise<void> {
+    await this.cacheService.invalidateManga(id);
+    // Also invalidate related caches
+    await this.cacheService.invalidateSearchCache();
   }
 }

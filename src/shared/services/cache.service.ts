@@ -115,6 +115,14 @@ export class CacheService implements OnModuleInit {
     await this.set(`manga:${id}`, manga, ttl); // 10 minutes
   }
 
+  async getMangaList(key: string): Promise<any> {
+    return this.get(`manga_list:${key}`);
+  }
+
+  async setMangaList(key: string, mangas: any, ttl = 300): Promise<void> {
+    await this.set(`manga_list:${key}`, mangas, ttl); // 5 minutes
+  }
+
   // Search cache methods
   async getSearchResult(query: string, type: string): Promise<any> {
     const key = `search:${type}:${this.hashQuery(query)}`;
