@@ -14,7 +14,6 @@ export class CacheService implements OnModuleInit {
       this.redis = new Redis(redisUrl, {
         tls: { rejectUnauthorized: false },
         maxRetriesPerRequest: 3,
-        retryDelayOnFailover: 100,
         connectTimeout: 10000,
         lazyConnect: true
       });
