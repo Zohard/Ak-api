@@ -123,6 +123,19 @@ export class CacheService implements OnModuleInit {
     await this.set(`manga_list:${key}`, mangas, ttl); // 5 minutes
   }
 
+  // User collections cache methods
+  async getUserCollections(userId: number, key: string): Promise<any> {
+    return this.get(`user_collections:${userId}:${key}`);
+  }
+
+  async setUserCollections(userId: number, key: string, data: any, ttl = 300): Promise<void> {
+    await this.set(`user_collections:${userId}:${key}`, data, ttl); // 5 minutes
+  }
+
+  async invalidateUserCollections(userId: number): Promise<void> {
+    await this.delByPattern(`user_collections:${userId}:*`);
+  }
+
   // Search cache methods
   async getSearchResult(query: string, type: string): Promise<any> {
     const key = `search:${type}:${this.hashQuery(query)}`;
