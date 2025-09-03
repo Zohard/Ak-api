@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException, ForbiddenException, ConflictException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../shared/services/prisma.service';
+import { CacheService } from '../../shared/services/cache.service';
 import { AddAnimeToCollectionDto } from './dto/add-anime-to-collection.dto';
 import { AddMangaToCollectionDto } from './dto/add-manga-to-collection.dto';
 import { AddToCollectionDto } from './dto/add-to-collection.dto';
@@ -8,7 +9,10 @@ import { CollectionQueryDto } from './dto/collection-query.dto';
 
 @Injectable()
 export class CollectionsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private readonly cacheService: CacheService,
+  ) {}
 
   async createCollection(userId: number, createCollectionDto: CreateCollectionDto) {
     // This method isn't really applicable with the existing table structure
@@ -26,6 +30,13 @@ export class CollectionsService {
 
   async getUserCollections(userId: number, query: CollectionQueryDto) {
     const { page = 1, limit = 20, search } = query;
+
+    const cacheKey = this.createCacheKey(query);
+    const cached = await this.cacheService.getUserCollections(userId, cacheKey);
+    if (cached) {
+      return cached;
+    }
+
     const skip = (page - 1) * limit;
 
     // Get distinct collection types from both tables
@@ -115,7 +126,7 @@ export class CollectionsService {
     const total = collections.length;
     const paginatedCollections = collections.slice(skip, skip + limit);
 
-    return {
+    const result = {
       data: paginatedCollections,
       meta: {
         totalCount,
@@ -128,6 +139,10 @@ export class CollectionsService {
         totalPages: Math.ceil(total / limit),
       },
     };
+
+    await this.cacheService.setUserCollections(userId, cacheKey, result, 300);
+
+    return result;
   }
 
   async addToCollection(userId: number, addToCollectionDto: AddToCollectionDto) {
@@ -138,6 +153,7 @@ export class CollectionsService {
     const normalizedRating = Math.max(0, Math.min(5, Math.round((rating ?? 0))));
 
     try {
+      let result;
       if (mediaType === 'anime') {
         // Verify media exists
         const anime = await this.prisma.akAnime.findUnique({ where: { idAnime: mediaId } });
@@ -160,7 +176,7 @@ export class CollectionsService {
               updatedAt: new Date(),
             },
           });
-          return await this.prisma.collectionAnime.findFirst({
+          result = await this.prisma.collectionAnime.findFirst({
             where: { idMembre: userId, idAnime: mediaId },
             include: {
               anime: {
@@ -168,70 +184,73 @@ export class CollectionsService {
               },
             },
           });
+        } else {
+          result = await this.prisma.collectionAnime.create({
+            data: {
+              idMembre: userId,
+              idAnime: mediaId,
+              type: collectionType,
+              evaluation: normalizedRating,
+              notes: notes || null,
+              isPublic: true,
+            },
+            include: {
+              anime: {
+                select: { idAnime: true, titre: true, image: true, annee: true, moyenneNotes: true },
+              },
+            },
+          });
+        }
+      } else {
+        // mediaType === 'manga'
+        const manga = await this.prisma.akManga.findUnique({ where: { idManga: mediaId } });
+        if (!manga) {
+          throw new NotFoundException('Manga not found');
         }
 
-        return await this.prisma.collectionAnime.create({
-          data: {
-            idMembre: userId,
-            idAnime: mediaId,
-            type: collectionType,
-            evaluation: normalizedRating,
-            notes: notes || null,
-            isPublic: true,
-          },
-          include: {
-            anime: {
-              select: { idAnime: true, titre: true, image: true, annee: true, moyenneNotes: true },
-            },
-          },
-        });
-      }
-
-      // mediaType === 'manga'
-      const manga = await this.prisma.akManga.findUnique({ where: { idManga: mediaId } });
-      if (!manga) {
-        throw new NotFoundException('Manga not found');
-      }
-
-      const existingAny = await this.prisma.collectionManga.findFirst({
-        where: { idMembre: userId, idManga: mediaId },
-      });
-      if (existingAny) {
-        await this.prisma.collectionManga.updateMany({
+        const existingAny = await this.prisma.collectionManga.findFirst({
           where: { idMembre: userId, idManga: mediaId },
-          data: {
-            type: collectionType,
-            evaluation: normalizedRating,
-            notes: notes || null,
-            isPublic: true,
-            updatedAt: new Date(),
-          },
         });
-        return await this.prisma.collectionManga.findFirst({
-          where: { idMembre: userId, idManga: mediaId },
-          include: {
-            manga: {
-              select: { idManga: true, titre: true, image: true, annee: true, moyenneNotes: true },
+        if (existingAny) {
+          await this.prisma.collectionManga.updateMany({
+            where: { idMembre: userId, idManga: mediaId },
+            data: {
+              type: collectionType,
+              evaluation: normalizedRating,
+              notes: notes || null,
+              isPublic: true,
+              updatedAt: new Date(),
             },
-          },
-        });
+          });
+          result = await this.prisma.collectionManga.findFirst({
+            where: { idMembre: userId, idManga: mediaId },
+            include: {
+              manga: {
+                select: { idManga: true, titre: true, image: true, annee: true, moyenneNotes: true },
+              },
+            },
+          });
+        } else {
+          result = await this.prisma.collectionManga.create({
+            data: {
+              idMembre: userId,
+              idManga: mediaId,
+              type: collectionType,
+              evaluation: normalizedRating,
+              notes: notes || null,
+              isPublic: true,
+            },
+            include: {
+              manga: {
+                select: { idManga: true, titre: true, image: true, annee: true, moyenneNotes: true },
+              },
+            },
+          });
+        }
       }
 
-      return await this.prisma.collectionManga.create({
-        data: {
-          idMembre: userId,
-          idManga: mediaId,
-          type: collectionType,
-          evaluation: normalizedRating,
-          notes: notes || null,
-          isPublic: true,
-        },
-        include: {
-          manga: {
-            select: { idManga: true, titre: true, image: true, annee: true, moyenneNotes: true },
-          },
-        },
-      });
+      await this.cacheService.invalidateUserCollections(userId);
+      return result;
     } catch (err: any) {
       // Map known Prisma errors to proper HTTP errors; log for debugging
       const code = err?.code;
@@ -252,7 +271,7 @@ export class CollectionsService {
               updatedAt: new Date(),
             },
           });
-          return await this.prisma.collectionAnime.findFirst({
+          const result = await this.prisma.collectionAnime.findFirst({
             where: { idMembre: userId, idAnime: mediaId },
             include: {
               anime: {
@@ -260,6 +279,8 @@ export class CollectionsService {
               },
             },
           });
+          await this.cacheService.invalidateUserCollections(userId);
+          return result;
         } else {
           await this.prisma.collectionManga.updateMany({
             where: { idMembre: userId, idManga: mediaId },
@@ -271,7 +292,7 @@ export class CollectionsService {
               updatedAt: new Date(),
             },
           });
-          return await this.prisma.collectionManga.findFirst({
+          const result = await this.prisma.collectionManga.findFirst({
             where: { idMembre: userId, idManga: mediaId },
             include: {
               manga: {
@@ -279,6 +300,8 @@ export class CollectionsService {
               },
             },
           });
+          await this.cacheService.invalidateUserCollections(userId);
+          return result;
         }
       }
       // Re-throw known HTTP exceptions
@@ -524,6 +547,7 @@ export class CollectionsService {
       }
     }
 
+    await this.cacheService.invalidateUserCollections(userId);
     return { success: true };
   }
 
@@ -975,7 +999,7 @@ export class CollectionsService {
         anime: true
       }
     });
-
+    await this.cacheService.invalidateUserCollections(userId);
     return {
       id: collectionItem.idCollection,
       animeId: collectionItem.idAnime,
@@ -1019,7 +1043,7 @@ export class CollectionsService {
         idCollection: collectionItem.idCollection
       }
     });
-
+    await this.cacheService.invalidateUserCollections(userId);
     return { message: 'Anime removed from collection successfully' };
   }
 
@@ -1122,7 +1146,7 @@ export class CollectionsService {
         manga: true
       }
     });
-
+    await this.cacheService.invalidateUserCollections(userId);
     return {
       id: collectionItem.idCollection,
       mangaId: collectionItem.idManga,
@@ -1166,7 +1190,7 @@ export class CollectionsService {
         idCollection: collectionItem.idCollection
       }
     });
-
+    await this.cacheService.invalidateUserCollections(userId);
     return { message: 'Manga removed from collection successfully' };
   }
 
@@ -1222,6 +1246,12 @@ export class CollectionsService {
       case 4: return 'Abandonné';
       default: return 'Unknown';
     }
+  }
+
+  // Cache helper method
+  private createCacheKey(query: CollectionQueryDto): string {
+    const { page = 1, limit = 20, search = '' } = query;
+    return `${page}_${limit}_${search}`;
   }
 
   private async getStatusCounts(
