@@ -5,13 +5,17 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '../../shared/services/prisma.service';
+import { CacheService } from '../../shared/services/cache.service';
 import { CreateReviewDto } from './dto/create-review.dto';
 import { UpdateReviewDto } from './dto/update-review.dto';
 import { ReviewQueryDto } from './dto/review-query.dto';
 
 @Injectable()
 export class ReviewsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly cacheService: CacheService,
+  ) {}
 
   async create(createReviewDto: CreateReviewDto, userId: number) {
     const { idAnime, idManga, ...reviewData } = createReviewDto;
@@ -112,6 +116,15 @@ export class ReviewsService {
       type,
     } = query;
 
+    // Create cache key from query parameters
+    const cacheKey = this.createCacheKey(query);
+    
+    // Try to get from cache first
+    const cached = await this.cacheService.getReviews(idAnime || 0, idManga || 0);
+    if (cached && !search && !idMembre) { // Only cache non-search, non-user-specific queries
+      return cached;
+    }
+
     const skip = ((page || 1) - 1) * (limit || 20);
 
     const where: any = {};
@@ -195,7 +208,7 @@ export class ReviewsService {
       this.prisma.akCritique.count({ where }),
     ]);
 
-    return {
+    const result = {
       reviews: reviews.map(this.formatReview),
       pagination: {
         page,
@@ -204,9 +217,23 @@ export class ReviewsService {
         totalPages: Math.ceil(total / (limit || 20)),
       },
     };
+
+    // Cache the result if it's not user-specific or search-based
+    if (!search && !idMembre) {
+      const ttl = idAnime || idManga ? 300 : 180; // 5 mins for specific anime/manga, 3 mins for general
+      await this.cacheService.setReviews(idAnime || 0, idManga || 0, result, ttl);
+    }
+
+    return result;
   }
 
   async findOne(id: number) {
+    // Try to get from cache first
+    const cached = await this.cacheService.get(`review:${id}`);
+    if (cached) {
+      return cached;
+    }
+
     const review = await this.prisma.akCritique.findUnique({
       where: { idCritique: id },
       include: {
@@ -242,7 +269,12 @@ export class ReviewsService {
       throw new NotFoundException('Critique introuvable');
     }
 
-    return this.formatReview(review);
+    const formattedReview = this.formatReview(review);
+    
+    // Cache the individual review for 10 minutes
+    await this.cacheService.set(`review:${id}`, formattedReview, 600);
+
+    return formattedReview;
   }
 
   async findBySlug(slug: string) {
@@ -340,6 +372,9 @@ export class ReviewsService {
       },
     });
 
+    // Invalidate caches after update
+    await this.invalidateReviewCache(id, review.idAnime, review.idManga);
+
     return this.formatReview(updatedReview);
   }
 
@@ -363,10 +398,20 @@ export class ReviewsService {
       where: { idCritique: id },
     });
 
+    // Invalidate caches after removal
+    await this.invalidateReviewCache(id, review.idAnime, review.idManga);
+
     return { message: 'Critique supprimée avec succès' };
   }
 
   async getTopReviews(limit = 10, type?: 'anime' | 'manga' | 'both') {
+    // Try to get from cache first
+    const cacheKey = `top_reviews:${type || 'both'}:${limit}`;
+    const cached = await this.cacheService.get(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
     const where: any = {
       statut: 0, // Only active/visible reviews
       notation: { gte: 8 }, // High ratings
@@ -410,10 +455,15 @@ export class ReviewsService {
       },
     });
 
-    return {
+    const result = {
       topReviews: reviews.map(this.formatReview),
       generatedAt: new Date().toISOString(),
     };
+
+    // Cache for 15 minutes
+    await this.cacheService.set(cacheKey, result, 900);
+
+    return result;
   }
 
   async getUserReviews(userId: number, limit = 20) {
@@ -489,5 +539,40 @@ export class ReviewsService {
       critique,
       ...otherFields,
     };
+  }
+
+  // Cache helper methods
+  private createCacheKey(query: ReviewQueryDto): string {
+    const {
+      page = 1,
+      limit = 20,
+      search = '',
+      idAnime = 0,
+      idManga = 0,
+      idMembre = 0,
+      statut = '',
+      minNotation = '',
+      sortBy = 'dateCritique',
+      sortOrder = 'desc',
+      type = '',
+    } = query;
+
+    return `${page}_${limit}_${search}_${idAnime}_${idManga}_${idMembre}_${statut}_${minNotation}_${sortBy}_${sortOrder}_${type}`;
+  }
+
+  // Cache invalidation methods
+  async invalidateReviewCache(reviewId: number, animeId?: number, mangaId?: number): Promise<void> {
+    await this.cacheService.del(`review:${reviewId}`);
+    
+    // Invalidate related content caches
+    if (animeId) {
+      await this.cacheService.invalidateAnime(animeId);
+    }
+    if (mangaId) {
+      await this.cacheService.invalidateManga(mangaId);
+    }
+    
+    // Invalidate top reviews cache
+    await this.cacheService.delByPattern('top_reviews:*');
   }
 }
