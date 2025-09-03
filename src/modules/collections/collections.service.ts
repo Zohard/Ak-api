@@ -11,7 +11,7 @@ import { CollectionQueryDto } from './dto/collection-query.dto';
 export class CollectionsService {
   constructor(
     private prisma: PrismaService,
-    private readonly cacheService: CacheService,
+    private cacheService: CacheService,
   ) {}
 
   async createCollection(userId: number, createCollectionDto: CreateCollectionDto) {
@@ -29,14 +29,33 @@ export class CollectionsService {
   }
 
   async getUserCollections(userId: number, query: CollectionQueryDto) {
-    const { page = 1, limit = 20, search } = query;
+    const { page = 1, limit = 10, search } = query;
 
-    const cacheKey = this.createCacheKey(query);
-    const cached = await this.cacheService.getUserCollections(userId, cacheKey);
+    // Skip cache for search queries
+    if (search) {
+      return this.getUserCollectionsFromDB(userId, query);
+    }
+
+    // Create cache key
+    const cacheKey = `user_collections:${userId}:${page}:${limit}`;
+    
+    // Try to get from cache
+    const cached = await this.cacheService.get(cacheKey);
     if (cached) {
       return cached;
     }
 
+    // Get from database
+    const result = await this.getUserCollectionsFromDB(userId, query);
+
+    // Cache for 5 minutes
+    await this.cacheService.set(cacheKey, result, 300);
+
+    return result;
+  }
+
+  private async getUserCollectionsFromDB(userId: number, query: CollectionQueryDto) {
+    const { page = 1, limit = 10, search } = query;
     const skip = (page - 1) * limit;
 
     // Get distinct collection types from both tables
@@ -126,7 +145,7 @@ export class CollectionsService {
     const total = collections.length;
     const paginatedCollections = collections.slice(skip, skip + limit);
 
-    const result = {
+    return {
       data: paginatedCollections,
       meta: {
         totalCount,
@@ -139,10 +158,6 @@ export class CollectionsService {
         totalPages: Math.ceil(total / limit),
       },
     };
-
-    await this.cacheService.setUserCollections(userId, cacheKey, result, 300);
-
-    return result;
   }
 
   async addToCollection(userId: number, addToCollectionDto: AddToCollectionDto) {
@@ -153,7 +168,6 @@ export class CollectionsService {
     const normalizedRating = Math.max(0, Math.min(5, Math.round((rating ?? 0))));
 
     try {
-      let result;
       if (mediaType === 'anime') {
         // Verify media exists
         const anime = await this.prisma.akAnime.findUnique({ where: { idAnime: mediaId } });
@@ -176,7 +190,7 @@ export class CollectionsService {
               updatedAt: new Date(),
             },
           });
-          result = await this.prisma.collectionAnime.findFirst({
+          return await this.prisma.collectionAnime.findFirst({
             where: { idMembre: userId, idAnime: mediaId },
             include: {
               anime: {
@@ -184,73 +198,70 @@ export class CollectionsService {
               },
             },
           });
-        } else {
-          result = await this.prisma.collectionAnime.create({
-            data: {
-              idMembre: userId,
-              idAnime: mediaId,
-              type: collectionType,
-              evaluation: normalizedRating,
-              notes: notes || null,
-              isPublic: true,
-            },
-            include: {
-              anime: {
-                select: { idAnime: true, titre: true, image: true, annee: true, moyenneNotes: true },
-              },
-            },
-          });
-        }
-      } else {
-        // mediaType === 'manga'
-        const manga = await this.prisma.akManga.findUnique({ where: { idManga: mediaId } });
-        if (!manga) {
-          throw new NotFoundException('Manga not found');
         }
 
-        const existingAny = await this.prisma.collectionManga.findFirst({
-          where: { idMembre: userId, idManga: mediaId },
+        return await this.prisma.collectionAnime.create({
+          data: {
+            idMembre: userId,
+            idAnime: mediaId,
+            type: collectionType,
+            evaluation: normalizedRating,
+            notes: notes || null,
+            isPublic: true,
+          },
+          include: {
+            anime: {
+              select: { idAnime: true, titre: true, image: true, annee: true, moyenneNotes: true },
+            },
+          },
         });
-        if (existingAny) {
-          await this.prisma.collectionManga.updateMany({
-            where: { idMembre: userId, idManga: mediaId },
-            data: {
-              type: collectionType,
-              evaluation: normalizedRating,
-              notes: notes || null,
-              isPublic: true,
-              updatedAt: new Date(),
-            },
-          });
-          result = await this.prisma.collectionManga.findFirst({
-            where: { idMembre: userId, idManga: mediaId },
-            include: {
-              manga: {
-                select: { idManga: true, titre: true, image: true, annee: true, moyenneNotes: true },
-              },
-            },
-          });
-        } else {
-          result = await this.prisma.collectionManga.create({
-            data: {
-              idMembre: userId,
-              idManga: mediaId,
-              type: collectionType,
-              evaluation: normalizedRating,
-              notes: notes || null,
-              isPublic: true,
-            },
-            include: {
-              manga: {
-                select: { idManga: true, titre: true, image: true, annee: true, moyenneNotes: true },
-              },
-            },
-          });
-        }
       }
 
-      await this.cacheService.invalidateUserCollections(userId);
-      return result;
+      // mediaType === 'manga'
+      const manga = await this.prisma.akManga.findUnique({ where: { idManga: mediaId } });
+      if (!manga) {
+        throw new NotFoundException('Manga not found');
+      }
+
+      const existingAny = await this.prisma.collectionManga.findFirst({
+        where: { idMembre: userId, idManga: mediaId },
+      });
+      if (existingAny) {
+        await this.prisma.collectionManga.updateMany({
+          where: { idMembre: userId, idManga: mediaId },
+          data: {
+            type: collectionType,
+            evaluation: normalizedRating,
+            notes: notes || null,
+            isPublic: true,
+            updatedAt: new Date(),
+          },
+        });
+        return await this.prisma.collectionManga.findFirst({
+          where: { idMembre: userId, idManga: mediaId },
+          include: {
+            manga: {
+              select: { idManga: true, titre: true, image: true, annee: true, moyenneNotes: true },
+            },
+          },
+        });
+      }
+
+      return await this.prisma.collectionManga.create({
+        data: {
+          idMembre: userId,
+          idManga: mediaId,
+          type: collectionType,
+          evaluation: normalizedRating,
+          notes: notes || null,
+          isPublic: true,
+        },
+        include: {
+          manga: {
+            select: { idManga: true, titre: true, image: true, annee: true, moyenneNotes: true },
+          },
+        },
+      });
     } catch (err: any) {
       // Map known Prisma errors to proper HTTP errors; log for debugging
       const code = err?.code;
@@ -271,7 +282,7 @@ export class CollectionsService {
               updatedAt: new Date(),
             },
           });
-          const result = await this.prisma.collectionAnime.findFirst({
+          return await this.prisma.collectionAnime.findFirst({
             where: { idMembre: userId, idAnime: mediaId },
             include: {
               anime: {
@@ -279,8 +290,6 @@ export class CollectionsService {
               },
             },
           });
-          await this.cacheService.invalidateUserCollections(userId);
-          return result;
         } else {
           await this.prisma.collectionManga.updateMany({
             where: { idMembre: userId, idManga: mediaId },
@@ -292,7 +301,7 @@ export class CollectionsService {
               updatedAt: new Date(),
             },
           });
-          const result = await this.prisma.collectionManga.findFirst({
+          return await this.prisma.collectionManga.findFirst({
             where: { idMembre: userId, idManga: mediaId },
             include: {
               manga: {
@@ -300,8 +309,6 @@ export class CollectionsService {
               },
             },
           });
-          await this.cacheService.invalidateUserCollections(userId);
-          return result;
         }
       }
       // Re-throw known HTTP exceptions
@@ -318,10 +325,40 @@ export class CollectionsService {
         err: { message: err?.message, code: err?.code },
       });
       throw new BadRequestException('Unable to add to collection');
+    } finally {
+      // Invalidate user's collection cache after any add operation
+      await this.invalidateUserCollectionCache(userId);
     }
   }
 
   async getCollectionItems(userId: number, query: CollectionQueryDto) {
+    const { page = 1, limit = 20, mediaType, type, search } = query;
+
+    // Skip cache for search queries
+    if (search) {
+      return this.getCollectionItemsFromDB(userId, query);
+    }
+
+    // Create cache key including all relevant parameters
+    const collectionType = type ? this.getCollectionTypeFromName(type) : 'all';
+    const cacheKey = `collection_items:${userId}:${mediaType || 'all'}:${collectionType}:${page}:${limit}`;
+    
+    // Try to get from cache
+    const cached = await this.cacheService.get(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
+    // Get from database
+    const result = await this.getCollectionItemsFromDB(userId, query);
+
+    // Cache for 5 minutes
+    await this.cacheService.set(cacheKey, result, 300);
+
+    return result;
+  }
+
+  private async getCollectionItemsFromDB(userId: number, query: CollectionQueryDto) {
     const { page = 1, limit = 20, mediaType, type, search } = query;
     const skip = (page - 1) * limit;
     
@@ -547,7 +584,9 @@ export class CollectionsService {
       }
     }
 
-    await this.cacheService.invalidateUserCollections(userId);
+    // Invalidate user's collection cache after removal
+    await this.invalidateUserCollectionCache(userId);
+
     return { success: true };
   }
 
@@ -596,6 +635,28 @@ export class CollectionsService {
 
   // Get all collections for a user (virtual collections based on type)
   async findUserCollections(userId: number, currentUserId?: number) {
+    // Only show collections if it's the current user or collections are public
+    const isOwnCollection = currentUserId === userId;
+    
+    // Create cache key - different keys for own vs public view
+    const cacheKey = `find_user_collections:${userId}:${isOwnCollection ? 'own' : 'public'}`;
+    
+    // Try to get from cache
+    const cached = await this.cacheService.get(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
+    // Get from database
+    const result = await this.findUserCollectionsFromDB(userId, currentUserId);
+
+    // Cache for 10 minutes (longer since this data changes less frequently)
+    await this.cacheService.set(cacheKey, result, 600);
+
+    return result;
+  }
+
+  private async findUserCollectionsFromDB(userId: number, currentUserId?: number) {
     // Only show collections if it's the current user or collections are public
     const isOwnCollection = currentUserId === userId;
     
@@ -999,8 +1060,8 @@ export class CollectionsService {
         anime: true
       }
     });
-    await this.cacheService.invalidateUserCollections(userId);
-    return {
+
+    const result = {
       id: collectionItem.idCollection,
       animeId: collectionItem.idAnime,
       addedAt: collectionItem.createdAt?.toISOString() || new Date().toISOString(),
@@ -1018,6 +1079,11 @@ export class CollectionsService {
         niceUrl: collectionItem.anime.niceUrl
       }
     };
+
+    // Invalidate user's collection cache after adding
+    await this.invalidateUserCollectionCache(userId);
+
+    return result;
   }
 
   // Remove anime from collection
@@ -1043,7 +1109,10 @@ export class CollectionsService {
         idCollection: collectionItem.idCollection
       }
     });
-    await this.cacheService.invalidateUserCollections(userId);
+
+    // Invalidate user's collection cache after removal
+    await this.invalidateUserCollectionCache(userId);
+
     return { message: 'Anime removed from collection successfully' };
   }
 
@@ -1146,8 +1215,8 @@ export class CollectionsService {
         manga: true
       }
     });
-    await this.cacheService.invalidateUserCollections(userId);
-    return {
+
+    const result = {
       id: collectionItem.idCollection,
       mangaId: collectionItem.idManga,
       addedAt: collectionItem.createdAt?.toISOString() || new Date().toISOString(),
@@ -1165,6 +1234,11 @@ export class CollectionsService {
         origine: collectionItem.manga.origine
       }
     };
+
+    // Invalidate user's collection cache after adding
+    await this.invalidateUserCollectionCache(userId);
+
+    return result;
   }
 
   // Remove manga from collection
@@ -1190,7 +1264,10 @@ export class CollectionsService {
         idCollection: collectionItem.idCollection
       }
     });
-    await this.cacheService.invalidateUserCollections(userId);
+
+    // Invalidate user's collection cache after removal
+    await this.invalidateUserCollectionCache(userId);
+
     return { message: 'Manga removed from collection successfully' };
   }
 
@@ -1246,12 +1323,6 @@ export class CollectionsService {
       case 4: return 'Abandonné';
       default: return 'Unknown';
     }
-  }
-
-  // Cache helper method
-  private createCacheKey(query: CollectionQueryDto): string {
-    const { page = 1, limit = 20, search = '' } = query;
-    return `${page}_${limit}_${search}`;
   }
 
   private async getStatusCounts(
@@ -1321,5 +1392,24 @@ export class CollectionsService {
     }
 
     return statusCounts;
+  }
+
+  // Helper method to invalidate all collection-related cache for a user
+  private async invalidateUserCollectionCache(userId: number): Promise<void> {
+    try {
+      // Invalidate various cache patterns for the user
+      await Promise.all([
+        // User collection lists cache
+        this.cacheService.delByPattern(`user_collections:${userId}:*`),
+        // Collection items cache
+        this.cacheService.delByPattern(`collection_items:${userId}:*`),
+        // Find user collections cache (both own and public views)
+        this.cacheService.del(`find_user_collections:${userId}:own`),
+        this.cacheService.del(`find_user_collections:${userId}:public`),
+      ]);
+    } catch (error) {
+      // Log error but don't throw to avoid breaking the main operation
+      console.error('Cache invalidation error for user', userId, error);
+    }
   }
 }
