@@ -188,6 +188,15 @@ export class CacheService implements OnModuleInit {
     return Math.abs(hash).toString(36);
   }
 
+  // Homepage-specific cache methods
+  async getHomepageData(key: string): Promise<any> {
+    return this.get(`homepage:${key}`);
+  }
+
+  async setHomepageData(key: string, data: any, ttl = 1800): Promise<void> {
+    await this.set(`homepage:${key}`, data, ttl); // 30 minutes default for homepage data
+  }
+
   // Health check method
   async isHealthy(): Promise<boolean> {
     if (!this.redis) return false;

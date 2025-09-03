@@ -1,9 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from './shared/services/prisma.service';
+import { CacheService } from './shared/services/cache.service';
 
 @Injectable()
 export class AppService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly cacheService: CacheService,
+  ) {}
 
   async getHealth() {
     try {
@@ -28,6 +32,12 @@ export class AppService {
   }
 
   async getAkTags() {
+    // Try to get from cache first
+    const cached = await this.cacheService.get('ak_tags:all');
+    if (cached) {
+      return cached;
+    }
+
     const tags = await this.prisma.$queryRaw`
       SELECT 
         id_tag,
@@ -39,9 +49,14 @@ export class AppService {
       ORDER BY categorie, tag_name
     `;
 
-    return {
+    const result = {
       tags,
       count: Array.isArray(tags) ? tags.length : 0,
     };
+
+    // Cache for 2 hours (7200 seconds) - tags rarely change
+    await this.cacheService.set('ak_tags:all', result, 7200);
+
+    return result;
   }
 }
