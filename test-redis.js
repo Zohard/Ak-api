@@ -27,8 +27,10 @@ async function testRedis() {
     const patterns = [
       'anime*',           // Direct anime keys
       'manga*',           // Direct manga keys
+      'review*',          // Direct review keys  
       '*anime*',          // Contains anime
       '*manga*',          // Contains manga
+      '*review*',         // Contains review
       '*list*',           // Contains list
     ];
     

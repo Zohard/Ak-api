@@ -1,19 +1,32 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../shared/services/prisma.service';
+import { CacheService } from '../../shared/services/cache.service';
 
 @Injectable()
 export class SeasonsService {
   private readonly logger = new Logger(SeasonsService.name);
 
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private readonly cacheService: CacheService,
+  ) {}
 
   async findAll() {
     try {
+      // Try to get from cache first
+      const cached = await this.cacheService.get('seasons:all');
+      if (cached) {
+        return cached;
+      }
+
       const seasons = await this.prisma.$queryRaw`
         SELECT id_saison, saison, annee, statut, json_data
         FROM ak_animes_saisons
         ORDER BY annee DESC, saison DESC
       `;
+      
+      // Cache for 1 hour (3600 seconds) - seasons don't change often
+      await this.cacheService.set('seasons:all', seasons, 3600);
       
       return seasons;
     } catch (error) {
@@ -24,6 +37,12 @@ export class SeasonsService {
 
   async findCurrent() {
     try {
+      // Try to get from cache first
+      const cached = await this.cacheService.get('seasons:current');
+      if (cached) {
+        return cached;
+      }
+
       const currentSeason = await this.prisma.$queryRaw`
         SELECT id_saison, saison, annee, statut, json_data
         FROM ak_animes_saisons
@@ -32,7 +51,12 @@ export class SeasonsService {
         LIMIT 1
       `;
       
-      return Array.isArray(currentSeason) && currentSeason.length > 0 ? currentSeason[0] : null;
+      const result = Array.isArray(currentSeason) && currentSeason.length > 0 ? currentSeason[0] : null;
+      
+      // Cache for 30 minutes (1800 seconds) - current season is frequently accessed
+      await this.cacheService.set('seasons:current', result, 1800);
+      
+      return result;
     } catch (error) {
       this.logger.error('Error fetching current season:', error);
       throw error;
@@ -41,13 +65,24 @@ export class SeasonsService {
 
   async findById(id: number) {
     try {
+      // Try to get from cache first
+      const cached = await this.cacheService.get(`season:${id}`);
+      if (cached) {
+        return cached;
+      }
+
       const season = await this.prisma.$queryRaw`
         SELECT id_saison, saison, annee, statut, json_data
         FROM ak_animes_saisons
         WHERE id_saison = ${id}
       `;
       
-      return Array.isArray(season) && season.length > 0 ? season[0] : null;
+      const result = Array.isArray(season) && season.length > 0 ? season[0] : null;
+      
+      // Cache for 2 hours (7200 seconds) - individual seasons rarely change
+      await this.cacheService.set(`season:${id}`, result, 7200);
+      
+      return result;
     } catch (error) {
       this.logger.error(`Error fetching season with ID ${id}:`, error);
       throw error;
@@ -56,6 +91,12 @@ export class SeasonsService {
 
   async getSeasonAnimes(seasonId: number) {
     try {
+      // Try to get from cache first
+      const cached = await this.cacheService.get(`season_animes:${seasonId}`);
+      if (cached) {
+        return cached;
+      }
+
       // First get the season data to extract anime IDs from json_data
       const season = await this.findById(seasonId);
       if (!season) {
@@ -85,7 +126,9 @@ export class SeasonsService {
       }
 
       if (animeIds.length === 0) {
-        return [];
+        const emptyResult = [];
+        await this.cacheService.set(`season_animes:${seasonId}`, emptyResult, 1800);
+        return emptyResult;
       }
 
       // Create a parameterized query with the anime IDs
@@ -115,10 +158,15 @@ export class SeasonsService {
       `, ...animeIds);
 
       // Add format field if missing (default to 'Série TV')
-      return (animes as any[]).map((anime: any) => ({
+      const result = (animes as any[]).map((anime: any) => ({
         ...anime,
         format: anime.format || 'Série TV'
       }));
+
+      // Cache for 30 minutes (1800 seconds) - season animes are frequently accessed for homepage
+      await this.cacheService.set(`season_animes:${seasonId}`, result, 1800);
+
+      return result;
 
     } catch (error) {
       this.logger.error(`Error fetching animes for season ${seasonId}:`, error);
