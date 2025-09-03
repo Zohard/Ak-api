@@ -28,9 +28,14 @@ async function testRedis() {
       'anime*',           // Direct anime keys
       'manga*',           // Direct manga keys
       'review*',          // Direct review keys  
+      'season*',          // Season keys
+      'ak_tags*',         // Tag keys
+      'homepage*',        // Homepage keys
       '*anime*',          // Contains anime
       '*manga*',          // Contains manga
       '*review*',         // Contains review
+      '*season*',         // Contains season
+      '*tag*',            // Contains tag
       '*list*',           // Contains list
     ];
     
