@@ -1465,7 +1465,7 @@ export class CollectionsService {
           by: ['type'],
           where: animeWhere,
           _count: { type: true }
-        })
+        }) as any
       );
     } else {
       queries.push(Promise.resolve([]));
@@ -1482,7 +1482,7 @@ export class CollectionsService {
           by: ['type'],
           where: mangaWhere,
           _count: { type: true }
-        })
+        }) as any
       );
     } else {
       queries.push(Promise.resolve([]));
