@@ -17,6 +17,7 @@ import { SeasonsModule } from './modules/seasons/seasons.module';
 import { ForumsModule } from './modules/forums/forums.module';
 import { CollectionsModule } from './modules/collections/collections.module';
 import { ListsModule } from './modules/lists/lists.module';
+import { GatewayModule } from './modules/gateway/gateway.module';
 import { PrismaService } from './shared/services/prisma.service';
 import { CacheService } from './shared/services/cache.service';
 import databaseConfig from './config/database.config';
@@ -44,6 +45,7 @@ import jwtConfig from './config/jwt.config';
     ForumsModule,
     CollectionsModule,
     ListsModule,
+    GatewayModule,
   ],
   controllers: [AppController],
   providers: [AppService, PrismaService, CacheService],
