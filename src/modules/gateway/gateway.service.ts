@@ -122,12 +122,12 @@ export class GatewayService {
   findRoute(method: string, path: string): GatewayRoute | null {
     const exactKey = `${method}:${path}`;
     if (this.routes.has(exactKey)) {
-      return this.routes.get(exactKey);
+      return this.routes.get(exactKey) || null;
     }
 
     const allKey = `ALL:${path}`;
     if (this.routes.has(allKey)) {
-      return this.routes.get(allKey);
+      return this.routes.get(allKey) || null;
     }
 
     for (const [key, route] of this.routes.entries()) {
