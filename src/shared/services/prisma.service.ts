@@ -26,10 +26,12 @@ export class PrismaService
           if (!params.has('sslmode')) params.set('sslmode', 'require');
           // Tell Prisma we are behind pgBouncer (disables prepared statements)
           if (!params.has('pgbouncer')) params.set('pgbouncer', 'true');
-          // Optimize connections for serverless with better limits
-          if (!params.has('connection_limit')) params.set('connection_limit', '10');
+          // Optimize connections for serverless with very conservative limits
+          if (!params.has('connection_limit')) params.set('connection_limit', '1');
           // Keep pool wait reasonable for serverless
-          if (!params.has('pool_timeout')) params.set('pool_timeout', '20');
+          if (!params.has('pool_timeout')) params.set('pool_timeout', '10');
+          // Add connect timeout for faster failures
+          if (!params.has('connect_timeout')) params.set('connect_timeout', '10');
 
           u.search = params.toString();
           effectiveUrl = u.toString();
