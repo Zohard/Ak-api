@@ -48,8 +48,8 @@ export class CollectionsService {
     // Get from database
     const result = await this.getUserCollectionsFromDB(userId, query);
 
-    // Cache for 5 minutes
-    await this.cacheService.set(cacheKey, result, 300);
+    // Cache for 20 minutes
+    await this.cacheService.set(cacheKey, result, 1200);
 
     return result;
   }
@@ -352,8 +352,8 @@ export class CollectionsService {
     // Get from database
     const result = await this.getCollectionItemsFromDB(userId, query);
 
-    // Cache for 5 minutes
-    await this.cacheService.set(cacheKey, result, 300);
+    // Cache for 20 minutes
+    await this.cacheService.set(cacheKey, result, 1200);
 
     return result;
   }
@@ -382,31 +382,35 @@ export class CollectionsService {
         };
       }
 
-      const [animes, animeTotal] = await Promise.all([
-        this.prisma.collectionAnime.findMany({
-          where: animeWhere,
-          skip: mediaType === 'anime' ? skip : 0,
-          take: mediaType === 'anime' ? limit : undefined,
-          orderBy: { createdAt: 'desc' },
-          include: {
-            anime: {
-              select: {
-                idAnime: true,
-                titre: true,
-                image: true,
-                annee: true,
-                moyenneNotes: true,
-                synopsis: true,
+      const [animes, animeTotal] = await this.prisma.executeWithRetry(async () => {
+        return Promise.all([
+          this.prisma.collectionAnime.findMany({
+            where: animeWhere,
+            skip: mediaType === 'anime' ? skip : 0,
+            take: mediaType === 'anime' ? limit : undefined,
+            orderBy: { createdAt: 'desc' },
+            include: {
+              anime: {
+                select: {
+                  idAnime: true,
+                  titre: true,
+                  image: true,
+                  annee: true,
+                  moyenneNotes: true,
+                  synopsis: true,
+                },
               },
             },
-          },
-        }),
-        this.prisma.collectionAnime.count({ where: animeWhere }),
-      ]);
+          }),
+          this.prisma.collectionAnime.count({ where: animeWhere }),
+        ]);
+      });
 
       if (mediaType === 'anime') {
         // Calculate status counts for anime
-        const statusCounts = await this.getStatusCounts(userId, 'anime', collectionType);
+        const statusCounts = await this.prisma.executeWithRetry(async () => {
+          return this.getStatusCounts(userId, 'anime', collectionType);
+        });
 
         return {
           data: animes.map(a => ({
@@ -445,31 +449,35 @@ export class CollectionsService {
         };
       }
 
-      const [mangas, mangaTotal] = await Promise.all([
-        this.prisma.collectionManga.findMany({
-          where: mangaWhere,
-          skip: mediaType === 'manga' ? skip : 0,
-          take: mediaType === 'manga' ? limit : undefined,
-          orderBy: { createdAt: 'desc' },
-          include: {
-            manga: {
-              select: {
-                idManga: true,
-                titre: true,
-                image: true,
-                annee: true,
-                moyenneNotes: true,
-                synopsis: true,
+      const [mangas, mangaTotal] = await this.prisma.executeWithRetry(async () => {
+        return Promise.all([
+          this.prisma.collectionManga.findMany({
+            where: mangaWhere,
+            skip: mediaType === 'manga' ? skip : 0,
+            take: mediaType === 'manga' ? limit : undefined,
+            orderBy: { createdAt: 'desc' },
+            include: {
+              manga: {
+                select: {
+                  idManga: true,
+                  titre: true,
+                  image: true,
+                  annee: true,
+                  moyenneNotes: true,
+                  synopsis: true,
+                },
               },
             },
-          },
-        }),
-        this.prisma.collectionManga.count({ where: mangaWhere }),
-      ]);
+          }),
+          this.prisma.collectionManga.count({ where: mangaWhere }),
+        ]);
+      });
 
       if (mediaType === 'manga') {
         // Calculate status counts for manga
-        const statusCounts = await this.getStatusCounts(userId, 'manga', collectionType);
+        const statusCounts = await this.prisma.executeWithRetry(async () => {
+          return this.getStatusCounts(userId, 'manga', collectionType);
+        });
 
         return {
           data: mangas.map(m => ({
@@ -499,40 +507,42 @@ export class CollectionsService {
       mangaWhere.type = collectionType;
     }
 
-    const [animes, mangas] = await Promise.all([
-      this.prisma.collectionAnime.findMany({
-        where: animeWhere,
-        orderBy: { createdAt: 'desc' },
-        include: {
-          anime: {
-            select: {
-              idAnime: true,
-              titre: true,
-              image: true,
-              annee: true,
-              moyenneNotes: true,
-              synopsis: true,
+    const [animes, mangas] = await this.prisma.executeWithRetry(async () => {
+      return Promise.all([
+        this.prisma.collectionAnime.findMany({
+          where: animeWhere,
+          orderBy: { createdAt: 'desc' },
+          include: {
+            anime: {
+              select: {
+                idAnime: true,
+                titre: true,
+                image: true,
+                annee: true,
+                moyenneNotes: true,
+                synopsis: true,
+              },
             },
           },
-        },
-      }),
-      this.prisma.collectionManga.findMany({
-        where: mangaWhere,
-        orderBy: { createdAt: 'desc' },
-        include: {
-          manga: {
-            select: {
-              idManga: true,
-              titre: true,
-              image: true,
-              annee: true,
-              moyenneNotes: true,
-              synopsis: true,
+        }),
+        this.prisma.collectionManga.findMany({
+          where: mangaWhere,
+          orderBy: { createdAt: 'desc' },
+          include: {
+            manga: {
+              select: {
+                idManga: true,
+                titre: true,
+                image: true,
+                annee: true,
+                moyenneNotes: true,
+                synopsis: true,
+              },
             },
           },
-        },
-      }),
-    ]);
+        }),
+      ]);
+    });
 
     const combined = [
       ...animes.map(a => ({ ...a, mediaType: 'anime' })),
@@ -542,7 +552,9 @@ export class CollectionsService {
     const paginatedData = combined.slice(skip, skip + limit);
 
     // Calculate status counts for combined data
-    const statusCounts = await this.getStatusCounts(userId, 'both', collectionType);
+    const statusCounts = await this.prisma.executeWithRetry(async () => {
+      return this.getStatusCounts(userId, 'both', collectionType);
+    });
 
     return {
       data: paginatedData,
@@ -591,46 +603,48 @@ export class CollectionsService {
   }
 
   async isInCollection(userId: number, mediaId: number, mediaType: 'anime' | 'manga') {
-    let inCollection = false;
-    let collections: any[] = [];
+    return await this.prisma.executeWithRetry(async () => {
+      let inCollection = false;
+      let collections: any[] = [];
 
-    if (mediaType === 'anime') {
-      collections = await this.prisma.collectionAnime.findMany({
-        where: {
-          idMembre: userId,
-          idAnime: mediaId,
-        },
-        select: {
-          type: true,
-          evaluation: true,
-          notes: true,
-        },
-      });
-      inCollection = collections.length > 0;
-    } else {
-      collections = await this.prisma.collectionManga.findMany({
-        where: {
-          idMembre: userId,
-          idManga: mediaId,
-        },
-        select: {
-          type: true,
-          evaluation: true,
-          notes: true,
-        },
-      });
-      inCollection = collections.length > 0;
-    }
+      if (mediaType === 'anime') {
+        collections = await this.prisma.collectionAnime.findMany({
+          where: {
+            idMembre: userId,
+            idAnime: mediaId,
+          },
+          select: {
+            type: true,
+            evaluation: true,
+            notes: true,
+          },
+        });
+        inCollection = collections.length > 0;
+      } else {
+        collections = await this.prisma.collectionManga.findMany({
+          where: {
+            idMembre: userId,
+            idManga: mediaId,
+          },
+          select: {
+            type: true,
+            evaluation: true,
+            notes: true,
+          },
+        });
+        inCollection = collections.length > 0;
+      }
 
-    return {
-      inCollection,
-      collections: collections.map(c => ({
-        type: c.type,
-        name: this.getCollectionNameByTypeId(c.type),
-        rating: c.evaluation,
-        notes: c.notes,
-      })),
-    };
+      return {
+        inCollection,
+        collections: collections.map(c => ({
+          type: c.type,
+          name: this.getCollectionNameByTypeId(c.type),
+          rating: c.evaluation,
+          notes: c.notes,
+        })),
+      };
+    });
   }
 
   // Get all collections for a user (virtual collections based on type)
@@ -650,8 +664,8 @@ export class CollectionsService {
     // Get from database
     const result = await this.findUserCollectionsFromDB(userId, currentUserId);
 
-    // Cache for 10 minutes (longer since this data changes less frequently)
-    await this.cacheService.set(cacheKey, result, 600);
+    // Cache for 40 minutes (longer since this data changes less frequently)
+    await this.cacheService.set(cacheKey, result, 2400);
 
     return result;
   }
@@ -1063,8 +1077,8 @@ export class CollectionsService {
       }
     };
 
-    // Cache for 10 minutes
-    await this.cacheService.set(cacheKey, result, 600);
+    // Cache for 40 minutes
+    await this.cacheService.set(cacheKey, result, 2400);
     
     return result;
   }
@@ -1268,8 +1282,8 @@ export class CollectionsService {
       }
     };
 
-    // Cache for 10 minutes
-    await this.cacheService.set(cacheKey, result, 600);
+    // Cache for 40 minutes
+    await this.cacheService.set(cacheKey, result, 2400);
     
     return result;
   }
@@ -1437,31 +1451,24 @@ export class CollectionsService {
       dropped: 0,
     };
 
+    // Use single optimized queries with groupBy to reduce connection usage
+    const queries = [];
+
     if (mediaType === 'anime' || mediaType === 'both') {
       const animeWhere: any = { idMembre: userId };
       if (collectionType !== undefined) {
         animeWhere.type = collectionType;
       }
 
-      const animeCounts = await Promise.all([
-        this.prisma.collectionAnime.count({
-          where: { ...animeWhere, type: 1 },
-        }), // watching
-        this.prisma.collectionAnime.count({
-          where: { ...animeWhere, type: 2 },
-        }), // completed
-        this.prisma.collectionAnime.count({
-          where: { ...animeWhere, type: 3 },
-        }), // planned
-        this.prisma.collectionAnime.count({
-          where: { ...animeWhere, type: 4 },
-        }), // dropped
-      ]);
-
-      statusCounts.watching += animeCounts[0];
-      statusCounts.completed += animeCounts[1];
-      statusCounts.planned += animeCounts[2];
-      statusCounts.dropped += animeCounts[3];
+      queries.push(
+        this.prisma.collectionAnime.groupBy({
+          by: ['type'],
+          where: animeWhere,
+          _count: { type: true }
+        })
+      );
+    } else {
+      queries.push(Promise.resolve([]));
     }
 
     if (mediaType === 'manga' || mediaType === 'both') {
@@ -1470,26 +1477,38 @@ export class CollectionsService {
         mangaWhere.type = collectionType;
       }
 
-      const mangaCounts = await Promise.all([
-        this.prisma.collectionManga.count({
-          where: { ...mangaWhere, type: 1 },
-        }), // watching
-        this.prisma.collectionManga.count({
-          where: { ...mangaWhere, type: 2 },
-        }), // completed
-        this.prisma.collectionManga.count({
-          where: { ...mangaWhere, type: 3 },
-        }), // planned
-        this.prisma.collectionManga.count({
-          where: { ...mangaWhere, type: 4 },
-        }), // dropped
-      ]);
-
-      statusCounts.watching += mangaCounts[0];
-      statusCounts.completed += mangaCounts[1];
-      statusCounts.planned += mangaCounts[2];
-      statusCounts.dropped += mangaCounts[3];
+      queries.push(
+        this.prisma.collectionManga.groupBy({
+          by: ['type'],
+          where: mangaWhere,
+          _count: { type: true }
+        })
+      );
+    } else {
+      queries.push(Promise.resolve([]));
     }
+
+    const [animeCounts, mangaCounts] = await Promise.all(queries);
+
+    // Process anime counts
+    animeCounts.forEach((count: any) => {
+      switch (count.type) {
+        case 1: statusCounts.watching += count._count.type; break;
+        case 2: statusCounts.completed += count._count.type; break;
+        case 3: statusCounts.planned += count._count.type; break;
+        case 4: statusCounts.dropped += count._count.type; break;
+      }
+    });
+
+    // Process manga counts
+    mangaCounts.forEach((count: any) => {
+      switch (count.type) {
+        case 1: statusCounts.watching += count._count.type; break;
+        case 2: statusCounts.completed += count._count.type; break;
+        case 3: statusCounts.planned += count._count.type; break;
+        case 4: statusCounts.dropped += count._count.type; break;
+      }
+    });
 
     return statusCounts;
   }
