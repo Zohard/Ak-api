@@ -44,7 +44,6 @@ export class UsersService {
           idMember: true,
           memberName: true,
           realName: true,
-          emailAddress: true,
           dateRegistered: true,
           lastLogin: true,
           posts: true,
@@ -594,15 +593,20 @@ export class UsersService {
       ...otherFields
     } = user;
 
-    return {
+    const sanitized: any = {
       id: idMember,
       username: memberName,
       realName,
-      email: emailAddress,
       registrationDate: dateRegistered,
       lastLogin,
       isAdmin: user.idGroup === 1 || idMember === 1,
       ...otherFields,
     };
+
+    if (emailAddress !== undefined) {
+      sanitized.email = emailAddress;
+    }
+
+    return sanitized;
   }
 }
