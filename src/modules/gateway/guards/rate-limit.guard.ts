@@ -28,17 +28,18 @@ export class RateLimitGuard implements CanActivate {
       return true;
     }
 
-    const limiterKey = `${route.target}:${route.rateLimit.windowMs}:${route.rateLimit.max}`;
+    const rateLimitConfig = route.rateLimit;
+    const limiterKey = `${route.target}:${rateLimitConfig.windowMs}:${rateLimitConfig.max}`;
     
     if (!this.limiters.has(limiterKey)) {
       const limiter = rateLimit({
-        windowMs: route.rateLimit.windowMs,
-        max: route.rateLimit.max,
+        windowMs: rateLimitConfig.windowMs,
+        max: rateLimitConfig.max,
         message: {
           error: 'Too many requests',
           message: `Rate limit exceeded for ${route.target}. Try again later.`,
-          retryAfter: Math.ceil(route.rateLimit.windowMs / 1000),
-          limit: route.rateLimit.max,
+          retryAfter: Math.ceil(rateLimitConfig.windowMs / 1000),
+          limit: rateLimitConfig.max,
           timestamp: new Date().toISOString(),
         },
         standardHeaders: true,
@@ -54,8 +55,8 @@ export class RateLimitGuard implements CanActivate {
             {
               error: 'Too many requests',
               message: `Rate limit exceeded for ${route.target}. Try again later.`,
-              retryAfter: Math.ceil(route.rateLimit.windowMs / 1000),
-              limit: route.rateLimit.max,
+              retryAfter: Math.ceil(rateLimitConfig.windowMs / 1000),
+              limit: rateLimitConfig.max,
               timestamp: new Date().toISOString(),
             },
             HttpStatus.TOO_MANY_REQUESTS,
