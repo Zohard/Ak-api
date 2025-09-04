@@ -18,6 +18,7 @@ import { ForumsModule } from './modules/forums/forums.module';
 import { CollectionsModule } from './modules/collections/collections.module';
 import { ListsModule } from './modules/lists/lists.module';
 import { GatewayModule } from './modules/gateway/gateway.module';
+import { HomePageModule } from './modules/homepage/homepage.module';
 import { PrismaService } from './shared/services/prisma.service';
 import { CacheService } from './shared/services/cache.service';
 import databaseConfig from './config/database.config';
@@ -46,6 +47,7 @@ import jwtConfig from './config/jwt.config';
     CollectionsModule,
     ListsModule,
     GatewayModule,
+    HomePageModule,
   ],
   controllers: [AppController],
   providers: [AppService, PrismaService, CacheService],
