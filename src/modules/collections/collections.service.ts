@@ -241,7 +241,7 @@ export class CollectionsService {
           where: { idMembre: userId, idManga: mediaId },
           include: {
             manga: {
-              select: { idManga: true, titre: true, image: true, annee: true, moyenneNotes: true },
+              select: { idManga: true, titre: true, image: true, annee: true, moyenneNotes: true, nbVol: true },
             },
           },
         });
@@ -258,7 +258,7 @@ export class CollectionsService {
         },
         include: {
           manga: {
-            select: { idManga: true, titre: true, image: true, annee: true, moyenneNotes: true },
+            select: { idManga: true, titre: true, image: true, annee: true, moyenneNotes: true, nbVol: true },
           },
         },
       });
@@ -305,7 +305,7 @@ export class CollectionsService {
             where: { idMembre: userId, idManga: mediaId },
             include: {
               manga: {
-                select: { idManga: true, titre: true, image: true, annee: true, moyenneNotes: true },
+                select: { idManga: true, titre: true, image: true, annee: true, moyenneNotes: true, nbVol: true },
               },
             },
           });
@@ -465,6 +465,7 @@ export class CollectionsService {
                   annee: true,
                   moyenneNotes: true,
                   synopsis: true,
+                  nbVol: true,
                 },
               },
             },
@@ -537,6 +538,7 @@ export class CollectionsService {
                 annee: true,
                 moyenneNotes: true,
                 synopsis: true,
+                nbVol: true,
               },
             },
           },
@@ -1218,7 +1220,8 @@ export class CollectionsService {
               synopsis: true,
               moyenneNotes: true,
               niceUrl: true,
-              origine: true
+              origine: true,
+              nbVol: true
             }
           }
         }
@@ -1246,7 +1249,8 @@ export class CollectionsService {
         synopsis: item.manga.synopsis,
         moyenneNotes: item.manga.moyenneNotes,
         niceUrl: item.manga.niceUrl,
-        origine: item.manga.origine
+        origine: item.manga.origine,
+        nbVol: item.manga.nbVol
       }
     }));
 
@@ -1345,7 +1349,8 @@ export class CollectionsService {
         synopsis: collectionItem.manga.synopsis,
         moyenneNotes: collectionItem.manga.moyenneNotes,
         niceUrl: collectionItem.manga.niceUrl,
-        origine: collectionItem.manga.origine
+        origine: collectionItem.manga.origine,
+        nbVol: collectionItem.manga.nbVol
       }
     };
 
