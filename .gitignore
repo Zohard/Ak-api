@@ -103,3 +103,12 @@ Thumbs.db
 # Production
 /build
 /dist
+
+# Windows Zone.Identifier files
+*:Zone.Identifier
+
+# Test files in root
+/test-*.js
+
+# User uploads
+/uploads/
