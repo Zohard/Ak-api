@@ -1452,7 +1452,7 @@ export class CollectionsService {
     };
 
     // Use single optimized queries with groupBy to reduce connection usage
-    const queries = [];
+    const queries: Promise<any[]>[] = [];
 
     if (mediaType === 'anime' || mediaType === 'both') {
       const animeWhere: any = { idMembre: userId };
@@ -1465,7 +1465,7 @@ export class CollectionsService {
           by: ['type'],
           where: animeWhere,
           _count: { type: true }
-        })
+        }) as Promise<any[]>
       );
     } else {
       queries.push(Promise.resolve([]));
@@ -1482,7 +1482,7 @@ export class CollectionsService {
           by: ['type'],
           where: mangaWhere,
           _count: { type: true }
-        })
+        }) as Promise<any[]>
       );
     } else {
       queries.push(Promise.resolve([]));
