@@ -156,6 +156,15 @@ export class CacheService implements OnModuleInit {
     await this.set(`top:${type}:${limit}`, content, ttl); // 15 minutes
   }
 
+  // Lists cache methods
+  async getPublicLists(mediaType: string, sort: string, limit: number): Promise<any> {
+    return this.get(`lists:${mediaType}:${sort}:${limit}`);
+  }
+
+  async setPublicLists(mediaType: string, sort: string, limit: number, lists: any, ttl = 14400): Promise<void> {
+    await this.set(`lists:${mediaType}:${sort}:${limit}`, lists, ttl); // 4 hours (14400 seconds)
+  }
+
   // Reviews cache
   async getReviews(animeId: number, mangaId: number): Promise<any> {
     const id = animeId || mangaId;
@@ -189,6 +198,12 @@ export class CacheService implements OnModuleInit {
     this.logger.debug('Search cache invalidation requested');
   }
 
+  async invalidatePublicLists(mediaType: 'anime' | 'manga'): Promise<void> {
+    // Invalidate all cached public lists for this media type
+    await this.delByPattern(`lists:${mediaType}:*`);
+    this.logger.debug(`Invalidated public lists cache for ${mediaType}`);
+  }
+
   // Utility method to create consistent cache keys
   private hashQuery(query: string): string {
     // Simple hash function for query strings
@@ -208,6 +223,39 @@ export class CacheService implements OnModuleInit {
 
   async setHomepageData(key: string, data: any, ttl = 1800): Promise<void> {
     await this.set(`homepage:${key}`, data, ttl); // 30 minutes default for homepage data
+  }
+
+  // Articles cache methods
+  async getArticlesList(key: string): Promise<any> {
+    return this.get(`articles_list:${key}`);
+  }
+
+  async setArticlesList(key: string, articles: any, ttl = 600): Promise<void> {
+    await this.set(`articles_list:${key}`, articles, ttl); // 10 minutes for articles lists
+  }
+
+  async getArticle(id: number): Promise<any> {
+    return this.get(`article:${id}`);
+  }
+
+  async setArticle(id: number, article: any, ttl = 1800): Promise<void> {
+    await this.set(`article:${id}`, article, ttl); // 30 minutes for individual articles
+  }
+
+  async getArticleBySlug(slug: string): Promise<any> {
+    return this.get(`article_slug:${slug}`);
+  }
+
+  async setArticleBySlug(slug: string, article: any, ttl = 1800): Promise<void> {
+    await this.set(`article_slug:${slug}`, article, ttl); // 30 minutes for articles by slug
+  }
+
+  async getFeaturedArticles(): Promise<any> {
+    return this.get('featured_articles');
+  }
+
+  async setFeaturedArticles(articles: any, ttl = 3600): Promise<void> {
+    await this.set('featured_articles', articles, ttl); // 1 hour for featured articles
   }
 
   // Health check method

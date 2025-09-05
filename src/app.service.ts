@@ -54,8 +54,8 @@ export class AppService {
       count: Array.isArray(tags) ? tags.length : 0,
     };
 
-    // Cache for 2 hours (7200 seconds) - tags rarely change
-    await this.cacheService.set('ak_tags:all', result, 7200);
+    // Cache for 1 day (86400 seconds) - tags rarely change
+    await this.cacheService.set('ak_tags:all', result, 86400);
 
     return result;
   }
