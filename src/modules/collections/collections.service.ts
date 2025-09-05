@@ -58,18 +58,18 @@ export class CollectionsService {
     const { page = 1, limit = 10, search } = query;
     const skip = (page - 1) * limit;
 
-    // Get distinct collection types from both tables
-    const [animeCollections, mangaCollections] = await Promise.all([
-      this.prisma.collectionAnime.findMany({
+    // Use optimized groupBy queries to get counts for all types in one query each
+    const [animeCounts, mangaCounts] = await Promise.all([
+      this.prisma.collectionAnime.groupBy({
+        by: ['type'],
         where: { idMembre: userId },
-        select: { type: true },
-        distinct: ['type'],
+        _count: { type: true }
       }),
-      this.prisma.collectionManga.findMany({
+      this.prisma.collectionManga.groupBy({
+        by: ['type'],
         where: { idMembre: userId },
-        select: { type: true },
-        distinct: ['type'],
-      }),
+        _count: { type: true }
+      })
     ]);
 
     const collections: Array<{
@@ -86,10 +86,14 @@ export class CollectionsService {
     }> = [];
     const typeNames = this.getCollectionTypeNames();
     
-    // Create collection objects based on types found
+    // Create maps for fast lookup
+    const animeCountMap = new Map(animeCounts.map(item => [item.type, item._count.type]));
+    const mangaCountMap = new Map(mangaCounts.map(item => [item.type, item._count.type]));
+    
+    // Get all unique types from both collections
     const allTypes = new Set([
-      ...animeCollections.map(c => c.type),
-      ...mangaCollections.map(c => c.type)
+      ...animeCounts.map(c => c.type),
+      ...mangaCounts.map(c => c.type)
     ]);
 
     // Get status counts for meta
@@ -103,12 +107,8 @@ export class CollectionsService {
     let totalCount = 0;
 
     for (const type of allTypes) {
-      const animeCount = await this.prisma.collectionAnime.count({
-        where: { idMembre: userId, type }
-      });
-      const mangaCount = await this.prisma.collectionManga.count({
-        where: { idMembre: userId, type }
-      });
+      const animeCount = animeCountMap.get(type) || 0;
+      const mangaCount = mangaCountMap.get(type) || 0;
       const typeTotal = animeCount + mangaCount;
       totalCount += typeTotal;
 
