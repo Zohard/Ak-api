@@ -211,22 +211,6 @@ export class ArticlesService {
             },
           },
         },
-        // Optimize selected fields
-        select: {
-          ID: true,
-          postTitle: true,
-          postName: true,
-          postDate: true,
-          postModified: true,
-          postExcerpt: true,
-          postAuthor: true,
-          postStatus: true,
-          commentCount: true,
-          postContent: includeContent,
-          termRelationships: true,
-          postMeta: true,
-          _count: true,
-        },
         orderBy,
         skip: offset,
         take: limit,
@@ -245,7 +229,7 @@ export class ArticlesService {
 
       // Extract categories (filter for category taxonomy only)
       const categories = post.termRelationships
-        .filter(rel => rel.termTaxonomy.taxonomy === 'category')
+        .filter(rel => rel.termTaxonomy && rel.termTaxonomy.taxonomy === 'category')
         .map(rel => ({
           id: rel.termTaxonomy.term.termId,
           idCat: rel.termTaxonomy.term.termId,
@@ -774,7 +758,7 @@ export class ArticlesService {
     const tagsMeta = post.postMeta?.find(meta => meta.metaKey === 'tags');
 
     // Extract categories
-    const categories = post.termRelationships?.map(rel => ({
+    const categories = post.termRelationships?.filter(rel => rel.termTaxonomy).map(rel => ({
       id: rel.termTaxonomy.term.termId,
       idCat: rel.termTaxonomy.term.termId,
       name: rel.termTaxonomy.term.name,
