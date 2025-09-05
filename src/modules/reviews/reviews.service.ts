@@ -173,9 +173,22 @@ export class ReviewsService {
       }
     }
 
-    const orderBy = { [sortBy || 'dateCritique']: sortOrder || 'desc' };
+    // Create proper orderBy object with better null handling
+    let orderBy: any;
+    const sortField = sortBy || 'dateCritique';
+    const sortDirection = sortOrder || 'desc';
     
-    console.log('Reviews query debug:', { sortBy, sortOrder, orderBy, page, limit });
+    // For fields that might have null values, add secondary sort by date
+    if (sortField === 'popularite' || sortField === 'nbClics') {
+      orderBy = [
+        { [sortField]: sortDirection },
+        { dateCritique: 'desc' } // Secondary sort by date for consistency
+      ];
+    } else {
+      orderBy = { [sortField]: sortDirection };
+    }
+    
+    console.log('Reviews query debug:', { sortBy, sortOrder, sortField, sortDirection, orderBy, page, limit });
 
     const [reviews, total] = await Promise.all([
       this.prisma.akCritique.findMany({
