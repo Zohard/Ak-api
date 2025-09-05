@@ -117,10 +117,10 @@ export class ReviewsService {
     } = query;
 
     // Create cache key from query parameters
-    const cacheKey = this.createCacheKey(query);
+    const cacheKey = `reviews:${this.createCacheKey(query)}`;
     
     // Try to get from cache first
-    const cached = await this.cacheService.getReviews(idAnime || 0, idManga || 0);
+    const cached = await this.cacheService.get(cacheKey);
     if (cached && !search && !idMembre) { // Only cache non-search, non-user-specific queries
       return cached;
     }
@@ -235,7 +235,7 @@ export class ReviewsService {
     // Cache the result if it's not user-specific or search-based
     if (!search && !idMembre) {
       const ttl = idAnime || idManga ? 300 : 180; // 5 mins for specific anime/manga, 3 mins for general
-      await this.cacheService.setReviews(idAnime || 0, idManga || 0, result, ttl);
+      await this.cacheService.set(cacheKey, result, ttl);
     }
 
     return result;
