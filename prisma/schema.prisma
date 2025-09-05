@@ -284,7 +284,7 @@ model AkCritique {
   variationPopularite String? @map("variation_popularite") @db.Text
 
   // Relations
-  membre       SmfMember @relation(fields: [idMembre], references: [idMember], onDelete: Cascade)
+  membre       SmfMember? @relation(fields: [idMembre], references: [idMember], onDelete: Cascade)
   anime        AkAnime?  @relation(fields: [idAnime], references: [idAnime], onDelete: Cascade)
   manga        AkManga?  @relation(fields: [idManga], references: [idManga], onDelete: Cascade)
 
