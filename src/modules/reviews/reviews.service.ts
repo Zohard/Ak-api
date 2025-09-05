@@ -527,6 +527,7 @@ export class ReviewsService {
       idAnime,
       idManga,
       critique,
+      membre,
       ...otherFields
     } = review;
 
@@ -551,6 +552,7 @@ export class ReviewsService {
       mangaId: idManga,
       reviewDate,
       critique,
+      membre: membre || null, // Handle null membre
       ...otherFields,
     };
   }
