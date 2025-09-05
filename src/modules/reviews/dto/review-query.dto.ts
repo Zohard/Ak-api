@@ -95,6 +95,7 @@ export class ReviewQueryDto {
   })
   @IsOptional()
   @IsString()
+  @IsIn(['dateCritique', 'notation', 'popularite', 'nbClics'])
   sortBy?: string = 'dateCritique';
 
   @ApiPropertyOptional({
