@@ -172,4 +172,48 @@ export class ReviewsController {
   async rejectReview(@Param('id', ParseIntPipe) id: number, @Request() req) {
     return this.reviewsService.update(id, { statut: 2 }, req.user.id, true);
   }
+
+  @Post(':id/view')
+  @ApiOperation({ summary: 'Incrémenter les vues/popularité d\'une critique' })
+  @ApiParam({ name: 'id', description: 'ID de la critique', type: 'number' })
+  @ApiResponse({ status: 200, description: 'Popularité mise à jour avec succès' })
+  @ApiResponse({ status: 404, description: 'Critique introuvable' })
+  async incrementViews(@Param('id', ParseIntPipe) id: number, @Request() req) {
+    // Pass user ID to avoid self-increment (optional)
+    const userId = req.user?.id || null;
+    return this.reviewsService.incrementViews(id, userId);
+  }
+
+  @Post(':id/like')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Aimer une critique' })
+  @ApiParam({ name: 'id', description: 'ID de la critique', type: 'number' })
+  @ApiResponse({ status: 200, description: 'Like ajouté/retiré avec succès' })
+  @ApiResponse({ status: 404, description: 'Critique introuvable' })
+  @ApiResponse({ status: 403, description: 'Impossible d\'aimer sa propre critique' })
+  async likeReview(@Param('id', ParseIntPipe) id: number, @Request() req) {
+    return this.reviewsService.likeReview(id, req.user.id);
+  }
+
+  @Post(':id/dislike')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Ne pas aimer une critique' })
+  @ApiParam({ name: 'id', description: 'ID de la critique', type: 'number' })
+  @ApiResponse({ status: 200, description: 'Dislike ajouté/retiré avec succès' })
+  @ApiResponse({ status: 404, description: 'Critique introuvable' })
+  @ApiResponse({ status: 403, description: 'Impossible de disliker sa propre critique' })
+  async dislikeReview(@Param('id', ParseIntPipe) id: number, @Request() req) {
+    return this.reviewsService.dislikeReview(id, req.user.id);
+  }
+
+  @Get(':id/stats')
+  @ApiOperation({ summary: 'Statistiques d\'une critique' })
+  @ApiParam({ name: 'id', description: 'ID de la critique', type: 'number' })
+  @ApiResponse({ status: 200, description: 'Statistiques de la critique' })
+  @ApiResponse({ status: 404, description: 'Critique introuvable' })
+  async getReviewStats(@Param('id', ParseIntPipe) id: number) {
+    return this.reviewsService.getReviewStats(id);
+  }
 }
