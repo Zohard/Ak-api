@@ -188,7 +188,6 @@ export class ReviewsService {
       orderBy = { [sortField]: sortDirection };
     }
     
-    console.log('Reviews query debug:', { sortBy, sortOrder, sortField, sortDirection, orderBy, page, limit });
 
     const [reviews, total] = await Promise.all([
       this.prisma.akCritique.findMany({
