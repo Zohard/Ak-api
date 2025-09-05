@@ -17,6 +17,7 @@ import { SeasonsModule } from './modules/seasons/seasons.module';
 import { ForumsModule } from './modules/forums/forums.module';
 import { CollectionsModule } from './modules/collections/collections.module';
 import { ListsModule } from './modules/lists/lists.module';
+import { JobsModule } from './modules/jobs/jobs.module';
 import { GatewayModule } from './modules/gateway/gateway.module';
 import { HomePageModule } from './modules/homepage/homepage.module';
 import { PrismaService } from './shared/services/prisma.service';
@@ -46,6 +47,7 @@ import jwtConfig from './config/jwt.config';
     ForumsModule,
     CollectionsModule,
     ListsModule,
+    JobsModule,
     GatewayModule,
     HomePageModule,
   ],
