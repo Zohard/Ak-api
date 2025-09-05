@@ -654,6 +654,8 @@ export class ReviewsService {
       select: {
         idCritique: true,
         idMembre: true,
+        idAnime: true,
+        idManga: true,
         jaime: true,
         jaimepas: true,
         nbClics: true,
@@ -719,6 +721,8 @@ export class ReviewsService {
       select: {
         idCritique: true,
         idMembre: true,
+        idAnime: true,
+        idManga: true,
         jaime: true,
         jaimepas: true,
         nbClics: true,
