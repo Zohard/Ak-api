@@ -85,8 +85,8 @@ export class ListsService {
     });
     
     // Invalidate cache if the list is public or was made public/private
-    if (existing.statut === 1 || updated.statut === 1) {
-      await this.cacheService.invalidatePublicLists(updated.animeOrManga);
+    if ((existing.statut === 1 || updated.statut === 1) && updated.animeOrManga) {
+      await this.cacheService.invalidatePublicLists(updated.animeOrManga as 'anime' | 'manga');
     }
     
     return this.formatList(updated);
@@ -100,8 +100,8 @@ export class ListsService {
     await this.prisma.akListesTop.delete({ where: { idListe: id } });
     
     // Invalidate cache when a public list is deleted
-    if (existing.statut === 1) {
-      await this.cacheService.invalidatePublicLists(existing.animeOrManga);
+    if (existing.statut === 1 && existing.animeOrManga) {
+      await this.cacheService.invalidatePublicLists(existing.animeOrManga as 'anime' | 'manga');
     }
     
     return { success: true };
