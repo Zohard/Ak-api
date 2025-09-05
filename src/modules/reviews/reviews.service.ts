@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../shared/services/prisma.service';
 import { CacheService } from '../../shared/services/cache.service';
+import { PopularityService } from '../../shared/services/popularity.service';
 import { CreateReviewDto } from './dto/create-review.dto';
 import { UpdateReviewDto } from './dto/update-review.dto';
 import { ReviewQueryDto } from './dto/review-query.dto';
@@ -15,6 +16,7 @@ export class ReviewsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly cacheService: CacheService,
+    private readonly popularityService: PopularityService,
   ) {}
 
   async create(createReviewDto: CreateReviewDto, userId: number) {
@@ -519,6 +521,81 @@ export class ReviewsService {
     return { count: total };
   }
 
+  /**
+   * Increment view count and popularity for a review
+   * Following the same logic as the original WordPress implementation
+   */
+  async incrementViews(reviewId: number, userId?: number) {
+    // First, check if the review exists
+    const review = await this.prisma.akCritique.findUnique({
+      where: { idCritique: reviewId },
+      select: {
+        idCritique: true,
+        idMembre: true,
+        nbClics: true,
+        nbClicsDay: true,
+        nbClicsWeek: true,
+        nbClicsMonth: true,
+        popularite: true,
+        idAnime: true,
+        idManga: true,
+      },
+    });
+
+    if (!review) {
+      throw new NotFoundException('Critique introuvable');
+    }
+
+    // Only increment if the user is not the author (following WordPress logic)
+    if (userId && userId === review.idMembre) {
+      return {
+        message: 'Vue non comptée - auteur de la critique',
+        reviewId,
+        nbClics: review.nbClics,
+      };
+    }
+
+    // Increment all view counters
+    const updatedReview = await this.prisma.akCritique.update({
+      where: { idCritique: reviewId },
+      data: {
+        nbClics: { increment: 1 },
+        nbClicsDay: { increment: 1 },
+        nbClicsWeek: { increment: 1 },
+        nbClicsMonth: { increment: 1 },
+      },
+      select: {
+        idCritique: true,
+        nbClics: true,
+        nbClicsDay: true,
+        nbClicsWeek: true,
+        nbClicsMonth: true,
+        popularite: true,
+      },
+    });
+
+    // Recalculate and update popularity
+    const newPopularity = await this.calculateReviewPopularity(reviewId);
+    await this.prisma.akCritique.update({
+      where: { idCritique: reviewId },
+      data: { popularite: newPopularity },
+    });
+
+    // Invalidate related caches
+    await this.invalidateReviewCache(reviewId, review.idAnime, review.idManga);
+
+    // Return updated stats
+    return {
+      message: 'Popularité mise à jour avec succès',
+      reviewId,
+      nbClics: updatedReview.nbClics,
+      nbClicsDay: updatedReview.nbClicsDay,
+      nbClicsWeek: updatedReview.nbClicsWeek,
+      nbClicsMonth: updatedReview.nbClicsMonth,
+      popularite: newPopularity,
+    };
+  }
+
   private formatReview(review: any) {
     const {
       idCritique,
@@ -554,6 +631,321 @@ export class ReviewsService {
       critique,
       membre: membre || null, // Handle null membre
       ...otherFields,
+    };
+  }
+
+  /**
+   * Like/dislike system methods
+   */
+  private parseVotes(csv?: string | null): number[] {
+    return (csv || '')
+      .split(',')
+      .map((s) => parseInt(s))
+      .filter((n) => !isNaN(n) && n > 0);
+  }
+
+  private toCsv(ids: number[]): string {
+    return ids.join(',');
+  }
+
+  async likeReview(reviewId: number, userId: number) {
+    const review = await this.prisma.akCritique.findUnique({
+      where: { idCritique: reviewId },
+      select: {
+        idCritique: true,
+        idMembre: true,
+        jaime: true,
+        jaimepas: true,
+        nbClics: true,
+        notation: true,
+        nbCarac: true,
+        dateCritique: true,
+      },
+    });
+
+    if (!review) {
+      throw new NotFoundException('Critique introuvable');
+    }
+
+    // Prevent self-liking
+    if (review.idMembre === userId) {
+      throw new ForbiddenException('Vous ne pouvez pas aimer votre propre critique');
+    }
+
+    const likes = new Set(this.parseVotes(review.jaime));
+    const dislikes = new Set(this.parseVotes(review.jaimepas));
+    
+    // Remove from dislikes if present
+    dislikes.delete(userId);
+    
+    // Toggle like
+    const wasLiked = likes.has(userId);
+    if (wasLiked) {
+      likes.delete(userId);
+    } else {
+      likes.add(userId);
+    }
+
+    // Update the review
+    const updated = await this.prisma.akCritique.update({
+      where: { idCritique: reviewId },
+      data: { 
+        jaime: this.toCsv([...likes]), 
+        jaimepas: this.toCsv([...dislikes]) 
+      },
+    });
+
+    // Calculate and update popularity
+    const popularity = await this.calculateReviewPopularity(reviewId);
+    await this.prisma.akCritique.update({ 
+      where: { idCritique: reviewId }, 
+      data: { popularite: popularity } 
+    });
+
+    // Invalidate caches
+    await this.invalidateReviewCache(reviewId, review.idAnime, review.idManga);
+
+    return {
+      liked: !wasLiked,
+      likes: likes.size,
+      dislikes: dislikes.size,
+      popularite: popularity,
+    };
+  }
+
+  async dislikeReview(reviewId: number, userId: number) {
+    const review = await this.prisma.akCritique.findUnique({
+      where: { idCritique: reviewId },
+      select: {
+        idCritique: true,
+        idMembre: true,
+        jaime: true,
+        jaimepas: true,
+        nbClics: true,
+        notation: true,
+        nbCarac: true,
+        dateCritique: true,
+      },
+    });
+
+    if (!review) {
+      throw new NotFoundException('Critique introuvable');
+    }
+
+    // Prevent self-disliking
+    if (review.idMembre === userId) {
+      throw new ForbiddenException('Vous ne pouvez pas disliker votre propre critique');
+    }
+
+    const likes = new Set(this.parseVotes(review.jaime));
+    const dislikes = new Set(this.parseVotes(review.jaimepas));
+    
+    // Remove from likes if present
+    likes.delete(userId);
+    
+    // Toggle dislike
+    const wasDisliked = dislikes.has(userId);
+    if (wasDisliked) {
+      dislikes.delete(userId);
+    } else {
+      dislikes.add(userId);
+    }
+
+    // Update the review
+    const updated = await this.prisma.akCritique.update({
+      where: { idCritique: reviewId },
+      data: { 
+        jaime: this.toCsv([...likes]), 
+        jaimepas: this.toCsv([...dislikes]) 
+      },
+    });
+
+    // Calculate and update popularity
+    const popularity = await this.calculateReviewPopularity(reviewId);
+    await this.prisma.akCritique.update({ 
+      where: { idCritique: reviewId }, 
+      data: { popularite: popularity } 
+    });
+
+    // Invalidate caches
+    await this.invalidateReviewCache(reviewId, review.idAnime, review.idManga);
+
+    return {
+      disliked: !wasDisliked,
+      likes: likes.size,
+      dislikes: dislikes.size,
+      popularite: popularity,
+    };
+  }
+
+  async getReviewStats(reviewId: number) {
+    const review = await this.prisma.akCritique.findUnique({
+      where: { idCritique: reviewId },
+      select: {
+        idCritique: true,
+        jaime: true,
+        jaimepas: true,
+        nbClics: true,
+        nbClicsDay: true,
+        nbClicsWeek: true,
+        nbClicsMonth: true,
+        notation: true,
+        nbCarac: true,
+        dateCritique: true,
+        popularite: true,
+        membre: {
+          select: {
+            idMember: true,
+            memberName: true,
+          },
+        },
+      },
+    });
+
+    if (!review) {
+      throw new NotFoundException('Critique introuvable');
+    }
+
+    const likes = this.parseVotes(review.jaime);
+    const dislikes = this.parseVotes(review.jaimepas);
+
+    // Calculate various scores
+    const popularity = await this.calculateReviewPopularity(reviewId);
+    const trendingScore = this.calculateTrendingScore(review);
+    const qualityScore = this.calculateQualityScore(review);
+
+    return {
+      reviewId: review.idCritique,
+      likes: likes.length,
+      dislikes: dislikes.length,
+      totalVotes: likes.length + dislikes.length,
+      likeRatio: likes.length + dislikes.length > 0 ? likes.length / (likes.length + dislikes.length) : 0,
+      views: {
+        total: review.nbClics || 0,
+        day: review.nbClicsDay || 0,
+        week: review.nbClicsWeek || 0,
+        month: review.nbClicsMonth || 0,
+      },
+      scores: {
+        popularity,
+        trending: trendingScore,
+        quality: qualityScore,
+      },
+      tier: this.popularityService.getPopularityTier(popularity),
+      category: this.popularityService.getPopularityCategory(popularity),
+    };
+  }
+
+  /**
+   * Calculate comprehensive popularity for a review
+   */
+  private async calculateReviewPopularity(reviewId: number): Promise<number> {
+    const review = await this.prisma.akCritique.findUnique({
+      where: { idCritique: reviewId },
+      select: {
+        jaime: true,
+        jaimepas: true,
+        nbClics: true,
+        nbClicsWeek: true,
+        notation: true,
+        nbCarac: true,
+        dateCritique: true,
+        membre: {
+          select: {
+            // We'll calculate author reputation later
+          },
+        },
+      },
+    });
+
+    if (!review) return 0;
+
+    const likes = this.parseVotes(review.jaime).length;
+    const dislikes = this.parseVotes(review.jaimepas).length;
+    const ageInDays = review.dateCritique 
+      ? Math.floor((Date.now() - new Date(review.dateCritique).getTime()) / (1000 * 60 * 60 * 24))
+      : 0;
+
+    // Use the popularity service
+    return this.popularityService.calculatePopularity({
+      totalViews: review.nbClics || 0,
+      recentViews: review.nbClicsWeek || 0,
+      averageRating: review.notation || 0,
+      ratingCount: 1, // Individual review rating
+      likes,
+      dislikes,
+      reviewLength: review.nbCarac || 0,
+      ageInDays,
+    });
+  }
+
+  /**
+   * Calculate trending score for recent activity
+   */
+  private calculateTrendingScore(review: any): number {
+    const likes = this.parseVotes(review.jaime).length;
+    const dislikes = this.parseVotes(review.jaimepas).length;
+    const ageInDays = review.dateCritique 
+      ? Math.floor((Date.now() - new Date(review.dateCritique).getTime()) / (1000 * 60 * 60 * 24))
+      : 0;
+
+    return this.popularityService.calculateTrendingScore({
+      totalViews: review.nbClics || 0,
+      recentViews: review.nbClicsWeek || 0,
+      likes,
+      ageInDays,
+    });
+  }
+
+  /**
+   * Calculate quality score based on content
+   */
+  private calculateQualityScore(review: any): number {
+    return this.popularityService.calculateQualityScore({
+      averageRating: review.notation || 0,
+      ratingCount: 1,
+      reviewLength: review.nbCarac || 0,
+    });
+  }
+
+  /**
+   * Batch update popularities (for scheduled jobs)
+   */
+  async updateAllPopularities(limit = 100) {
+    const reviews = await this.prisma.akCritique.findMany({
+      take: limit,
+      orderBy: { dateCritique: 'desc' },
+      select: {
+        idCritique: true,
+        jaime: true,
+        jaimepas: true,
+        nbClics: true,
+        nbClicsWeek: true,
+        notation: true,
+        nbCarac: true,
+        dateCritique: true,
+      },
+    });
+
+    const updates = await Promise.allSettled(
+      reviews.map(async (review) => {
+        const popularity = await this.calculateReviewPopularity(review.idCritique);
+        
+        return this.prisma.akCritique.update({
+          where: { idCritique: review.idCritique },
+          data: { popularite: popularity },
+        });
+      })
+    );
+
+    const successful = updates.filter(result => result.status === 'fulfilled').length;
+    const failed = updates.filter(result => result.status === 'rejected').length;
+
+    return {
+      processed: reviews.length,
+      successful,
+      failed,
+      timestamp: new Date().toISOString(),
     };
   }
 
