@@ -115,10 +115,10 @@ export class CollectionsService {
       // Map type to status name for counts
       switch (type) {
         case 1:
-          statusCounts.watching = typeTotal;
+          statusCounts.completed = typeTotal;
           break;
         case 2:
-          statusCounts.completed = typeTotal;
+          statusCounts.watching = typeTotal;
           break;
         case 3:
           statusCounts.planned = typeTotal;
@@ -211,7 +211,7 @@ export class CollectionsService {
           },
           include: {
             anime: {
-              select: { idAnime: true, titre: true, image: true, annee: true, moyenneNotes: true },
+              select: { idAnime: true, titre: true, image: true, annee: true, moyenneNotes: true, nbEp: true },
             },
           },
         });
@@ -398,6 +398,7 @@ export class CollectionsService {
                   annee: true,
                   moyenneNotes: true,
                   synopsis: true,
+                  nbEp: true,
                 },
               },
             },
@@ -522,6 +523,7 @@ export class CollectionsService {
                 annee: true,
                 moyenneNotes: true,
                 synopsis: true,
+                nbEp: true,
               },
             },
           },
@@ -1498,8 +1500,8 @@ export class CollectionsService {
     // Process anime counts
     animeCounts.forEach((count: any) => {
       switch (count.type) {
-        case 1: statusCounts.watching += count._count.type; break;
-        case 2: statusCounts.completed += count._count.type; break;
+        case 1: statusCounts.completed += count._count.type; break;
+        case 2: statusCounts.watching += count._count.type; break;
         case 3: statusCounts.planned += count._count.type; break;
         case 4: statusCounts.dropped += count._count.type; break;
       }
@@ -1508,8 +1510,8 @@ export class CollectionsService {
     // Process manga counts
     mangaCounts.forEach((count: any) => {
       switch (count.type) {
-        case 1: statusCounts.watching += count._count.type; break;
-        case 2: statusCounts.completed += count._count.type; break;
+        case 1: statusCounts.completed += count._count.type; break;
+        case 2: statusCounts.watching += count._count.type; break;
         case 3: statusCounts.planned += count._count.type; break;
         case 4: statusCounts.dropped += count._count.type; break;
       }
