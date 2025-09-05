@@ -5,6 +5,7 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { PrismaService } from '../../shared/services/prisma.service';
+import { CacheService } from '../../shared/services/cache.service';
 import { CreateArticleDto } from './dto/create-article.dto';
 import { UpdateArticleDto } from './dto/update-article.dto';
 import { ArticleQueryDto } from './dto/article-query.dto';
@@ -12,7 +13,10 @@ import { PublishArticleDto } from './dto/publish-article.dto';
 
 @Injectable()
 export class ArticlesService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private cacheService: CacheService,
+  ) {}
 
   private serializeBigInt(obj: any): any {
     return JSON.parse(JSON.stringify(obj, (key, value) =>
@@ -20,7 +24,45 @@ export class ArticlesService {
     ));
   }
 
+  private createCacheKey(query: ArticleQueryDto): string {
+    const {
+      page = 1,
+      limit = 20,
+      search = '',
+      categoryId = '',
+      authorId = '',
+      status = '',
+      sort = '',
+      sortBy = '',
+      order = '',
+      sortOrder = '',
+      onindex = '',
+      tag = '',
+      includeContent = false,
+    } = query;
+
+    const key = `${page}_${limit}_${search}_${categoryId}_${authorId}_${status}_${sort}_${sortBy}_${order}_${sortOrder}_${onindex}_${tag}_${includeContent}`;
+    
+    // Simple hash to keep key length manageable
+    let hash = 0;
+    for (let i = 0; i < key.length; i++) {
+      const char = key.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash;
+    }
+    return Math.abs(hash).toString(36);
+  }
+
   async findAll(query: ArticleQueryDto) {
+    // Create cache key from query parameters
+    const cacheKey = this.createCacheKey(query);
+    
+    // Try to get from cache first
+    const cached = await this.cacheService.getArticlesList(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
     const {
       page = 1,
       limit = 20,
@@ -126,26 +168,41 @@ export class ArticlesService {
       this.prisma.wpPost.findMany({
         where,
         include: {
+          // Only load category relationships to reduce joins
           termRelationships: {
+            where: {
+              termTaxonomy: {
+                taxonomy: 'category',
+              },
+            },
             include: {
               termTaxonomy: {
                 include: {
-                  term: true,
+                  term: {
+                    select: {
+                      termId: true,
+                      name: true,
+                      slug: true,
+                    },
+                  },
                 },
               },
             },
+            take: 5, // Limit categories to reduce data transfer
           },
+          // Only load essential meta fields
           postMeta: {
             where: {
               OR: [
                 { metaKey: '_thumbnail_id' },
-                { metaKey: 'excerpt' },
-                { metaKey: 'views' },
                 { metaKey: 'ak_img' },
                 { metaKey: 'img' },
+                { metaKey: 'views' },
               ],
             },
+            take: 10, // Limit meta fields
           },
+          // Simplified comment count
           _count: {
             select: {
               comments: {
@@ -153,6 +210,22 @@ export class ArticlesService {
               },
             },
           },
+        },
+        // Optimize selected fields
+        select: {
+          ID: true,
+          postTitle: true,
+          postName: true,
+          postDate: true,
+          postModified: true,
+          postExcerpt: true,
+          postAuthor: true,
+          postStatus: true,
+          commentCount: true,
+          postContent: includeContent,
+          termRelationships: true,
+          postMeta: true,
+          _count: true,
         },
         orderBy,
         skip: offset,
@@ -224,7 +297,7 @@ export class ArticlesService {
 
     const totalPages = Math.ceil(total / limit);
 
-    return this.serializeBigInt({
+    const result = this.serializeBigInt({
       articles: transformedArticles,
       pagination: {
         currentPage: page,
@@ -234,9 +307,21 @@ export class ArticlesService {
         hasPrevious: page > 1,
       },
     });
+
+    // Cache the result (TTL based on query type)
+    const ttl = search || categoryId || authorId ? 300 : 600; // 5 mins for filtered, 10 mins for general lists
+    await this.cacheService.setArticlesList(cacheKey, result, ttl);
+
+    return result;
   }
 
   async getById(id: number, includeContent: boolean = true) {
+    // Check cache first
+    const cached = await this.cacheService.getArticle(id);
+    if (cached) {
+      return cached;
+    }
+
     const post = await this.prisma.wpPost.findUnique({
       where: { ID: BigInt(id) },
       include: {
@@ -276,11 +361,23 @@ export class ArticlesService {
     // Increment view count
     await this.incrementViewCount(id);
 
-    return this.transformPost(post, includeContent);
+    const result = this.transformPost(post, includeContent);
+    
+    // Cache the result for 30 minutes
+    await this.cacheService.setArticle(id, result, 1800);
+
+    return result;
   }
 
   async getByNiceUrl(niceUrl: string, includeContent: boolean = true) {
     console.log('ArticlesService.getByNiceUrl called with:', niceUrl);
+    
+    // Check cache first
+    const cached = await this.cacheService.getArticleBySlug(niceUrl);
+    if (cached) {
+      return cached;
+    }
+
     const post = await this.prisma.wpPost.findFirst({
       where: { 
         postName: niceUrl,
@@ -324,10 +421,21 @@ export class ArticlesService {
     // Increment view count
     await this.incrementViewCount(Number(post.ID));
 
-    return this.transformPost(post, includeContent);
+    const result = this.transformPost(post, includeContent);
+    
+    // Cache the result for 30 minutes
+    await this.cacheService.setArticleBySlug(niceUrl, result, 1800);
+
+    return result;
   }
 
   async getFeaturedArticles(limit: number = 5) {
+    // Check cache first
+    const cached = await this.cacheService.getFeaturedArticles();
+    if (cached) {
+      return cached;
+    }
+
     // Get posts with a specific meta key indicating they're featured
     const posts = await this.prisma.wpPost.findMany({
       where: {
@@ -375,7 +483,12 @@ export class ArticlesService {
       take: limit,
     });
 
-    return posts.map(post => this.transformPost(post, false));
+    const result = posts.map(post => this.transformPost(post, false));
+    
+    // Cache the featured articles for 1 hour
+    await this.cacheService.setFeaturedArticles(result, 3600);
+
+    return result;
   }
 
   async create(articleData: CreateArticleDto, authorId: number): Promise<any> {

@@ -10,6 +10,7 @@ import { CommentsController } from './comments/comments.controller';
 import { AdminCommentsController } from './comments/admin/admin-comments.controller';
 import { ArticlePermissionsGuard } from './guards/article-permissions.guard';
 import { PrismaService } from '../../shared/services/prisma.service';
+import { CacheService } from '../../shared/services/cache.service';
 
 @Module({
   controllers: [
@@ -26,6 +27,7 @@ import { PrismaService } from '../../shared/services/prisma.service';
     CommentsService,
     ArticlePermissionsGuard,
     PrismaService,
+    CacheService,
   ],
   exports: [ArticlesService, CategoriesService, CommentsService],
 })

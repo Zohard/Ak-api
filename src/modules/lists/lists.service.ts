@@ -1,11 +1,15 @@
 import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../../shared/services/prisma.service';
+import { CacheService } from '../../shared/services/cache.service';
 import { CreateListDto } from './dto/create-list.dto';
 import { UpdateListDto } from './dto/update-list.dto';
 
 @Injectable()
 export class ListsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private cacheService: CacheService,
+  ) {}
 
   private calculatePopularity(jaime?: string | null, jaimepas?: string | null, nb_clics = 0): number {
     const likes = (jaime || '')
@@ -53,6 +57,12 @@ export class ListsService {
         popularite: 0,
       },
     });
+    
+    // Invalidate cache when a new public list is created
+    if (list.statut === 1) {
+      await this.cacheService.invalidatePublicLists(dto.animeOrManga);
+    }
+    
     return this.formatList(list);
   }
 
@@ -73,6 +83,12 @@ export class ListsService {
         statut: dto.statut ?? existing.statut,
       },
     });
+    
+    // Invalidate cache if the list is public or was made public/private
+    if (existing.statut === 1 || updated.statut === 1) {
+      await this.cacheService.invalidatePublicLists(updated.animeOrManga);
+    }
+    
     return this.formatList(updated);
   }
 
@@ -82,6 +98,12 @@ export class ListsService {
     if (existing.idMembre !== userId) throw new ForbiddenException('Not your list');
 
     await this.prisma.akListesTop.delete({ where: { idListe: id } });
+    
+    // Invalidate cache when a public list is deleted
+    if (existing.statut === 1) {
+      await this.cacheService.invalidatePublicLists(existing.animeOrManga);
+    }
+    
     return { success: true };
   }
 
@@ -100,26 +122,39 @@ export class ListsService {
   }
 
   async getPublicLists(mediaType: 'anime' | 'manga', sort: 'recent' | 'popular' = 'recent', limit = 10) {
+    // Check cache first
+    const cachedLists = await this.cacheService.getPublicLists(mediaType, sort, limit);
+    if (cachedLists) {
+      return cachedLists;
+    }
+
+    let result: any[];
+
     if (sort === 'recent') {
       const rows = await this.prisma.akListesTop.findMany({
         where: { statut: 1, animeOrManga: mediaType },
         orderBy: { dateCreation: 'desc' },
         take: limit,
       });
-      return rows.map((r) => this.formatList(r));
+      result = rows.map((r) => this.formatList(r));
+    } else {
+      // Popular: compute popularity score on the fly and sort in JS
+      const lists = await this.prisma.akListesTop.findMany({
+        where: { statut: 1, animeOrManga: mediaType },
+        orderBy: { idListe: 'desc' },
+        take: 100,
+      });
+      const scored = lists
+        .map((l) => ({ ...l, popularityScore: this.calculatePopularity(l.jaime, l.jaimepas, l.nbClics) }))
+        .sort((a, b) => b.popularityScore - a.popularityScore)
+        .slice(0, limit);
+      result = scored.map((r) => this.formatList(r));
     }
 
-    // Popular: compute popularity score on the fly and sort in JS
-    const lists = await this.prisma.akListesTop.findMany({
-      where: { statut: 1, animeOrManga: mediaType },
-      orderBy: { idListe: 'desc' },
-      take: 100,
-    });
-    const scored = lists
-      .map((l) => ({ ...l, popularityScore: this.calculatePopularity(l.jaime, l.jaimepas, l.nbClics) }))
-      .sort((a, b) => b.popularityScore - a.popularityScore)
-      .slice(0, limit);
-    return scored.map((r) => this.formatList(r));
+    // Cache the result for 4 hours
+    await this.cacheService.setPublicLists(mediaType, sort, limit, result);
+    
+    return result;
   }
 
   async getById(id: number) {
