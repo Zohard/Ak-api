@@ -847,7 +847,10 @@ export class ReviewsService {
         dateCritique: true,
         membre: {
           select: {
-            // We'll calculate author reputation later
+            idMember: true,
+            posts: true,
+            nbCritiques: true,
+            experience: true,
           },
         },
       },
