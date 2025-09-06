@@ -247,7 +247,7 @@ export class FriendsController {
     if (isNaN(parsedLimit) || parsedLimit < 1 || parsedLimit > 50) {
       throw new BadRequestException('Invalid limit (must be between 1 and 50)');
     }
-    return await this.friendsService.searchUsers(query, req.user.userId, parsedLimit);
+    return await this.friendsService.searchUsers(query, req.user.id, parsedLimit);
   }
 
   @Get('recommendations')
@@ -286,7 +286,7 @@ export class FriendsController {
     if (isNaN(parsedLimit) || parsedLimit < 1 || parsedLimit > 20) {
       throw new BadRequestException('Invalid limit (must be between 1 and 20)');
     }
-    return await this.friendsService.getFriendRecommendations(req.user.userId, parsedLimit);
+    return await this.friendsService.getFriendRecommendations(req.user.id, parsedLimit);
   }
 
   @Post('bulk-add')
