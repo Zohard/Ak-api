@@ -1,4 +1,5 @@
 import { Injectable, BadRequestException, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../shared/services/prisma.service';
 
 export interface FriendData {
@@ -65,6 +66,7 @@ export class FriendsService {
     }
 
     // Get friend details
+    const friendsIdsSql = Prisma.sql`(${Prisma.join(friendIds)})`;
     const friendsData = await this.prisma.$queryRaw<Array<{
       id_member: number;
       real_name: string;
@@ -74,7 +76,7 @@ export class FriendsService {
     }>>`
       SELECT id_member, real_name, last_login, avatar, buddy_list
       FROM smf_members 
-      WHERE id_member IN (${friendIds.join(',')})
+      WHERE id_member IN ${friendsIdsSql}
       ORDER BY real_name ASC
     `;
 
@@ -337,6 +339,7 @@ export class FriendsService {
     }
 
     // Get mutual friends data
+    const mutualIdsSql = Prisma.sql`(${Prisma.join(mutualFriendIds)})`;
     const mutualFriendsData = await this.prisma.$queryRaw<Array<{
       id_member: number;
       real_name: string;
@@ -345,7 +348,7 @@ export class FriendsService {
     }>>`
       SELECT id_member, real_name, last_login, avatar
       FROM smf_members 
-      WHERE id_member IN (${mutualFriendIds.join(',')})
+      WHERE id_member IN ${mutualIdsSql}
       ORDER BY real_name ASC
     `;
 
