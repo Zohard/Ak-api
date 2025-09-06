@@ -312,4 +312,33 @@ export class CollectionsController {
   ) {
     return this.collectionsService.removeMangaFromCollection(userId, type, mangaId, req.user.id);
   }
+
+  // Ratings distribution (for charts)
+  @Get('user/:userId/type/:type/animes/ratings')
+  @ApiOperation({ summary: 'Get ratings distribution for animes in a user collection type' })
+  @ApiParam({ name: 'userId', type: 'number', description: 'User ID' })
+  @ApiParam({ name: 'type', type: 'number', description: 'Collection type (0-4). 0 = all types' })
+  @ApiResponse({ status: 200, description: 'Ratings distribution computed successfully' })
+  getAnimeRatingsDistribution(
+    @Param('userId', ParseIntPipe) userId: number,
+    @Param('type', ParseIntPipe) type: number,
+    @Request() req,
+  ) {
+    const currentUserId = req.user?.id;
+    return this.collectionsService.getRatingsDistribution(userId, type, 'anime', currentUserId);
+  }
+
+  @Get('user/:userId/type/:type/mangas/ratings')
+  @ApiOperation({ summary: 'Get ratings distribution for mangas in a user collection type' })
+  @ApiParam({ name: 'userId', type: 'number', description: 'User ID' })
+  @ApiParam({ name: 'type', type: 'number', description: 'Collection type (0-4). 0 = all types' })
+  @ApiResponse({ status: 200, description: 'Ratings distribution computed successfully' })
+  getMangaRatingsDistribution(
+    @Param('userId', ParseIntPipe) userId: number,
+    @Param('type', ParseIntPipe) type: number,
+    @Request() req,
+  ) {
+    const currentUserId = req.user?.id;
+    return this.collectionsService.getRatingsDistribution(userId, type, 'manga', currentUserId);
+  }
 }

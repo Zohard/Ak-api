@@ -1392,6 +1392,73 @@ export class CollectionsService {
     return { message: 'Manga removed from collection successfully' };
   }
 
+  // Get ratings distribution for a user's collection (anime or manga)
+  async getRatingsDistribution(
+    userId: number,
+    type: number, // 0 = all types
+    mediaType: 'anime' | 'manga',
+    currentUserId?: number,
+  ) {
+    const isOwnCollection = currentUserId === userId;
+
+    const cacheKey = `collection_ratings:${mediaType}:${userId}:${type}:${isOwnCollection ? 'own' : 'public'}`;
+    const cached = await this.cacheService.get(cacheKey);
+    if (cached) return cached;
+
+    const whereBase: any = { idMembre: userId, ...(isOwnCollection ? {} : { isPublic: true }) };
+    if (type && type > 0) {
+      whereBase.type = type;
+    }
+
+    // Build histogram for integer evaluations (1..10). We also count unrated (0) separately.
+    const buckets: Record<number, number> = {};
+    for (let i = 1; i <= 10; i++) buckets[i] = 0;
+    let unrated = 0;
+
+    if (mediaType === 'anime') {
+      const rows = await this.prisma.collectionAnime.groupBy({
+        by: ['evaluation'],
+        where: whereBase,
+        _count: { evaluation: true },
+      });
+      for (const r of rows) {
+        const val = r.evaluation ?? 0;
+        if (val <= 0) unrated += r._count.evaluation;
+        else if (val >= 1 && val <= 10) buckets[val] = (buckets[val] || 0) + r._count.evaluation;
+      }
+    } else {
+      const rows = await this.prisma.collectionManga.groupBy({
+        by: ['evaluation'],
+        where: whereBase,
+        _count: { evaluation: true },
+      });
+      for (const r of rows) {
+        const val = r.evaluation ?? 0;
+        if (val <= 0) unrated += r._count.evaluation;
+        else if (val >= 1 && val <= 10) buckets[val] = (buckets[val] || 0) + r._count.evaluation;
+      }
+    }
+
+    const data = Object.entries(buckets)
+      .sort((a, b) => Number(a[0]) - Number(b[0]))
+      .map(([rating, count]) => ({ rating: Number(rating), count }));
+
+    const result = {
+      success: true,
+      data,
+      meta: {
+        userId,
+        type,
+        mediaType,
+        totalRated: data.reduce((s, d) => s + d.count, 0),
+        unrated,
+      },
+    };
+
+    await this.cacheService.set(cacheKey, result, 1200);
+    return result;
+  }
+
   private getCollectionNameByType(type: string): string {
     const typeMap: Record<string, string> = {
       'completed': 'Terminé',
@@ -1529,6 +1596,8 @@ export class CollectionsService {
         this.cacheService.delByPattern(`user_collections:${userId}:*`),
         // Collection items cache
         this.cacheService.delByPattern(`collection_items:${userId}:*`),
+        // Ratings distribution cache
+        this.cacheService.delByPattern(`collection_ratings:*:${userId}:*`),
         // Find user collections cache (both own and public views)
         this.cacheService.del(`find_user_collections:${userId}:own`),
         this.cacheService.del(`find_user_collections:${userId}:public`),
