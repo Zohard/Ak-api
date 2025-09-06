@@ -86,9 +86,10 @@ export class FriendsService {
     let recentlyActiveCount = 0;
 
     const friends: FriendData[] = friendsData.map(friend => {
-      // Check if friendship is mutual
-      const isMutual = friend.buddy_list && 
-        friend.buddy_list.split(',').includes(userId.toString());
+      // Check if friendship is mutual (ensure boolean, not empty string)
+      const isMutual = friend.buddy_list
+        ? friend.buddy_list.split(',').includes(userId.toString())
+        : false;
       
       if (isMutual) mutualCount++;
 
