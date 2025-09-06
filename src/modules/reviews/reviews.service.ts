@@ -912,8 +912,6 @@ export class ReviewsService {
       orderBy: { dateCritique: 'desc' },
       select: {
         idCritique: true,
-        jaime: true,
-        jaimepas: true,
         nbClics: true,
         nbClicsWeek: true,
         notation: true,
