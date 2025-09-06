@@ -331,7 +331,7 @@ export class FriendsController {
       throw new BadRequestException('Cannot add more than 10 friends at once');
     }
 
-    const results = [];
+    const results: { userId: number; success: boolean; message: string }[] = [];
     let added = 0;
     let failed = 0;
 
@@ -348,7 +348,7 @@ export class FriendsController {
         results.push({
           userId: targetUserId,
           success: false,
-          message: error.message
+          message: String((error as any)?.message || 'Unknown error')
         });
         failed++;
       }
@@ -385,7 +385,7 @@ export class FriendsController {
       throw new BadRequestException('Cannot remove more than 10 friends at once');
     }
 
-    const results = [];
+    const results: { userId: number; success: boolean; message: string }[] = [];
     let removed = 0;
     let failed = 0;
 
@@ -402,7 +402,7 @@ export class FriendsController {
         results.push({
           userId: targetUserId,
           success: false,
-          message: error.message
+          message: String((error as any)?.message || 'Unknown error')
         });
         failed++;
       }

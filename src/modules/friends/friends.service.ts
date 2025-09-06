@@ -1,5 +1,5 @@
 import { Injectable, BadRequestException, NotFoundException, ForbiddenException } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
+import { PrismaService } from '../../shared/services/prisma.service';
 
 export interface FriendData {
   id: number;
@@ -278,10 +278,10 @@ export class FriendsService {
       WHERE id_member IN (${userId}, ${targetUserId})
     `;
 
-    const userMap = new Map(users.map(u => [u.id_member, u.buddy_list || '']));
+    const userMap = new Map<number, string>(users.map(u => [u.id_member, u.buddy_list || '']));
     
-    const userBuddyList = userMap.get(userId) || '';
-    const targetBuddyList = userMap.get(targetUserId) || '';
+    const userBuddyList: string = userMap.get(userId) || '';
+    const targetBuddyList: string = userMap.get(targetUserId) || '';
 
     const userBuddies = userBuddyList.split(',').map(id => parseInt(id.trim()));
     const targetBuddies = targetBuddyList.split(',').map(id => parseInt(id.trim()));
@@ -315,10 +315,10 @@ export class FriendsService {
       return [];
     }
 
-    const userMap = new Map(users.map(u => [u.id_member, u.buddy_list || '']));
+    const userMap = new Map<number, string>(users.map(u => [u.id_member, u.buddy_list || '']));
     
-    const userBuddyList = userMap.get(userId) || '';
-    const targetBuddyList = userMap.get(targetUserId) || '';
+    const userBuddyList: string = userMap.get(userId) || '';
+    const targetBuddyList: string = userMap.get(targetUserId) || '';
 
     const userBuddies = userBuddyList.split(',')
       .map(id => parseInt(id.trim()))
