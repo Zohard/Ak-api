@@ -20,6 +20,7 @@ import { ListsModule } from './modules/lists/lists.module';
 import { JobsModule } from './modules/jobs/jobs.module';
 import { GatewayModule } from './modules/gateway/gateway.module';
 import { HomePageModule } from './modules/homepage/homepage.module';
+import { FriendsModule } from './modules/friends/friends.module';
 import { PrismaService } from './shared/services/prisma.service';
 import { CacheService } from './shared/services/cache.service';
 import databaseConfig from './config/database.config';
@@ -50,6 +51,7 @@ import jwtConfig from './config/jwt.config';
     JobsModule,
     GatewayModule,
     HomePageModule,
+    FriendsModule,
   ],
   controllers: [AppController],
   providers: [AppService, PrismaService, CacheService],
