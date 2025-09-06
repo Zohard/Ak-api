@@ -62,7 +62,7 @@ export class FriendsController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 404, description: 'User not found' })
   async getFriends(@Request() req: any) {
-    return await this.friendsService.getFriends(req.user.userId);
+    return await this.friendsService.getFriends(req.user.id);
   }
 
   @Get('user/:userId')
@@ -114,7 +114,7 @@ export class FriendsController {
     if (isNaN(parsedTargetUserId)) {
       throw new BadRequestException('Invalid target user ID');
     }
-    return await this.friendsService.addFriend(req.user.userId, parsedTargetUserId);
+    return await this.friendsService.addFriend(req.user.id, parsedTargetUserId);
   }
 
   @Delete('remove/:targetUserId')
@@ -145,7 +145,7 @@ export class FriendsController {
     if (isNaN(parsedTargetUserId)) {
       throw new BadRequestException('Invalid target user ID');
     }
-    return await this.friendsService.removeFriend(req.user.userId, parsedTargetUserId);
+    return await this.friendsService.removeFriend(req.user.id, parsedTargetUserId);
   }
 
   @Get('status/:targetUserId')
@@ -175,7 +175,7 @@ export class FriendsController {
     if (isNaN(parsedTargetUserId)) {
       throw new BadRequestException('Invalid target user ID');
     }
-    return await this.friendsService.getFriendshipStatus(req.user.userId, parsedTargetUserId);
+    return await this.friendsService.getFriendshipStatus(req.user.id, parsedTargetUserId);
   }
 
   @Get('mutual/:targetUserId')
@@ -210,7 +210,7 @@ export class FriendsController {
     if (isNaN(parsedTargetUserId)) {
       throw new BadRequestException('Invalid target user ID');
     }
-    return await this.friendsService.getMutualFriends(req.user.userId, parsedTargetUserId);
+    return await this.friendsService.getMutualFriends(req.user.id, parsedTargetUserId);
   }
 
   @Get('search')
@@ -337,7 +337,7 @@ export class FriendsController {
 
     for (const targetUserId of body.userIds) {
       try {
-        const result = await this.friendsService.addFriend(req.user.userId, targetUserId);
+        const result = await this.friendsService.addFriend(req.user.id, targetUserId);
         results.push({
           userId: targetUserId,
           success: true,
@@ -391,7 +391,7 @@ export class FriendsController {
 
     for (const targetUserId of body.userIds) {
       try {
-        const result = await this.friendsService.removeFriend(req.user.userId, targetUserId);
+        const result = await this.friendsService.removeFriend(req.user.id, targetUserId);
         results.push({
           userId: targetUserId,
           success: true,
