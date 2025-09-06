@@ -176,8 +176,6 @@ export class PopularityJobService {
       where: { idCritique: reviewId },
       select: {
         idCritique: true,
-        jaime: true,
-        jaimepas: true,
         nbClics: true,
         nbClicsWeek: true,
         notation: true,
