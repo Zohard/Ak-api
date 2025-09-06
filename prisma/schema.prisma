@@ -282,8 +282,6 @@ model AkCritique {
   popularite   Float?    @db.Real
   classementPopularite Int? @map("classement_popularite")
   variationPopularite String? @map("variation_popularite") @db.Text
-  jaime        String?   @db.Text // CSV user IDs who liked
-  jaimepas     String?   @db.Text // CSV user IDs who disliked
 
   // Relations
   membre       SmfMember? @relation(fields: [idMembre], references: [idMember], onDelete: Cascade)

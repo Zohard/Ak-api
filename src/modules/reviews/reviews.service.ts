@@ -635,20 +635,38 @@ export class ReviewsService {
   }
 
   /**
-   * Like/dislike system methods
+   * Rating system methods - using questions JSON field
    */
-  private parseVotes(csv?: string | null): number[] {
-    return (csv || '')
-      .split(',')
-      .map((s) => parseInt(s))
-      .filter((n) => !isNaN(n) && n > 0);
+  private parseQuestions(questionsJson?: string | null): any {
+    if (!questionsJson) return {};
+    try {
+      return JSON.parse(questionsJson);
+    } catch {
+      return {};
+    }
   }
 
-  private toCsv(ids: number[]): string {
-    return ids.join(',');
+  private updateQuestionsJson(questionsJson: string | null, userId: number, ratings: {c?: number, a?: number, o?: number, y?: number, n?: number}): string {
+    const questions = this.parseQuestions(questionsJson);
+    questions[userId.toString()] = ratings;
+    return JSON.stringify(questions);
   }
 
-  async likeReview(reviewId: number, userId: number) {
+  private calculateRatingTotals(questions: any): {c: number, a: number, o: number, y: number, n: number} {
+    const totals = {c: 0, a: 0, o: 0, y: 0, n: 0};
+    
+    Object.values(questions).forEach((userRatings: any) => {
+      if (userRatings.c === 1) totals.c++;
+      if (userRatings.a === 1) totals.a++;
+      if (userRatings.o === 1) totals.o++;
+      if (userRatings.y === 1) totals.y++;
+      if (userRatings.n === 1) totals.n++;
+    });
+    
+    return totals;
+  }
+
+  async rateReview(reviewId: number, userId: number, ratingType: 'c' | 'a' | 'o' | 'y' | 'n') {
     const review = await this.prisma.akCritique.findUnique({
       where: { idCritique: reviewId },
       select: {
@@ -656,8 +674,7 @@ export class ReviewsService {
         idMembre: true,
         idAnime: true,
         idManga: true,
-        jaime: true,
-        jaimepas: true,
+        questions: true,
         nbClics: true,
         notation: true,
         nbCarac: true,
@@ -669,31 +686,30 @@ export class ReviewsService {
       throw new NotFoundException('Critique introuvable');
     }
 
-    // Prevent self-liking
+    // Prevent self-rating
     if (review.idMembre === userId) {
-      throw new ForbiddenException('Vous ne pouvez pas aimer votre propre critique');
+      throw new ForbiddenException('Vous ne pouvez pas évaluer votre propre critique');
     }
 
-    const likes = new Set(this.parseVotes(review.jaime));
-    const dislikes = new Set(this.parseVotes(review.jaimepas));
+    const questions = this.parseQuestions(review.questions);
+    const userRatings = questions[userId.toString()] || {c: 0, a: 0, o: 0, y: 0, n: 0};
     
-    // Remove from dislikes if present
-    dislikes.delete(userId);
+    // Toggle the specific rating
+    userRatings[ratingType] = userRatings[ratingType] === 1 ? 0 : 1;
     
-    // Toggle like
-    const wasLiked = likes.has(userId);
-    if (wasLiked) {
-      likes.delete(userId);
-    } else {
-      likes.add(userId);
+    // For y/n ratings, ensure only one is active
+    if (ratingType === 'y' && userRatings.y === 1) {
+      userRatings.n = 0;
+    } else if (ratingType === 'n' && userRatings.n === 1) {
+      userRatings.y = 0;
     }
 
     // Update the review
-    const updated = await this.prisma.akCritique.update({
+    const updatedQuestionsJson = this.updateQuestionsJson(review.questions, userId, userRatings);
+    await this.prisma.akCritique.update({
       where: { idCritique: reviewId },
       data: { 
-        jaime: this.toCsv([...likes]), 
-        jaimepas: this.toCsv([...dislikes]) 
+        questions: updatedQuestionsJson
       },
     });
 
@@ -707,28 +723,25 @@ export class ReviewsService {
     // Invalidate caches
     await this.invalidateReviewCache(reviewId, review.idAnime, review.idManga);
 
+    // Calculate current totals
+    const allQuestions = this.parseQuestions(updatedQuestionsJson);
+    const totals = this.calculateRatingTotals(allQuestions);
+
     return {
-      liked: !wasLiked,
-      likes: likes.size,
-      dislikes: dislikes.size,
+      ratingType,
+      active: userRatings[ratingType] === 1,
+      totals,
       popularite: popularity,
     };
   }
 
-  async dislikeReview(reviewId: number, userId: number) {
+  async getReviewRatings(reviewId: number, userId?: number) {
     const review = await this.prisma.akCritique.findUnique({
       where: { idCritique: reviewId },
       select: {
         idCritique: true,
+        questions: true,
         idMembre: true,
-        idAnime: true,
-        idManga: true,
-        jaime: true,
-        jaimepas: true,
-        nbClics: true,
-        notation: true,
-        nbCarac: true,
-        dateCritique: true,
       },
     });
 
@@ -736,49 +749,25 @@ export class ReviewsService {
       throw new NotFoundException('Critique introuvable');
     }
 
-    // Prevent self-disliking
-    if (review.idMembre === userId) {
-      throw new ForbiddenException('Vous ne pouvez pas disliker votre propre critique');
-    }
-
-    const likes = new Set(this.parseVotes(review.jaime));
-    const dislikes = new Set(this.parseVotes(review.jaimepas));
+    const questions = this.parseQuestions(review.questions);
+    const totals = this.calculateRatingTotals(questions);
     
-    // Remove from likes if present
-    likes.delete(userId);
-    
-    // Toggle dislike
-    const wasDisliked = dislikes.has(userId);
-    if (wasDisliked) {
-      dislikes.delete(userId);
-    } else {
-      dislikes.add(userId);
+    let userRatings = null;
+    if (userId) {
+      userRatings = questions[userId.toString()] || {c: 0, a: 0, o: 0, y: 0, n: 0};
     }
-
-    // Update the review
-    const updated = await this.prisma.akCritique.update({
-      where: { idCritique: reviewId },
-      data: { 
-        jaime: this.toCsv([...likes]), 
-        jaimepas: this.toCsv([...dislikes]) 
-      },
-    });
-
-    // Calculate and update popularity
-    const popularity = await this.calculateReviewPopularity(reviewId);
-    await this.prisma.akCritique.update({ 
-      where: { idCritique: reviewId }, 
-      data: { popularite: popularity } 
-    });
-
-    // Invalidate caches
-    await this.invalidateReviewCache(reviewId, review.idAnime, review.idManga);
 
     return {
-      disliked: !wasDisliked,
-      likes: likes.size,
-      dislikes: dislikes.size,
-      popularite: popularity,
+      reviewId: review.idCritique,
+      totals: {
+        convaincante: totals.c,
+        amusante: totals.a,
+        originale: totals.o,
+        partageAvis: totals.y,
+        nePartageAvis: totals.n,
+      },
+      userRatings,
+      canRate: userId && userId !== review.idMembre,
     };
   }
 
@@ -787,8 +776,7 @@ export class ReviewsService {
       where: { idCritique: reviewId },
       select: {
         idCritique: true,
-        jaime: true,
-        jaimepas: true,
+        questions: true,
         nbClics: true,
         nbClicsDay: true,
         nbClicsWeek: true,
@@ -810,8 +798,8 @@ export class ReviewsService {
       throw new NotFoundException('Critique introuvable');
     }
 
-    const likes = this.parseVotes(review.jaime);
-    const dislikes = this.parseVotes(review.jaimepas);
+    const questions = this.parseQuestions(review.questions);
+    const totals = this.calculateRatingTotals(questions);
 
     // Calculate various scores
     const popularity = await this.calculateReviewPopularity(reviewId);
@@ -820,10 +808,14 @@ export class ReviewsService {
 
     return {
       reviewId: review.idCritique,
-      likes: likes.length,
-      dislikes: dislikes.length,
-      totalVotes: likes.length + dislikes.length,
-      likeRatio: likes.length + dislikes.length > 0 ? likes.length / (likes.length + dislikes.length) : 0,
+      ratings: {
+        convaincante: totals.c,
+        amusante: totals.a,
+        originale: totals.o,
+        partageAvis: totals.y,
+        nePartageAvis: totals.n,
+        totalVotes: totals.y + totals.n,
+      },
       views: {
         total: review.nbClics || 0,
         day: review.nbClicsDay || 0,
@@ -847,8 +839,7 @@ export class ReviewsService {
     const review = await this.prisma.akCritique.findUnique({
       where: { idCritique: reviewId },
       select: {
-        jaime: true,
-        jaimepas: true,
+        questions: true,
         nbClics: true,
         nbClicsWeek: true,
         notation: true,
@@ -864,20 +855,20 @@ export class ReviewsService {
 
     if (!review) return 0;
 
-    const likes = this.parseVotes(review.jaime).length;
-    const dislikes = this.parseVotes(review.jaimepas).length;
+    const questions = this.parseQuestions(review.questions);
+    const totals = this.calculateRatingTotals(questions);
     const ageInDays = review.dateCritique 
       ? Math.floor((Date.now() - new Date(review.dateCritique).getTime()) / (1000 * 60 * 60 * 24))
       : 0;
 
-    // Use the popularity service
+    // Use the popularity service with adapted ratings
     return this.popularityService.calculatePopularity({
       totalViews: review.nbClics || 0,
       recentViews: review.nbClicsWeek || 0,
       averageRating: review.notation || 0,
       ratingCount: 1, // Individual review rating
-      likes,
-      dislikes,
+      likes: totals.y, // "Vous partagez cet avis"
+      dislikes: totals.n, // "Vous ne partagez pas cet avis"
       reviewLength: review.nbCarac || 0,
       ageInDays,
     });
@@ -887,8 +878,8 @@ export class ReviewsService {
    * Calculate trending score for recent activity
    */
   private calculateTrendingScore(review: any): number {
-    const likes = this.parseVotes(review.jaime).length;
-    const dislikes = this.parseVotes(review.jaimepas).length;
+    const questions = this.parseQuestions(review.questions);
+    const totals = this.calculateRatingTotals(questions);
     const ageInDays = review.dateCritique 
       ? Math.floor((Date.now() - new Date(review.dateCritique).getTime()) / (1000 * 60 * 60 * 24))
       : 0;
@@ -896,7 +887,7 @@ export class ReviewsService {
     return this.popularityService.calculateTrendingScore({
       totalViews: review.nbClics || 0,
       recentViews: review.nbClicsWeek || 0,
-      likes,
+      likes: totals.y, // "Vous partagez cet avis"
       ageInDays,
     });
   }

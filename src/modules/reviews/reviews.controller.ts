@@ -184,28 +184,31 @@ export class ReviewsController {
     return this.reviewsService.incrementViews(id, userId);
   }
 
-  @Post(':id/like')
+  @Post(':id/rate/:type')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Aimer une critique' })
+  @ApiOperation({ summary: 'Évaluer une critique' })
   @ApiParam({ name: 'id', description: 'ID de la critique', type: 'number' })
-  @ApiResponse({ status: 200, description: 'Like ajouté/retiré avec succès' })
+  @ApiParam({ name: 'type', description: 'Type d\'évaluation (c|a|o|y|n)', enum: ['c', 'a', 'o', 'y', 'n'] })
+  @ApiResponse({ status: 200, description: 'Évaluation mise à jour avec succès' })
   @ApiResponse({ status: 404, description: 'Critique introuvable' })
-  @ApiResponse({ status: 403, description: 'Impossible d\'aimer sa propre critique' })
-  async likeReview(@Param('id', ParseIntPipe) id: number, @Request() req) {
-    return this.reviewsService.likeReview(id, req.user.id);
+  @ApiResponse({ status: 403, description: 'Impossible d\'évaluer sa propre critique' })
+  async rateReview(
+    @Param('id', ParseIntPipe) id: number, 
+    @Param('type') type: 'c' | 'a' | 'o' | 'y' | 'n',
+    @Request() req
+  ) {
+    return this.reviewsService.rateReview(id, req.user.id, type);
   }
 
-  @Post(':id/dislike')
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Ne pas aimer une critique' })
+  @Get(':id/ratings')
+  @ApiOperation({ summary: 'Récupérer les évaluations d\'une critique' })
   @ApiParam({ name: 'id', description: 'ID de la critique', type: 'number' })
-  @ApiResponse({ status: 200, description: 'Dislike ajouté/retiré avec succès' })
+  @ApiResponse({ status: 200, description: 'Évaluations de la critique' })
   @ApiResponse({ status: 404, description: 'Critique introuvable' })
-  @ApiResponse({ status: 403, description: 'Impossible de disliker sa propre critique' })
-  async dislikeReview(@Param('id', ParseIntPipe) id: number, @Request() req) {
-    return this.reviewsService.dislikeReview(id, req.user.id);
+  async getReviewRatings(@Param('id', ParseIntPipe) id: number, @Request() req) {
+    const userId = req.user?.id || null;
+    return this.reviewsService.getReviewRatings(id, userId);
   }
 
   @Get(':id/stats')
