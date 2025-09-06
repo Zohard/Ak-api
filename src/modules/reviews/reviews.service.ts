@@ -100,6 +100,9 @@ export class ReviewsService {
       },
     });
 
+    // Invalidate user review cache after creation
+    await this.invalidateReviewCache(review.idCritique, idAnime, idManga, userId);
+
     return this.formatReview(review);
   }
 
@@ -389,7 +392,7 @@ export class ReviewsService {
     });
 
     // Invalidate caches after update
-    await this.invalidateReviewCache(id, review.idAnime, review.idManga);
+    await this.invalidateReviewCache(id, review.idAnime, review.idManga, userId);
 
     return this.formatReview(updatedReview);
   }
@@ -415,7 +418,7 @@ export class ReviewsService {
     });
 
     // Invalidate caches after removal
-    await this.invalidateReviewCache(id, review.idAnime, review.idManga);
+    await this.invalidateReviewCache(id, review.idAnime, review.idManga, userId);
 
     return { message: 'Critique supprimée avec succès' };
   }
@@ -519,6 +522,45 @@ export class ReviewsService {
     });
 
     return { count: total };
+  }
+
+  async checkUserReview(userId: number, type: 'anime' | 'manga', contentId: number) {
+    // Create cache key for user's review check
+    const cacheKey = `user_review:${userId}:${type}:${contentId}`;
+    
+    // Try to get from cache first
+    const cached = await this.cacheService.get(cacheKey);
+    if (cached !== null) {
+      return cached;
+    }
+
+    const whereCondition = {
+      idMembre: userId,
+      ...(type === 'anime' ? { idAnime: contentId, idManga: 0 } : { idManga: contentId, idAnime: 0 }),
+    };
+
+    const existingReview = await this.prisma.akCritique.findFirst({
+      where: whereCondition,
+      select: {
+        idCritique: true,
+        titre: true,
+        critique: true,
+        notation: true,
+        dateCritique: true,
+        statut: true,
+        niceUrl: true,
+      },
+    });
+
+    const result = {
+      hasReview: !!existingReview,
+      review: existingReview ? this.formatReview(existingReview) : null,
+    };
+
+    // Cache for 60 minutes (user reviews don't change frequently)
+    await this.cacheService.set(cacheKey, result, 3600);
+
+    return result;
   }
 
   /**
@@ -965,8 +1007,18 @@ export class ReviewsService {
   }
 
   // Cache invalidation methods
-  async invalidateReviewCache(reviewId: number, animeId?: number, mangaId?: number): Promise<void> {
+  async invalidateReviewCache(reviewId: number, animeId?: number, mangaId?: number, userId?: number): Promise<void> {
     await this.cacheService.del(`review:${reviewId}`);
+    
+    // Invalidate user review check cache
+    if (userId) {
+      if (animeId) {
+        await this.cacheService.del(`user_review:${userId}:anime:${animeId}`);
+      }
+      if (mangaId) {
+        await this.cacheService.del(`user_review:${userId}:manga:${mangaId}`);
+      }
+    }
     
     // Invalidate related content caches
     if (animeId) {

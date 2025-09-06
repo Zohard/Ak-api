@@ -83,6 +83,35 @@ export class ReviewsController {
     return this.reviewsService.getUserReviews(req.user.id, limit);
   }
 
+  @Get('check/:type/:id')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Vérifier si l\'utilisateur a déjà une critique pour ce contenu' })
+  @ApiParam({ name: 'type', description: 'Type de contenu (anime ou manga)', enum: ['anime', 'manga'] })
+  @ApiParam({ name: 'id', description: 'ID du contenu', type: 'number' })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Statut de la critique utilisateur',
+    schema: {
+      type: 'object',
+      properties: {
+        hasReview: { type: 'boolean', description: 'L\'utilisateur a-t-il déjà une critique' },
+        review: { 
+          type: 'object', 
+          nullable: true, 
+          description: 'Données de la critique existante si elle existe' 
+        }
+      }
+    }
+  })
+  async checkUserReview(
+    @Param('type') type: 'anime' | 'manga',
+    @Param('id', ParseIntPipe) contentId: number,
+    @Request() req
+  ) {
+    return this.reviewsService.checkUserReview(req.user.id, type, contentId);
+  }
+
   @Post()
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
