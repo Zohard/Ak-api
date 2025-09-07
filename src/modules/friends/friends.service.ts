@@ -578,12 +578,21 @@ export class FriendsService {
       FROM smf_members sender
       LEFT JOIN smf_members receiver ON receiver.id_member = ${userId}
       WHERE sender.id_member != ${userId}
-        AND sender.buddy_list LIKE ${`%,${userId},%`} OR sender.buddy_list LIKE ${`${userId},%`} OR sender.buddy_list LIKE ${`%,${userId}`} OR sender.buddy_list = ${userId.toString()}
-        AND (receiver.buddy_list IS NULL 
-             OR receiver.buddy_list NOT LIKE CONCAT('%,', sender.id_member, ',%') 
-             AND receiver.buddy_list NOT LIKE CONCAT(sender.id_member, ',%')
-             AND receiver.buddy_list NOT LIKE CONCAT('%,', sender.id_member)
-             AND receiver.buddy_list != sender.id_member)
+        AND (
+          sender.buddy_list LIKE ${`%,${userId},%`} 
+          OR sender.buddy_list LIKE ${`${userId},%`} 
+          OR sender.buddy_list LIKE ${`%,${userId}`} 
+          OR sender.buddy_list = ${userId.toString()}
+        )
+        AND (
+          receiver.buddy_list IS NULL 
+          OR (
+            receiver.buddy_list NOT LIKE CONCAT('%,', sender.id_member, ',%') 
+            AND receiver.buddy_list NOT LIKE CONCAT(sender.id_member, ',%')
+            AND receiver.buddy_list NOT LIKE CONCAT('%,', sender.id_member)
+            AND receiver.buddy_list <> sender.id_member::text
+          )
+        )
       ORDER BY sender.real_name ASC
     `;
 
