@@ -100,8 +100,9 @@ export class CollectionsService {
     const statusCounts = {
       completed: 0,
       watching: 0,
-      planned: 0,
+      'plan-to-watch': 0,
       dropped: 0,
+      'on-hold': 0,
     };
 
     let totalCount = 0;
@@ -121,10 +122,13 @@ export class CollectionsService {
           statusCounts.watching = typeTotal;
           break;
         case 3:
-          statusCounts.planned = typeTotal;
+          statusCounts['plan-to-watch'] = typeTotal;
           break;
         case 4:
           statusCounts.dropped = typeTotal;
+          break;
+        case 5:
+          statusCounts['on-hold'] = typeTotal;
           break;
       }
       
@@ -1474,8 +1478,9 @@ export class CollectionsService {
     const typeMap: Record<string, number> = {
       'completed': 1,
       'watching': 2,
-      'planned': 3,
+      'plan-to-watch': 3,
       'dropped': 4,
+      'on-hold': 5,
     };
 
     return typeMap[type] || 0;
@@ -1488,6 +1493,7 @@ export class CollectionsService {
       2: 'En cours',
       3: 'Planifié',
       4: 'Abandonné',
+      5: 'En pause',
     };
 
     return typeMap[typeId] || 'Ma collection';
@@ -1500,6 +1506,7 @@ export class CollectionsService {
       2: 'En cours',
       3: 'Planifié',
       4: 'Abandonné',
+      5: 'En pause',
     };
   }
 
@@ -1509,6 +1516,7 @@ export class CollectionsService {
       case 2: return 'En cours';
       case 3: return 'Planifié';
       case 4: return 'Abandonné';
+      case 5: return 'En pause';
       default: return 'Unknown';
     }
   }
@@ -1521,8 +1529,9 @@ export class CollectionsService {
     const statusCounts = {
       completed: 0,
       watching: 0,
-      planned: 0,
+      'plan-to-watch': 0,
       dropped: 0,
+      'on-hold': 0,
     };
 
     // Use single optimized queries with groupBy to reduce connection usage
@@ -1569,8 +1578,9 @@ export class CollectionsService {
       switch (count.type) {
         case 1: statusCounts.completed += count._count.type; break;
         case 2: statusCounts.watching += count._count.type; break;
-        case 3: statusCounts.planned += count._count.type; break;
+        case 3: statusCounts['plan-to-watch'] += count._count.type; break;
         case 4: statusCounts.dropped += count._count.type; break;
+        case 5: statusCounts['on-hold'] += count._count.type; break;
       }
     });
 
@@ -1579,8 +1589,9 @@ export class CollectionsService {
       switch (count.type) {
         case 1: statusCounts.completed += count._count.type; break;
         case 2: statusCounts.watching += count._count.type; break;
-        case 3: statusCounts.planned += count._count.type; break;
+        case 3: statusCounts['plan-to-watch'] += count._count.type; break;
         case 4: statusCounts.dropped += count._count.type; break;
+        case 5: statusCounts['on-hold'] += count._count.type; break;
       }
     });
 
