@@ -81,6 +81,8 @@ export class SendNotificationDto {
       'review_moderated',
       'security_alert',
       'marketing',
+      'friend_request',
+      'friend_accepted',
     ],
     example: 'new_review',
   })
@@ -91,6 +93,8 @@ export class SendNotificationDto {
     'review_moderated',
     'security_alert',
     'marketing',
+    'friend_request',
+    'friend_accepted',
   ])
   type:
     | 'new_review'
@@ -98,7 +102,9 @@ export class SendNotificationDto {
     | 'new_manga'
     | 'review_moderated'
     | 'security_alert'
-    | 'marketing';
+    | 'marketing'
+    | 'friend_request'
+    | 'friend_accepted';
 
   @ApiProperty({
     description: 'Notification title',
