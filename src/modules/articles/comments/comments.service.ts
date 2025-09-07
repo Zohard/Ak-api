@@ -40,7 +40,7 @@ export class CommentsService {
     // If user is logged in (SMF member), get their info and check for wp_users
     if (userId && createCommentDto.email) {
       // Try to find corresponding wp_users record by email
-      const wpUser = await this.prisma.wpUser.findUnique({
+      const wpUser = await this.prisma.wpUser.findFirst({
         where: { userEmail: createCommentDto.email }
       });
 
@@ -105,10 +105,9 @@ export class CommentsService {
 
     // Generate cache key for approved comments (public queries only)
     const shouldCache = !includePrivateFields && status === 'approved' && articleId;
-    let cacheKey: string;
+    const cacheKey = shouldCache ? `comments:article:${articleId}:p${page}:l${limit}:s${sort}:o${order}` : '';
     
     if (shouldCache) {
-      cacheKey = `comments:article:${articleId}:p${page}:l${limit}:s${sort}:o${order}`;
       const cached = await this.cacheService.get(cacheKey);
       if (cached) {
         return cached;
