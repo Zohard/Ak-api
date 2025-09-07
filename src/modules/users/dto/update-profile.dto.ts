@@ -10,6 +10,17 @@ import {
 
 export class UpdateProfileDto {
   @ApiPropertyOptional({
+    description: "Pseudo / nom d'utilisateur",
+    example: 'johndoe',
+  })
+  @IsOptional()
+  @IsString()
+  @MinLength(3, {
+    message: "Le pseudo doit contenir au moins 3 caractères",
+  })
+  memberName?: string;
+
+  @ApiPropertyOptional({
     description: "Nom réel de l'utilisateur",
     example: 'Jean Dupont',
   })
@@ -90,4 +101,12 @@ export class UpdateProfileDto {
     message: 'Le mot de passe doit contenir au moins 6 caractères',
   })
   newPassword?: string;
+
+  @ApiPropertyOptional({
+    description: "URL de l'avatar (peut être un chemin /uploads)",
+    example: 'https://cdn.example.com/avatars/u123.png',
+  })
+  @IsOptional()
+  @IsString()
+  avatar?: string;
 }
