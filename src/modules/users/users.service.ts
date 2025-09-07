@@ -185,6 +185,35 @@ export class UsersService {
       updateData.passwd = hashedPassword;
     }
 
+    // Handle pseudo/username change (memberName)
+    if (
+      (otherFields as any).memberName &&
+      (otherFields as any).memberName !== user.memberName
+    ) {
+      const newMemberName = String((otherFields as any).memberName).trim();
+      if (newMemberName.length < 3) {
+        throw new BadRequestException(
+          "Le pseudo doit contenir au moins 3 caractères",
+        );
+      }
+
+      const existingByName = await this.prisma.smfMember.findFirst({
+        where: {
+          memberName: newMemberName,
+          idMember: { not: id },
+        },
+      });
+
+      if (existingByName) {
+        throw new BadRequestException(
+          'Ce pseudo est déjà utilisé par un autre utilisateur',
+        );
+      }
+
+      updateData.memberName = newMemberName;
+      delete (otherFields as any).memberName;
+    }
+
     // Handle other fields
     Object.entries(otherFields).forEach(([key, value]) => {
       if (value !== undefined) {

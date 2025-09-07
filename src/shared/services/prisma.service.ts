@@ -26,12 +26,12 @@ export class PrismaService
           if (!params.has('sslmode')) params.set('sslmode', 'require');
           // Tell Prisma we are behind pgBouncer (disables prepared statements)
           if (!params.has('pgbouncer')) params.set('pgbouncer', 'true');
-          // Optimize connections for serverless - increase limit for better performance
-          if (!params.has('connection_limit')) params.set('connection_limit', '5');
-          // Keep pool wait reasonable for serverless
-          if (!params.has('pool_timeout')) params.set('pool_timeout', '15');
+          // Optimize connections for serverless with conservative limits
+          if (!params.has('connection_limit')) params.set('connection_limit', '3');
+          // Reduce pool wait time for faster failures
+          if (!params.has('pool_timeout')) params.set('pool_timeout', '8');
           // Add connect timeout for faster failures
-          if (!params.has('connect_timeout')) params.set('connect_timeout', '10');
+          if (!params.has('connect_timeout')) params.set('connect_timeout', '5');
 
           u.search = params.toString();
           effectiveUrl = u.toString();
@@ -183,13 +183,26 @@ export class PrismaService
           this.logger.warn(`Database operation failed (attempt ${attempt}/${maxRetries}):`, error.message);
           
           if (attempt < maxRetries) {
-            // Exponential backoff
-            const delay = Math.pow(2, attempt - 1) * 1000;
+            // For max connections error, force disconnect to free up connections
+            if (error.message?.includes('Max client connections reached')) {
+              try {
+                await this.$disconnect();
+                await new Promise(resolve => setTimeout(resolve, 500));
+              } catch (disconnectError) {
+                this.logger.warn('Failed to disconnect:', disconnectError.message);
+              }
+            }
+            
+            // Exponential backoff with jitter
+            const baseDelay = Math.pow(2, attempt - 1) * 1000;
+            const jitter = Math.random() * 1000;
+            const delay = baseDelay + jitter;
             await new Promise(resolve => setTimeout(resolve, delay));
             
             // Try to reconnect
             try {
               await this.$disconnect();
+              await new Promise(resolve => setTimeout(resolve, 200));
               await this.$connect();
             } catch (reconnectError) {
               this.logger.error('Failed to reconnect:', reconnectError);
