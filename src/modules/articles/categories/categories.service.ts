@@ -143,10 +143,10 @@ export class CategoriesService {
                     postName: true,
                     postDate: true,
                     postStatus: true,
-                    author: {
+                    wpAuthor: {
                       select: {
-                        idMember: true,
-                        memberName: true,
+                        ID: true,
+                        displayName: true,
                       },
                     },
                   },
@@ -180,7 +180,7 @@ export class CategoriesService {
       niceUrl: rel.post.postName,
       date: rel.post.postDate.toISOString(),
       statut: rel.post.postStatus,
-      author: rel.post.author,
+      author: rel.post.wpAuthor,
     })) || [];
 
     return {
