@@ -5,6 +5,7 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { PrismaService } from '../../../shared/services/prisma.service';
+import { CacheService } from '../../../shared/services/cache.service';
 import { CreateCommentDto } from './dto/create-comment.dto';
 import { UpdateCommentDto } from './dto/update-comment.dto';
 import { CommentQueryDto } from './dto/comment-query.dto';
@@ -12,7 +13,10 @@ import { ModerateCommentDto } from './dto/moderate-comment.dto';
 
 @Injectable()
 export class CommentsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private cacheService: CacheService,
+  ) {}
 
   async create(
     createCommentDto: CreateCommentDto,
@@ -48,6 +52,9 @@ export class CommentsService {
       },
     });
 
+    // Invalidate comments cache for this article
+    await this.invalidateCommentsCache(createCommentDto.articleId);
+
     return {
       id: Number(comment.commentID),
       articleId: Number(comment.commentPostID),
@@ -71,6 +78,18 @@ export class CommentsService {
       sort = 'commentDate',
       order = 'desc',
     } = query;
+
+    // Generate cache key for approved comments (public queries only)
+    const shouldCache = !includePrivateFields && status === 'approved' && articleId;
+    let cacheKey: string;
+    
+    if (shouldCache) {
+      cacheKey = `comments:article:${articleId}:p${page}:l${limit}:s${sort}:o${order}`;
+      const cached = await this.cacheService.get(cacheKey);
+      if (cached) {
+        return cached;
+      }
+    }
 
     const offset = (page - 1) * limit;
 
@@ -132,7 +151,7 @@ export class CommentsService {
 
     const totalPages = Math.ceil(total / limit);
 
-    return {
+    const result = {
       comments: transformedComments,
       pagination: {
         currentPage: page,
@@ -142,6 +161,13 @@ export class CommentsService {
         hasPrevious: page > 1,
       },
     };
+
+    // Cache the result for approved comments (20 minutes)
+    if (shouldCache) {
+      await this.cacheService.set(cacheKey, result, 1200);
+    }
+
+    return result;
   }
 
   async findOne(id: number, includePrivateFields: boolean = false): Promise<any> {
@@ -204,6 +230,9 @@ export class CommentsService {
       data: updateData,
     });
 
+    // Invalidate comments cache for this article
+    await this.invalidateCommentsCache(Number(updatedComment.commentPostID));
+
     return {
       id: Number(updatedComment.commentID),
       articleId: Number(updatedComment.commentPostID),
@@ -246,6 +275,9 @@ export class CommentsService {
       where: { commentID: BigInt(id) },
       data: { commentApproved },
     });
+
+    // Invalidate comments cache for this article
+    await this.invalidateCommentsCache(Number(comment.commentPostID));
 
     return { message: `Comment ${moderateDto.action}d successfully` };
   }
@@ -302,6 +334,9 @@ export class CommentsService {
       where: { commentID: BigInt(id) },
     });
 
+    // Invalidate comments cache for this article
+    await this.invalidateCommentsCache(Number(comment.commentPostID));
+
     return { message: 'Comment deleted successfully' };
   }
 
@@ -324,5 +359,11 @@ export class CommentsService {
       member_comments: Number(result.member_comments),
       anonymous_comments: Number(result.anonymous_comments),
     };
+  }
+
+  // Cache invalidation helper
+  private async invalidateCommentsCache(articleId: number): Promise<void> {
+    // Invalidate all cache entries for this article's comments
+    await this.cacheService.delByPattern(`comments:article:${articleId}:*`);
   }
 }
