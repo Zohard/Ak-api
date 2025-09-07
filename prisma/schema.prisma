@@ -365,7 +365,7 @@ model WpComment {
   commentAuthor       String?   @map("comment_author") @db.Text
   commentAuthorEmail  String?   @map("comment_author_email") @db.VarChar(100)
   commentAuthorUrl    String?   @map("comment_author_url") @db.VarChar(200)
-  commentAuthorIP     String?   @map("comment_author_ip") @db.VarChar(100)
+  commentAuthorIP     String?   @map("comment_author_IP") @db.VarChar(100)
   commentDate         DateTime  @map("comment_date") @db.Timestamp
   commentDateGmt      DateTime  @map("comment_date_gmt") @db.Timestamp
   commentContent      String?   @map("comment_content") @db.Text
