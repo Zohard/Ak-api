@@ -801,10 +801,14 @@ export class ArticlesService {
       nbClics: viewsMeta ? parseInt(viewsMeta.metaValue || '0') : 0,
       statut: post.postStatus === 'publish' ? 1 : 0,
       postStatus: post.postStatus,
-      author: {
+      author: post.author ? {
         idMember: post.author.idMember,
         memberName: post.author.memberName,
         realName: post.author.realName,
+      } : {
+        idMember: null,
+        memberName: 'Unknown',
+        realName: 'Unknown',
       },
       categories,
       comments,
