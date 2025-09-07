@@ -309,11 +309,11 @@ export class ArticlesService {
     const post = await this.prisma.wpPost.findUnique({
       where: { ID: BigInt(id) },
       include: {
-        author: {
+        wpAuthor: {
           select: {
-            idMember: true,
-            memberName: true,
-            realName: true,
+            ID: true,
+            userLogin: true,
+            displayName: true,
           },
         },
         termRelationships: {
@@ -369,11 +369,11 @@ export class ArticlesService {
         postStatus: 'publish'
       },
       include: {
-        author: {
+        wpAuthor: {
           select: {
-            idMember: true,
-            memberName: true,
-            realName: true,
+            ID: true,
+            userLogin: true,
+            displayName: true,
           },
         },
         termRelationships: {
@@ -433,11 +433,11 @@ export class ArticlesService {
         },
       },
       include: {
-        author: {
+        wpAuthor: {
           select: {
-            idMember: true,
-            memberName: true,
-            realName: true,
+            ID: true,
+            userLogin: true,
+            displayName: true,
           },
         },
         termRelationships: {
@@ -514,11 +514,11 @@ export class ArticlesService {
     const article = await this.prisma.wpPost.create({
       data: createData,
       include: {
-        author: {
+        wpAuthor: {
           select: {
-            idMember: true,
-            memberName: true,
-            realName: true,
+            ID: true,
+            userLogin: true,
+            displayName: true,
           },
         },
         comments: {
@@ -567,11 +567,11 @@ export class ArticlesService {
       where: { ID: BigInt(id) },
       data: updatePayload,
       include: {
-        author: {
+        wpAuthor: {
           select: {
-            idMember: true,
-            memberName: true,
-            realName: true,
+            ID: true,
+            userLogin: true,
+            displayName: true,
           },
         },
         termRelationships: {
@@ -801,10 +801,10 @@ export class ArticlesService {
       nbClics: viewsMeta ? parseInt(viewsMeta.metaValue || '0') : 0,
       statut: post.postStatus === 'publish' ? 1 : 0,
       postStatus: post.postStatus,
-      author: post.author ? {
-        idMember: post.author.idMember,
-        memberName: post.author.memberName,
-        realName: post.author.realName,
+      author: post.wpAuthor ? {
+        idMember: Number(post.wpAuthor.ID),
+        memberName: post.wpAuthor.userLogin,
+        realName: post.wpAuthor.displayName,
       } : {
         idMember: null,
         memberName: 'Unknown',

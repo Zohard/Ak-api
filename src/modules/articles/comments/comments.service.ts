@@ -61,7 +61,7 @@ export class CommentsService {
     };
   }
 
-  async findAll(query: CommentQueryDto) {
+  async findAll(query: CommentQueryDto, includePrivateFields: boolean = false) {
     const {
       page = 1,
       limit = 20,
@@ -107,18 +107,28 @@ export class CommentsService {
       this.prisma.wpComment.count({ where }),
     ]);
 
-    const transformedComments = comments.map((comment) => ({
-      id: Number(comment.commentID),
-      articleId: Number(comment.commentPostID),
-      userId: comment.userId,
-      nom: comment.commentAuthor,
-      email: comment.commentAuthorEmail,
-      website: comment.commentAuthorUrl,
-      commentaire: comment.commentContent,
-      date: comment.commentDate.toISOString(),
-      moderation: comment.commentApproved === '1' ? 1 : 0,
-      ip: comment.commentAuthorIP,
-    }));
+    const transformedComments = comments.map((comment) => {
+      const baseComment = {
+        id: Number(comment.commentID),
+        articleId: Number(comment.commentPostID),
+        userId: comment.userId,
+        nom: comment.commentAuthor,
+        website: comment.commentAuthorUrl,
+        commentaire: comment.commentContent,
+        date: comment.commentDate.toISOString(),
+      };
+
+      if (includePrivateFields) {
+        return {
+          ...baseComment,
+          email: comment.commentAuthorEmail,
+          moderation: comment.commentApproved === '1' ? 1 : 0,
+          ip: comment.commentAuthorIP,
+        };
+      }
+
+      return baseComment;
+    });
 
     const totalPages = Math.ceil(total / limit);
 
@@ -134,7 +144,7 @@ export class CommentsService {
     };
   }
 
-  async findOne(id: number): Promise<any> {
+  async findOne(id: number, includePrivateFields: boolean = false): Promise<any> {
     const comment = await this.prisma.wpComment.findUnique({
       where: { commentID: BigInt(id) },
     });
@@ -143,18 +153,26 @@ export class CommentsService {
       throw new NotFoundException('Comment not found');
     }
 
-    return {
+    const baseComment = {
       id: Number(comment.commentID),
       articleId: Number(comment.commentPostID),
       userId: comment.userId,
       nom: comment.commentAuthor,
-      email: comment.commentAuthorEmail,
       website: comment.commentAuthorUrl,
       commentaire: comment.commentContent,
       date: comment.commentDate.toISOString(),
-      moderation: comment.commentApproved === '1' ? 1 : 0,
-      ip: comment.commentAuthorIP,
     };
+
+    if (includePrivateFields) {
+      return {
+        ...baseComment,
+        email: comment.commentAuthorEmail,
+        moderation: comment.commentApproved === '1' ? 1 : 0,
+        ip: comment.commentAuthorIP,
+      };
+    }
+
+    return baseComment;
   }
 
   async update(
@@ -232,8 +250,8 @@ export class CommentsService {
     return { message: `Comment ${moderateDto.action}d successfully` };
   }
 
-  async getById(id: number): Promise<any> {
-    return this.findOne(id);
+  async getById(id: number, includePrivateFields: boolean = false): Promise<any> {
+    return this.findOne(id, includePrivateFields);
   }
 
   async bulkModerate(
