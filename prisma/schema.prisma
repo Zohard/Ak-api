@@ -326,7 +326,7 @@ model AdminAuditLog {
 // WordPress Posts (Webzine Articles)
 model WpPost {
   ID                    BigInt    @id @default(autoincrement())
-  postAuthor           Int       @map("post_author")
+  postAuthor           Int?      @map("post_author")
   postDate             DateTime  @map("post_date") @db.Timestamp
   postDateGmt          DateTime  @map("post_date_gmt") @db.Timestamp
   postContent          String?   @map("post_content") @db.Text
@@ -350,7 +350,7 @@ model WpPost {
   commentCount         Int       @map("comment_count") @default(0)
 
   // Relations
-  author               SmfMember @relation(fields: [postAuthor], references: [idMember], onDelete: Cascade)
+  author               SmfMember? @relation(fields: [postAuthor], references: [idMember], onDelete: Cascade)
   comments             WpComment[]
   postMeta             WpPostMeta[]
   termRelationships    WpTermRelationship[]
