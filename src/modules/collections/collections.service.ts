@@ -174,18 +174,80 @@ export class CollectionsService {
     try {
       if (mediaType === 'anime') {
         // Verify media exists
-        const anime = await this.prisma.akAnime.findUnique({ where: { idAnime: mediaId } });
+        const anime = await this.prisma.executeWithRetry(() => 
+          this.prisma.akAnime.findUnique({ where: { idAnime: mediaId } })
+        );
         if (!anime) {
           throw new NotFoundException('Anime not found');
         }
 
         // Check if already in collection for this user+media (any type)
-        const existingAny = await this.prisma.collectionAnime.findFirst({
-          where: { idMembre: userId, idAnime: mediaId },
-        });
-        if (existingAny) {
-          await this.prisma.collectionAnime.updateMany({
+        const existingAny = await this.prisma.executeWithRetry(() =>
+          this.prisma.collectionAnime.findFirst({
             where: { idMembre: userId, idAnime: mediaId },
+          })
+        );
+        if (existingAny) {
+          await this.prisma.executeWithRetry(() =>
+            this.prisma.collectionAnime.updateMany({
+              where: { idMembre: userId, idAnime: mediaId },
+              data: {
+                type: collectionType,
+                evaluation: normalizedRating,
+                notes: notes || null,
+                isPublic: true,
+                updatedAt: new Date(),
+              },
+            })
+          );
+          return await this.prisma.executeWithRetry(() =>
+            this.prisma.collectionAnime.findFirst({
+              where: { idMembre: userId, idAnime: mediaId },
+              include: {
+                anime: {
+                  select: { idAnime: true, titre: true, image: true, annee: true, moyenneNotes: true },
+                },
+              },
+            })
+          );
+        }
+
+        return await this.prisma.executeWithRetry(() =>
+          this.prisma.collectionAnime.create({
+            data: {
+              idMembre: userId,
+              idAnime: mediaId,
+              type: collectionType,
+              evaluation: normalizedRating,
+              notes: notes || null,
+              isPublic: true,
+            },
+            include: {
+              anime: {
+                select: { idAnime: true, titre: true, image: true, annee: true, moyenneNotes: true, nbEp: true },
+              },
+            },
+          })
+        );
+      }
+
+      // mediaType === 'manga'
+      const manga = await this.prisma.executeWithRetry(() =>
+        this.prisma.akManga.findUnique({ where: { idManga: mediaId } })
+      );
+      if (!manga) {
+        throw new NotFoundException('Manga not found');
+      }
+
+      const existingAny = await this.prisma.executeWithRetry(() =>
+        this.prisma.collectionManga.findFirst({
+          where: { idMembre: userId, idManga: mediaId },
+        })
+      );
+      if (existingAny) {
+        await this.prisma.executeWithRetry(() =>
+          this.prisma.collectionManga.updateMany({
+            where: { idMembre: userId, idManga: mediaId },
             data: {
               type: collectionType,
               evaluation: normalizedRating,
@@ -193,79 +255,37 @@ export class CollectionsService {
               isPublic: true,
               updatedAt: new Date(),
             },
-          });
-          return await this.prisma.collectionAnime.findFirst({
-            where: { idMembre: userId, idAnime: mediaId },
+          })
+        );
+        return await this.prisma.executeWithRetry(() =>
+          this.prisma.collectionManga.findFirst({
+            where: { idMembre: userId, idManga: mediaId },
             include: {
-              anime: {
-                select: { idAnime: true, titre: true, image: true, annee: true, moyenneNotes: true },
+              manga: {
+                select: { idManga: true, titre: true, image: true, annee: true, moyenneNotes: true, nbVol: true },
               },
             },
-          });
-        }
+          })
+        );
+      }
 
-        return await this.prisma.collectionAnime.create({
+      return await this.prisma.executeWithRetry(() =>
+        this.prisma.collectionManga.create({
           data: {
             idMembre: userId,
-            idAnime: mediaId,
+            idManga: mediaId,
             type: collectionType,
             evaluation: normalizedRating,
             notes: notes || null,
             isPublic: true,
           },
-          include: {
-            anime: {
-              select: { idAnime: true, titre: true, image: true, annee: true, moyenneNotes: true, nbEp: true },
-            },
-          },
-        });
-      }
-
-      // mediaType === 'manga'
-      const manga = await this.prisma.akManga.findUnique({ where: { idManga: mediaId } });
-      if (!manga) {
-        throw new NotFoundException('Manga not found');
-      }
-
-      const existingAny = await this.prisma.collectionManga.findFirst({
-        where: { idMembre: userId, idManga: mediaId },
-      });
-      if (existingAny) {
-        await this.prisma.collectionManga.updateMany({
-          where: { idMembre: userId, idManga: mediaId },
-          data: {
-            type: collectionType,
-            evaluation: normalizedRating,
-            notes: notes || null,
-            isPublic: true,
-            updatedAt: new Date(),
-          },
-        });
-        return await this.prisma.collectionManga.findFirst({
-          where: { idMembre: userId, idManga: mediaId },
           include: {
             manga: {
               select: { idManga: true, titre: true, image: true, annee: true, moyenneNotes: true, nbVol: true },
             },
           },
-        });
-      }
-
-      return await this.prisma.collectionManga.create({
-        data: {
-          idMembre: userId,
-          idManga: mediaId,
-          type: collectionType,
-          evaluation: normalizedRating,
-          notes: notes || null,
-          isPublic: true,
-        },
-        include: {
-          manga: {
-            select: { idManga: true, titre: true, image: true, annee: true, moyenneNotes: true, nbVol: true },
-          },
-        },
-      });
+        })
+      );
     } catch (err: any) {
       // Map known Prisma errors to proper HTTP errors; log for debugging
       const code = err?.code;
@@ -1544,11 +1564,13 @@ export class CollectionsService {
       }
 
       queries.push(
-        this.prisma.collectionAnime.groupBy({
-          by: ['type'],
-          where: animeWhere,
-          _count: { type: true }
-        }) as any
+        this.prisma.executeWithRetry(() =>
+          this.prisma.collectionAnime.groupBy({
+            by: ['type'],
+            where: animeWhere,
+            _count: { type: true }
+          })
+        ) as any
       );
     } else {
       queries.push(Promise.resolve([]));
@@ -1561,11 +1583,13 @@ export class CollectionsService {
       }
 
       queries.push(
-        this.prisma.collectionManga.groupBy({
-          by: ['type'],
-          where: mangaWhere,
-          _count: { type: true }
-        }) as any
+        this.prisma.executeWithRetry(() =>
+          this.prisma.collectionManga.groupBy({
+            by: ['type'],
+            where: mangaWhere,
+            _count: { type: true }
+          })
+        ) as any
       );
     } else {
       queries.push(Promise.resolve([]));
