@@ -1,6 +1,7 @@
 import { Injectable, BadRequestException, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../shared/services/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 export interface FriendData {
   id: number;
@@ -19,7 +20,10 @@ export interface FriendshipStats {
 
 @Injectable()
 export class FriendsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private notificationsService: NotificationsService
+  ) {}
 
   /**
    * Get user's friends list
@@ -186,8 +190,8 @@ export class FriendsService {
     `;
 
     // Check if friendship is mutual
-    const targetUserData = await this.prisma.$queryRaw<Array<{ buddy_list: string }>>`
-      SELECT buddy_list 
+    const targetUserData = await this.prisma.$queryRaw<Array<{ buddy_list: string; real_name: string }>>`
+      SELECT buddy_list, real_name 
       FROM smf_members 
       WHERE id_member = ${targetUserId}
       LIMIT 1
@@ -195,6 +199,50 @@ export class FriendsService {
 
     const targetBuddyList = targetUserData[0]?.buddy_list || '';
     const isMutual = targetBuddyList.split(',').includes(userId.toString());
+
+    // Get sender's name for notification
+    const senderData = await this.prisma.$queryRaw<Array<{ real_name: string }>>`
+      SELECT real_name 
+      FROM smf_members 
+      WHERE id_member = ${userId}
+      LIMIT 1
+    `;
+    
+    const senderName = senderData[0]?.real_name || 'Un utilisateur';
+    const targetName = targetUserData[0]?.real_name || 'Utilisateur';
+
+    // Send notification to target user
+    if (isMutual) {
+      // If mutual, notify that they are now mutual friends
+      await this.notificationsService.sendNotification({
+        userId: targetUserId,
+        type: 'friend_accepted',
+        title: 'Amitié mutuelle établie',
+        message: `${senderName} a accepté votre demande d'ami. Vous êtes maintenant amis !`,
+        priority: 'medium',
+        data: { friendId: userId, friendName: senderName }
+      });
+      
+      // Also notify the sender that mutual friendship is established
+      await this.notificationsService.sendNotification({
+        userId: userId,
+        type: 'friend_accepted',
+        title: 'Amitié mutuelle établie',
+        message: `Vous et ${targetName} êtes maintenant amis mutuels !`,
+        priority: 'medium',
+        data: { friendId: targetUserId, friendName: targetName }
+      });
+    } else {
+      // If not mutual, it's a new friend request
+      await this.notificationsService.sendNotification({
+        userId: targetUserId,
+        type: 'friend_request',
+        title: 'Nouvelle demande d\'ami',
+        message: `${senderName} souhaite vous ajouter en ami`,
+        priority: 'medium',
+        data: { requesterId: userId, requesterName: senderName }
+      });
+    }
 
     return {
       success: true,
@@ -508,5 +556,127 @@ export class FriendsService {
       .slice(0, limit);
 
     return recommendations;
+  }
+
+  /**
+   * Get pending friend requests (users who have added current user but not mutual)
+   */
+  async getPendingFriendRequests(userId: number): Promise<FriendData[]> {
+    if (!userId || userId <= 0) {
+      throw new BadRequestException('Invalid user ID');
+    }
+
+    // Find users who have this user in their buddy list but they're not in the user's buddy list
+    const pendingRequests = await this.prisma.$queryRaw<Array<{
+      id_member: number;
+      real_name: string;
+      last_login: number;
+      avatar: string;
+      buddy_list: string;
+    }>>`
+      SELECT sender.id_member, sender.real_name, sender.last_login, sender.avatar, sender.buddy_list
+      FROM smf_members sender
+      LEFT JOIN smf_members receiver ON receiver.id_member = ${userId}
+      WHERE sender.id_member != ${userId}
+        AND sender.buddy_list LIKE ${`%,${userId},%`} OR sender.buddy_list LIKE ${`${userId},%`} OR sender.buddy_list LIKE ${`%,${userId}`} OR sender.buddy_list = ${userId.toString()}
+        AND (receiver.buddy_list IS NULL 
+             OR receiver.buddy_list NOT LIKE ${`%,${sender.id_member},%`} 
+             AND receiver.buddy_list NOT LIKE ${`${sender.id_member},%`}
+             AND receiver.buddy_list NOT LIKE ${`%,${sender.id_member}`}
+             AND receiver.buddy_list != ${`sender.id_member`})
+      ORDER BY sender.real_name ASC
+    `;
+
+    return pendingRequests.map(request => ({
+      id: request.id_member,
+      realName: request.real_name,
+      lastLogin: request.last_login,
+      avatar: request.avatar || '../img/noavatar.png',
+      lastLoginFormatted: this.formatLastLogin(request.last_login)
+    }));
+  }
+
+  /**
+   * Accept a friend request
+   */
+  async acceptFriendRequest(userId: number, requesterId: number): Promise<{ success: boolean; message: string }> {
+    if (!userId || !requesterId || userId === requesterId) {
+      throw new BadRequestException('Invalid user IDs');
+    }
+
+    // Verify that the requester has actually sent a friend request
+    const requester = await this.prisma.$queryRaw<Array<{ buddy_list: string }>>`
+      SELECT buddy_list 
+      FROM smf_members 
+      WHERE id_member = ${requesterId}
+      LIMIT 1
+    `;
+
+    if (!requester.length) {
+      throw new NotFoundException('Requester not found');
+    }
+
+    const requesterBuddyList = requester[0].buddy_list || '';
+    const requesterBuddies = requesterBuddyList.split(',')
+      .map(id => parseInt(id.trim()))
+      .filter(id => !isNaN(id) && id > 0);
+
+    if (!requesterBuddies.includes(userId)) {
+      throw new BadRequestException('No pending friend request from this user');
+    }
+
+    // Add requester to current user's buddy list (this will make it mutual)
+    const result = await this.addFriend(userId, requesterId);
+    
+    // Note: addFriend already sends notifications, but we'll make sure the message is appropriate for acceptance
+    return {
+      success: true,
+      message: result.isMutual ? 'Friend request accepted - you are now mutual friends!' : 'Friend request accepted!'
+    };
+  }
+
+  /**
+   * Decline a friend request
+   */
+  async declineFriendRequest(userId: number, requesterId: number): Promise<{ success: boolean; message: string }> {
+    if (!userId || !requesterId || userId === requesterId) {
+      throw new BadRequestException('Invalid user IDs');
+    }
+
+    // Verify that the requester has actually sent a friend request
+    const requester = await this.prisma.$queryRaw<Array<{ buddy_list: string }>>`
+      SELECT buddy_list 
+      FROM smf_members 
+      WHERE id_member = ${requesterId}
+      LIMIT 1
+    `;
+
+    if (!requester.length) {
+      throw new NotFoundException('Requester not found');
+    }
+
+    const requesterBuddyList = requester[0].buddy_list || '';
+    const requesterBuddies = requesterBuddyList.split(',')
+      .map(id => parseInt(id.trim()))
+      .filter(id => !isNaN(id) && id > 0);
+
+    if (!requesterBuddies.includes(userId)) {
+      throw new BadRequestException('No pending friend request from this user');
+    }
+
+    // Remove current user from requester's buddy list
+    const updatedBuddies = requesterBuddies.filter(id => id !== userId);
+    const newBuddyList = updatedBuddies.length > 0 ? updatedBuddies.join(',') : '';
+
+    await this.prisma.$queryRaw`
+      UPDATE smf_members 
+      SET buddy_list = ${newBuddyList}
+      WHERE id_member = ${requesterId}
+    `;
+
+    return {
+      success: true,
+      message: 'Friend request declined'
+    };
   }
 }
