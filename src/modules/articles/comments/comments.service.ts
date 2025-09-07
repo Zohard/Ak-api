@@ -33,12 +33,36 @@ export class CommentsService {
       throw new NotFoundException('Article not found');
     }
 
+    let wpUserId = 0;
+    let authorName = 'Anonymous';
+    let authorEmail = '';
+
+    // If user is logged in (SMF member), get their info and check for wp_users
+    if (userId && createCommentDto.email) {
+      // Try to find corresponding wp_users record by email
+      const wpUser = await this.prisma.wpUser.findUnique({
+        where: { userEmail: createCommentDto.email }
+      });
+
+      if (wpUser) {
+        wpUserId = Number(wpUser.ID);
+      }
+
+      // Use the provided name and email from SMF member
+      authorName = createCommentDto.nom || 'Anonymous';
+      authorEmail = createCommentDto.email;
+    } else if (createCommentDto.nom && createCommentDto.email) {
+      // Anonymous comment with name and email provided
+      authorName = createCommentDto.nom;
+      authorEmail = createCommentDto.email;
+    }
+
     // Create the comment
     const comment = await this.prisma.wpComment.create({
       data: {
         commentPostID: BigInt(createCommentDto.articleId),
-        commentAuthor: createCommentDto.nom || 'Anonymous',
-        commentAuthorEmail: createCommentDto.email || '',
+        commentAuthor: authorName,
+        commentAuthorEmail: authorEmail,
         commentAuthorUrl: createCommentDto.website || '',
         commentAuthorIP: ipAddress || '',
         commentContent: createCommentDto.commentaire || '',
@@ -48,7 +72,7 @@ export class CommentsService {
         commentAgent: userAgent || '',
         commentType: '',
         commentParent: BigInt(0),
-        userId: userId || 0,
+        userId: wpUserId,
       },
     });
 
