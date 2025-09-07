@@ -163,7 +163,7 @@ export class NotificationsController {
     schema: {
       type: 'object',
       properties: {
-        type: { type: 'string', enum: ['new_anime', 'new_manga', 'marketing'] },
+        type: { type: 'string', enum: ['new_anime', 'new_manga', 'marketing', 'friend_request', 'friend_accepted'] },
         title: { type: 'string' },
         message: { type: 'string' },
         priority: {
@@ -180,7 +180,7 @@ export class NotificationsController {
   async broadcastNotification(
     @Body()
     broadcastData: {
-      type: 'new_anime' | 'new_manga' | 'marketing';
+      type: 'new_anime' | 'new_manga' | 'marketing' | 'friend_request' | 'friend_accepted';
       title: string;
       message: string;
       priority?: 'low' | 'medium' | 'high';

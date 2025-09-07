@@ -26,7 +26,9 @@ export interface NotificationData {
     | 'new_manga'
     | 'review_moderated'
     | 'security_alert'
-    | 'marketing';
+    | 'marketing'
+    | 'friend_request'
+    | 'friend_accepted';
   title: string;
   message: string;
   data?: any;

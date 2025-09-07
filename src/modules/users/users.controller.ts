@@ -29,12 +29,12 @@ import { AdminGuard } from '../../common/guards/admin.guard';
 
 @ApiTags('Users')
 @Controller('users')
-@UseGuards(JwtAuthGuard)
-@ApiBearerAuth()
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
   @Get()
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @ApiOperation({
     summary: 'Liste des utilisateurs (avec pagination et recherche)',
   })
@@ -47,7 +47,8 @@ export class UsersController {
   }
 
   @Post()
-  @UseGuards(AdminGuard)
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'Créer un nouvel utilisateur (Admin seulement)' })
   @ApiResponse({ status: 201, description: 'Utilisateur créé avec succès' })
   @ApiResponse({ status: 403, description: 'Accès refusé - Admin requis' })
@@ -56,6 +57,8 @@ export class UsersController {
   }
 
   @Get('me')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @ApiOperation({ summary: "Récupérer le profil de l'utilisateur connecté" })
   @ApiResponse({ status: 200, description: "Profil de l'utilisateur connecté" })
   async getProfile(@Request() req) {
@@ -63,6 +66,8 @@ export class UsersController {
   }
 
   @Patch('me')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @ApiOperation({
     summary: "Mettre à jour le profil de l'utilisateur connecté",
   })
@@ -81,6 +86,8 @@ export class UsersController {
   }
 
   @Get(':id')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'Récupérer un utilisateur par ID' })
   @ApiParam({ name: 'id', description: "ID de l'utilisateur", type: 'number' })
   @ApiResponse({ status: 200, description: "Données de l'utilisateur" })
@@ -90,6 +97,8 @@ export class UsersController {
   }
 
   @Patch(':id')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @ApiOperation({
     summary: 'Mettre à jour un utilisateur (Admin ou propriétaire seulement)',
   })
@@ -114,6 +123,8 @@ export class UsersController {
   }
 
   @Delete(':id')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({
     summary: 'Supprimer un utilisateur (Admin ou propriétaire seulement)',
@@ -127,6 +138,8 @@ export class UsersController {
   }
 
   @Get(':id/stats')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @ApiOperation({ summary: "Statistiques détaillées d'un utilisateur" })
   @ApiParam({ name: 'id', description: "ID de l'utilisateur", type: 'number' })
   @ApiResponse({ status: 200, description: "Statistiques de l'utilisateur" })
@@ -136,6 +149,8 @@ export class UsersController {
   }
 
   @Get(':id/activity')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @ApiOperation({ summary: "Activité récente d'un utilisateur" })
   @ApiParam({ name: 'id', description: "ID de l'utilisateur", type: 'number' })
   @ApiResponse({ status: 200, description: "Activité récente de l'utilisateur" })
@@ -148,6 +163,8 @@ export class UsersController {
   }
 
   @Get(':id/recommendations')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @ApiOperation({ summary: "Recommandations personnalisées pour un utilisateur" })
   @ApiParam({ name: 'id', description: "ID de l'utilisateur", type: 'number' })
   @ApiResponse({ status: 200, description: "Recommandations personnalisées" })
@@ -157,5 +174,48 @@ export class UsersController {
     @Query('limit') limit?: number,
   ) {
     return this.usersService.getUserRecommendations(id, limit || 12);
+  }
+
+  // Public endpoints (no authentication required)
+  @Get('public/:pseudo')
+  @ApiOperation({ summary: 'Récupérer le profil public d\'un utilisateur par pseudo' })
+  @ApiParam({ name: 'pseudo', description: 'Pseudo de l\'utilisateur' })
+  @ApiResponse({ status: 200, description: 'Profil public de l\'utilisateur' })
+  @ApiResponse({ status: 404, description: 'Utilisateur introuvable' })
+  async getPublicProfile(@Param('pseudo') pseudo: string) {
+    return this.usersService.findPublicByPseudo(pseudo);
+  }
+
+  @Get('public/:pseudo/stats')
+  @ApiOperation({ summary: 'Statistiques publiques d\'un utilisateur' })
+  @ApiParam({ name: 'pseudo', description: 'Pseudo de l\'utilisateur' })
+  @ApiResponse({ status: 200, description: 'Statistiques publiques' })
+  @ApiResponse({ status: 404, description: 'Utilisateur introuvable' })
+  async getPublicUserStats(@Param('pseudo') pseudo: string) {
+    return this.usersService.getPublicUserStats(pseudo);
+  }
+
+  @Get('public/:pseudo/reviews')
+  @ApiOperation({ summary: 'Critiques publiques d\'un utilisateur' })
+  @ApiParam({ name: 'pseudo', description: 'Pseudo de l\'utilisateur' })
+  @ApiResponse({ status: 200, description: 'Liste des critiques publiques' })
+  @ApiResponse({ status: 404, description: 'Utilisateur introuvable' })
+  async getPublicUserReviews(
+    @Param('pseudo') pseudo: string,
+    @Query('limit') limit?: number,
+  ) {
+    return this.usersService.getPublicUserReviews(pseudo, limit || 10);
+  }
+
+  @Get('public/:pseudo/activity')
+  @ApiOperation({ summary: 'Activité publique d\'un utilisateur' })
+  @ApiParam({ name: 'pseudo', description: 'Pseudo de l\'utilisateur' })
+  @ApiResponse({ status: 200, description: 'Activité publique récente' })
+  @ApiResponse({ status: 404, description: 'Utilisateur introuvable' })
+  async getPublicUserActivity(
+    @Param('pseudo') pseudo: string,
+    @Query('limit') limit?: number,
+  ) {
+    return this.usersService.getPublicUserActivity(pseudo, limit || 10);
   }
 }
