@@ -35,8 +35,8 @@ export class AdminCommentsController {
   @ApiOperation({ summary: 'Get all comments (including pending moderation)' })
   @ApiResponse({ status: 200, description: 'Comments retrieved successfully' })
   findAll(@Query() query: CommentQueryDto) {
-    // Allow admins to see all comments
-    return this.commentsService.findAll(query);
+    // Allow admins to see all comments with private fields
+    return this.commentsService.findAll(query, true);
   }
 
   @Get('stats')
@@ -57,7 +57,7 @@ export class AdminCommentsController {
   })
   getPending(@Query() query: CommentQueryDto) {
     query.status = 'pending';
-    return this.commentsService.findAll(query);
+    return this.commentsService.findAll(query, true);
   }
 
   @Get('spam')
@@ -68,7 +68,7 @@ export class AdminCommentsController {
   })
   getSpam(@Query() query: CommentQueryDto) {
     query.status = 'rejected';
-    return this.commentsService.findAll(query);
+    return this.commentsService.findAll(query, true);
   }
 
   @Get(':id')
@@ -76,7 +76,7 @@ export class AdminCommentsController {
   @ApiResponse({ status: 200, description: 'Comment retrieved successfully' })
   @ApiResponse({ status: 404, description: 'Comment not found' })
   findOne(@Param('id', ParseIntPipe) id: number) {
-    return this.commentsService.getById(id);
+    return this.commentsService.getById(id, true);
   }
 
   @Patch(':id')

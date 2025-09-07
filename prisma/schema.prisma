@@ -40,7 +40,6 @@ model SmfMember {
   passwordResetTokens AkPasswordResetToken[]
   reviews          AkCritique[]
   adminAuditLogs   AdminAuditLog[]
-  wpPosts          WpPost[]
   animeCollections CollectionAnime[] @relation("UserAnimeCollection")
   mangaCollections CollectionManga[] @relation("UserMangaCollection")
   listesTop        AkListesTop[]
@@ -350,7 +349,7 @@ model WpPost {
   commentCount         Int       @map("comment_count") @default(0)
 
   // Relations
-  author               SmfMember? @relation(fields: [postAuthor], references: [idMember], onDelete: Cascade)
+  wpAuthor             WpUser? @relation(fields: [postAuthor], references: [ID], onDelete: SetNull)
   comments             WpComment[]
   postMeta             WpPostMeta[]
   termRelationships    WpTermRelationship[]
@@ -452,6 +451,7 @@ model WpUser {
   displayName         String    @map("display_name") @db.VarChar(250)
 
   // Relations
+  posts                WpPost[]
 
   @@map("wp_users")
 }
