@@ -18,12 +18,12 @@ import { FriendsService } from './friends.service';
 
 @ApiTags('Friends')
 @Controller('friends')
-@UseGuards(JwtAuthGuard)
-@ApiBearerAuth()
 export class FriendsController {
   constructor(private readonly friendsService: FriendsService) {}
 
   @Get()
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @ApiOperation({ 
     summary: 'Get user\'s friends list',
     description: 'Retrieve the current user\'s friends list with statistics'
@@ -65,7 +65,30 @@ export class FriendsController {
     return await this.friendsService.getFriends(req.user.id);
   }
 
+  // Public endpoint for viewing anyone's friends list
+  @Get('public/user/:userId')
+  @ApiOperation({ 
+    summary: 'Get specific user\'s public friends list',
+    description: 'Retrieve a specific user\'s friends list (public view, no authentication required)'
+  })
+  @ApiParam({ name: 'userId', type: 'number', description: 'Target user ID' })
+  @ApiResponse({
+    status: 200,
+    description: 'Friends list retrieved successfully'
+  })
+  @ApiResponse({ status: 400, description: 'Invalid user ID' })
+  @ApiResponse({ status: 404, description: 'User not found' })
+  async getPublicUserFriends(@Param('userId') userId: string) {
+    const parsedUserId = parseInt(userId);
+    if (isNaN(parsedUserId)) {
+      throw new BadRequestException('Invalid user ID');
+    }
+    return await this.friendsService.getFriends(parsedUserId);
+  }
+
   @Get('user/:userId')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @ApiOperation({ 
     summary: 'Get specific user\'s friends list',
     description: 'Retrieve a specific user\'s friends list (public view)'
@@ -86,6 +109,8 @@ export class FriendsController {
   }
 
   @Post('add/:targetUserId')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ 
     summary: 'Add a friend',
@@ -118,6 +143,8 @@ export class FriendsController {
   }
 
   @Delete('remove/:targetUserId')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ 
     summary: 'Remove a friend',
@@ -149,6 +176,8 @@ export class FriendsController {
   }
 
   @Get('status/:targetUserId')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @ApiOperation({ 
     summary: 'Check friendship status',
     description: 'Check the friendship status between current user and target user'
@@ -179,6 +208,8 @@ export class FriendsController {
   }
 
   @Get('mutual/:targetUserId')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @ApiOperation({ 
     summary: 'Get mutual friends',
     description: 'Get friends in common between current user and target user'
@@ -214,6 +245,8 @@ export class FriendsController {
   }
 
   @Get('search')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @ApiOperation({ 
     summary: 'Search for users',
     description: 'Search for potential friends by name'
@@ -251,6 +284,8 @@ export class FriendsController {
   }
 
   @Get('recommendations')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @ApiOperation({ 
     summary: 'Get friend recommendations',
     description: 'Get friend recommendations based on mutual friends'
@@ -290,6 +325,8 @@ export class FriendsController {
   }
 
   @Post('bulk-add')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ 
     summary: 'Add multiple friends',
@@ -363,6 +400,8 @@ export class FriendsController {
   }
 
   @Delete('bulk-remove')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ 
     summary: 'Remove multiple friends',
@@ -414,5 +453,100 @@ export class FriendsController {
       failed,
       results
     };
+  }
+
+  @Get('requests')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ 
+    summary: 'Get pending friend requests',
+    description: 'Get friend requests sent to the current user that haven\'t been accepted yet'
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Pending friend requests retrieved successfully',
+    schema: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          id: { type: 'number', example: 123 },
+          realName: { type: 'string', example: 'John Doe' },
+          lastLogin: { type: 'number', example: 1640995200 },
+          avatar: { type: 'string', example: '../img/avatar123.jpg' },
+          lastLoginFormatted: { type: 'string', example: '2 jours' }
+        }
+      }
+    }
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  async getPendingFriendRequests(@Request() req: any) {
+    return await this.friendsService.getPendingFriendRequests(req.user.id);
+  }
+
+  @Post('requests/accept/:requesterId')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ 
+    summary: 'Accept a friend request',
+    description: 'Accept a pending friend request from another user'
+  })
+  @ApiParam({ name: 'requesterId', type: 'number', description: 'ID of user who sent the friend request' })
+  @ApiResponse({
+    status: 200,
+    description: 'Friend request accepted successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean', example: true },
+        message: { type: 'string', example: 'Friend request accepted - you are now mutual friends!' }
+      }
+    }
+  })
+  @ApiResponse({ status: 400, description: 'Invalid request or no pending request' })
+  @ApiResponse({ status: 404, description: 'Requester not found' })
+  async acceptFriendRequest(
+    @Request() req: any,
+    @Param('requesterId') requesterId: string
+  ) {
+    const parsedRequesterId = parseInt(requesterId);
+    if (isNaN(parsedRequesterId)) {
+      throw new BadRequestException('Invalid requester ID');
+    }
+    return await this.friendsService.acceptFriendRequest(req.user.id, parsedRequesterId);
+  }
+
+  @Post('requests/decline/:requesterId')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ 
+    summary: 'Decline a friend request',
+    description: 'Decline a pending friend request from another user'
+  })
+  @ApiParam({ name: 'requesterId', type: 'number', description: 'ID of user who sent the friend request' })
+  @ApiResponse({
+    status: 200,
+    description: 'Friend request declined successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean', example: true },
+        message: { type: 'string', example: 'Friend request declined' }
+      }
+    }
+  })
+  @ApiResponse({ status: 400, description: 'Invalid request or no pending request' })
+  @ApiResponse({ status: 404, description: 'Requester not found' })
+  async declineFriendRequest(
+    @Request() req: any,
+    @Param('requesterId') requesterId: string
+  ) {
+    const parsedRequesterId = parseInt(requesterId);
+    if (isNaN(parsedRequesterId)) {
+      throw new BadRequestException('Invalid requester ID');
+    }
+    return await this.friendsService.declineFriendRequest(req.user.id, parsedRequesterId);
   }
 }

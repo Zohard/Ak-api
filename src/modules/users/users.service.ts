@@ -581,6 +581,172 @@ export class UsersService {
     };
   }
 
+  // Public methods (no authentication required)
+  async findPublicByPseudo(pseudo: string) {
+    const user = await this.prisma.smfMember.findFirst({
+      where: {
+        OR: [
+          { memberName: pseudo },
+          { realName: pseudo }
+        ]
+      },
+      select: {
+        idMember: true,
+        memberName: true,
+        realName: true,
+        dateRegistered: true,
+        lastLogin: true,
+        posts: true,
+        nbCritiques: true,
+        nbSynopsis: true,
+        nbContributions: true,
+        experience: true,
+        idGroup: true,
+        avatar: true,
+        personalText: true,
+        location: true,
+        // Don't include email, password, or other sensitive fields
+      },
+    });
+
+    if (!user) {
+      throw new NotFoundException('Utilisateur introuvable');
+    }
+
+    return {
+      user: this.sanitizePublicUser(user)
+    };
+  }
+
+  async getPublicUserStats(pseudo: string) {
+    const user = await this.prisma.smfMember.findFirst({
+      where: {
+        OR: [
+          { memberName: pseudo },
+          { realName: pseudo }
+        ]
+      },
+      select: { idMember: true }
+    });
+
+    if (!user) {
+      throw new NotFoundException('Utilisateur introuvable');
+    }
+
+    // Get public review stats only
+    const reviewStats = await this.prisma.$queryRaw`
+      SELECT 
+        notation as rating,
+        COUNT(*) as count
+      FROM ak_critique 
+      WHERE id_membre = ${user.idMember} AND statut = 1
+      GROUP BY notation 
+      ORDER BY notation DESC
+    `;
+
+    // Get total review count
+    const totalReviewsResult = await this.prisma.akCritique.count({
+      where: { 
+        idMembre: user.idMember,
+        statut: 1  // Only published reviews
+      }
+    });
+
+    return {
+      totalReviews: totalReviewsResult,
+      reviewStats: (reviewStats as any[]).map(stat => ({
+        rating: stat.rating,
+        count: Number(stat.count)
+      }))
+    };
+  }
+
+  async getPublicUserReviews(pseudo: string, limit: number = 10) {
+    const user = await this.prisma.smfMember.findFirst({
+      where: {
+        OR: [
+          { memberName: pseudo },
+          { realName: pseudo }
+        ]
+      },
+      select: { idMember: true, memberName: true, realName: true, avatar: true }
+    });
+
+    if (!user) {
+      throw new NotFoundException('Utilisateur introuvable');
+    }
+
+    // Get only published reviews
+    const reviews = await this.prisma.$queryRaw`
+      SELECT 
+        c.id_critique as id,
+        c.titre,
+        c.critique,
+        c.notation,
+        c.date_critique as reviewDate,
+        c.statut,
+        c.id_anime as animeId,
+        c.id_manga as mangaId,
+        c.nb_clics as nbClics,
+        COALESCE(a.titre, m.titre) as mediaTitle,
+        COALESCE(a.image, m.image) as mediaImage,
+        COALESCE(a.nice_url, m.nice_url) as mediaNiceUrl,
+        CASE WHEN c.id_anime IS NOT NULL THEN 'anime' ELSE 'manga' END as mediaType
+      FROM ak_critique c
+      LEFT JOIN ak_animes a ON c.id_anime = a.id_anime
+      LEFT JOIN ak_mangas m ON c.id_manga = m.id_manga
+      WHERE c.id_membre = ${user.idMember} AND c.statut = 1
+      ORDER BY c.date_critique DESC
+      LIMIT ${limit}
+    `;
+
+    return {
+      reviews: (reviews as any[]).map(review => ({
+        ...review,
+        membre: {
+          id: user.idMember,
+          pseudo: user.realName || user.memberName,
+          avatar: user.avatar
+        }
+      }))
+    };
+  }
+
+  async getPublicUserActivity(pseudo: string, limit: number = 10) {
+    const user = await this.prisma.smfMember.findFirst({
+      where: {
+        OR: [
+          { memberName: pseudo },
+          { realName: pseudo }
+        ]
+      },
+      select: { idMember: true }
+    });
+
+    if (!user) {
+      throw new NotFoundException('Utilisateur introuvable');
+    }
+
+    // Only show recent public reviews as activity
+    const activities = await this.prisma.$queryRaw`
+      SELECT 
+        'review' as type,
+        c.date_critique as date,
+        COALESCE(a.titre, m.titre) as title,
+        c.id_critique as id
+      FROM ak_critique c
+      LEFT JOIN ak_animes a ON c.id_anime = a.id_anime
+      LEFT JOIN ak_mangas m ON c.id_manga = m.id_manga
+      WHERE c.id_membre = ${user.idMember} AND c.statut = 1
+      ORDER BY c.date_critique DESC
+      LIMIT ${limit}
+    `;
+
+    return {
+      activities: activities
+    };
+  }
+
   private sanitizeUser(user: any) {
     // Remove sensitive fields and format response
     const {
@@ -608,5 +774,29 @@ export class UsersService {
     }
 
     return sanitized;
+  }
+
+  private sanitizePublicUser(user: any) {
+    // Format public user data (no sensitive info)
+    const {
+      idMember,
+      memberName,
+      realName,
+      dateRegistered,
+      lastLogin,
+      posts,
+      ...otherFields
+    } = user;
+
+    return {
+      id: idMember,
+      pseudo: realName || memberName,
+      username: memberName,
+      dateInscription: dateRegistered,
+      lastLogin,
+      nbPost: posts,
+      reputation: otherFields.experience || 0,
+      ...otherFields,
+    };
   }
 }
