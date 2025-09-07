@@ -168,6 +168,14 @@ export class ArticlesService {
       this.prisma.wpPost.findMany({
         where,
         include: {
+          // Include author relationship
+          wpAuthor: {
+            select: {
+              ID: true,
+              userLogin: true,
+              displayName: true,
+            },
+          },
           // Only load category relationships to reduce joins
           termRelationships: {
             where: {
@@ -264,10 +272,14 @@ export class ArticlesService {
         nbClics: viewsMeta ? parseInt(viewsMeta.metaValue || '0') : 0,
         statut: post.postStatus === 'publish' ? 1 : 0,
         postStatus: post.postStatus,
-        author: {
-          idMember: post.postAuthor,
-          memberName: `User ${post.postAuthor}`,
-          realName: `User ${post.postAuthor}`,
+        author: post.wpAuthor ? {
+          idMember: Number(post.wpAuthor.ID),
+          memberName: post.wpAuthor.userLogin,
+          realName: post.wpAuthor.displayName,
+        } : {
+          idMember: null,
+          memberName: 'Unknown',
+          realName: 'Unknown',
         },
         categories,
         content: includeContent ? post.postContent : undefined,
