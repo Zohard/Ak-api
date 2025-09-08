@@ -130,6 +130,64 @@ export class SynopsisService {
   }
 
   // Admin/Moderation methods
+  async findPendingSynopses() {
+    const pendingSynopses = await this.prisma.akSynopsis.findMany({
+      where: {
+        validation: 0, // Only pending synopses
+      },
+      orderBy: {
+        date: 'asc', // Oldest first for fairness
+      },
+      include: {
+        // Join with user to get author name
+        user: {
+          select: {
+            memberName: true,
+          },
+        },
+      },
+    });
+
+    // Enrich with content information
+    const enrichedSynopses = await Promise.all(
+      pendingSynopses.map(async (synopsis) => {
+        let contentTitle = 'Contenu introuvable';
+        
+        if (synopsis.type === 1) {
+          // Anime
+          const anime = await this.prisma.akAnime.findUnique({
+            where: { idAnime: synopsis.idFiche ?? undefined },
+            select: { titre: true },
+          });
+          contentTitle = anime?.titre || 'Anime introuvable';
+        } else if (synopsis.type === 2) {
+          // Manga
+          const manga = await this.prisma.akManga.findUnique({
+            where: { idManga: synopsis.idFiche ?? undefined },
+            select: { titre: true },
+          });
+          contentTitle = manga?.titre || 'Manga introuvable';
+        }
+
+        return {
+          id_synopsis: synopsis.idSynopsis,
+          synopsis: synopsis.synopsis,
+          type: synopsis.type,
+          id_fiche: synopsis.idFiche,
+          validation: synopsis.validation,
+          date: synopsis.date,
+          author_name: synopsis.user?.memberName || 'Utilisateur introuvable',
+          content_title: contentTitle,
+        };
+      })
+    );
+
+    return {
+      success: true,
+      synopses: enrichedSynopses,
+    };
+  }
+
   async validateSynopsis(synopsisId: number, validation: number, moderatorId: number) {
     const synopsis = await this.prisma.akSynopsis.findUnique({
       where: { idSynopsis: synopsisId },
