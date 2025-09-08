@@ -156,7 +156,7 @@ export class SynopsisService {
       if (synopsis.type === 1) {
         // Update anime synopsis
         await this.prisma.akAnime.update({
-          where: { idAnime: synopsis.idFiche },
+          where: { idAnime: synopsis.idFiche ?? undefined },
           data: {
             synopsis: `${synopsis.synopsis}\n\nSynopsis soumis par ${attribution}`,
           },
@@ -164,7 +164,7 @@ export class SynopsisService {
       } else if (synopsis.type === 2) {
         // Update manga synopsis
         await this.prisma.akManga.update({
-          where: { idManga: synopsis.idFiche },
+          where: { idManga: synopsis.idFiche ?? undefined },
           data: {
             synopsis: `${synopsis.synopsis}\n\nSynopsis soumis par ${attribution}`,
           },
