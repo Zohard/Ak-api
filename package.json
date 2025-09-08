@@ -10,6 +10,7 @@
     "build:vercel": "npx prisma generate && npm run build",
     "vercel-build": "npm run build:vercel",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
+    "warm-cache": "node -r ts-node/register -r tsconfig-paths/register scripts/warmup-cache.ts",
     "start": "nest start",
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
