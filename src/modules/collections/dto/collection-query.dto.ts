@@ -1,5 +1,5 @@
-import { IsOptional, IsString, IsBoolean, IsNumber, Min, IsIn } from 'class-validator';
-import { Transform, Type } from 'class-transformer';
+import { IsOptional, IsString, IsNumber, Min, IsIn } from 'class-validator';
+import { Type } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CollectionQueryDto {
@@ -27,16 +27,6 @@ export class CollectionQueryDto {
   @Type(() => Number)
   @IsNumber()
   userId?: number;
-
-  @ApiPropertyOptional({ example: true, description: 'Filter by public collections only' })
-  @IsOptional()
-  @Transform(({ value }) => {
-    if (value === 'true') return true;
-    if (value === 'false') return false;
-    return value;
-  })
-  @IsBoolean()
-  isPublic?: boolean;
 
   @ApiPropertyOptional({
     example: 'anime',
