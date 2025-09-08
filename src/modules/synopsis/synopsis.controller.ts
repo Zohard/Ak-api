@@ -126,6 +126,40 @@ export class SynopsisController {
   }
 
   // Admin endpoints
+  @Get('pending')
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Obtenir les synopsis en attente de validation (Admin seulement)' })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Liste des synopsis en attente de validation',
+    schema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean', example: true },
+        synopses: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              id_synopsis: { type: 'number', example: 123 },
+              synopsis: { type: 'string', example: 'Contenu du synopsis...' },
+              type: { type: 'number', example: 1, description: '1 = anime, 2 = manga' },
+              id_fiche: { type: 'number', example: 456 },
+              validation: { type: 'number', example: 0, description: '0 = en attente, 1 = validé, 2 = rejeté' },
+              date: { type: 'string', format: 'date-time' },
+              author_name: { type: 'string', example: 'Nom utilisateur' },
+              content_title: { type: 'string', example: 'Titre du contenu' }
+            }
+          }
+        }
+      }
+    }
+  })
+  async getPendingSynopses() {
+    return this.synopsisService.findPendingSynopses();
+  }
+
   @Patch(':id/validate')
   @UseGuards(JwtAuthGuard, AdminGuard)
   @ApiBearerAuth()
