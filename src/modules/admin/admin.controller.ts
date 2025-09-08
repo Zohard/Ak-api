@@ -57,6 +57,7 @@ export class AdminController {
             active_business: { type: 'number' },
             active_articles: { type: 'number' },
             pending_reviews: { type: 'number' },
+            pending_synopses: { type: 'number' },
           },
         },
         moderation: {

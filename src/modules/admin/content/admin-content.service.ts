@@ -565,7 +565,8 @@ export class AdminContentService {
         (SELECT COUNT(*) FROM ak_mangas WHERE statut = 0) as inactive_mangas,
         (SELECT COUNT(*) FROM ak_business WHERE statut = 1) as active_business,
         (SELECT COUNT(*) FROM ak_webzine_articles WHERE statut = 1) as active_articles,
-        (SELECT COUNT(*) FROM ak_critique WHERE statut = 0) as pending_reviews
+        (SELECT COUNT(*) FROM ak_critique WHERE statut = 0) as pending_reviews,
+        (SELECT COUNT(*) FROM ak_synopsis WHERE validation = 0) as pending_synopses
     `;
 
     const result = (stats as any[])[0];
@@ -579,6 +580,7 @@ export class AdminContentService {
       active_business: Number(result.active_business),
       active_articles: Number(result.active_articles),
       pending_reviews: Number(result.pending_reviews),
+      pending_synopses: Number(result.pending_synopses),
     };
   }
 }
