@@ -1,0 +1,217 @@
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  ConflictException,
+} from '@nestjs/common';
+import { PrismaService } from '../../shared/services/prisma.service';
+import { CacheService } from '../../shared/services/cache.service';
+import { CreateSynopsisDto } from './dto/create-synopsis.dto';
+import { SynopsisQueryDto } from './dto/synopsis-query.dto';
+import * as crypto from 'crypto';
+
+@Injectable()
+export class SynopsisService {
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly cacheService: CacheService,
+  ) {}
+
+  async create(createSynopsisDto: CreateSynopsisDto, userId: number) {
+    const { synopsis, type, id_fiche } = createSynopsisDto;
+
+    // Validate that anime/manga exists
+    if (type === 1) {
+      const anime = await this.prisma.akAnime.findUnique({
+        where: { idAnime: id_fiche },
+      });
+      if (!anime) {
+        throw new NotFoundException('Anime introuvable');
+      }
+    } else if (type === 2) {
+      const manga = await this.prisma.akManga.findUnique({
+        where: { idManga: id_fiche },
+      });
+      if (!manga) {
+        throw new NotFoundException('Manga introuvable');
+      }
+    }
+
+    // Check if user has already submitted a synopsis for this item
+    const existingSubmission = await this.prisma.akSynopsis.findFirst({
+      where: {
+        id_membre: userId,
+        type,
+        id_fiche,
+      },
+    });
+
+    if (existingSubmission) {
+      throw new ConflictException('Vous avez déjà soumis un synopsis pour ce contenu');
+    }
+
+    // Sanitize synopsis content
+    const sanitizedSynopsis = this.sanitizeSynopsis(synopsis);
+
+    // Create SHA1 hash for validation (as mentioned in requirements)
+    const hash = crypto.createHash('sha1');
+    hash.update(sanitizedSynopsis + userId.toString() + Date.now().toString());
+    const validationHash = hash.digest('hex');
+
+    // Insert synopsis with validation = 0 (pending)
+    const newSynopsis = await this.prisma.akSynopsis.create({
+      data: {
+        id_membre: userId,
+        synopsis: sanitizedSynopsis,
+        type,
+        id_fiche,
+        validation: 0, // Pending validation
+        date: new Date(),
+      },
+    });
+
+    // Clear cache for the related content
+    const cacheKey = type === 1 ? `anime:${id_fiche}` : `manga:${id_fiche}`;
+    await this.cacheService.del(cacheKey);
+
+    return {
+      success: true,
+      message: 'Synopsis soumis avec succès. Il sera examiné par notre équipe.',
+      data: {
+        id_synopsis: newSynopsis.id_synopsis,
+        validation: newSynopsis.validation,
+      },
+    };
+  }
+
+  async findUserSubmissions(userId: number, query: SynopsisQueryDto) {
+    const where: any = {
+      id_membre: userId,
+    };
+
+    if (query.type) {
+      where.type = query.type;
+    }
+
+    if (query.id_fiche) {
+      where.id_fiche = query.id_fiche;
+    }
+
+    if (query.validation !== undefined) {
+      where.validation = query.validation;
+    }
+
+    const submissions = await this.prisma.akSynopsis.findMany({
+      where,
+      orderBy: {
+        date: 'desc',
+      },
+      include: {
+        // Add relation to get anime/manga info if needed
+      },
+    });
+
+    return {
+      success: true,
+      submissions,
+    };
+  }
+
+  async hasUserSubmitted(userId: number, type: number, id_fiche: number): Promise<boolean> {
+    const submission = await this.prisma.akSynopsis.findFirst({
+      where: {
+        id_membre: userId,
+        type,
+        id_fiche,
+      },
+    });
+
+    return !!submission;
+  }
+
+  // Admin/Moderation methods
+  async validateSynopsis(synopsisId: number, validation: number, moderatorId: number) {
+    const synopsis = await this.prisma.akSynopsis.findUnique({
+      where: { id_synopsis: synopsisId },
+    });
+
+    if (!synopsis) {
+      throw new NotFoundException('Synopsis introuvable');
+    }
+
+    if (synopsis.validation !== 0) {
+      throw new BadRequestException('Ce synopsis a déjà été traité');
+    }
+
+    // Update synopsis validation status
+    const updatedSynopsis = await this.prisma.akSynopsis.update({
+      where: { id_synopsis: synopsisId },
+      data: { validation },
+    });
+
+    // If validated (validation = 1), update the anime/manga table and user stats
+    if (validation === 1) {
+      const attribution = await this.getUserAttribution(synopsis.id_membre);
+      
+      if (synopsis.type === 1) {
+        // Update anime synopsis
+        await this.prisma.akAnime.update({
+          where: { idAnime: synopsis.id_fiche },
+          data: {
+            synopsis: `${synopsis.synopsis}\n\nSynopsis soumis par ${attribution}`,
+          },
+        });
+      } else if (synopsis.type === 2) {
+        // Update manga synopsis
+        await this.prisma.akManga.update({
+          where: { idManga: synopsis.id_fiche },
+          data: {
+            synopsis: `${synopsis.synopsis}\n\nSynopsis soumis par ${attribution}`,
+          },
+        });
+      }
+
+      // Increment user's synopsis count
+      await this.prisma.smfMember.update({
+        where: { idMember: synopsis.id_membre },
+        data: {
+          nb_synopsis: {
+            increment: 1,
+          },
+        },
+      });
+
+      // Clear cache
+      const cacheKey = synopsis.type === 1 ? `anime:${synopsis.id_fiche}` : `manga:${synopsis.id_fiche}`;
+      await this.cacheService.del(cacheKey);
+    }
+
+    return {
+      success: true,
+      message: validation === 1 ? 'Synopsis validé et publié' : 'Synopsis rejeté',
+      data: updatedSynopsis,
+    };
+  }
+
+  private sanitizeSynopsis(synopsis: string): string {
+    // Remove potentially dangerous HTML/script tags
+    let sanitized = synopsis.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
+    sanitized = sanitized.replace(/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi, '');
+    sanitized = sanitized.replace(/<object\b[^<]*(?:(?!<\/object>)<[^<]*)*<\/object>/gi, '');
+    sanitized = sanitized.replace(/<embed\b[^<]*(?:(?!<\/embed>)<[^<]*)*<\/embed>/gi, '');
+    
+    // Trim whitespace
+    sanitized = sanitized.trim();
+    
+    return sanitized;
+  }
+
+  private async getUserAttribution(userId: number): Promise<string> {
+    const user = await this.prisma.smfMember.findUnique({
+      where: { idMember: userId },
+      select: { memberName: true },
+    });
+
+    return user?.memberName || 'Utilisateur anonyme';
+  }
+}

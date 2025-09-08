@@ -42,6 +42,7 @@ model SmfMember {
   adminAuditLogs   AdminAuditLog[]
   animeCollections CollectionAnime[] @relation("UserAnimeCollection")
   mangaCollections CollectionManga[] @relation("UserMangaCollection")
+  synopsisSubmissions AkSynopsis[]   @relation("UserSynopsis")
   listesTop        AkListesTop[]
 
   @@map("smf_members")
@@ -499,4 +500,20 @@ model CollectionManga {
   manga            AkManga   @relation("UserMangaList", fields: [idManga], references: [idManga], onDelete: Cascade)
 
   @@map("collection_mangas")
+}
+
+// Synopsis submissions
+model AkSynopsis {
+  idSynopsis   Int       @id @default(autoincrement()) @map("id_synopsis")
+  date         DateTime  @default(now()) @db.Timestamp
+  idMembre     Int       @default(0) @map("id_membre")
+  synopsis     String?   @db.Text
+  type         Int       @default(0) // 1 = anime, 2 = manga
+  validation   Int       @default(0) // 0 = pending, 1 = approved, 2 = rejected
+  idFiche      Int?      @default(0) @map("id_fiche")
+
+  // Relations
+  user         SmfMember @relation("UserSynopsis", fields: [idMembre], references: [idMember], onDelete: Cascade)
+
+  @@map("ak_synopsis")
 }
