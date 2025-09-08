@@ -40,9 +40,9 @@ export class SynopsisService {
     // Check if user has already submitted a synopsis for this item
     const existingSubmission = await this.prisma.akSynopsis.findFirst({
       where: {
-        id_membre: userId,
+        idMembre: userId,
         type,
-        id_fiche,
+        idFiche: id_fiche,
       },
     });
 
@@ -61,10 +61,10 @@ export class SynopsisService {
     // Insert synopsis with validation = 0 (pending)
     const newSynopsis = await this.prisma.akSynopsis.create({
       data: {
-        id_membre: userId,
+        idMembre: userId,
         synopsis: sanitizedSynopsis,
         type,
-        id_fiche,
+        idFiche: id_fiche,
         validation: 0, // Pending validation
         date: new Date(),
       },
@@ -78,7 +78,7 @@ export class SynopsisService {
       success: true,
       message: 'Synopsis soumis avec succès. Il sera examiné par notre équipe.',
       data: {
-        id_synopsis: newSynopsis.id_synopsis,
+        id_synopsis: newSynopsis.idSynopsis,
         validation: newSynopsis.validation,
       },
     };
@@ -86,7 +86,7 @@ export class SynopsisService {
 
   async findUserSubmissions(userId: number, query: SynopsisQueryDto) {
     const where: any = {
-      id_membre: userId,
+      idMembre: userId,
     };
 
     if (query.type) {
@@ -94,7 +94,7 @@ export class SynopsisService {
     }
 
     if (query.id_fiche) {
-      where.id_fiche = query.id_fiche;
+      where.idFiche = query.id_fiche;
     }
 
     if (query.validation !== undefined) {
@@ -120,9 +120,9 @@ export class SynopsisService {
   async hasUserSubmitted(userId: number, type: number, id_fiche: number): Promise<boolean> {
     const submission = await this.prisma.akSynopsis.findFirst({
       where: {
-        id_membre: userId,
+        idMembre: userId,
         type,
-        id_fiche,
+        idFiche: id_fiche,
       },
     });
 
@@ -132,7 +132,7 @@ export class SynopsisService {
   // Admin/Moderation methods
   async validateSynopsis(synopsisId: number, validation: number, moderatorId: number) {
     const synopsis = await this.prisma.akSynopsis.findUnique({
-      where: { id_synopsis: synopsisId },
+      where: { idSynopsis: synopsisId },
     });
 
     if (!synopsis) {
@@ -145,18 +145,18 @@ export class SynopsisService {
 
     // Update synopsis validation status
     const updatedSynopsis = await this.prisma.akSynopsis.update({
-      where: { id_synopsis: synopsisId },
+      where: { idSynopsis: synopsisId },
       data: { validation },
     });
 
     // If validated (validation = 1), update the anime/manga table and user stats
     if (validation === 1) {
-      const attribution = await this.getUserAttribution(synopsis.id_membre);
+      const attribution = await this.getUserAttribution(synopsis.idMembre);
       
       if (synopsis.type === 1) {
         // Update anime synopsis
         await this.prisma.akAnime.update({
-          where: { idAnime: synopsis.id_fiche },
+          where: { idAnime: synopsis.idFiche },
           data: {
             synopsis: `${synopsis.synopsis}\n\nSynopsis soumis par ${attribution}`,
           },
@@ -164,7 +164,7 @@ export class SynopsisService {
       } else if (synopsis.type === 2) {
         // Update manga synopsis
         await this.prisma.akManga.update({
-          where: { idManga: synopsis.id_fiche },
+          where: { idManga: synopsis.idFiche },
           data: {
             synopsis: `${synopsis.synopsis}\n\nSynopsis soumis par ${attribution}`,
           },
@@ -173,16 +173,16 @@ export class SynopsisService {
 
       // Increment user's synopsis count
       await this.prisma.smfMember.update({
-        where: { idMember: synopsis.id_membre },
+        where: { idMember: synopsis.idMembre },
         data: {
-          nb_synopsis: {
+          nbSynopsis: {
             increment: 1,
           },
         },
       });
 
       // Clear cache
-      const cacheKey = synopsis.type === 1 ? `anime:${synopsis.id_fiche}` : `manga:${synopsis.id_fiche}`;
+      const cacheKey = synopsis.type === 1 ? `anime:${synopsis.idFiche}` : `manga:${synopsis.idFiche}`;
       await this.cacheService.del(cacheKey);
     }
 
