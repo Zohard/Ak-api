@@ -487,7 +487,7 @@ export class UsersService {
     };
   }
 
-  async getUserRecommendations(id: number, limit: number = 12) {
+  async getUserRecommendations(id: number, limit: number = 12, page: number = 1) {
     const user = await this.prisma.smfMember.findUnique({
       where: { idMember: id },
       select: { idMember: true },
@@ -512,11 +512,13 @@ export class UsersService {
       LIMIT 3
     `;
 
+    const offset = (page - 1) * limit;
+
     let recommendations: any[] = [];
 
     if ((userGenres as any[]).length > 0) {
       const topGenres = (userGenres as any[]).map(g => g.genre);
-      
+
       // Get anime recommendations based on favorite genres (using tags system)
       const animeRecs = await this.prisma.$queryRaw`
         SELECT DISTINCT
@@ -528,13 +530,13 @@ export class UsersService {
         FROM ak_animes a
         JOIN ak_tag2fiche tf ON a.id_anime = tf.id_fiche AND tf.type = 'anime'
         JOIN ak_tags t ON tf.id_tag = t.id_tag
-        WHERE t.tag_name = ANY(${topGenres}) 
-          AND a.statut = 1 
+        WHERE t.tag_name = ANY(${topGenres})
+          AND a.statut = 1
           AND a.id_anime NOT IN (
             SELECT id_anime FROM ak_critique WHERE id_membre = ${id} AND id_anime IS NOT NULL
           )
-        ORDER BY RANDOM()
-        LIMIT ${Math.ceil(limit / 2)}
+        ORDER BY a.moyennenotes DESC, a.id_anime DESC
+        LIMIT ${Math.ceil(limit / 2)} OFFSET ${offset}
       `;
 
       // Get manga recommendations based on favorite genres (using tags system)
@@ -548,13 +550,13 @@ export class UsersService {
         FROM ak_mangas m
         JOIN ak_tag2fiche tf ON m.id_manga = tf.id_fiche AND tf.type = 'manga'
         JOIN ak_tags t ON tf.id_tag = t.id_tag
-        WHERE t.tag_name = ANY(${topGenres}) 
-          AND m.statut = 1 
+        WHERE t.tag_name = ANY(${topGenres})
+          AND m.statut = 1
           AND m.id_manga NOT IN (
             SELECT id_manga FROM ak_critique WHERE id_membre = ${id} AND id_manga IS NOT NULL
           )
-        ORDER BY RANDOM()
-        LIMIT ${Math.floor(limit / 2)}
+        ORDER BY m.moyennenotes DESC, m.id_manga DESC
+        LIMIT ${Math.floor(limit / 2)} OFFSET ${offset}
       `;
 
       recommendations = [
@@ -566,37 +568,36 @@ export class UsersService {
     // If not enough recommendations, add popular items
     if (recommendations.length < limit) {
       const remaining = limit - recommendations.length;
-      
+
       // Get popular anime items
       const popularAnimes = await this.prisma.$queryRaw`
-        SELECT 
+        SELECT
           id_anime as id,
           titre,
           image,
           'anime' as type,
           nice_url as niceUrl
-        FROM ak_animes 
-        WHERE statut = 1 
+        FROM ak_animes
+        WHERE statut = 1
         ORDER BY moyennenotes DESC, id_anime DESC
-        LIMIT ${Math.ceil(remaining / 2)}
+        LIMIT ${Math.ceil(remaining / 2)} OFFSET ${offset}
       `;
-      
+
       // Get popular manga items
       const popularMangas = await this.prisma.$queryRaw`
-        SELECT 
+        SELECT
           id_manga as id,
           titre,
           image,
           'manga' as type,
           nice_url as niceUrl
-        FROM ak_mangas 
-        WHERE statut = 1 
+        FROM ak_mangas
+        WHERE statut = 1
         ORDER BY moyennenotes DESC, id_manga DESC
-        LIMIT ${Math.ceil(remaining / 2)}
+        LIMIT ${Math.ceil(remaining / 2)} OFFSET ${offset}
       `;
-      
+
       const popularItems = [...(popularAnimes as any[]), ...(popularMangas as any[])]
-        .sort(() => Math.random() - 0.5) // Shuffle the combined results
         .slice(0, remaining);
 
       recommendations = [
@@ -606,7 +607,8 @@ export class UsersService {
     }
 
     return {
-      items: recommendations.slice(0, limit)
+      items: recommendations.slice(0, limit),
+      pagination: { page, limit },
     };
   }
 
