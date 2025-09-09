@@ -19,6 +19,7 @@ import {
   ApiResponse,
   ApiBearerAuth,
   ApiParam,
+  ApiQuery,
 } from '@nestjs/swagger';
 import { UsersService } from './users.service';
 import { UpdateProfileDto } from './dto/update-profile.dto';
@@ -167,13 +168,16 @@ export class UsersController {
   @ApiBearerAuth()
   @ApiOperation({ summary: "Recommandations personnalisées pour un utilisateur" })
   @ApiParam({ name: 'id', description: "ID de l'utilisateur", type: 'number' })
+  @ApiQuery({ name: 'limit', required: false, description: 'Nombre de recommandations', example: 12 })
+  @ApiQuery({ name: 'page', required: false, description: 'Numéro de page', example: 1 })
   @ApiResponse({ status: 200, description: "Recommandations personnalisées" })
   @ApiResponse({ status: 404, description: 'Utilisateur introuvable' })
   async getUserRecommendations(
     @Param('id', ParseIntPipe) id: number,
     @Query('limit') limit?: number,
+    @Query('page') page?: number,
   ) {
-    return this.usersService.getUserRecommendations(id, limit || 12);
+    return this.usersService.getUserRecommendations(id, limit || 12, page || 1);
   }
 
   // Public endpoints (no authentication required)
