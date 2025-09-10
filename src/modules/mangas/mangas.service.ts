@@ -525,6 +525,49 @@ export class MangasService extends BaseContentService<
     };
   }
 
+  async getMostPopularMangaTags(limit = 20) {
+    const cacheKey = `popular_manga_tags:${limit}`;
+    
+    const cached = await this.cacheService.get(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
+    const tags = await this.prisma.$queryRaw`
+      SELECT 
+        t.id_tag,
+        t.tag_name,
+        t.tag_nice_url,
+        t.description,
+        t.categorie,
+        COUNT(tf.id_fiche) as usage_count
+      FROM ak_tags t
+      INNER JOIN ak_tag2fiche tf ON t.id_tag = tf.id_tag
+      INNER JOIN ak_mangas m ON tf.id_fiche = m.id_manga
+      WHERE tf.type = 'manga' AND m.statut = 1
+      GROUP BY t.id_tag, t.tag_name, t.tag_nice_url, t.description, t.categorie
+      ORDER BY usage_count DESC, t.tag_name ASC
+      LIMIT ${limit}
+    ` as any[];
+
+    const result = {
+      tags: tags.map(tag => ({
+        id_tag: tag.id_tag,
+        tag_name: tag.tag_name,
+        tag_nice_url: tag.tag_nice_url,
+        description: tag.description,
+        categorie: tag.categorie,
+        usage_count: Number(tag.usage_count),
+      })),
+      total: tags.length,
+      generatedAt: new Date().toISOString(),
+    };
+
+    await this.cacheService.set(cacheKey, result, 86400); // 24 hours
+    
+    return result;
+  }
+
   private formatManga(manga: any) {
     const { idManga, dateAjout, image, ...otherFields } = manga;
 
