@@ -327,11 +327,11 @@ export class AdminContentController {
   @ApiQuery({ name: 'categorie', required: false, description: 'Filter by category (e.g., Genre)' })
   async searchTags(
     @Query('q') q: string,
-    @Query('limit') limit?: string,
+    @Query('limit', new ParseIntPipe({ optional: true })) limit?: number,
     @Query('categorie') categorie?: string,
   ) {
     if (!q || !q.trim()) return { items: [] };
-    const lim = limit ? parseInt(limit, 10) : 10;
+    const lim = limit || 10;
     return this.adminContentService.searchTags(q.trim(), lim, categorie);
   }
 }
