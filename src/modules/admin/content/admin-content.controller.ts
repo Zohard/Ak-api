@@ -335,14 +335,4 @@ export class AdminContentController {
     return this.adminContentService.searchTags(q.trim(), lim, categorie);
   }
 
-  @Post('tags')
-  @ApiOperation({ summary: 'Create a new tag' })
-  @ApiResponse({ status: 201, description: 'Tag created successfully' })
-  async createTag(
-    @Body('name') name: string,
-    @Body('categorie') categorie?: string,
-    @Body('description') description?: string,
-  ) {
-    return this.adminContentService.createTag(name, categorie, description);
-  }
 }
