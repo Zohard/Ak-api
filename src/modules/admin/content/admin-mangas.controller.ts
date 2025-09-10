@@ -1,4 +1,5 @@
 import { Body, Controller, Delete, Get, Param, ParseIntPipe, Post, Put, Query, UseGuards } from '@nestjs/common';
+import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { AdminGuard } from '../../../common/guards/admin.guard';
@@ -26,7 +27,7 @@ export class AdminMangasController {
 
   @Put(':id')
   @ApiOperation({ summary: 'Mettre à jour un manga (admin)' })
-  update(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateAdminMangaDto) { return this.service.update(id, dto); }
+  update(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateAdminMangaDto, @CurrentUser() user: any) { return this.service.update(id, dto, user); }
 
   @Put(':id/status')
   @ApiOperation({ summary: 'Mettre à jour le statut (admin)' })
