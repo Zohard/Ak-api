@@ -547,34 +547,6 @@ export class AdminContentService {
     return { items: rows };
   }
 
-  async createTag(name: string, categorie?: string, description?: string) {
-    // Create nice_url from name (lowercase, replace spaces with dashes)
-    const niceUrl = name.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]/g, '');
-    
-    // Check if tag already exists
-    const existing = await this.prisma.$queryRaw`
-      SELECT id_tag FROM ak_tags WHERE LOWER(tag_name) = LOWER(${name})
-    ` as any[];
-    
-    if (existing.length > 0) {
-      throw new BadRequestException('Un tag avec ce nom existe déjà');
-    }
-    
-    // Insert new tag
-    const result = await this.prisma.$queryRaw`
-      INSERT INTO ak_tags (tag_name, tag_nice_url, categorie, description)
-      VALUES (${name}, ${niceUrl}, ${categorie || 'Genre'}, ${description || ''})
-      RETURNING id_tag, tag_name, tag_nice_url, categorie, description
-    ` as any[];
-    
-    return {
-      id: result[0].id_tag,
-      name: result[0].tag_name,
-      niceUrl: result[0].tag_nice_url,
-      categorie: result[0].categorie,
-      description: result[0].description
-    };
-  }
 
   async removeContentTag(id: number, type: string, tagId: number) {
     await this.prisma.$queryRaw`
