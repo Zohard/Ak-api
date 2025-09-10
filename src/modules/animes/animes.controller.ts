@@ -79,6 +79,20 @@ export class AnimesController {
     return this.animesService.getGenres();
   }
 
+  @Get('popular-tags')
+  @ApiOperation({ summary: 'Tags les plus populaires pour les animes' })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    description: 'Nombre de tags à retourner',
+    example: 20,
+  })
+  @ApiResponse({ status: 200, description: 'Liste des tags les plus populaires' })
+  async getMostPopularAnimeTags(@Query('limit') limit?: string) {
+    const parsedLimit = limit ? parseInt(limit) : 20;
+    return this.animesService.getMostPopularAnimeTags(parsedLimit);
+  }
+
   @Get('genre/:genre')
   @ApiOperation({ summary: 'Animes par genre' })
   @ApiParam({ name: 'genre', description: 'Nom du genre', example: 'action' })
