@@ -218,11 +218,69 @@ export class CacheService implements OnModuleInit {
 
   // Homepage-specific cache methods
   async getHomepageData(key: string): Promise<any> {
-    return this.get(`homepage:${key}`);
+    const value = await this.get(`homepage:${key}`);
+    try {
+      if (this.isEmptyHomepagePayload(value)) {
+        this.logger.warn(`🚫 Ignoring cached empty payload for homepage:${key}`);
+        return undefined;
+      }
+    } catch (e) {
+      // If validation fails, return the value to avoid accidental cache misses
+      this.logger.warn(
+        `⚠️  Homepage payload validation error on get: ${(e as Error).message}`
+      );
+    }
+    return value;
   }
 
   async setHomepageData(key: string, data: any, ttl = 1800): Promise<void> {
+    // Do not cache empty/minimal homepage payloads
+    try {
+      const isEmpty = this.isEmptyHomepagePayload(data);
+      if (isEmpty) {
+        this.logger.warn(
+          `⏭️  Skipping cache for homepage:${key} — payload considered empty`
+        );
+        return;
+      }
+    } catch (e) {
+      // If validation throws, log and proceed with caching to avoid false negatives
+      this.logger.warn(
+        `⚠️  Homepage payload validation error, proceeding to cache: ${(e as Error).message}`
+      );
+    }
+
     await this.set(`homepage:${key}`, data, ttl); // 30 minutes default for homepage data
+  }
+
+  // Heuristic to determine if homepage payload is "empty" and not worth caching
+  private isEmptyHomepagePayload(payload: any): boolean {
+    if (!payload || typeof payload !== 'object') return true;
+
+    const heroReviews = Array.isArray(payload?.hero?.reviews)
+      ? payload.hero.reviews.length
+      : 0;
+    const heroArticles = Array.isArray(payload?.hero?.articles)
+      ? payload.hero.articles.length
+      : 0;
+    const seasonAnimes = Array.isArray(payload?.season?.animes)
+      ? payload.season.animes.length
+      : 0;
+    const forumMessages = Array.isArray(payload?.forum?.messages)
+      ? payload.forum.messages.length
+      : 0;
+
+    const stats = payload?.stats || {};
+    const statAnimes = Number(stats?.animes || 0);
+    const statMangas = Number(stats?.mangas || 0);
+    const statReviews = Number(stats?.reviews || 0);
+
+    // Consider payload empty if no lists have items AND all stats are zero
+    const hasAnyListItems =
+      heroReviews > 0 || heroArticles > 0 || seasonAnimes > 0 || forumMessages > 0;
+    const allStatsZero = statAnimes === 0 && statMangas === 0 && statReviews === 0;
+
+    return !hasAnyListItems && allStatsZero;
   }
 
   // Articles cache methods
