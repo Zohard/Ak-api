@@ -163,6 +163,23 @@ export class UsersController {
     return this.usersService.getUserActivity(id, limit || 10);
   }
 
+  @Get(':id/recommendations/:media')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: "Recommandations personnalisées par type pour un utilisateur" })
+  @ApiParam({ name: 'id', description: "ID de l'utilisateur", type: 'number' })
+  @ApiParam({ name: 'media', description: 'Type de contenu', enum: ['anime', 'manga'] })
+  @ApiResponse({ status: 200, description: "Recommandations personnalisées (filtrées)" })
+  @ApiResponse({ status: 404, description: 'Utilisateur introuvable' })
+  async getUserRecommendationsByMedia(
+    @Param('id', ParseIntPipe) id: number,
+    @Param('media') media: 'anime' | 'manga',
+    @Query('limit', ParseIntPipe) limit?: number,
+    @Query('offset', ParseIntPipe) offset?: number,
+  ) {
+    return this.usersService.getUserRecommendations(id, limit || 12, media, offset || 0);
+  }
+
   @Get(':id/recommendations')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
