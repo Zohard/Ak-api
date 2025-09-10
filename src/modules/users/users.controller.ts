@@ -177,7 +177,18 @@ export class UsersController {
     @Query('limit', ParseIntPipe) limit?: number,
     @Query('offset', ParseIntPipe) offset?: number,
   ) {
-    return this.usersService.getUserRecommendations(id, limit || 12, media, offset || 0);
+    const effectiveLimit = limit || 12;
+    const effectiveOffset = offset || 0;
+    const page = Math.floor(effectiveOffset / effectiveLimit) + 1;
+    const result = await this.usersService.getUserRecommendations(
+      id,
+      effectiveLimit,
+      page,
+    );
+    return {
+      ...result,
+      items: result.items.filter((item: any) => item.type === media),
+    };
   }
 
   @Get(':id/recommendations')
