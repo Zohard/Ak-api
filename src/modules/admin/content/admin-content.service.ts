@@ -584,4 +584,30 @@ export class AdminContentService {
       pending_synopses: Number(result.pending_synopses),
     };
   }
+
+  async getStaffRoleTypes(type: string, query?: string) {
+    let table: string;
+    
+    if (type === 'anime') {
+      table = 'ak_business_to_animes';
+    } else if (type === 'manga') {
+      table = 'ak_business_to_mangas';
+    } else {
+      throw new BadRequestException('Invalid content type. Must be anime or manga.');
+    }
+
+    let sql: string;
+    const params: any[] = [];
+
+    if (query && query.trim()) {
+      const q = `%${query.trim()}%`;
+      sql = `SELECT type FROM ${table} WHERE type ILIKE $1 GROUP BY type ORDER BY type ASC`;
+      params.push(q);
+    } else {
+      sql = `SELECT type FROM ${table} WHERE type IS NOT NULL AND type != '' GROUP BY type ORDER BY type ASC`;
+    }
+
+    const rows = await this.prisma.$queryRawUnsafe(sql, ...params);
+    return { items: rows };
+  }
 }
