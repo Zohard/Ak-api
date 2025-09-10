@@ -535,6 +535,9 @@ export class UsersService {
           AND a.id_anime NOT IN (
             SELECT id_anime FROM ak_critique WHERE id_membre = ${id} AND id_anime IS NOT NULL
           )
+          AND a.id_anime NOT IN (
+            SELECT id_anime FROM collection_animes WHERE id_membre = ${id} AND id_anime IS NOT NULL
+          )
         ORDER BY a.moyennenotes DESC, a.id_anime DESC
         LIMIT ${Math.ceil(limit / 2)} OFFSET ${offset}
       `;
@@ -554,6 +557,9 @@ export class UsersService {
           AND m.statut = 1
           AND m.id_manga NOT IN (
             SELECT id_manga FROM ak_critique WHERE id_membre = ${id} AND id_manga IS NOT NULL
+          )
+          AND m.id_manga NOT IN (
+            SELECT id_manga FROM collection_mangas WHERE id_membre = ${id} AND id_manga IS NOT NULL
           )
         ORDER BY m.moyennenotes DESC, m.id_manga DESC
         LIMIT ${Math.floor(limit / 2)} OFFSET ${offset}
@@ -579,6 +585,12 @@ export class UsersService {
           nice_url as niceUrl
         FROM ak_animes
         WHERE statut = 1
+          AND id_anime NOT IN (
+            SELECT id_anime FROM ak_critique WHERE id_membre = ${id} AND id_anime IS NOT NULL
+          )
+          AND id_anime NOT IN (
+            SELECT id_anime FROM collection_animes WHERE id_membre = ${id} AND id_anime IS NOT NULL
+          )
         ORDER BY moyennenotes DESC, id_anime DESC
         LIMIT ${Math.ceil(remaining / 2)} OFFSET ${offset}
       `;
@@ -593,6 +605,12 @@ export class UsersService {
           nice_url as niceUrl
         FROM ak_mangas
         WHERE statut = 1
+          AND id_manga NOT IN (
+            SELECT id_manga FROM ak_critique WHERE id_membre = ${id} AND id_manga IS NOT NULL
+          )
+          AND id_manga NOT IN (
+            SELECT id_manga FROM collection_mangas WHERE id_membre = ${id} AND id_manga IS NOT NULL
+          )
         ORDER BY moyennenotes DESC, id_manga DESC
         LIMIT ${Math.ceil(remaining / 2)} OFFSET ${offset}
       `;
