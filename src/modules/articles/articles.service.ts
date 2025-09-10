@@ -65,7 +65,7 @@ export class ArticlesService {
 
     const {
       page = 1,
-      limit = 20,
+      limit = 8,
       search,
       categoryId,
       authorId,
