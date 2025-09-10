@@ -146,7 +146,7 @@ export class CollectionsService {
       });
     }
 
-    const total = collections.length;
+    const totalCollectionTypes = collections.length;
     const paginatedCollections = collections.slice(skip, skip + limit);
 
     return {
@@ -158,8 +158,8 @@ export class CollectionsService {
       pagination: {
         page,
         limit,
-        total,
-        totalPages: Math.ceil(total / limit),
+        total: totalCollectionTypes,
+        totalPages: Math.ceil(totalCollectionTypes / limit),
       },
     };
   }
