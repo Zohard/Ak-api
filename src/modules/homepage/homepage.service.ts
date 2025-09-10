@@ -22,8 +22,14 @@ export class HomePageService {
   async getHomePageData() {
     const cacheKey = 'v1';
     
-    // Skip cache for debugging - force fresh data
-    this.logger.log('🏠 Homepage data requested, bypassing cache for debugging');
+    // Try cache first
+    const cached = await this.cache.getHomepageData(cacheKey);
+    if (cached) {
+      this.logger.log('✅ Homepage cache HIT');
+      return cached;
+    }
+    
+    this.logger.log('🏠 Homepage data cache MISS, generating fresh data');
     
     try {
       this.logger.log('📊 Starting homepage data aggregation...');
@@ -112,8 +118,8 @@ export class HomePageService {
         stats: payload.stats
       });
 
-      // Skip cache for now to debug
-      // await this.cache.setHomepageData(cacheKey, payload, 300); // 5 minutes
+      // Cache for 2 hours (7200 seconds)
+      await this.cache.setHomepageData(cacheKey, payload, 7200);
       return payload;
     } catch (error) {
       this.logger.error('Homepage aggregation error:', error);
