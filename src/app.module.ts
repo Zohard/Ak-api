@@ -21,6 +21,7 @@ import { JobsModule } from './modules/jobs/jobs.module';
 import { GatewayModule } from './modules/gateway/gateway.module';
 import { HomePageModule } from './modules/homepage/homepage.module';
 import { FriendsModule } from './modules/friends/friends.module';
+import { LegacyModule } from './modules/legacy/legacy.module';
 import { SynopsisModule } from './modules/synopsis/synopsis.module';
 import { PrismaService } from './shared/services/prisma.service';
 import { CacheService } from './shared/services/cache.service';
@@ -54,6 +55,7 @@ import jwtConfig from './config/jwt.config';
     HomePageModule,
     FriendsModule,
     SynopsisModule,
+    LegacyModule,
   ],
   controllers: [AppController],
   providers: [AppService, PrismaService, CacheService],
