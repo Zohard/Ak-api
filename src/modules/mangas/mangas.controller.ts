@@ -19,6 +19,7 @@ import {
   ApiResponse,
   ApiBearerAuth,
   ApiParam,
+  ApiQuery,
 } from '@nestjs/swagger';
 import { MangasService } from './mangas.service';
 import { CreateMangaDto } from './dto/create-manga.dto';
