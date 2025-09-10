@@ -38,11 +38,26 @@ export class AdminMangasService {
     return this.prisma.akManga.create({ data });
   }
 
-  async update(id: number, dto: UpdateAdminMangaDto) {
+  async update(id: number, dto: UpdateAdminMangaDto, user?: any) {
     const existing = await this.prisma.akManga.findUnique({ where: { idManga: id } });
     if (!existing) throw new NotFoundException('Manga introuvable');
     const data: any = { ...dto };
     if (dto.titre && !dto.niceUrl) data.niceUrl = this.slugify(dto.titre);
+
+    // Handle synopsis validation - append user attribution if synopsis is being updated
+    if (dto.synopsis && user?.username) {
+      // Check if synopsis is being changed (not just updating the same value)
+      if (dto.synopsis !== existing.synopsis) {
+        // Remove any existing attribution to avoid duplication
+        let cleanSynopsis = dto.synopsis;
+        const attributionRegex = /<br><br>"Synopsis soumis par .+"/g;
+        cleanSynopsis = cleanSynopsis.replace(attributionRegex, '');
+        
+        // Append the new attribution
+        data.synopsis = `${cleanSynopsis}<br><br>"Synopsis soumis par ${user.username}"`;
+      }
+    }
+
     return this.prisma.akManga.update({ where: { idManga: id }, data });
   }
 

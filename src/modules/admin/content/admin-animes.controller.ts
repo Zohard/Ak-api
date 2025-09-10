@@ -10,6 +10,7 @@ import {
   UseGuards,
   Delete,
 } from '@nestjs/common';
+import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { AdminGuard } from '../../../common/guards/admin.guard';
@@ -54,8 +55,9 @@ export class AdminAnimesController {
   update(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateAdminAnimeDto,
+    @CurrentUser() user: any,
   ) {
-    return this.service.update(id, dto);
+    return this.service.update(id, dto, user);
   }
 
   @Put(':id/status')
