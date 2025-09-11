@@ -8,7 +8,7 @@ export class ImageKitService {
   constructor() {
     this.imagekit = new ImageKit({
       publicKey: 'public_pjoQrRTPxVOD7iy9kWQVSXWcXCU=',
-      privateKey: process.env.IMAGEKIT_PRIVATE_KEY,
+      privateKey: process.env.IMAGEKIT_PRIVATE_KEY || '',
       urlEndpoint: 'https://ik.imagekit.io/akimages',
     });
   }
