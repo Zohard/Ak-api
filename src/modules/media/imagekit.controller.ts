@@ -7,13 +7,7 @@ export class ImageKitController {
   constructor(private readonly imageKitService: ImageKitService) {}
 
   @Get('auth')
-  @UseGuards(JwtAuthGuard)
-  getAuthenticationParameters(@Request() req) {
-    // Only allow admin users to upload images
-    if (!req.user.isAdmin) {
-      throw new Error('Unauthorized: Admin access required');
-    }
-    
+  getAuthenticationParameters() {
     return this.imageKitService.getAuthenticationParameters();
   }
 
