@@ -64,4 +64,22 @@ export class AppController {
   async getAkTags() {
     return this.appService.getAkTags();
   }
+
+  @Get('imagekit/auth')
+  @ApiOperation({ summary: 'Get ImageKit authentication parameters' })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Authentication parameters for ImageKit uploads',
+    schema: {
+      type: 'object',
+      properties: {
+        token: { type: 'string' },
+        expire: { type: 'number' },
+        signature: { type: 'string' }
+      }
+    }
+  })
+  async getImageKitAuth() {
+    return this.appService.getImageKitAuth();
+  }
 }
