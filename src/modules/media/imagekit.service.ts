@@ -26,7 +26,7 @@ export class ImageKitService {
     };
   }
 
-  async uploadImage(file: any, fileName: string, folder: string = '') {
+  async uploadImage(file: any, fileName: string, folder: string = ''): Promise<any> {
     try {
       const result = await this.imagekit.upload({
         file: file,
