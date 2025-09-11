@@ -2,11 +2,11 @@ import { Controller, Post, Get, Request, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { ImageKitService } from './imagekit.service';
 
-@Controller('imagekit')
+@Controller('api/imagekit')
 export class ImageKitController {
   constructor(private readonly imageKitService: ImageKitService) {}
 
-  @Post('auth')
+  @Get('auth')
   @UseGuards(JwtAuthGuard)
   getAuthenticationParameters(@Request() req) {
     // Only allow admin users to upload images
