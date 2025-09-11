@@ -221,6 +221,39 @@ export class AdminContentController {
     return this.adminContentService.deleteContentRelationship(relationshipId);
   }
 
+  @Get('staff-roles/:type')
+  @ApiOperation({ summary: 'Get existing staff role types for autocomplete' })
+  @ApiParam({
+    name: 'type',
+    description: 'Content type',
+    enum: ['anime', 'manga'],
+  })
+  @ApiQuery({ name: 'q', required: false, description: 'Search query for role types' })
+  @ApiResponse({
+    status: 200,
+    description: 'Staff role types retrieved successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        items: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              type: { type: 'string' }
+            }
+          }
+        }
+      }
+    }
+  })
+  async getStaffRoleTypes(
+    @Param('type') type: string,
+    @Query('q') query?: string,
+  ) {
+    return this.adminContentService.getStaffRoleTypes(type, query);
+  }
+
   // Staff management
   @Get(':type/:id/staff')
   @ApiOperation({ summary: 'Get content staff members' })
@@ -333,39 +366,6 @@ export class AdminContentController {
     if (!q || !q.trim()) return { items: [] };
     const lim = limit || 10;
     return this.adminContentService.searchTags(q.trim(), lim, categorie);
-  }
-
-  @Get('staff-roles/:type')
-  @ApiOperation({ summary: 'Get existing staff role types for autocomplete' })
-  @ApiParam({
-    name: 'type',
-    description: 'Content type',
-    enum: ['anime', 'manga'],
-  })
-  @ApiQuery({ name: 'q', required: false, description: 'Search query for role types' })
-  @ApiResponse({
-    status: 200,
-    description: 'Staff role types retrieved successfully',
-    schema: {
-      type: 'object',
-      properties: {
-        items: {
-          type: 'array',
-          items: {
-            type: 'object',
-            properties: {
-              type: { type: 'string' }
-            }
-          }
-        }
-      }
-    }
-  })
-  async getStaffRoleTypes(
-    @Param('type') type: string,
-    @Query('q') query?: string,
-  ) {
-    return this.adminContentService.getStaffRoleTypes(type, query);
   }
 
 }
