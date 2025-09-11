@@ -1,13 +1,22 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from './shared/services/prisma.service';
 import { CacheService } from './shared/services/cache.service';
+import ImageKit from 'imagekit';
 
 @Injectable()
 export class AppService {
+  private imagekit: ImageKit;
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly cacheService: CacheService,
-  ) {}
+  ) {
+    this.imagekit = new ImageKit({
+      publicKey: 'public_pjoQrRTPxVOD7iy9kWQVSXWcXCU=',
+      privateKey: process.env.IMAGEKIT_PRIVATE_KEY || '',
+      urlEndpoint: 'https://ik.imagekit.io/akimages'
+    });
+  }
 
   async getHealth() {
     try {
@@ -58,5 +67,14 @@ export class AppService {
     await this.cacheService.set('ak_tags:all', result, 86400);
 
     return result;
+  }
+
+  async getImageKitAuth() {
+    try {
+      const authenticationParameters = this.imagekit.getAuthenticationParameters();
+      return authenticationParameters;
+    } catch (error) {
+      throw new Error(`ImageKit authentication failed: ${error.message}`);
+    }
   }
 }
