@@ -123,4 +123,14 @@ export class ReviewQueryDto {
   @IsOptional()
   @IsIn(['anime', 'manga', 'both'])
   type?: 'anime' | 'manga' | 'both';
+
+  @ApiPropertyOptional({
+    description: 'Période de filtrage',
+    example: 'week',
+    enum: ['today', 'week', 'month', 'year'],
+  })
+  @IsOptional()
+  @IsString()
+  @IsIn(['today', 'week', 'month', 'year'])
+  dateRange?: 'today' | 'week' | 'month' | 'year';
 }
