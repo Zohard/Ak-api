@@ -11,6 +11,9 @@ import {
   ParseIntPipe,
   HttpCode,
   HttpStatus,
+  UploadedFile,
+  UseInterceptors,
+  BadRequestException,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -19,6 +22,7 @@ import {
   ApiBearerAuth,
   ApiParam,
   ApiQuery,
+  ApiConsumes,
 } from '@nestjs/swagger';
 import { BusinessService } from './business.service';
 import { CreateBusinessDto } from './dto/create-business.dto';
@@ -27,11 +31,16 @@ import { BusinessQueryDto } from './dto/business-query.dto';
 import { BusinessSearchDto } from './dto/business-search.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { AdminGuard } from '../../common/guards/admin.guard';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { ImageKitService } from '../media/imagekit.service';
 
 @ApiTags('Business')
 @Controller('business')
 export class BusinessController {
-  constructor(private readonly businessService: BusinessService) {}
+  constructor(
+    private readonly businessService: BusinessService,
+    private readonly imageKitService: ImageKitService,
+  ) {}
 
   @Get('search')
   @ApiOperation({
@@ -174,5 +183,32 @@ export class BusinessController {
   @ApiResponse({ status: 403, description: 'Accès admin requis' })
   async remove(@Param('id', ParseIntPipe) id: number) {
     await this.businessService.remove(id);
+  }
+
+  @Post(':id/upload-image')
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @UseInterceptors(FileInterceptor('file'))
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({ summary: 'Upload business image to ImageKit (Admin only)' })
+  @ApiResponse({ status: 200, description: 'Image uploaded and business updated' })
+  async uploadImage(
+    @Param('id', ParseIntPipe) id: number,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    if (!file) {
+      throw new BadRequestException('No file uploaded');
+    }
+
+    const folder = '/images/business';
+    const result = await this.imageKitService.uploadImage(
+      file.buffer,
+      file.originalname,
+      folder,
+    );
+
+    const updated = await this.businessService.update(id, { image: result.url });
+
+    return { message: 'Image uploaded', url: result.url, business: updated };
   }
 }

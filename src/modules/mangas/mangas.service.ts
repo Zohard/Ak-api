@@ -10,6 +10,7 @@ import { CreateMangaDto } from './dto/create-manga.dto';
 import { UpdateMangaDto } from './dto/update-manga.dto';
 import { MangaQueryDto } from './dto/manga-query.dto';
 import { RelatedContentItem, RelationsResponse } from '../shared/types/relations.types';
+import { ImageKitService } from '../media/imagekit.service';
 
 @Injectable()
 export class MangasService extends BaseContentService<
@@ -21,6 +22,7 @@ export class MangasService extends BaseContentService<
   constructor(
     prisma: PrismaService,
     private readonly cacheService: CacheService,
+    private readonly imageKitService: ImageKitService,
   ) {
     super(prisma);
   }
@@ -272,6 +274,22 @@ export class MangasService extends BaseContentService<
       throw new ForbiddenException(
         'Seul un administrateur peut modifier un manga validé',
       );
+    }
+
+    // If replacing image and previous image is an ImageKit URL, attempt deletion in IK
+    try {
+      if (
+        typeof updateMangaDto.image === 'string' &&
+        updateMangaDto.image &&
+        updateMangaDto.image !== manga.image &&
+        typeof manga.image === 'string' &&
+        manga.image &&
+        /imagekit\.io/.test(manga.image)
+      ) {
+        await this.imageKitService.deleteImageByUrl(manga.image);
+      }
+    } catch (e) {
+      console.warn('Failed to delete previous ImageKit image (manga):', (e as Error).message);
     }
 
     const updatedManga = await this.prisma.akManga.update({
@@ -574,7 +592,7 @@ export class MangasService extends BaseContentService<
     return {
       id: idManga,
       addedDate: dateAjout?.toISOString(),
-      image: image ? `/api/media/serve/manga/${image}` : null,
+      image: image ? (typeof image === 'string' && /^https?:\/\//.test(image) ? image : `/api/media/serve/manga/${image}`) : null,
       ...otherFields,
     };
   }

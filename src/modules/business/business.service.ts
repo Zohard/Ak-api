@@ -4,10 +4,11 @@ import { CreateBusinessDto } from './dto/create-business.dto';
 import { UpdateBusinessDto } from './dto/update-business.dto';
 import { BusinessQueryDto } from './dto/business-query.dto';
 import { BusinessSearchDto } from './dto/business-search.dto';
+import { ImageKitService } from '../media/imagekit.service';
 
 @Injectable()
 export class BusinessService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService, private readonly imageKitService: ImageKitService) {}
 
   async create(createBusinessDto: CreateBusinessDto) {
     const business = await this.prisma.akBusiness.create({
@@ -92,6 +93,22 @@ export class BusinessService {
 
     if (!existingBusiness) {
       throw new NotFoundException('Entité business introuvable');
+    }
+
+    // Attempt to delete old ImageKit image if being replaced
+    try {
+      if (
+        typeof updateBusinessDto.image === 'string' &&
+        updateBusinessDto.image &&
+        updateBusinessDto.image !== existingBusiness.image &&
+        typeof existingBusiness.image === 'string' &&
+        existingBusiness.image &&
+        /imagekit\.io/.test(existingBusiness.image)
+      ) {
+        await this.imageKitService.deleteImageByUrl(existingBusiness.image);
+      }
+    } catch (e) {
+      console.warn('Failed to delete previous ImageKit image (business):', (e as Error).message);
     }
 
     const business = await this.prisma.akBusiness.update({

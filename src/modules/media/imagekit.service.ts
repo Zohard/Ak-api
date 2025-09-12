@@ -26,6 +26,30 @@ export class ImageKitService {
     };
   }
 
+  private extractFilePathFromUrl(urlStr: string): { folderPath: string; name: string } | null {
+    try {
+      const u = new URL(urlStr);
+      // Path could look like: /akimages/tr:.../folder/file.jpg OR /akimages/folder/file.jpg
+      let pathname = u.pathname || '';
+      // Strip leading /akimages/
+      pathname = pathname.replace(/^\/akimages\//, '');
+      // Strip leading transformation segment if present
+      pathname = pathname.replace(/^tr:[^/]+\//, '');
+      // Ensure no leading slash
+      pathname = pathname.replace(/^\//, '');
+      if (!pathname) return null;
+
+      const lastSlash = pathname.lastIndexOf('/');
+      const name = lastSlash >= 0 ? pathname.substring(lastSlash + 1) : pathname;
+      const folderPathRaw = lastSlash >= 0 ? pathname.substring(0, lastSlash) : '';
+      // folderPath in ImageKit search queries should start and end with '/'
+      const folderPath = `/${folderPathRaw}/`;
+      return { folderPath, name };
+    } catch {
+      return null;
+    }
+  }
+
   async uploadImage(file: any, fileName: string, folder: string = ''): Promise<any> {
     try {
       const result = await this.imagekit.upload({
@@ -56,6 +80,30 @@ export class ImageKitService {
       return { success: true };
     } catch (error) {
       throw new Error(`ImageKit delete failed: ${error.message}`);
+    }
+  }
+
+  async deleteImageByUrl(url: string) {
+    const parsed = this.extractFilePathFromUrl(url);
+    if (!parsed) {
+      return { success: false, reason: 'unrecognizable_url' };
+    }
+
+    try {
+      // Use advanced search to fetch file by name and folder path
+      const files = await this.imagekit.listFiles({
+        searchQuery: `name = \"${parsed.name}\" AND folderPath = \"${parsed.folderPath}\"`,
+        limit: 1,
+      } as any);
+
+      if (Array.isArray(files) && files.length > 0 && (files[0] as any).fileId) {
+        await this.imagekit.deleteFile((files[0] as any).fileId);
+        return { success: true };
+      }
+
+      return { success: false, reason: 'not_found' };
+    } catch (error) {
+      return { success: false, reason: 'api_error', message: (error as Error).message };
     }
   }
 
