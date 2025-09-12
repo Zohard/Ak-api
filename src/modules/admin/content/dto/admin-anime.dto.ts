@@ -18,6 +18,12 @@ export class CreateAdminAnimeDto {
   @IsString()
   titreOrig?: string;
 
+  // Legacy compatibility: allow snake_case variant
+  @ApiPropertyOptional({ description: 'Titre original (legacy: titre_orig)' })
+  @IsOptional()
+  @IsString()
+  titre_orig?: string;
+
   @ApiPropertyOptional({ description: 'Année de sortie', minimum: 1900 })
   @IsOptional()
   @IsInt()
@@ -29,6 +35,12 @@ export class CreateAdminAnimeDto {
   @IsInt()
   @Min(0)
   nbEp?: number;
+
+  // Legacy compatibility: free-form episodes field like "12" or "12+" (will be parsed)
+  @ApiPropertyOptional({ description: 'Nombre d\'épisodes (legacy: nb_epduree)' })
+  @IsOptional()
+  @IsString()
+  nb_epduree?: string;
 
   @ApiPropertyOptional({ description: 'Studio d\'animation' })
   @IsOptional()
@@ -55,6 +67,52 @@ export class CreateAdminAnimeDto {
   @IsInt()
   @IsIn([0, 1, 2])
   statut?: number;
+
+  // Additional legacy fields accepted but not persisted (ignored server-side)
+  @ApiPropertyOptional({ description: 'Format (legacy only)' })
+  @IsOptional()
+  @IsString()
+  format?: string;
+
+  @ApiPropertyOptional({ description: 'Licence FR (legacy only)' })
+  @IsOptional()
+  @IsInt()
+  licence?: number;
+
+  @ApiPropertyOptional({ description: 'Titre français (legacy only)' })
+  @IsOptional()
+  @IsString()
+  titre_fr?: string;
+
+  @ApiPropertyOptional({ description: 'Titres alternatifs (legacy only)' })
+  @IsOptional()
+  @IsString()
+  titres_alternatifs?: string;
+
+  @ApiPropertyOptional({ description: 'Site officiel (legacy only)' })
+  @IsOptional()
+  @IsString()
+  official_site?: string;
+
+  @ApiPropertyOptional({ description: 'Lien ADN (legacy only)' })
+  @IsOptional()
+  @IsString()
+  lien_adn?: string;
+
+  @ApiPropertyOptional({ description: 'Doublage (legacy only)' })
+  @IsOptional()
+  @IsString()
+  doublage?: string;
+
+  @ApiPropertyOptional({ description: 'Topic forum (legacy only)' })
+  @IsOptional()
+  @IsString()
+  topic?: string;
+
+  @ApiPropertyOptional({ description: 'Commentaire fiche (legacy only)' })
+  @IsOptional()
+  @IsString()
+  commentaire?: string;
 }
 
 export class UpdateAdminAnimeDto {
@@ -110,6 +168,57 @@ export class UpdateAdminAnimeDto {
   @IsInt()
   @IsIn([0, 1, 2])
   statut?: number;
+
+  // Additional optional fields
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  format?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsInt()
+  licence?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  titreFr?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  titresAlternatifs?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  nbEpduree?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  officialSite?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  lienAdn?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  doublage?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsInt()
+  topic?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  commentaire?: string;
 }
 
 export class AdminAnimeListQueryDto {
@@ -161,4 +270,3 @@ export class AdminAnimeListQueryDto {
   @IsString()
   sortOrder?: 'asc' | 'desc' = 'desc';
 }
-
