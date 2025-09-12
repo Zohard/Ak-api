@@ -104,10 +104,7 @@ export class CreateAdminAnimeDto {
   @IsString()
   doublage?: string;
 
-  @ApiPropertyOptional({ description: 'Topic forum (legacy only)' })
-  @IsOptional()
-  @IsString()
-  topic?: string;
+  // `topic` removed. Use `commentaire` instead.
 
   @ApiPropertyOptional({ description: 'Commentaire fiche (legacy only)' })
   @IsOptional()
@@ -210,10 +207,7 @@ export class UpdateAdminAnimeDto {
   @IsString()
   doublage?: string;
 
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsInt()
-  topic?: number;
+  // `topic` removed. Use `commentaire` instead.
 
   @ApiPropertyOptional()
   @IsOptional()
