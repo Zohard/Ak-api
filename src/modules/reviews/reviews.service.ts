@@ -120,6 +120,7 @@ export class ReviewsService {
       sortBy = 'dateCritique',
       sortOrder = 'desc',
       type,
+      dateRange,
     } = query;
 
     // Create cache key from query parameters
@@ -166,6 +167,33 @@ export class ReviewsService {
 
     if (minNotation) {
       where.notation = { gte: minNotation };
+    }
+
+    // Date range filter
+    if (dateRange) {
+      const now = new Date();
+      let startDate: Date;
+
+      switch (dateRange) {
+        case 'today':
+          startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+          break;
+        case 'week':
+          startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+          break;
+        case 'month':
+          startDate = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
+          break;
+        case 'year':
+          startDate = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate());
+          break;
+        default:
+          startDate = null;
+      }
+
+      if (startDate) {
+        where.dateCritique = { gte: startDate };
+      }
     }
 
     // Type filter: our schema uses 0 when unset
