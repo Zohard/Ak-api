@@ -10,7 +10,6 @@ import { AdminAnimesService } from './admin-animes.service';
 import { spawn } from 'child_process';
 import { promises as fs } from 'fs';
 import { join } from 'path';
-import { JSDOM } from 'jsdom';
 
 @Injectable()
 export class NautiljonImportService {
@@ -52,42 +51,32 @@ export class NautiljonImportService {
   }
 
   private extractAnimeTitlesFromHtml(htmlContent: string): string[] {
-    const dom = new JSDOM(htmlContent);
-    const document = dom.window.document;
     const titles: string[] = [];
 
-    // Remove ongoing section if it exists (same logic as the HTML script)
-    const ongoingSectionTitle = document.querySelector('#saison_continue_titre');
-    if (ongoingSectionTitle) {
-      const ongoingSectionStart = ongoingSectionTitle.nextElementSibling;
-      if (ongoingSectionStart && ongoingSectionStart.id === 'saison_continue') {
-        ongoingSectionStart.remove();
-      }
-    }
-
-    // Look for elements with class "elt" (anime entries)
-    const animeElements = document.querySelectorAll('.elt');
+    // Use regex to extract anime titles - simpler approach without JSDOM
+    // Look for elements with class "elt" and extract h2 > a text content
+    const eltMatches = htmlContent.match(/<div[^>]*class="[^"]*elt[^"]*"[^>]*>[\s\S]*?<\/div>/gi) || [];
     
-    animeElements.forEach((element) => {
-      // Extract Japanese title from h2 > a
-      const h2Element = element.querySelector('.title h2 a');
-      let japaneseTitle = h2Element ? h2Element.textContent?.trim() : '';
-      
-      // Remove anything in parentheses from the main title
-      if (japaneseTitle) {
-        japaneseTitle = japaneseTitle.replace(/\s*\([^)]*\)/g, '').trim();
-        if (japaneseTitle) {
-          titles.push(japaneseTitle);
+    eltMatches.forEach((eltHtml) => {
+      // Extract title from h2 > a within title div
+      const titleMatch = eltHtml.match(/<div[^>]*class="[^"]*title[^"]*"[^>]*>[\s\S]*?<h2[^>]*>[\s\S]*?<a[^>]*>([^<]+)<\/a>/i);
+      if (titleMatch && titleMatch[1]) {
+        let title = titleMatch[1].trim();
+        // Remove anything in parentheses
+        title = title.replace(/\s*\([^)]*\)/g, '').trim();
+        if (title && title.length > 0) {
+          titles.push(title);
         }
       }
     });
 
-    // If no .elt elements found, try alternative selectors
+    // If no .elt elements found, try alternative approach with h2 a tags
     if (titles.length === 0) {
-      const h2Links = document.querySelectorAll('h2 a');
-      h2Links.forEach((link) => {
-        let title = link.textContent?.trim();
-        if (title) {
+      const h2Matches = htmlContent.match(/<h2[^>]*>[\s\S]*?<a[^>]*>([^<]+)<\/a>[\s\S]*?<\/h2>/gi) || [];
+      h2Matches.forEach((h2Html) => {
+        const titleMatch = h2Html.match(/<a[^>]*>([^<]+)<\/a>/i);
+        if (titleMatch && titleMatch[1]) {
+          let title = titleMatch[1].trim();
           // Remove anything in parentheses
           title = title.replace(/\s*\([^)]*\)/g, '').trim();
           if (title && title.length > 0) {
@@ -97,7 +86,7 @@ export class NautiljonImportService {
       });
     }
 
-    return titles;
+    return [...new Set(titles)]; // Remove duplicates
   }
 
   private async compareAnimeWithDatabase(title: string): Promise<NautiljonAnimeComparisonDto> {

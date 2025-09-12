@@ -7,11 +7,10 @@ import {
   ParseIntPipe,
   UseGuards,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBody } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../../../shared/guards/jwt-auth.guard';
-import { RolesGuard } from '../../../shared/guards/roles.guard';
-import { Roles } from '../../../shared/decorators/roles.decorator';
-import { GetUser } from '../../../shared/decorators/get-user.decorator';
+import { ApiTags, ApiOperation, ApiResponse, ApiBody, ApiBearerAuth } from '@nestjs/swagger';
+import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
+import { AdminGuard } from '../../../common/guards/admin.guard';
+import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import { NautiljonImportService } from './nautiljon-import.service';
 import {
   NautiljonImportDto,
@@ -21,8 +20,8 @@ import {
 
 @ApiTags('Admin - Nautiljon Import')
 @Controller('admin/nautiljon')
-@UseGuards(JwtAuthGuard, RolesGuard)
-@Roles('admin')
+@UseGuards(JwtAuthGuard, AdminGuard)
+@ApiBearerAuth()
 export class NautiljonImportController {
   constructor(private readonly nautiljonImportService: NautiljonImportService) {}
 
@@ -55,7 +54,7 @@ export class NautiljonImportController {
   })
   async createAnimeFromNautiljon(
     @Body() createDto: CreateAnimeFromNautiljonDto,
-    @GetUser() user: any,
+    @CurrentUser() user: any,
   ): Promise<any> {
     return this.nautiljonImportService.createAnimeFromNautiljon(createDto, user);
   }
