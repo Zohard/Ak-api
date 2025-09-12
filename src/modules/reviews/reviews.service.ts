@@ -172,7 +172,7 @@ export class ReviewsService {
     // Date range filter
     if (dateRange) {
       const now = new Date();
-      let startDate: Date;
+      let startDate: Date | null;
 
       switch (dateRange) {
         case 'today':
