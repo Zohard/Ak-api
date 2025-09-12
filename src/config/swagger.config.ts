@@ -21,6 +21,7 @@ export function setupSwagger(app: INestApplication): void {
     .addServer('http://localhost:3001', 'Docker Legacy API (port 3001)')
     .addServer('http://localhost:3003', 'Docker NestJS API (port 3003)')
     .addServer('https://api.anime-kun.com', 'Production server')
+    .addServer('https://ak-api-three.vercel.app', 'Production server (Vercel)')
     .addBearerAuth()
     .addTag('Authentication', "Endpoints d'authentification")
     .addTag('Users', 'Gestion des utilisateurs')
