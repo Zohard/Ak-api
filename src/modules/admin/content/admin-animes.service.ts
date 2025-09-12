@@ -93,10 +93,7 @@ export class AdminAnimesService {
     if (dto.lien_adn) data.lienAdn = dto.lien_adn;
     if (dto.doublage) data.doublage = dto.doublage;
     if (dto.commentaire) data.commentaire = dto.commentaire;
-    if ((dto as any).topic !== undefined) {
-      const topicVal = Number((dto as any).topic);
-      if (!Number.isNaN(topicVal)) data.topic = topicVal;
-    }
+    // Note: legacy `topic` is not supported; use `commentaire` instead
 
     const created = await this.prisma.akAnime.create({ data });
     return created;
@@ -106,7 +103,8 @@ export class AdminAnimesService {
     const existing = await this.prisma.akAnime.findUnique({ where: { idAnime: id } });
     if (!existing) throw new NotFoundException('Anime introuvable');
 
-    const data: any = { ...dto };
+    const { topic, ...rest } = dto as any;
+    const data: any = { ...rest };
     if (dto.titre) {
       data.titre = dto.titre;
       if (!dto.niceUrl) data.niceUrl = this.slugify(dto.titre);

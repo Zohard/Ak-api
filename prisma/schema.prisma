@@ -111,7 +111,6 @@ model AkAnime {
   officialSite String?   @map("official_site") @db.VarChar(255)
   lienAdn      String?   @map("lien_adn") @db.VarChar(255)
   doublage     String?   @db.Text
-  topic        Int?
   commentaire  String?   @db.Text
 
   // Relations
