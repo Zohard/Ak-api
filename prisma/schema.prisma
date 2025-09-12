@@ -88,7 +88,7 @@ model AkPasswordResetToken {
 
 // Animes
 model AkAnime {
-  idAnime      Int       @id @map("id_anime")
+  idAnime      Int       @id @default(autoincrement()) @map("id_anime")
   niceUrl      String?   @map("nice_url") @db.VarChar(255)
   titre        String    @db.VarChar(255)
   titreOrig    String?   @map("titre_orig") @db.Text
@@ -140,7 +140,7 @@ model AkAnimesEpisode {
 
 // Mangas
 model AkManga {
-  idManga              Int       @id @map("id_manga")
+  idManga              Int       @id @default(autoincrement()) @map("id_manga")
   niceUrl              String?   @map("nice_url") @db.VarChar(255)
   titre                String    @db.Text
   auteur               String?   @db.Text
