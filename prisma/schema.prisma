@@ -92,8 +92,12 @@ model AkAnime {
   niceUrl      String?   @map("nice_url") @db.VarChar(255)
   titre        String    @db.VarChar(255)
   titreOrig    String?   @map("titre_orig") @db.Text
+  // Legacy/title variants and metadata
+  titreFr      String?   @map("titre_fr") @db.Text
+  titresAlternatifs String? @map("titres_alternatifs") @db.Text
   annee        Int?
   nbEp         Int?      @map("nb_ep")
+  nbEpduree    String?   @map("nb_epduree") @db.VarChar(255)
   image        String?   @db.VarChar(255)
   studio       String?   @db.VarChar(100)
   dateAjout    DateTime? @map("date_ajout") @db.Timestamptz
@@ -102,6 +106,13 @@ model AkAnime {
   realisateur  String?   @db.VarChar(255)
   nbReviews    Int?      @default(0) @map("nb_reviews")
   moyenneNotes Float?    @default(0) @map("moyennenotes") @db.Real
+  format       String?   @db.VarChar(100)
+  licence      Int?      @default(0)
+  officialSite String?   @map("official_site") @db.VarChar(255)
+  lienAdn      String?   @map("lien_adn") @db.VarChar(255)
+  doublage     String?   @db.Text
+  topic        Int?
+  commentaire  String?   @db.Text
 
   // Relations
   reviews      AkCritique[]
