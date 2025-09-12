@@ -10,6 +10,7 @@ import { CreateAnimeDto } from './dto/create-anime.dto';
 import { UpdateAnimeDto } from './dto/update-anime.dto';
 import { AnimeQueryDto } from './dto/anime-query.dto';
 import { RelatedContentItem, RelationsResponse } from '../shared/types/relations.types';
+import { ImageKitService } from '../media/imagekit.service';
 
 @Injectable()
 export class AnimesService extends BaseContentService<
@@ -21,6 +22,7 @@ export class AnimesService extends BaseContentService<
   constructor(
     prisma: PrismaService,
     private readonly cacheService: CacheService,
+    private readonly imageKitService: ImageKitService,
   ) {
     super(prisma);
   }
@@ -317,6 +319,23 @@ export class AnimesService extends BaseContentService<
       throw new ForbiddenException(
         'Seul un administrateur peut modifier un anime validé',
       );
+    }
+
+    // If replacing image and previous image is an ImageKit URL, attempt deletion in IK
+    try {
+      if (
+        typeof updateAnimeDto.image === 'string' &&
+        updateAnimeDto.image &&
+        updateAnimeDto.image !== anime.image &&
+        typeof anime.image === 'string' &&
+        anime.image &&
+        /imagekit\.io/.test(anime.image)
+      ) {
+        await this.imageKitService.deleteImageByUrl(anime.image);
+      }
+    } catch (e) {
+      // Non-blocking: log and continue update
+      console.warn('Failed to delete previous ImageKit image:', (e as Error).message);
     }
 
     const updatedAnime = await this.prisma.akAnime.update({
@@ -643,7 +662,7 @@ export class AnimesService extends BaseContentService<
     return {
       id: idAnime,
       addedDate: dateAjout?.toISOString(),
-      image: image ? `/api/media/serve/anime/${image}` : null,
+      image: image ? (typeof image === 'string' && /^https?:\/\//.test(image) ? image : `/api/media/serve/anime/${image}`) : null,
       ...otherFields,
     };
   }

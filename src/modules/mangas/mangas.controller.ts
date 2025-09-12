@@ -12,6 +12,9 @@ import {
   ParseIntPipe,
   HttpCode,
   HttpStatus,
+  UploadedFile,
+  UseInterceptors,
+  BadRequestException,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -20,6 +23,7 @@ import {
   ApiBearerAuth,
   ApiParam,
   ApiQuery,
+  ApiConsumes,
 } from '@nestjs/swagger';
 import { MangasService } from './mangas.service';
 import { CreateMangaDto } from './dto/create-manga.dto';
@@ -27,11 +31,16 @@ import { UpdateMangaDto } from './dto/update-manga.dto';
 import { MangaQueryDto } from './dto/manga-query.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { AdminGuard } from '../../common/guards/admin.guard';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { ImageKitService } from '../media/imagekit.service';
 
 @ApiTags('Mangas')
 @Controller('mangas')
 export class MangasController {
-  constructor(private readonly mangasService: MangasService) {}
+  constructor(
+    private readonly mangasService: MangasService,
+    private readonly imageKitService: ImageKitService,
+  ) {}
 
   @Get()
   @ApiOperation({ summary: 'Liste des mangas avec pagination et filtres' })
@@ -177,5 +186,39 @@ export class MangasController {
   @ApiResponse({ status: 204, description: 'Manga supprimé avec succès' })
   async remove(@Param('id', ParseIntPipe) id: number, @Request() req) {
     return this.mangasService.remove(id, req.user.id, req.user.isAdmin);
+  }
+
+  @Post(':id/upload-image')
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @UseInterceptors(FileInterceptor('file'))
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({ summary: 'Upload cover image to ImageKit and set it (Admin)' })
+  @ApiResponse({ status: 200, description: 'Image uploaded and manga updated' })
+  async uploadImage(
+    @Param('id', ParseIntPipe) id: number,
+    @UploadedFile() file: Express.Multer.File,
+    @Request() req,
+  ) {
+    if (!file) {
+      throw new BadRequestException('No file uploaded');
+    }
+
+    const folder = '/images/mangas';
+    const result = await this.imageKitService.uploadImage(
+      file.buffer,
+      file.originalname,
+      folder,
+    );
+
+    // Update manga image with the ImageKit URL
+    const updated = await this.mangasService.update(
+      id,
+      { image: result.url } as UpdateMangaDto,
+      req.user.id,
+      true,
+    );
+
+    return { message: 'Image uploaded', url: result.url, manga: updated };
   }
 }
