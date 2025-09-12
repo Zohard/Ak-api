@@ -188,6 +188,7 @@ export class NautiljonImportService {
       // Default values
       annee: new Date().getFullYear(),
       statut: 0, // Pending approval
+      commentaire: JSON.stringify(createDto.ressources), // Store resources as JSON string in commentaire field
     };
 
     // Extract additional data from ressources if available
@@ -223,20 +224,6 @@ export class NautiljonImportService {
 
     // Create the anime
     const createdAnime = await this.adminAnimesService.create(adminDto);
-    
-    // Store the full resources data in a separate field if the database supports it
-    if (ressources && createdAnime.idAnime) {
-      try {
-        await this.prisma.akAnime.update({
-          where: { idAnime: createdAnime.idAnime },
-          data: { 
-            commentaire: JSON.stringify(ressources) // Store in commentaire field as JSON
-          },
-        });
-      } catch (error) {
-        console.warn('Failed to store resources data:', error.message);
-      }
-    }
 
     return createdAnime;
   }
@@ -252,7 +239,9 @@ export class NautiljonImportService {
     }
 
     try {
-      const ressources = JSON.parse(anime.commentaire);
+      // Use commentaire field to store/read resources JSON
+      const resourcesText = anime.commentaire;
+      const ressources = JSON.parse(resourcesText);
       
       const result = {
         staff: [],
