@@ -114,6 +114,7 @@ export class ReviewsService {
       idAnime,
       idManga,
       idMembre,
+      pseudo,
       statut,
       minNotation,
       sortBy = 'dateCritique',
@@ -126,7 +127,7 @@ export class ReviewsService {
     
     // Try to get from cache first
     const cached = await this.cacheService.get(cacheKey);
-    if (cached && !search && !idMembre) { // Only cache non-search, non-user-specific queries
+    if (cached && !search && !idMembre && !pseudo) { // Only cache non-search, non-user-specific queries
       return cached;
     }
 
@@ -151,6 +152,12 @@ export class ReviewsService {
 
     if (idMembre) {
       where.idMembre = idMembre;
+    }
+
+    if (pseudo) {
+      where.membre = {
+        memberName: { contains: pseudo, mode: 'insensitive' },
+      };
     }
 
     if (statut !== undefined) {
@@ -238,7 +245,7 @@ export class ReviewsService {
     };
 
     // Cache the result if it's not user-specific or search-based
-    if (!search && !idMembre) {
+    if (!search && !idMembre && !pseudo) {
       const ttl = idAnime || idManga ? 300 : 180; // 5 mins for specific anime/manga, 3 mins for general
       await this.cacheService.set(cacheKey, result, ttl);
     }
@@ -996,6 +1003,7 @@ export class ReviewsService {
       idAnime = 0,
       idManga = 0,
       idMembre = 0,
+      pseudo = '',
       statut = '',
       minNotation = '',
       sortBy = 'dateCritique',
@@ -1003,7 +1011,7 @@ export class ReviewsService {
       type = '',
     } = query;
 
-    return `${page}_${limit}_${search}_${idAnime}_${idManga}_${idMembre}_${statut}_${minNotation}_${sortBy}_${sortOrder}_${type}`;
+    return `${page}_${limit}_${search}_${idAnime}_${idManga}_${idMembre}_${pseudo}_${statut}_${minNotation}_${sortBy}_${sortOrder}_${type}`;
   }
 
   // Cache invalidation methods

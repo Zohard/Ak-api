@@ -63,6 +63,14 @@ export class ReviewQueryDto {
   idMembre?: number;
 
   @ApiPropertyOptional({
+    description: 'Filtrer par pseudo de membre',
+    example: 'JohnDoe',
+  })
+  @IsOptional()
+  @IsString()
+  pseudo?: string;
+
+  @ApiPropertyOptional({
     description: 'Filtrer par statut (0 = actif/visible, 1 = autre statut)',
     example: 0,
     minimum: 0,
