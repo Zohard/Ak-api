@@ -65,6 +65,21 @@ export class ScrapeService {
     const aired = textAfterLabel('Aired:');
     const status = textAfterLabel('Status:');
 
+    // Extract staff information
+    const staff: Array<{ name: string; role: string }> = [];
+    $('.detail-characters-list table').each((_, table) => {
+      const $table = $(table);
+      const nameLink = $table.find('td').eq(1).find('a').first();
+      const roleBadge = $table.find('.spaceit_pad small').first();
+
+      const name = nameLink.text().trim();
+      const role = roleBadge.text().trim();
+
+      if (name && role) {
+        staff.push({ name, role });
+      }
+    });
+
     return {
       source: 'mal',
       url: animeUrl,
@@ -78,6 +93,7 @@ export class ScrapeService {
       episodes,
       aired,
       status,
+      staff,
     };
   }
 
@@ -187,6 +203,44 @@ export class ScrapeService {
     synopsisNode.find('div.fader').remove();
     const synopsis = synopsisNode.text().trim();
 
+    // Extract staff information
+    const staff: Array<{ name: string; role: string }> = [];
+
+    // Look for staff section
+    const staffSection = $('div.top_bloc').filter((_, el) => {
+      return $(el).find('h2').text().trim() === 'Staff';
+    }).first();
+
+    if (staffSection.length) {
+      // Extract from visible staff members
+      staffSection.find('.unPeople').each((_, person) => {
+        const $person = $(person);
+        const nameEl = $person.find('.unPeopleT a').first();
+        const roleEl = $person.find('.nom_role').first();
+
+        const name = nameEl.text().trim();
+        const role = roleEl.text().trim();
+
+        if (name && role) {
+          staff.push({ name, role });
+        }
+      });
+
+      // Also extract from hidden staff (staff_next)
+      staffSection.find('#staff_next .unPeople').each((_, person) => {
+        const $person = $(person);
+        const nameEl = $person.find('.unPeopleT a').first();
+        const roleEl = $person.find('.nom_role').first();
+
+        const name = nameEl.text().trim();
+        const role = roleEl.text().trim();
+
+        if (name && role) {
+          staff.push({ name, role });
+        }
+      });
+    }
+
     return {
       source: 'nautiljon',
       url,
@@ -203,6 +257,7 @@ export class ScrapeService {
       streaming,
       official_website,
       synopsis,
+      staff,
     };
   }
 
@@ -216,6 +271,7 @@ export class ScrapeService {
       genres: [] as string[],
       themes: [] as string[],
       studios: [] as string[],
+      staff: [] as Array<{ name: string; role: string }>,
       episode_count: '',
       official_sites: [] as string[],
       source_urls: {} as Record<string, string>,
@@ -242,6 +298,22 @@ export class ScrapeService {
 
     const st = new Set<string>(); (mal?.studios || []).forEach((x: string) => st.add(x)); if (nj?.studio) st.add(nj.studio);
     merged.studios = Array.from(st);
+
+    // Merge staff from both sources
+    const staffSet = new Map();
+    (mal?.staff || []).forEach((staff: { name: string; role: string }) => {
+      const key = `${staff.name?.toLowerCase() || ''}|${staff.role?.toLowerCase() || ''}`;
+      if (!staffSet.has(key) && staff.name && staff.role) {
+        staffSet.set(key, staff);
+      }
+    });
+    (nj?.staff || []).forEach((staff: { name: string; role: string }) => {
+      const key = `${staff.name?.toLowerCase() || ''}|${staff.role?.toLowerCase() || ''}`;
+      if (!staffSet.has(key) && staff.name && staff.role) {
+        staffSet.set(key, staff);
+      }
+    });
+    merged.staff = Array.from(staffSet.values());
 
     merged.episode_count = mal?.episodes || nj?.episodes_count || '';
 
