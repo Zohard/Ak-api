@@ -65,18 +65,35 @@ export class ScrapeService {
     const aired = textAfterLabel('Aired:');
     const status = textAfterLabel('Status:');
 
-    // Extract staff information
+    // Extract staff information (production staff, not characters)
     const staff: Array<{ name: string; role: string }> = [];
-    $('.detail-characters-list table').each((_, table) => {
-      const $table = $(table);
-      const nameLink = $table.find('td').eq(1).find('a').first();
-      const roleBadge = $table.find('.spaceit_pad small').first();
 
-      const name = nameLink.text().trim();
-      const role = roleBadge.text().trim();
+    // Look for staff section after "Staff" header
+    let staffSectionFound = false;
+    $('h2, .detail-characters-list').each((_, element) => {
+      const $element = $(element);
 
-      if (name && role) {
-        staff.push({ name, role });
+      if ($element.is('h2') && $element.text().trim() === 'Staff') {
+        staffSectionFound = true;
+        return true; // continue
+      }
+
+      if (staffSectionFound && $element.hasClass('detail-characters-list')) {
+        // Extract staff from this section
+        $element.find('table').each((_, table) => {
+          const $table = $(table);
+          const nameLink = $table.find('td').eq(1).find('a').first();
+          const roleBadge = $table.find('.spaceit_pad small').first();
+
+          const name = nameLink.text().trim();
+          const role = roleBadge.text().trim();
+
+          // Only include actual production staff roles, not character roles
+          if (name && role && role !== 'Main' && role !== 'Supporting') {
+            staff.push({ name, role });
+          }
+        });
+        return false; // stop after processing staff section
       }
     });
 
