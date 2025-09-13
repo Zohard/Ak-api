@@ -62,11 +62,18 @@ export class AnimesService extends BaseContentService<
   }
 
   async create(createAnimeDto: CreateAnimeDto, userId: number) {
+    // Normalize incoming payload (handle legacy alias and format mapping already in DTO)
+    const data: any = { ...createAnimeDto };
+    if (!data.titreOrig && data.titreOrign) {
+      data.titreOrig = data.titreOrign;
+    }
+    delete data.titreOrign;
+
     const anime = await this.prisma.akAnime.create({
       data: {
-        ...createAnimeDto,
+        ...data,
         dateAjout: new Date(),
-        statut: createAnimeDto.statut ?? 0, // Default to pending approval
+        statut: data.statut ?? 0, // Default to pending approval
       } as any, // Temporary fix for Prisma type issue
       include: {
         reviews: {
@@ -338,9 +345,16 @@ export class AnimesService extends BaseContentService<
       console.warn('Failed to delete previous ImageKit image:', (e as Error).message);
     }
 
+    // Normalize incoming payload for update (handle legacy alias)
+    const updateData: any = { ...updateAnimeDto };
+    if (!updateData.titreOrig && updateData.titreOrign) {
+      updateData.titreOrig = updateData.titreOrign;
+    }
+    delete updateData.titreOrign;
+
     const updatedAnime = await this.prisma.akAnime.update({
       where: { idAnime: id },
-      data: updateAnimeDto,
+      data: updateData,
       include: {
         reviews: {
           include: {

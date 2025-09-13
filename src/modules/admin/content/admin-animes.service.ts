@@ -61,6 +61,12 @@ export class AdminAnimesService {
   async create(dto: CreateAdminAnimeDto) {
     // Normalize legacy fields
     const titreOrig = dto.titreOrig ?? dto.titre_orig ?? null;
+    const normalizeFormat = (val?: string | null) => {
+      if (!val) return val ?? null;
+      const t = val.trim();
+      if (/^série$/i.test(t)) return 'Série TV';
+      return t;
+    };
     let nbEp: number | null = null;
     if (typeof dto.nbEp === 'number') {
       nbEp = dto.nbEp;
@@ -84,7 +90,7 @@ export class AdminAnimesService {
     };
 
     // Additional legacy fields if provided
-    if (dto.format) data.format = dto.format;
+    if (dto.format) data.format = normalizeFormat(dto.format);
     if (typeof dto.licence === 'number') data.licence = dto.licence;
     if (dto.titre_fr) data.titreFr = dto.titre_fr;
     if (dto.titres_alternatifs) data.titresAlternatifs = dto.titres_alternatifs;
@@ -122,6 +128,12 @@ export class AdminAnimesService {
         // Append the new attribution
         data.synopsis = `${cleanSynopsis}<br><br>"Synopsis soumis par ${user.username}"`;
       }
+    }
+
+    // Normalize format if provided
+    if (data.format) {
+      const t = String(data.format).trim();
+      data.format = /^série$/i.test(t) ? 'Série TV' : t;
     }
 
     const updated = await this.prisma.akAnime.update({ where: { idAnime: id }, data });
