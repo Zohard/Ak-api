@@ -73,6 +73,7 @@ export class ScrapeService {
     const episodes = textAfterLabel('Episodes:');
     const aired = textAfterLabel('Aired:');
     const status = textAfterLabel('Status:');
+    const type = textAfterLabel('Type:');
 
     // Extract characters information with voice actors
     const characters: Array<{ name: string; role: string; voice_actors: Array<{ name: string; language: string }> }> = [];
@@ -186,6 +187,7 @@ export class ScrapeService {
       episodes,
       aired,
       status,
+      type,
       staff,
       characters,
     };
@@ -608,7 +610,7 @@ export class ScrapeService {
       return f;
     };
 
-    const format = mapFormat(nj?.format);
+    const format = mapFormat(mal?.type) || mapFormat(nj?.format);
 
     return {
       merged,
