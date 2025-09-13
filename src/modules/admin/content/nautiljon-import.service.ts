@@ -242,20 +242,43 @@ export class NautiljonImportService {
       // Use commentaire field to store/read resources JSON
       const resourcesText = anime.commentaire;
       const ressources = JSON.parse(resourcesText);
-      
+
       const result = {
         staff: [],
         tags: [],
       };
 
-      // Extract staff from resources
+      // Extract staff from resources with business entity matching
       if (ressources.staff) {
-        result.staff = ressources.staff.map((member: any) => ({
-          name: member.name,
-          role: member.role,
-          // Map role to system role
-          mappedRole: this.mapStaffRole(member.role),
-        }));
+        const staffWithMatching = await Promise.all(
+          ressources.staff.map(async (member: any) => {
+            // Try to find existing business entity by denomination
+            const existingBusiness = await this.prisma.akBusiness.findFirst({
+              where: {
+                denomination: {
+                  equals: member.name,
+                  mode: 'insensitive'
+                }
+              },
+              select: {
+                idBusiness: true,
+                denomination: true,
+                type: true
+              }
+            });
+
+            return {
+              name: member.name,
+              role: member.role,
+              mappedRole: this.mapStaffRole(member.role),
+              existingBusiness,
+              businessId: existingBusiness?.idBusiness || null,
+              canImport: !!existingBusiness
+            };
+          })
+        );
+
+        result.staff = staffWithMatching;
       }
 
       // Extract genres and themes as tags
@@ -304,5 +327,51 @@ export class NautiljonImportService {
     };
 
     return roleMapping[role] || role;
+  }
+
+  async importStaffFromResources(animeId: number, staffToImport: Array<{ businessId: number, role: string }>): Promise<any> {
+    try {
+      const results = [];
+
+      for (const staff of staffToImport) {
+        // Check if relationship already exists
+        const existing = await this.prisma.$queryRawUnsafe(
+          `SELECT 1 FROM ak_business_to_animes WHERE id_anime = $1 AND id_business = $2 LIMIT 1`,
+          animeId,
+          staff.businessId
+        );
+
+        if ((existing as any[]).length > 0) {
+          results.push({
+            businessId: staff.businessId,
+            status: 'skipped',
+            message: 'Staff member already attached'
+          });
+          continue;
+        }
+
+        // Add staff relationship
+        await this.prisma.$queryRawUnsafe(
+          `INSERT INTO ak_business_to_animes (id_anime, id_business, type) VALUES ($1, $2, $3)`,
+          animeId,
+          staff.businessId,
+          staff.role || null
+        );
+
+        results.push({
+          businessId: staff.businessId,
+          status: 'imported',
+          message: 'Staff member imported successfully'
+        });
+      }
+
+      return {
+        imported: results.filter(r => r.status === 'imported').length,
+        skipped: results.filter(r => r.status === 'skipped').length,
+        results
+      };
+    } catch (error) {
+      throw new BadRequestException('Failed to import staff: ' + error.message);
+    }
   }
 }

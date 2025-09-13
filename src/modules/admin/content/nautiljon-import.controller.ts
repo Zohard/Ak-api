@@ -60,17 +60,33 @@ export class NautiljonImportController {
   }
 
   @Get('anime/:id/resources')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Get staff and tags from anime resources',
     description: 'Extract staff and tags data from the stored resources JSON for auto-completion'
   })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: 'Staff and tags data for auto-completion'
   })
   async getStaffAndTags(
     @Param('id', ParseIntPipe) animeId: number,
   ): Promise<any> {
     return this.nautiljonImportService.getStaffAndTagsFromResources(animeId);
+  }
+
+  @Post('anime/:id/import-staff')
+  @ApiOperation({
+    summary: 'Import staff from resources',
+    description: 'Import selected staff members from anime resources to business relationships'
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Staff import results'
+  })
+  async importStaffFromResources(
+    @Param('id', ParseIntPipe) animeId: number,
+    @Body() importData: { staff: Array<{ businessId: number, role: string }> },
+  ): Promise<any> {
+    return this.nautiljonImportService.importStaffFromResources(animeId, importData.staff);
   }
 }
