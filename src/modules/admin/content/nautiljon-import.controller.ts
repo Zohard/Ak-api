@@ -89,4 +89,17 @@ export class NautiljonImportController {
   ): Promise<any> {
     return this.nautiljonImportService.importStaffFromResources(animeId, importData.staff);
   }
+
+  @Get('tag-mappings')
+  @ApiOperation({
+    summary: 'Get tag mappings',
+    description: 'Get all available tag mappings for genres/themes to form tag IDs'
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Tag mappings for frontend form'
+  })
+  async getTagMappings(): Promise<any> {
+    return this.nautiljonImportService.getTagMappings();
+  }
 }
