@@ -68,40 +68,40 @@ export class ScrapeService {
     // Extract characters information with voice actors
     const characters: Array<{ name: string; role: string; voice_actors: Array<{ name: string; language: string }> }> = [];
 
-    // Look for characters section after "Characters" header
-    let charactersSectionFound = false;
-    $('h2, .detail-characters-list').each((_, element) => {
-      const $element = $(element);
+    // Look for characters section - find the div.detail-characters-list that comes after Characters header
+    const charactersSection = $('.detail-characters-list').first();
 
-      if ($element.is('h2') && $element.text().trim() === 'Characters') {
-        charactersSectionFound = true;
-        return true; // continue
-      }
+    if (charactersSection.length) {
+      // Process both left and right columns
+      const leftColumn = charactersSection.find('.left-column');
+      const rightColumn = charactersSection.find('.left-right');
 
-      if (charactersSectionFound && $element.hasClass('detail-characters-list')) {
-        // Extract characters from this section
-        $element.find('table').each((_, table) => {
+      // Function to extract characters from a column
+      const extractCharactersFromColumn = (column: any) => {
+        column.find('table').each((_, table) => {
           const $table = $(table);
-          const characterCell = $table.find('td').eq(1);
-          const voiceActorCell = $table.find('td').eq(2);
 
-          // Extract character info
-          const characterNameLink = characterCell.find('a').first();
-          const characterRoleBadge = characterCell.find('.spaceit_pad small').first();
+          // Character info is in the second td
+          const characterCell = $table.find('td').eq(1);
+          const characterNameLink = characterCell.find('h3.h3_characters_voice_actors a').first();
+          const characterRoleElement = characterCell.find('.spaceit_pad small').first();
 
           const characterName = characterNameLink.text().trim();
-          const characterRole = characterRoleBadge.text().trim();
+          const characterRole = characterRoleElement.text().trim();
 
           // Only process Main and Supporting characters
           if (characterName && (characterRole === 'Main' || characterRole === 'Supporting')) {
             const voiceActors: Array<{ name: string; language: string }> = [];
 
-            // Extract voice actors from the voice actor cell
+            // Voice actor info is in the third td
+            const voiceActorCell = $table.find('td').eq(2);
+
+            // Extract voice actors from nested table structure
             voiceActorCell.find('table tr').each((_, row) => {
               const $row = $(row);
-              const vaNameCell = $row.find('td').eq(0);
-              const vaLanguageSmall = vaNameCell.find('small').first();
-              const vaNameLink = vaNameCell.find('a').first();
+              const vaCell = $row.find('td').first();
+              const vaNameLink = vaCell.find('a').first();
+              const vaLanguageSmall = vaCell.find('small').first();
 
               const vaName = vaNameLink.text().trim();
               const vaLanguage = vaLanguageSmall.text().trim();
@@ -121,9 +121,16 @@ export class ScrapeService {
             });
           }
         });
-        return false; // stop after processing characters section
+      };
+
+      // Extract from both columns
+      if (leftColumn.length) {
+        extractCharactersFromColumn(leftColumn);
       }
-    });
+      if (rightColumn.length) {
+        extractCharactersFromColumn(rightColumn);
+      }
+    }
 
     // Extract staff information (production staff, not characters)
     const staff: Array<{ name: string; role: string }> = [];
