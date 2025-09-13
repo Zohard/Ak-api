@@ -259,7 +259,7 @@ export class NautiljonImportService {
         ressources.staff // fallback to direct staff property
       ].filter(Boolean);
 
-      const allStaff = [];
+      const allStaff: Array<{ name: string; role: string }> = [];
       for (const staffArray of staffSources) {
         if (Array.isArray(staffArray)) {
           allStaff.push(...staffArray);
