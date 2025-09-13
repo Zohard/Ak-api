@@ -242,13 +242,63 @@ export class NautiljonImportService {
 
       const result: {
         staff: any[];
+        characters: any[];
         tags: { name: string; category: string; }[];
       } = {
         staff: [],
+        characters: [],
         tags: [],
       };
 
-      // Extract staff from nested structure (merged > mal > nautiljon priority)
+      // Extract characters and voice actors separately
+      const charactersSources = [
+        ressources.merged?.staff,
+        ressources.mal?.staff,
+        ressources.nautiljon?.staff,
+        ressources.staff
+      ].filter(Boolean);
+
+      // Separate characters (Main/Supporting) from production staff
+      const allCharacters: Array<{ name: string; role: string; voice_actors?: any[] }> = [];
+      const allProductionStaff: Array<{ name: string; role: string }> = [];
+
+      for (const staffArray of charactersSources) {
+        if (Array.isArray(staffArray)) {
+          staffArray.forEach(member => {
+            if (member.role === 'Main' || member.role === 'Supporting') {
+              // This is a character
+              allCharacters.push(member);
+            } else {
+              // This is production staff
+              allProductionStaff.push(member);
+            }
+          });
+        }
+      }
+
+      // Process characters with Japanese voice actors only
+      if (allCharacters.length > 0) {
+        const charactersWithVoiceActors = allCharacters.map(character => {
+          const japaneseVoiceActors = character.voice_actors
+            ? character.voice_actors.filter(va => va.language === 'Japanese')
+            : [];
+
+          return {
+            character: {
+              name: character.name,
+              role: character.role,
+            },
+            japaneseVoiceActors: japaneseVoiceActors.map(va => ({
+              name: va.name,
+              language: va.language
+            }))
+          };
+        }).filter(item => item.japaneseVoiceActors.length > 0);
+
+        result.characters = charactersWithVoiceActors;
+      }
+
+      // Extract production staff from nested structure (merged > mal > nautiljon priority)
       const staffSources = [
         ressources.merged?.staff,
         ressources.mal?.staff,
@@ -256,12 +306,8 @@ export class NautiljonImportService {
         ressources.staff // fallback to direct staff property
       ].filter(Boolean);
 
-      const allStaff: Array<{ name: string; role: string }> = [];
-      for (const staffArray of staffSources) {
-        if (Array.isArray(staffArray)) {
-          allStaff.push(...staffArray);
-        }
-      }
+      // Use production staff from the separation above
+      const allStaff: Array<{ name: string; role: string }> = [...allProductionStaff];
 
       // Add studios as staff
       const studioSources = [
@@ -373,6 +419,151 @@ export class NautiljonImportService {
       );
 
       return result;
+    } catch (error) {
+      throw new BadRequestException('Failed to parse resources data');
+    }
+  }
+
+  async getCharactersAsHtml(animeId: number): Promise<{ html: string }> {
+    const anime = await this.prisma.akAnime.findUnique({
+      where: { idAnime: animeId },
+      select: { commentaire: true },
+    });
+
+    if (!anime || !anime.commentaire) {
+      throw new BadRequestException('No resources data found for this anime');
+    }
+
+    try {
+      const resourcesText = anime.commentaire;
+      const ressources = JSON.parse(resourcesText);
+
+      // Extract characters from merged, mal, nautiljon sources
+      const charactersSources = [
+        ressources.merged?.staff,
+        ressources.mal?.staff,
+        ressources.nautiljon?.staff,
+        ressources.staff
+      ].filter(Boolean);
+
+      const allCharacters: Array<{ name: string; role: string; voice_actors?: any[] }> = [];
+
+      for (const staffArray of charactersSources) {
+        if (Array.isArray(staffArray)) {
+          staffArray.forEach(member => {
+            if (member.role === 'Main' || member.role === 'Supporting') {
+              allCharacters.push(member);
+            }
+          });
+        }
+      }
+
+      let htmlRows = '';
+
+      if (allCharacters.length > 0) {
+        allCharacters.forEach(character => {
+          const japaneseVoiceActors = character.voice_actors
+            ? character.voice_actors.filter(va => va.language === 'Japanese')
+            : [];
+
+          // Only include characters that have Japanese voice actors
+          if (japaneseVoiceActors.length > 0) {
+            japaneseVoiceActors.forEach(voiceActor => {
+              htmlRows += `
+    <tr>
+      <td valign="top" width="27" class="ac borderClass">
+        <div class="picSurround">
+          <a href="#" class="fw-n">
+            <img alt="${character.name}" width="42" height="62" src="https://via.placeholder.com/42x62/cccccc/ffffff?text=No+Image" />
+          </a>
+        </div>
+      </td>
+      <td valign="top" class="borderClass">
+        <h3 class="h3_characters_voice_actors"><a href="#">${character.name}</a></h3>
+        <div class="spaceit_pad">
+          <small>${character.role}</small>
+        </div>
+      </td>
+      <td align="right" valign="top" class="borderClass">
+        <table border="0" cellpadding="0" cellspacing="0"><tbody><tr>
+        <td class="va-t ar pl4 pr4">
+          <a href="#">${voiceActor.name}</a><br>
+          <small>Japanese</small>
+        </td>
+        <td valign="top">
+          <div class="picSurround">
+            <a href="#">
+              <img alt="${voiceActor.name}" width="42" height="62" src="https://via.placeholder.com/42x62/cccccc/ffffff?text=No+Image" />
+            </a>
+          </div>
+        </td>
+      </tr></tbody></table>
+      </td>
+    </tr>`;
+            });
+          }
+        });
+      }
+
+      return { html: htmlRows };
+    } catch (error) {
+      throw new BadRequestException('Failed to parse resources data');
+    }
+  }
+
+  async getDoublageFromResources(animeId: number): Promise<{ doublage: string }> {
+    const anime = await this.prisma.akAnime.findUnique({
+      where: { idAnime: animeId },
+      select: { commentaire: true },
+    });
+
+    if (!anime || !anime.commentaire) {
+      throw new BadRequestException('No resources data found for this anime');
+    }
+
+    try {
+      const resourcesText = anime.commentaire;
+      const ressources = JSON.parse(resourcesText);
+
+      // Extract characters from merged, mal, nautiljon sources
+      const charactersSources = [
+        ressources.merged?.staff,
+        ressources.mal?.staff,
+        ressources.nautiljon?.staff,
+        ressources.staff
+      ].filter(Boolean);
+
+      const allCharacters: Array<{ name: string; role: string; voice_actors?: any[] }> = [];
+
+      for (const staffArray of charactersSources) {
+        if (Array.isArray(staffArray)) {
+          staffArray.forEach(member => {
+            if (member.role === 'Main' || member.role === 'Supporting') {
+              allCharacters.push(member);
+            }
+          });
+        }
+      }
+
+      const doublageEntries: string[] = [];
+
+      if (allCharacters.length > 0) {
+        allCharacters.forEach(character => {
+          const japaneseVoiceActors = character.voice_actors
+            ? character.voice_actors.filter(va => va.language === 'Japanese')
+            : [];
+
+          // Only include characters that have Japanese voice actors
+          if (japaneseVoiceActors.length > 0) {
+            japaneseVoiceActors.forEach(voiceActor => {
+              // Format: {voice actor} ({character name})
+              doublageEntries.push(`${voiceActor.name} (${character.name})`);
+            });
+          }
+        });
+      }
+
+      return { doublage: doublageEntries.join(', ') };
     } catch (error) {
       throw new BadRequestException('Failed to parse resources data');
     }

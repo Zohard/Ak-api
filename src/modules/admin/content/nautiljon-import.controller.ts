@@ -74,6 +74,36 @@ export class NautiljonImportController {
     return this.nautiljonImportService.getStaffAndTagsFromResources(animeId);
   }
 
+  @Get('anime/:id/characters-html')
+  @ApiOperation({
+    summary: 'Get characters and voice actors as HTML structure',
+    description: 'Get characters with Japanese voice actors formatted as HTML table rows'
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'HTML structure for characters and Japanese voice actors'
+  })
+  async getCharactersAsHtml(
+    @Param('id', ParseIntPipe) animeId: number,
+  ): Promise<{ html: string }> {
+    return this.nautiljonImportService.getCharactersAsHtml(animeId);
+  }
+
+  @Get('anime/:id/doublage')
+  @ApiOperation({
+    summary: 'Get doublage field from anime resources',
+    description: 'Get Japanese voice actors and characters formatted for doublage field'
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Doublage string formatted as {voice actor} ({character}), ...'
+  })
+  async getDoublageFromResources(
+    @Param('id', ParseIntPipe) animeId: number,
+  ): Promise<{ doublage: string }> {
+    return this.nautiljonImportService.getDoublageFromResources(animeId);
+  }
+
   @Post('anime/:id/import-staff')
   @ApiOperation({
     summary: 'Import staff from resources',
