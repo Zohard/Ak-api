@@ -243,7 +243,10 @@ export class NautiljonImportService {
       const resourcesText = anime.commentaire;
       const ressources = JSON.parse(resourcesText);
 
-      const result = {
+      const result: {
+        staff: any[];
+        tags: { name: string; category: string; }[];
+      } = {
         staff: [],
         tags: [],
       };
@@ -331,7 +334,7 @@ export class NautiljonImportService {
 
   async importStaffFromResources(animeId: number, staffToImport: Array<{ businessId: number, role: string }>): Promise<any> {
     try {
-      const results = [];
+      const results: Array<{ businessId: number; status: string; message: string; }> = [];
 
       for (const staff of staffToImport) {
         // Check if relationship already exists
