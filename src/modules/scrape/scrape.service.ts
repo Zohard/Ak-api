@@ -233,7 +233,8 @@ export class ScrapeService {
     (nj?.alternative_titles || []).forEach((t: string) => t && alt.add(t));
     merged.titres_alternatifs = Array.from(alt);
 
-    merged.synopsis = mal?.synopsis && mal.synopsis !== 'No synopsis available' ? mal.synopsis : (nj?.synopsis || '');
+    // Skip synopsis due to copyright concerns
+    merged.synopsis = '';
 
     const g = new Set<string>(); (mal?.genres || []).forEach((x: string) => g.add(x)); (nj?.genres || []).forEach((x: string) => g.add(x));
     merged.genres = Array.from(g);
