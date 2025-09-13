@@ -206,10 +206,7 @@ export class NautiljonImportService {
         adminDto.nb_epduree = String(ressources.episode_count);
       }
       
-      // Extract synopsis
-      if (ressources.synopsis) {
-        adminDto.synopsis = ressources.synopsis;
-      }
+      // Skip synopsis due to copyright concerns
       
       // Extract studio
       if (ressources.studios && ressources.studios.length > 0) {
