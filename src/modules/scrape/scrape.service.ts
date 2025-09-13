@@ -16,6 +16,15 @@ export class ScrapeService {
     return load(html);
   }
 
+  private formatMALName(name: string): string {
+    // Transform "Last name, First name" to "First name Last name"
+    if (name.includes(',')) {
+      const [lastName, firstName] = name.split(',').map(part => part.trim());
+      return `${firstName} ${lastName}`;
+    }
+    return name;
+  }
+
   private async scrapeMAL(q: string) {
     const isUrl = /^https?:\/\//i.test(q);
     let animeUrl = q;
@@ -86,7 +95,7 @@ export class ScrapeService {
           const characterNameLink = characterCell.find('h3.h3_characters_voice_actors a').first();
           const characterRoleElement = characterCell.find('.spaceit_pad small').first();
 
-          const characterName = characterNameLink.text().trim();
+          const characterName = this.formatMALName(characterNameLink.text().trim());
           const characterRole = characterRoleElement.text().trim();
 
           // Only process Main and Supporting characters
@@ -103,7 +112,7 @@ export class ScrapeService {
               const vaNameLink = vaCell.find('a').first();
               const vaLanguageSmall = vaCell.find('small').first();
 
-              const vaName = vaNameLink.text().trim();
+              const vaName = this.formatMALName(vaNameLink.text().trim());
               const vaLanguage = vaLanguageSmall.text().trim();
 
               if (vaName && vaLanguage) {
@@ -152,7 +161,7 @@ export class ScrapeService {
           const nameLink = $table.find('td').eq(1).find('a').first();
           const roleBadge = $table.find('.spaceit_pad small').first();
 
-          const name = nameLink.text().trim();
+          const name = this.formatMALName(nameLink.text().trim());
           const role = roleBadge.text().trim();
 
           // Only include actual production staff roles, not character roles
