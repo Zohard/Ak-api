@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsString, IsOptional, IsNumber, Min, Max, IsUrl } from 'class-validator';
+import { Transform } from 'class-transformer';
 
 export class CreateAnimeDto {
   @ApiProperty({
@@ -24,6 +25,15 @@ export class CreateAnimeDto {
   @IsOptional()
   @IsString()
   titreOrig?: string;
+
+  // Accept legacy/misspelled field sent by some clients
+  @ApiPropertyOptional({
+    description: 'Alias legacy pour titreOrig (corrigé automatiquement)',
+    example: 'Shingeki no Kyojin',
+  })
+  @IsOptional()
+  @IsString()
+  titreOrign?: string;
 
   @ApiPropertyOptional({
     description: 'Titre français',
@@ -116,6 +126,13 @@ export class CreateAnimeDto {
   })
   @IsOptional()
   @IsString()
+  @Transform(({ value }) => {
+    if (typeof value !== 'string') return value;
+    // Normalize common synonyms
+    const trimmed = value.trim();
+    if (/^série$/i.test(trimmed)) return 'Série TV';
+    return trimmed;
+  })
   format?: string;
 
   @ApiPropertyOptional({
