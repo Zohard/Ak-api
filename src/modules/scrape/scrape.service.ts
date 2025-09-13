@@ -65,6 +65,66 @@ export class ScrapeService {
     const aired = textAfterLabel('Aired:');
     const status = textAfterLabel('Status:');
 
+    // Extract characters information with voice actors
+    const characters: Array<{ name: string; role: string; voice_actors: Array<{ name: string; language: string }> }> = [];
+
+    // Look for characters section after "Characters" header
+    let charactersSectionFound = false;
+    $('h2, .detail-characters-list').each((_, element) => {
+      const $element = $(element);
+
+      if ($element.is('h2') && $element.text().trim() === 'Characters') {
+        charactersSectionFound = true;
+        return true; // continue
+      }
+
+      if (charactersSectionFound && $element.hasClass('detail-characters-list')) {
+        // Extract characters from this section
+        $element.find('table').each((_, table) => {
+          const $table = $(table);
+          const characterCell = $table.find('td').eq(1);
+          const voiceActorCell = $table.find('td').eq(2);
+
+          // Extract character info
+          const characterNameLink = characterCell.find('a').first();
+          const characterRoleBadge = characterCell.find('.spaceit_pad small').first();
+
+          const characterName = characterNameLink.text().trim();
+          const characterRole = characterRoleBadge.text().trim();
+
+          // Only process Main and Supporting characters
+          if (characterName && (characterRole === 'Main' || characterRole === 'Supporting')) {
+            const voiceActors: Array<{ name: string; language: string }> = [];
+
+            // Extract voice actors from the voice actor cell
+            voiceActorCell.find('table tr').each((_, row) => {
+              const $row = $(row);
+              const vaNameCell = $row.find('td').eq(0);
+              const vaLanguageSmall = vaNameCell.find('small').first();
+              const vaNameLink = vaNameCell.find('a').first();
+
+              const vaName = vaNameLink.text().trim();
+              const vaLanguage = vaLanguageSmall.text().trim();
+
+              if (vaName && vaLanguage) {
+                voiceActors.push({
+                  name: vaName,
+                  language: vaLanguage
+                });
+              }
+            });
+
+            characters.push({
+              name: characterName,
+              role: characterRole,
+              voice_actors: voiceActors
+            });
+          }
+        });
+        return false; // stop after processing characters section
+      }
+    });
+
     // Extract staff information (production staff, not characters)
     const staff: Array<{ name: string; role: string }> = [];
 
@@ -111,6 +171,7 @@ export class ScrapeService {
       aired,
       status,
       staff,
+      characters,
     };
   }
 
@@ -220,6 +281,143 @@ export class ScrapeService {
     synopsisNode.find('div.fader').remove();
     const synopsis = synopsisNode.text().trim();
 
+    // Extract characters information with voice actors
+    const characters: Array<{ name: string; role: string; voice_actors: Array<{ name: string; language: string }> }> = [];
+
+    // Look for characters section ("Personnages" in French)
+    const charactersSection = $('div.top_bloc').filter((_, el) => {
+      const h2Text = $(el).find('h2').text().trim();
+      return h2Text === 'Personnages' || h2Text === 'Characters';
+    }).first();
+
+    if (charactersSection.length) {
+      // Extract from visible characters
+      charactersSection.find('.unPeople').each((_, person) => {
+        const $person = $(person);
+        const nameEl = $person.find('.unPeopleT a').first();
+        const roleEl = $person.find('.nom_role').first();
+
+        const characterName = nameEl.text().trim();
+        const characterRole = roleEl.text().trim();
+
+        // Map French roles to English
+        let mappedRole = characterRole;
+        if (characterRole === 'Principal' || characterRole === 'Principale') {
+          mappedRole = 'Main';
+        } else if (characterRole === 'Secondaire') {
+          mappedRole = 'Supporting';
+        }
+
+        if (characterName && (mappedRole === 'Main' || mappedRole === 'Supporting')) {
+          const voiceActors: Array<{ name: string; language: string }> = [];
+
+          // Look for voice actor information in the same person block
+          $person.find('.doublage').each((_, vaElement) => {
+            const $vaElement = $(vaElement);
+            const vaText = $vaElement.text().trim();
+
+            // Parse voice actor info (usually format: "Voice Actor Name (Language)")
+            const vaMatch = vaText.match(/(.+?)\s*\((.+?)\)/);
+            if (vaMatch) {
+              const vaName = vaMatch[1].trim();
+              let vaLanguage = vaMatch[2].trim();
+
+              // Map French language names to English
+              if (vaLanguage === 'japonais' || vaLanguage === 'jp' || vaLanguage === 'ja') {
+                vaLanguage = 'Japanese';
+              } else if (vaLanguage === 'français' || vaLanguage === 'fr') {
+                vaLanguage = 'French';
+              } else if (vaLanguage === 'anglais' || vaLanguage === 'en') {
+                vaLanguage = 'English';
+              }
+
+              if (vaName && vaLanguage) {
+                voiceActors.push({
+                  name: vaName,
+                  language: vaLanguage
+                });
+              }
+            } else if (vaText && !vaText.includes('(')) {
+              // If no language specified, assume Japanese for anime
+              voiceActors.push({
+                name: vaText,
+                language: 'Japanese'
+              });
+            }
+          });
+
+          characters.push({
+            name: characterName,
+            role: mappedRole,
+            voice_actors: voiceActors
+          });
+        }
+      });
+
+      // Also extract from hidden characters (characters_next)
+      charactersSection.find('#personnages_next .unPeople, #characters_next .unPeople').each((_, person) => {
+        const $person = $(person);
+        const nameEl = $person.find('.unPeopleT a').first();
+        const roleEl = $person.find('.nom_role').first();
+
+        const characterName = nameEl.text().trim();
+        const characterRole = roleEl.text().trim();
+
+        // Map French roles to English
+        let mappedRole = characterRole;
+        if (characterRole === 'Principal' || characterRole === 'Principale') {
+          mappedRole = 'Main';
+        } else if (characterRole === 'Secondaire') {
+          mappedRole = 'Supporting';
+        }
+
+        if (characterName && (mappedRole === 'Main' || mappedRole === 'Supporting')) {
+          const voiceActors: Array<{ name: string; language: string }> = [];
+
+          // Look for voice actor information in the same person block
+          $person.find('.doublage').each((_, vaElement) => {
+            const $vaElement = $(vaElement);
+            const vaText = $vaElement.text().trim();
+
+            // Parse voice actor info (usually format: "Voice Actor Name (Language)")
+            const vaMatch = vaText.match(/(.+?)\s*\((.+?)\)/);
+            if (vaMatch) {
+              const vaName = vaMatch[1].trim();
+              let vaLanguage = vaMatch[2].trim();
+
+              // Map French language names to English
+              if (vaLanguage === 'japonais' || vaLanguage === 'jp' || vaLanguage === 'ja') {
+                vaLanguage = 'Japanese';
+              } else if (vaLanguage === 'français' || vaLanguage === 'fr') {
+                vaLanguage = 'French';
+              } else if (vaLanguage === 'anglais' || vaLanguage === 'en') {
+                vaLanguage = 'English';
+              }
+
+              if (vaName && vaLanguage) {
+                voiceActors.push({
+                  name: vaName,
+                  language: vaLanguage
+                });
+              }
+            } else if (vaText && !vaText.includes('(')) {
+              // If no language specified, assume Japanese for anime
+              voiceActors.push({
+                name: vaText,
+                language: 'Japanese'
+              });
+            }
+          });
+
+          characters.push({
+            name: characterName,
+            role: mappedRole,
+            voice_actors: voiceActors
+          });
+        }
+      });
+    }
+
     // Extract staff information
     const staff: Array<{ name: string; role: string }> = [];
 
@@ -275,6 +473,7 @@ export class ScrapeService {
       official_website,
       synopsis,
       staff,
+      characters,
     };
   }
 
@@ -289,6 +488,7 @@ export class ScrapeService {
       themes: [] as string[],
       studios: [] as string[],
       staff: [] as Array<{ name: string; role: string }>,
+      characters: [] as Array<{ name: string; role: string; voice_actors: Array<{ name: string; language: string }> }>,
       episode_count: '',
       official_sites: [] as string[],
       source_urls: {} as Record<string, string>,
@@ -331,6 +531,40 @@ export class ScrapeService {
       }
     });
     merged.staff = Array.from(staffSet.values());
+
+    // Merge characters from both sources
+    const charactersSet = new Map();
+    (mal?.characters || []).forEach((character: { name: string; role: string; voice_actors: Array<{ name: string; language: string }> }) => {
+      const key = `${character.name?.toLowerCase() || ''}|${character.role?.toLowerCase() || ''}`;
+      if (!charactersSet.has(key) && character.name && character.role) {
+        charactersSet.set(key, character);
+      }
+    });
+    (nj?.characters || []).forEach((character: { name: string; role: string; voice_actors: Array<{ name: string; language: string }> }) => {
+      const key = `${character.name?.toLowerCase() || ''}|${character.role?.toLowerCase() || ''}`;
+      if (!charactersSet.has(key) && character.name && character.role) {
+        // If character already exists from MAL, merge voice actors
+        if (charactersSet.has(key)) {
+          const existingCharacter = charactersSet.get(key);
+          const allVoiceActors = [...existingCharacter.voice_actors];
+
+          character.voice_actors.forEach(va => {
+            const vaKey = `${va.name?.toLowerCase() || ''}|${va.language?.toLowerCase() || ''}`;
+            const exists = allVoiceActors.some(existing =>
+              `${existing.name?.toLowerCase() || ''}|${existing.language?.toLowerCase() || ''}` === vaKey
+            );
+            if (!exists && va.name && va.language) {
+              allVoiceActors.push(va);
+            }
+          });
+
+          existingCharacter.voice_actors = allVoiceActors;
+        } else {
+          charactersSet.set(key, character);
+        }
+      }
+    });
+    merged.characters = Array.from(charactersSet.values());
 
     merged.episode_count = mal?.episodes || nj?.episodes_count || '';
 
