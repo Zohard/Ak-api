@@ -50,15 +50,40 @@ export class ImageKitService {
     }
   }
 
-  async uploadImage(file: any, fileName: string, folder: string = ''): Promise<any> {
+  private async deleteExistingImage(fileName: string, folder: string): Promise<void> {
     try {
+      // Construct folder path for search (should start and end with '/')
+      const folderPath = folder ? `/${folder}/` : '/';
+
+      // Search for existing file with the same name in the folder
+      const files = await this.imagekit.listFiles({
+        searchQuery: `name = \"${fileName}\" AND folderPath = \"${folderPath}\"`,
+        limit: 1,
+      } as any);
+
+      if (Array.isArray(files) && files.length > 0 && (files[0] as any).fileId) {
+        await this.imagekit.deleteFile((files[0] as any).fileId);
+        console.log(`Deleted existing image: ${fileName} from folder: ${folder}`);
+      }
+    } catch (error) {
+      // Log the error but don't throw - we want the upload to continue even if delete fails
+      console.warn(`Failed to delete existing image ${fileName}:`, error.message);
+    }
+  }
+
+  async uploadImage(file: any, fileName: string, folder: string = '', replaceExisting: boolean = true): Promise<any> {
+    try {
+      // If replaceExisting is true, try to delete any existing image with the same name
+      if (replaceExisting) {
+        await this.deleteExistingImage(fileName, folder);
+      }
+
       const result = await this.imagekit.upload({
         file: file,
         fileName: fileName,
         folder: folder,
-        useUniqueFileName: true,
+        useUniqueFileName: !replaceExisting, // Don't use unique filename if we're replacing
         transformation: {
-          pre: 'l-text,i-Watermark,fs-50,l-end',
           post: [
             {
               type: 'transformation',
@@ -67,7 +92,7 @@ export class ImageKitService {
           ]
         }
       });
-      
+
       return result;
     } catch (error) {
       throw new Error(`ImageKit upload failed: ${error.message}`);
