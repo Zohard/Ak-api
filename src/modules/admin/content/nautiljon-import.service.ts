@@ -1,12 +1,13 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../../shared/services/prisma.service';
-import { 
-  NautiljonImportDto, 
+import {
+  NautiljonImportDto,
   NautiljonAnimeComparisonDto,
-  CreateAnimeFromNautiljonDto 
+  CreateAnimeFromNautiljonDto
 } from './dto/nautiljon-import.dto';
 import { CreateAdminAnimeDto } from './dto/admin-anime.dto';
 import { AdminAnimesService } from './admin-animes.service';
+import { ImageKitService } from '../../media/imagekit.service';
 import { spawn } from 'child_process';
 import { promises as fs } from 'fs';
 import { join } from 'path';
@@ -16,6 +17,7 @@ export class NautiljonImportService {
   constructor(
     private prisma: PrismaService,
     private adminAnimesService: AdminAnimesService,
+    private imageKitService: ImageKitService,
   ) {}
 
   async importSeasonAnimes(importDto: NautiljonImportDto): Promise<NautiljonAnimeComparisonDto[]> {
@@ -172,6 +174,40 @@ export class NautiljonImportService {
     });
   }
 
+  async importAnimeImage(
+    imageUrl: string,
+    animeTitle: string
+  ): Promise<{ success: boolean; imageKitUrl?: string; error?: string }> {
+    try {
+      if (!imageUrl || !imageUrl.trim()) {
+        return { success: false, error: 'No image URL provided' };
+      }
+
+      // Generate a clean filename from the anime title
+      const cleanTitle = animeTitle
+        .replace(/[^a-zA-Z0-9\s-]/g, '') // Remove special characters
+        .replace(/\s+/g, '_') // Replace spaces with underscores
+        .toLowerCase();
+
+      const result = await this.imageKitService.uploadImageFromUrl(
+        imageUrl,
+        `${cleanTitle}_poster`,
+        'animes'
+      );
+
+      return {
+        success: true,
+        imageKitUrl: result.url,
+      };
+    } catch (error) {
+      console.warn('Failed to import anime image:', error.message);
+      return {
+        success: false,
+        error: error.message,
+      };
+    }
+  }
+
   async createAnimeFromNautiljon(
     createDto: CreateAnimeFromNautiljonDto,
     user?: any,
@@ -200,29 +236,53 @@ export class NautiljonImportService {
           adminDto.annee = parseInt(seasonMatch[1]);
         }
       }
-      
+
       // Extract episode count
       if (ressources.episode_count) {
         adminDto.nb_epduree = String(ressources.episode_count);
       }
-      
+
       // Skip synopsis due to copyright concerns
-      
+
       // Extract studio
       if (ressources.studios && ressources.studios.length > 0) {
         adminDto.studio = ressources.studios[0];
       }
-      
+
       // Extract official site
       if (ressources.official_websites && ressources.official_websites.length > 0) {
         adminDto.official_site = ressources.official_websites[0];
       }
     }
 
+    // Try to import image if available
+    let imageImportResult = null;
+    if (ressources?.merged?.image_url || ressources?.mal?.image_url || ressources?.nautiljon?.image_url) {
+      // Prioritize MAL image, fallback to Nautiljon
+      const imageUrl = ressources.merged?.image_url || ressources.mal?.image_url || ressources.nautiljon?.image_url;
+
+      try {
+        imageImportResult = await this.importAnimeImage(imageUrl, createDto.titre);
+
+        if (imageImportResult.success && imageImportResult.imageKitUrl) {
+          // Update the adminDto with the uploaded image URL
+          adminDto.image = imageImportResult.imageKitUrl;
+        }
+      } catch (error) {
+        console.warn('Failed to import image during anime creation:', error.message);
+      }
+    }
+
     // Create the anime
     const createdAnime = await this.adminAnimesService.create(adminDto);
 
-    return createdAnime;
+    // Add image import result to response
+    const result = {
+      ...createdAnime,
+      imageImport: imageImportResult,
+    };
+
+    return result;
   }
 
   async getStaffAndTagsFromResources(animeId: number): Promise<any> {

@@ -132,4 +132,29 @@ export class NautiljonImportController {
   async getTagMappings(): Promise<any> {
     return this.nautiljonImportService.getTagMappings();
   }
+
+  @Post('import-image')
+  @ApiOperation({
+    summary: 'Import anime image to ImageKit',
+    description: 'Download and upload an anime image from MAL/Nautiljon to ImageKit'
+  })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        imageUrl: { type: 'string', description: 'URL of the image to import' },
+        animeTitle: { type: 'string', description: 'Title of the anime for filename generation' }
+      },
+      required: ['imageUrl', 'animeTitle']
+    }
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Image import result'
+  })
+  async importImage(
+    @Body() importData: { imageUrl: string; animeTitle: string },
+  ): Promise<any> {
+    return this.nautiljonImportService.importAnimeImage(importData.imageUrl, importData.animeTitle);
+  }
 }

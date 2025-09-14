@@ -10,8 +10,10 @@ import { AdminBusinessService } from './admin-business.service';
 import { NautiljonImportController } from './nautiljon-import.controller';
 import { NautiljonImportService } from './nautiljon-import.service';
 import { PrismaService } from '../../../shared/services/prisma.service';
+import { MediaModule } from '../../media/media.module';
 
 @Module({
+  imports: [MediaModule],
   controllers: [AdminContentController, AdminAnimesController, AdminMangasController, AdminBusinessController, NautiljonImportController],
   providers: [AdminContentService, AdminAnimesService, AdminMangasService, AdminBusinessService, NautiljonImportService, PrismaService],
   exports: [AdminContentService],
