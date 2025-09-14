@@ -228,12 +228,15 @@ export class ImageKitService {
 
       console.log(`Uploading to ImageKit: ${fullFileName} (${buffer.length} bytes) to folder: ${folder}`);
 
+      // Delete existing image with the same name before uploading
+      await this.deleteExistingImage(fullFileName, folder);
+
       // Upload to ImageKit
       const result = await this.imagekit.upload({
         file: buffer,
         fileName: fullFileName,
         folder: folder,
-        useUniqueFileName: true,
+        useUniqueFileName: false, // Changed to false since we're deleting existing files
         tags: ['import', 'anime', 'scraped']
         // Note: Removing transformation watermark for now as it might cause issues during import
       });
