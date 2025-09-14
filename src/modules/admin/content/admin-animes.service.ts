@@ -22,7 +22,7 @@ export class AdminAnimesService {
       limit = 20,
       search,
       annee,
-      studio,
+      format,
       statut,
       sortBy = 'dateAjout',
       sortOrder = 'desc',
@@ -37,10 +37,14 @@ export class AdminAnimesService {
       ];
     }
     if (annee) where.annee = annee;
-    if (studio) where.studio = { contains: studio, mode: 'insensitive' };
+    if (format) where.format = { contains: format, mode: 'insensitive' };
     if (statut !== undefined) where.statut = statut;
 
-    const orderBy = { [sortBy]: sortOrder } as any;
+    // Sort "En attente" (status 2) first, then by the requested sort
+    const orderBy = [
+      { statut: 'desc' as const }, // This puts 2 (En attente) before 1 (Publié) and 0 (Refusé)
+      { [sortBy]: sortOrder }
+    ] as any;
 
     const [items, total] = await Promise.all([
       this.prisma.akAnime.findMany({ where, skip, take: limit, orderBy }),
@@ -156,6 +160,80 @@ export class AdminAnimesService {
     if (!existing) throw new NotFoundException('Anime introuvable');
     await this.prisma.akAnime.delete({ where: { idAnime: id } });
     return { message: 'Anime supprimé' };
+  }
+
+  async createStaffFromImportData(animeId: number, staffData: Array<{ name: string; role: string }>): Promise<void> {
+    if (!staffData || staffData.length === 0) return;
+
+    for (const staffMember of staffData) {
+      if (!staffMember.name?.trim() || !staffMember.role?.trim()) continue;
+
+      try {
+        // First, try to find existing business entity by denomination
+        let business = await this.prisma.akBusiness.findFirst({
+          where: {
+            denomination: {
+              equals: staffMember.name,
+              mode: 'insensitive'
+            }
+          }
+        });
+
+        // If not found, create new business entity
+        if (!business) {
+          business = await this.prisma.akBusiness.create({
+            data: {
+              denomination: staffMember.name,
+              type: this.getBusinessTypeFromRole(staffMember.role),
+              statut: 1,
+              dateAjout: new Date()
+            }
+          });
+        }
+
+        // Check if relationship already exists
+        const existingRelation = await this.prisma.akBusinessToAnime.findFirst({
+          where: {
+            idAnime: animeId,
+            idBusiness: business.idBusiness,
+            type: staffMember.role
+          }
+        });
+
+        // Create relationship if it doesn't exist
+        if (!existingRelation) {
+          await this.prisma.akBusinessToAnime.create({
+            data: {
+              idAnime: animeId,
+              idBusiness: business.idBusiness,
+              type: staffMember.role
+            }
+          });
+        }
+      } catch (error) {
+        console.error(`Error creating staff member ${staffMember.name} with role ${staffMember.role}:`, error);
+        // Continue with next staff member instead of failing entire operation
+      }
+    }
+  }
+
+  private getBusinessTypeFromRole(role: string): string {
+    const roleMap: Record<string, string> = {
+      'Studio d\'animation': 'Studio',
+      'Studio d\'animation (sous-traitance)': 'Studio',
+      'Réalisateur': 'Personne',
+      'Director': 'Personne',
+      'Character Design': 'Personne',
+      'Music': 'Personne',
+      'Original Creator': 'Personne',
+      'Script': 'Personne',
+      'Producer': 'Personne',
+      'Executive Producer': 'Personne',
+      'Sound Director': 'Personne',
+      'Art Director': 'Personne',
+    };
+
+    return roleMap[role] || 'Personne';
   }
 
   private slugify(text: string) {

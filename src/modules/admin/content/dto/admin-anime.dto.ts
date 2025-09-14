@@ -254,10 +254,10 @@ export class AdminAnimeListQueryDto {
   @IsInt()
   annee?: number;
 
-  @ApiPropertyOptional({ description: 'Filtrer par studio' })
+  @ApiPropertyOptional({ description: 'Filtrer par format' })
   @IsOptional()
   @IsString()
-  studio?: string;
+  format?: string;
 
   @ApiPropertyOptional({ description: 'Filtrer par statut', enum: [0, 1, 2] })
   @IsOptional()

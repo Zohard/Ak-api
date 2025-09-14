@@ -70,6 +70,16 @@ export class AdminAnimesController {
     return this.service.updateStatus(id, statut);
   }
 
+  @Post(':id/staff')
+  @ApiOperation({ summary: 'Créer le staff depuis les données d\'import' })
+  @ApiResponse({ status: 200, description: 'Staff créé avec succès' })
+  createStaffFromImport(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() staffData: { staff: Array<{ name: string; role: string }> }
+  ) {
+    return this.service.createStaffFromImportData(id, staffData.staff);
+  }
+
   @ApiOperation({ summary: 'Supprimer un anime (admin)' })
   @ApiResponse({ status: 200, description: 'Anime supprimé' })
   @Delete(':id')
