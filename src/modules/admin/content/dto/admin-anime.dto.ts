@@ -42,6 +42,12 @@ export class CreateAdminAnimeDto {
   @IsString()
   nb_epduree?: string;
 
+  // Accept camelCase variant from frontend
+  @ApiPropertyOptional({ description: 'Nombre d\'épisodes (camelCase)' })
+  @IsOptional()
+  @IsString()
+  nbEpduree?: string;
+
   @ApiPropertyOptional({ description: 'Studio d\'animation' })
   @IsOptional()
   @IsString()
@@ -93,6 +99,12 @@ export class CreateAdminAnimeDto {
   @IsOptional()
   @IsString()
   official_site?: string;
+
+  // Accept camelCase variant from frontend
+  @ApiPropertyOptional({ description: 'Site officiel (camelCase)' })
+  @IsOptional()
+  @IsString()
+  officialSite?: string;
 
   @ApiPropertyOptional({ description: 'Lien ADN (legacy only)' })
   @IsOptional()
