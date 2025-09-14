@@ -70,8 +70,9 @@ export class AdminAnimesService {
     let nbEp: number | null = null;
     if (typeof dto.nbEp === 'number') {
       nbEp = dto.nbEp;
-    } else if (dto.nb_epduree) {
-      const m = String(dto.nb_epduree).match(/\d+/);
+    } else if (dto.nbEpduree || dto.nb_epduree) {
+      const episodeString = dto.nbEpduree || dto.nb_epduree;
+      const m = String(episodeString).match(/\d+/);
       if (m) nbEp = Number(m[0]);
     }
 
@@ -94,8 +95,12 @@ export class AdminAnimesService {
     if (typeof dto.licence === 'number') data.licence = dto.licence;
     if (dto.titre_fr) data.titreFr = dto.titre_fr;
     if (dto.titres_alternatifs) data.titresAlternatifs = dto.titres_alternatifs;
-    if (dto.nb_epduree) data.nbEpduree = dto.nb_epduree;
-    if (dto.official_site) data.officialSite = dto.official_site;
+    // Handle both camelCase and snake_case versions
+    const episodeCount = dto.nbEpduree || dto.nb_epduree;
+    if (episodeCount) data.nbEpduree = episodeCount;
+
+    const officialSite = dto.officialSite || dto.official_site;
+    if (officialSite) data.officialSite = officialSite;
     if (dto.lien_adn) data.lienAdn = dto.lien_adn;
     if (dto.doublage) data.doublage = dto.doublage;
     if (dto.commentaire) data.commentaire = dto.commentaire;
