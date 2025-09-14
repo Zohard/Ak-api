@@ -75,6 +75,17 @@ export class ScrapeService {
     const status = textAfterLabel('Status:');
     const type = textAfterLabel('Type:');
 
+    // Extract image URL from MAL leftside div
+    let imageUrl = '';
+    const imageElement = $('.leftside img[data-src], .leftside img[src]').first();
+    if (imageElement.length) {
+      imageUrl = imageElement.attr('data-src') || imageElement.attr('src') || '';
+      // Clean up the URL - remove any lazyloading parameters
+      if (imageUrl && imageUrl.includes('cdn.myanimelist.net')) {
+        imageUrl = imageUrl.split('?')[0]; // Remove query parameters
+      }
+    }
+
     // Extract characters information with voice actors
     const characters: Array<{ name: string; role: string; voice_actors: Array<{ name: string; language: string }> }> = [];
 
@@ -190,6 +201,7 @@ export class ScrapeService {
       type,
       staff,
       characters,
+      image_url: imageUrl,
     };
   }
 
@@ -298,6 +310,21 @@ export class ScrapeService {
     const synopsisNode = $('div.description').first().clone();
     synopsisNode.find('div.fader').remove();
     const synopsis = synopsisNode.text().trim();
+
+    // Extract image URL from Nautiljon .image_fiche div
+    let imageUrl = '';
+    const imageElement = $('.image_fiche img').first();
+    if (imageElement.length) {
+      const imgSrc = imageElement.attr('src');
+      if (imgSrc && imgSrc.includes('/images/anime/')) {
+        // Convert from mini version to full version if needed
+        imageUrl = imgSrc.replace('/mini/', '/').replace(/\?.*$/, ''); // Remove query parameters
+        // Make sure it's an absolute URL
+        if (imageUrl.startsWith('/')) {
+          imageUrl = `https://www.nautiljon.com${imageUrl}`;
+        }
+      }
+    }
 
     // Extract characters information with voice actors
     const characters: Array<{ name: string; role: string; voice_actors: Array<{ name: string; language: string }> }> = [];
@@ -492,6 +519,7 @@ export class ScrapeService {
       synopsis,
       staff,
       characters,
+      image_url: imageUrl,
     };
   }
 
@@ -510,6 +538,7 @@ export class ScrapeService {
       episode_count: '',
       official_sites: [] as string[],
       source_urls: {} as Record<string, string>,
+      image_url: '', // Prioritize MAL image, fallback to Nautiljon
     };
 
     if (mal?.url) merged.source_urls.myanimelist = mal.url;
@@ -609,6 +638,9 @@ export class ScrapeService {
     if (mal?.official_site) sites.add(mal.official_site);
     (nj?.official_website || []).forEach((x: string) => sites.add(x));
     merged.official_sites = Array.from(sites);
+
+    // Prioritize MAL image, fallback to Nautiljon
+    merged.image_url = mal?.image_url || nj?.image_url || '';
 
     const yearFrom = (s?: string) => {
       if (!s) return '';

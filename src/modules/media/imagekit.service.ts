@@ -114,4 +114,75 @@ export class ImageKitService {
     });
     return url;
   }
+
+  async uploadImageFromUrl(imageUrl: string, fileName: string, folder: string = 'animes'): Promise<any> {
+    try {
+      if (!imageUrl || !imageUrl.trim()) {
+        throw new Error('Image URL is required');
+      }
+
+      // Fetch the image from the URL
+      const response = await fetch(imageUrl, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (compatible; AK-Scraper/1.0)'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch image: ${response.status} ${response.statusText}`);
+      }
+
+      // Get the image as buffer
+      const imageBuffer = await response.arrayBuffer();
+      const buffer = Buffer.from(imageBuffer);
+
+      // Extract file extension from URL or content type
+      let fileExtension = '';
+      const urlPath = new URL(imageUrl).pathname;
+      const urlExtension = urlPath.split('.').pop()?.toLowerCase();
+
+      if (urlExtension && ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(urlExtension)) {
+        fileExtension = urlExtension;
+      } else {
+        // Try to get extension from content type
+        const contentType = response.headers.get('content-type') || '';
+        if (contentType.includes('jpeg') || contentType.includes('jpg')) {
+          fileExtension = 'jpg';
+        } else if (contentType.includes('png')) {
+          fileExtension = 'png';
+        } else if (contentType.includes('gif')) {
+          fileExtension = 'gif';
+        } else if (contentType.includes('webp')) {
+          fileExtension = 'webp';
+        } else {
+          fileExtension = 'jpg'; // Default fallback
+        }
+      }
+
+      // Ensure filename has proper extension
+      const cleanFileName = fileName.replace(/\.[^/.]+$/, ''); // Remove existing extension
+      const fullFileName = `${cleanFileName}.${fileExtension}`;
+
+      // Upload to ImageKit
+      const result = await this.imagekit.upload({
+        file: buffer,
+        fileName: fullFileName,
+        folder: folder,
+        useUniqueFileName: true,
+        transformation: {
+          pre: 'l-text,i-Watermark,fs-50,l-end',
+          post: [
+            {
+              type: 'transformation',
+              value: 'w-500,h-700,c-maintain_ratio'
+            }
+          ]
+        }
+      });
+
+      return result;
+    } catch (error) {
+      throw new Error(`ImageKit upload from URL failed: ${error.message}`);
+    }
+  }
 }
