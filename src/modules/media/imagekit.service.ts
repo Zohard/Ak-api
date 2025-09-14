@@ -121,20 +121,41 @@ export class ImageKitService {
         throw new Error('Image URL is required');
       }
 
-      // Fetch the image from the URL
+      console.log(`Starting image upload from URL: ${imageUrl}`);
+
+      // Fetch the image from the URL using node-fetch for better Node.js compatibility
       const response = await fetch(imageUrl, {
         headers: {
-          'User-Agent': 'Mozilla/5.0 (compatible; AK-Scraper/1.0)'
-        }
+          'User-Agent': 'Mozilla/5.0 (compatible; AK-Scraper/1.0)',
+          'Accept': 'image/*',
+          'Referer': new URL(imageUrl).origin
+        },
+        timeout: 30000 // 30 second timeout
       });
 
       if (!response.ok) {
-        throw new Error(`Failed to fetch image: ${response.status} ${response.statusText}`);
+        throw new Error(`Failed to fetch image: ${response.status} ${response.statusText} from ${imageUrl}`);
+      }
+
+      const contentLength = response.headers.get('content-length');
+      if (contentLength && parseInt(contentLength) > 10 * 1024 * 1024) { // 10MB limit
+        throw new Error('Image too large (>10MB)');
       }
 
       // Get the image as buffer
       const imageBuffer = await response.arrayBuffer();
       const buffer = Buffer.from(imageBuffer);
+
+      // Validate that we actually received image data
+      if (buffer.length === 0) {
+        throw new Error('No image data received');
+      }
+
+      if (buffer.length < 100) {
+        throw new Error('Image data too small, likely not a valid image');
+      }
+
+      console.log(`Downloaded image: ${buffer.length} bytes`);
 
       // Extract file extension from URL or content type
       let fileExtension = '';
@@ -146,6 +167,8 @@ export class ImageKitService {
       } else {
         // Try to get extension from content type
         const contentType = response.headers.get('content-type') || '';
+        console.log(`Content type: ${contentType}`);
+
         if (contentType.includes('jpeg') || contentType.includes('jpg')) {
           fileExtension = 'jpg';
         } else if (contentType.includes('png')) {
@@ -155,7 +178,17 @@ export class ImageKitService {
         } else if (contentType.includes('webp')) {
           fileExtension = 'webp';
         } else {
-          fileExtension = 'jpg'; // Default fallback
+          // Check image signature in buffer
+          const signature = buffer.subarray(0, 4);
+          if (signature[0] === 0xFF && signature[1] === 0xD8) {
+            fileExtension = 'jpg';
+          } else if (signature[0] === 0x89 && signature[1] === 0x50 && signature[2] === 0x4E && signature[3] === 0x47) {
+            fileExtension = 'png';
+          } else if (signature[0] === 0x47 && signature[1] === 0x49 && signature[2] === 0x46) {
+            fileExtension = 'gif';
+          } else {
+            fileExtension = 'jpg'; // Default fallback
+          }
         }
       }
 
@@ -163,25 +196,31 @@ export class ImageKitService {
       const cleanFileName = fileName.replace(/\.[^/.]+$/, ''); // Remove existing extension
       const fullFileName = `${cleanFileName}.${fileExtension}`;
 
+      console.log(`Uploading to ImageKit: ${fullFileName} (${buffer.length} bytes) to folder: ${folder}`);
+
       // Upload to ImageKit
       const result = await this.imagekit.upload({
         file: buffer,
         fileName: fullFileName,
         folder: folder,
         useUniqueFileName: true,
-        transformation: {
-          pre: 'l-text,i-Watermark,fs-50,l-end',
-          post: [
-            {
-              type: 'transformation',
-              value: 'w-500,h-700,c-maintain_ratio'
-            }
-          ]
-        }
+        tags: ['import', 'anime', 'scraped']
+        // Note: Removing transformation watermark for now as it might cause issues during import
       });
 
-      return result;
+      console.log(`Successfully uploaded to ImageKit: ${result.url}`);
+
+      return {
+        ...result,
+        // Store just the filename for database storage (without full ImageKit URL)
+        filename: result.name,
+        originalUrl: imageUrl,
+        size: buffer.length,
+        fileExtension,
+        folder
+      };
     } catch (error) {
+      console.error(`ImageKit upload from URL failed for ${imageUrl}:`, error);
       throw new Error(`ImageKit upload from URL failed: ${error.message}`);
     }
   }
