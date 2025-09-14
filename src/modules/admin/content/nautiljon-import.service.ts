@@ -177,7 +177,7 @@ export class NautiljonImportService {
   async importAnimeImage(
     imageUrl: string,
     animeTitle: string
-  ): Promise<{ success: boolean; imageKitUrl?: string; error?: string }> {
+  ): Promise<{ success: boolean; imageKitUrl?: string; filename?: string; error?: string }> {
     try {
       if (!imageUrl || !imageUrl.trim()) {
         return { success: false, error: 'No image URL provided' };

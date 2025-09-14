@@ -123,15 +123,20 @@ export class ImageKitService {
 
       console.log(`Starting image upload from URL: ${imageUrl}`);
 
-      // Fetch the image from the URL using node-fetch for better Node.js compatibility
+      // Fetch the image from the URL using fetch with AbortController for timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+
       const response = await fetch(imageUrl, {
         headers: {
           'User-Agent': 'Mozilla/5.0 (compatible; AK-Scraper/1.0)',
           'Accept': 'image/*',
           'Referer': new URL(imageUrl).origin
         },
-        timeout: 30000 // 30 second timeout
+        signal: controller.signal
       });
+
+      clearTimeout(timeoutId);
 
       if (!response.ok) {
         throw new Error(`Failed to fetch image: ${response.status} ${response.statusText} from ${imageUrl}`);
