@@ -548,6 +548,25 @@ export class ScrapeService {
         staffSet.set(key, staff);
       }
     });
+
+    // Add studios as staff with role "Studio d'animation"
+    (mal?.studios || []).forEach((studioName: string) => {
+      if (studioName?.trim()) {
+        const key = `${studioName.toLowerCase()}|studio d'animation`;
+        if (!staffSet.has(key)) {
+          staffSet.set(key, { name: studioName, role: "Studio d'animation" });
+        }
+      }
+    });
+
+    // Add studio from Nautiljon as staff
+    if (nj?.studio?.trim()) {
+      const key = `${nj.studio.toLowerCase()}|studio d'animation`;
+      if (!staffSet.has(key)) {
+        staffSet.set(key, { name: nj.studio, role: "Studio d'animation" });
+      }
+    }
+
     merged.staff = Array.from(staffSet.values());
 
     // Merge characters from both sources
