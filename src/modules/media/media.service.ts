@@ -4,15 +4,18 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../../shared/services/prisma.service';
+import { ImageKitService } from './imagekit.service';
 import sharp from 'sharp';
 import * as path from 'path';
 import * as fs from 'fs/promises';
 
 @Injectable()
 export class MediaService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private imagekitService: ImageKitService,
+  ) {}
 
-  private readonly uploadPath = './uploads';
   private readonly allowedMimeTypes = [
     'image/jpeg',
     'image/jpg',
@@ -36,55 +39,53 @@ export class MediaService {
       );
     }
 
-    // Ensure upload directory exists
-    await this.ensureUploadDirectory();
-
     // Generate unique filename
     const fileExtension = path.extname(file.originalname);
     const filename = `${type}_${Date.now()}_${Math.random().toString(36).substring(7)}${fileExtension}`;
-    const filePath = path.join(this.uploadPath, filename);
 
     try {
-      // Process and save image with Sharp
+      // Process image with Sharp
       const processedImage = await this.processImage(file.buffer, type);
-      await fs.writeFile(filePath, processedImage);
+
+      // Upload to ImageKit
+      const folderPath = `images/${type}s`; // images/animes, images/mangas, etc.
+      const uploadResult = await this.imagekitService.uploadImage(
+        processedImage,
+        filename,
+        folderPath
+      );
 
       // Save to database
       const result = await this.prisma.$queryRaw`
         INSERT INTO ak_screenshots (url_screen, id_titre, type, upload_date)
-        VALUES (${filename}, ${relatedId || 0}, ${this.getTypeId(type)}, NOW())
+        VALUES (${uploadResult.name}, ${relatedId || 0}, ${this.getTypeId(type)}, NOW())
         RETURNING id_screen
       `;
 
       return {
         id: (result as any[])[0]?.id_screen,
-        filename,
+        filename: uploadResult.name,
         originalName: file.originalname,
         size: processedImage.length,
         type,
-        url: `/uploads/${filename}`,
+        url: uploadResult.url,
         relatedId,
+        imagekitFileId: uploadResult.fileId,
       };
     } catch (error) {
-      // Clean up file if database insert fails
-      try {
-        await fs.unlink(filePath);
-      } catch (unlinkError) {
-        console.error('Failed to clean up file:', unlinkError);
-      }
       throw error;
     }
   }
 
   async getMediaById(id: number) {
     const media = await this.prisma.$queryRaw`
-      SELECT 
+      SELECT
         id_screen as id,
         url_screen as filename,
         id_titre as related_id,
         type,
         upload_date
-      FROM ak_screenshots 
+      FROM ak_screenshots
       WHERE id_screen = ${id}
     `;
 
@@ -93,91 +94,77 @@ export class MediaService {
     }
 
     const result = (media as any[])[0];
+    const typeName = this.getTypeName(result.type);
+
+    // Check if it's an ImageKit URL or filename
+    let url: string;
+    if (result.filename.startsWith('https://ik.imagekit.io/')) {
+      url = result.filename;
+    } else {
+      // Generate ImageKit URL from filename
+      const folderPath = `images/${typeName}s`;
+      url = this.imagekitService.getImageUrl(`${folderPath}/${result.filename}`);
+    }
+
     return {
       id: Number(result.id),
       filename: result.filename,
       relatedId: Number(result.related_id),
-      type: this.getTypeName(result.type),
+      type: typeName,
       uploadDate: result.upload_date,
-      url: `/uploads/${result.filename}`,
+      url: url,
     };
   }
 
   async getMediaByRelatedId(relatedId: number, type: 'anime' | 'manga') {
     const typeId = this.getTypeId(type);
     const media = await this.prisma.$queryRaw`
-      SELECT 
+      SELECT
         id_screen as id,
         url_screen as filename,
         upload_date
-      FROM ak_screenshots 
+      FROM ak_screenshots
       WHERE id_titre = ${relatedId} AND type = ${typeId}
       ORDER BY upload_date DESC
     `;
 
-    // Filter files and check if they exist in the new organized directory structure
-    const existingMedia: any[] = [];
-    
+    // Convert database results to use ImageKit URLs
+    const processedMedia: any[] = [];
+
     for (const item of media as any[]) {
       try {
-        let filePath: string;
+        let url: string;
         let cleanFilename: string;
-        let urlPath: string;
-        
-        // Handle different path structures - prioritize new structure
+
+        // Handle different filename formats
         if (item.filename.startsWith('screenshots/')) {
-          // Database has 'screenshots/filename.jpg' - could be legacy
           cleanFilename = item.filename.replace(/^screenshots\//, '');
         } else {
           cleanFilename = item.filename;
         }
-        
-        // Try to find file in prioritized order
-        const searchPaths = [
-          // 1. NEW STRUCTURE: type-specific screenshots directory
-          { path: path.join(this.uploadPath, type, 'screenshots', cleanFilename), url: `${type}/screenshots/${cleanFilename}` },
-          // 2. Type-specific cover directory
-          { path: path.join(this.uploadPath, type, cleanFilename), url: `${type}/${cleanFilename}` },
-          // 3. LEGACY: screenshots directory
-          { path: path.join(this.uploadPath, 'screenshots', cleanFilename), url: `screenshots/${cleanFilename}` },
-          // 4. Root uploads directory
-          { path: path.join(this.uploadPath, cleanFilename), url: cleanFilename }
-        ];
-        
-        let found = false;
-        for (const searchOption of searchPaths) {
-          try {
-            await fs.access(searchOption.path);
-            
-            // File exists, add to results
-            existingMedia.push({
-              id: Number(item.id),
-              filename: cleanFilename,
-              uploadDate: item.upload_date,
-              url: `/uploads/${searchOption.url}`,
-              actualPath: searchOption.path // For debugging
-            });
-            
-            found = true;
-            break;
-          } catch {
-            continue;
-          }
+
+        // Check if it's already an ImageKit URL
+        if (item.filename.startsWith('https://ik.imagekit.io/')) {
+          url = item.filename;
+        } else {
+          // Generate ImageKit URL from filename
+          const folderPath = `images/${type}s`;
+          url = this.imagekitService.getImageUrl(`${folderPath}/${cleanFilename}`);
         }
-        
-        if (!found) {
-          // File doesn't exist anywhere, skip it
-          console.warn(`Screenshot file not found: ${item.filename}`);
-          continue;
-        }
+
+        processedMedia.push({
+          id: Number(item.id),
+          filename: cleanFilename,
+          uploadDate: item.upload_date,
+          url: url,
+        });
       } catch (error) {
-        // Error checking file, skip it
         console.error('Error processing media item:', error);
         continue;
       }
     }
-    
-    return existingMedia;
+
+    return processedMedia;
   }
 
   async deleteMedia(id: number, userId: number) {
@@ -230,13 +217,6 @@ export class MediaService {
     return processor.webp({ quality: 85 }).toBuffer();
   }
 
-  private async ensureUploadDirectory() {
-    try {
-      await fs.access(this.uploadPath);
-    } catch {
-      await fs.mkdir(this.uploadPath, { recursive: true });
-    }
-  }
 
   private getTypeId(type: string): number {
     const typeMap = {
@@ -319,108 +299,13 @@ export class MediaService {
   }
 
   async serveImage(type: string, filename: string) {
-    // Try different locations based on file structure - prioritizing new organized structure
-    let filePath: string;
-    
-    // 1. NEW STRUCTURE: Try type-specific screenshots directory first (uploads/anime/screenshots/, uploads/manga/screenshots/)
-    if (type === 'anime' || type === 'manga') {
-      filePath = path.join(this.uploadPath, type, 'screenshots', filename);
-      try {
-        await fs.access(filePath);
-        // Found in new screenshot structure, return immediately
-      } catch {
-        // 2. Try type-specific cover directory (uploads/anime/, uploads/manga/)
-        filePath = path.join(this.uploadPath, type, filename);
-        try {
-          await fs.access(filePath);
-        } catch {
-          // 3. LEGACY: Try old screenshots directory (uploads/screenshots/)
-          filePath = path.join(this.uploadPath, 'screenshots', filename);
-          try {
-            await fs.access(filePath);
-          } catch {
-            // 4. Try root uploads directory
-            filePath = path.join(this.uploadPath, filename);
-            try {
-              await fs.access(filePath);
-            } catch {
-              // 5. Handle files with subdirectory paths in filename
-              const baseFilename = path.basename(filename);
-              if (baseFilename !== filename) {
-                // Try all locations with base filename
-                const searchPaths = [
-                  path.join(this.uploadPath, type, 'screenshots', baseFilename),
-                  path.join(this.uploadPath, type, baseFilename),
-                  path.join(this.uploadPath, 'screenshots', baseFilename),
-                  path.join(this.uploadPath, baseFilename)
-                ];
-                
-                let found = false;
-                for (const searchPath of searchPaths) {
-                  try {
-                    await fs.access(searchPath);
-                    filePath = searchPath;
-                    found = true;
-                    break;
-                  } catch {
-                    continue;
-                  }
-                }
-                
-                if (!found) {
-                  throw new NotFoundException('Image not found');
-                }
-              } else {
-                throw new NotFoundException('Image not found');
-              }
-            }
-          }
-        }
-      }
-    } else {
-      // For other types (avatar, cover), keep original logic
-      filePath = path.join(this.uploadPath, type, filename);
-      try {
-        await fs.access(filePath);
-      } catch {
-        filePath = path.join(this.uploadPath, filename);
-        try {
-          await fs.access(filePath);
-        } catch {
-          throw new NotFoundException('Image not found');
-        }
-      }
-    }
-
-    const buffer = await fs.readFile(filePath);
-    const ext = path.extname(filename).toLowerCase();
-
-    // Determine content type
-    let contentType = 'image/jpeg'; // default
-    switch (ext) {
-      case '.png':
-        contentType = 'image/png';
-        break;
-      case '.gif':
-        contentType = 'image/gif';
-        break;
-      case '.webp':
-        contentType = 'image/webp';
-        break;
-      case '.jpg':
-      case '.jpeg':
-        contentType = 'image/jpeg';
-        break;
-    }
-
-    // Generate ETag for caching
-    const crypto = require('crypto');
-    const etag = crypto.createHash('md5').update(buffer).digest('hex');
+    // Generate ImageKit URL and return redirect information
+    const folderPath = `images/${type}s`;
+    const imageUrl = this.imagekitService.getImageUrl(`${folderPath}/${filename}`);
 
     return {
-      buffer,
-      contentType,
-      etag,
+      redirect: true,
+      url: imageUrl,
     };
   }
 }
