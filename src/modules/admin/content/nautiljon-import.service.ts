@@ -198,6 +198,7 @@ export class NautiljonImportService {
       return {
         success: true,
         imageKitUrl: result.url,
+        filename: result.filename, // Store the filename for database
       };
     } catch (error) {
       console.warn('Failed to import anime image:', error.message);
@@ -264,9 +265,9 @@ export class NautiljonImportService {
       try {
         imageImportResult = await this.importAnimeImage(imageUrl, createDto.titre);
 
-        if (imageImportResult && imageImportResult.success && imageImportResult.imageKitUrl) {
-          // Update the adminDto with the uploaded image URL
-          adminDto.image = imageImportResult.imageKitUrl;
+        if (imageImportResult && imageImportResult.success) {
+          // Store the filename (not the full URL) in the database
+          adminDto.image = imageImportResult.filename || imageImportResult.imageKitUrl;
         }
       } catch (error) {
         console.warn('Failed to import image during anime creation:', error.message);
