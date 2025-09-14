@@ -854,18 +854,19 @@ export class NautiljonImportService {
       const results: Array<{ businessId: number; status: string; message: string; }> = [];
 
       for (const staff of staffToImport) {
-        // Check if relationship already exists
+        // Check if relationship already exists with same role
         const existing = await this.prisma.$queryRawUnsafe(
-          `SELECT 1 FROM ak_business_to_animes WHERE id_anime = $1 AND id_business = $2 LIMIT 1`,
+          `SELECT 1 FROM ak_business_to_animes WHERE id_anime = $1 AND id_business = $2 AND type = $3 LIMIT 1`,
           animeId,
-          staff.businessId
+          staff.businessId,
+          staff.role || null
         );
 
         if ((existing as any[]).length > 0) {
           results.push({
             businessId: staff.businessId,
             status: 'skipped',
-            message: 'Staff member already attached'
+            message: 'Staff member already attached with this role'
           });
           continue;
         }

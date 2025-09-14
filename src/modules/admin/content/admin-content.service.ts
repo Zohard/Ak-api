@@ -434,10 +434,11 @@ export class AdminContentService {
 
     const staff = await this.prisma.$queryRawUnsafe(
       `
-      SELECT 
+      SELECT
         bs.*,
         b.denomination as nom,
-        b.type,
+        bs.type as role,
+        b.type as business_type,
         b.notes as description
       FROM ${staffTable} bs
       JOIN ak_business b ON bs.id_business = b.id_business
@@ -459,14 +460,15 @@ export class AdminContentService {
       type === 'anime' ? 'ak_business_to_animes' : 'ak_business_to_mangas';
     const idColumn = type === 'anime' ? 'id_anime' : 'id_manga';
 
-    // Prevent duplicates
+    // Prevent duplicates (same business with same role)
     const existing = await this.prisma.$queryRawUnsafe(
-      `SELECT 1 FROM ${staffTable} WHERE ${idColumn} = $1 AND id_business = $2 LIMIT 1`,
+      `SELECT 1 FROM ${staffTable} WHERE ${idColumn} = $1 AND id_business = $2 AND type = $3 LIMIT 1`,
       id,
       businessId,
+      role || null,
     );
     if ((existing as any[]).length > 0) {
-      return { message: 'Staff member already attached' };
+      return { message: 'Staff member already attached with this role' };
     }
 
     await this.prisma.$queryRawUnsafe(
@@ -482,19 +484,33 @@ export class AdminContentService {
     return { message: 'Staff member added successfully' };
   }
 
-  async removeContentStaff(id: number, type: string, businessId: number) {
+  async removeContentStaff(id: number, type: string, businessId: number, role?: string) {
     const staffTable =
       type === 'anime' ? 'ak_business_to_animes' : 'ak_business_to_mangas';
     const idColumn = type === 'anime' ? 'id_anime' : 'id_manga';
 
-    await this.prisma.$queryRawUnsafe(
-      `
-      DELETE FROM ${staffTable} 
-      WHERE ${idColumn} = $1 AND id_business = $2
-    `,
-      id,
-      businessId,
-    );
+    if (role) {
+      // Remove specific role only
+      await this.prisma.$queryRawUnsafe(
+        `
+        DELETE FROM ${staffTable}
+        WHERE ${idColumn} = $1 AND id_business = $2 AND type = $3
+      `,
+        id,
+        businessId,
+        role,
+      );
+    } else {
+      // Remove all roles for this business (fallback for compatibility)
+      await this.prisma.$queryRawUnsafe(
+        `
+        DELETE FROM ${staffTable}
+        WHERE ${idColumn} = $1 AND id_business = $2
+      `,
+        id,
+        businessId,
+      );
+    }
 
     return { message: 'Staff member removed successfully' };
   }

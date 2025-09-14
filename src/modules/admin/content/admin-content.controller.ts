@@ -296,12 +296,14 @@ export class AdminContentController {
   })
   @ApiParam({ name: 'id', description: 'Content ID' })
   @ApiParam({ name: 'businessId', description: 'Business ID' })
+  @ApiQuery({ name: 'role', required: false, description: 'Specific role to remove' })
   async removeStaff(
     @Param('type') type: string,
     @Param('id', ParseIntPipe) id: number,
     @Param('businessId', ParseIntPipe) businessId: number,
+    @Query('role') role?: string,
   ) {
-    return this.adminContentService.removeContentStaff(id, type, businessId);
+    return this.adminContentService.removeContentStaff(id, type, businessId, role);
   }
 
   // Tag management
