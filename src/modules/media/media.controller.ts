@@ -179,7 +179,8 @@ export class MediaController {
         return res.redirect(result.url);
       }
 
-      return res.send(result.buffer);
+      // This case is not currently used since serveImage always returns redirect
+      throw new NotFoundException('Image not found');
     } catch (error) {
       throw new NotFoundException('Image not found');
     }
