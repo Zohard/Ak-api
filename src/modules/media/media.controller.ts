@@ -175,11 +175,9 @@ export class MediaController {
     try {
       const result = await this.mediaService.serveImage(type, filename);
 
-      res.set({
-        'Content-Type': result.contentType,
-        'Cache-Control': 'public, max-age=31536000', // 1 year cache
-        ETag: result.etag,
-      });
+      if (result.redirect) {
+        return res.redirect(result.url);
+      }
 
       return res.send(result.buffer);
     } catch (error) {
