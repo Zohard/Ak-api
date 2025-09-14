@@ -192,7 +192,7 @@ export class NautiljonImportService {
       const result = await this.imageKitService.uploadImageFromUrl(
         imageUrl,
         `${cleanTitle}_poster`,
-        'animes'
+        'images/animes'
       );
 
       return {
