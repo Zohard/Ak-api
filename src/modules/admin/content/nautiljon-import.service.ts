@@ -256,7 +256,7 @@ export class NautiljonImportService {
     }
 
     // Try to import image if available
-    let imageImportResult = null;
+    let imageImportResult: { success: boolean; imageKitUrl?: string; error?: string } | null = null;
     if (ressources?.merged?.image_url || ressources?.mal?.image_url || ressources?.nautiljon?.image_url) {
       // Prioritize MAL image, fallback to Nautiljon
       const imageUrl = ressources.merged?.image_url || ressources.mal?.image_url || ressources.nautiljon?.image_url;
@@ -264,7 +264,7 @@ export class NautiljonImportService {
       try {
         imageImportResult = await this.importAnimeImage(imageUrl, createDto.titre);
 
-        if (imageImportResult.success && imageImportResult.imageKitUrl) {
+        if (imageImportResult && imageImportResult.success && imageImportResult.imageKitUrl) {
           // Update the adminDto with the uploaded image URL
           adminDto.image = imageImportResult.imageKitUrl;
         }
