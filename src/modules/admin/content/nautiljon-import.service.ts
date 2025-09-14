@@ -854,6 +854,31 @@ export class NautiljonImportService {
       const results: Array<{ businessId: number; status: string; message: string; }> = [];
 
       for (const staff of staffToImport) {
+        // Validate businessId exists (prevent auto-creation)
+        if (!staff.businessId || typeof staff.businessId !== 'number') {
+          results.push({
+            businessId: staff.businessId,
+            status: 'error',
+            message: 'Invalid or missing businessId - staff member must exist in ak_business table'
+          });
+          continue;
+        }
+
+        // Verify the business actually exists in ak_business table
+        const businessExists = await this.prisma.$queryRawUnsafe(
+          `SELECT 1 FROM ak_business WHERE idBusiness = $1 LIMIT 1`,
+          staff.businessId
+        );
+
+        if ((businessExists as any[]).length === 0) {
+          results.push({
+            businessId: staff.businessId,
+            status: 'error',
+            message: 'Business not found in database - cannot import non-existent staff member'
+          });
+          continue;
+        }
+
         // Check if relationship already exists with same role
         const existing = await this.prisma.$queryRawUnsafe(
           `SELECT 1 FROM ak_business_to_animes WHERE id_anime = $1 AND id_business = $2 AND type = $3 LIMIT 1`,
@@ -871,7 +896,7 @@ export class NautiljonImportService {
           continue;
         }
 
-        // Add staff relationship
+        // Add staff relationship (only for existing businesses)
         await this.prisma.$queryRawUnsafe(
           `INSERT INTO ak_business_to_animes (id_anime, id_business, type) VALUES ($1, $2, $3)`,
           animeId,
@@ -889,6 +914,7 @@ export class NautiljonImportService {
       return {
         imported: results.filter(r => r.status === 'imported').length,
         skipped: results.filter(r => r.status === 'skipped').length,
+        errors: results.filter(r => r.status === 'error').length,
         results
       };
     } catch (error) {
