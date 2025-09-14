@@ -115,7 +115,7 @@ export class ImageKitService {
     return url;
   }
 
-  async uploadImageFromUrl(imageUrl: string, fileName: string, folder: string = 'animes'): Promise<any> {
+  async uploadImageFromUrl(imageUrl: string, fileName: string, folder: string = 'images/animes'): Promise<any> {
     try {
       if (!imageUrl || !imageUrl.trim()) {
         throw new Error('Image URL is required');
