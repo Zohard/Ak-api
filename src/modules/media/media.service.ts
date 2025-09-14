@@ -170,13 +170,8 @@ export class MediaService {
   async deleteMedia(id: number, userId: number) {
     const media = await this.getMediaById(id);
 
-    // Delete file from filesystem
-    const filePath = path.join(this.uploadPath, media.filename);
-    try {
-      await fs.unlink(filePath);
-    } catch (error) {
-      console.warn('File not found on filesystem:', error.message);
-    }
+    // TODO: Implement ImageKit file deletion if needed
+    // Files are now stored on ImageKit, not locally
 
     // Delete from database
     await this.prisma.$executeRaw`
