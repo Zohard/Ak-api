@@ -257,7 +257,7 @@ export class NautiljonImportService {
     }
 
     // Try to import image if available
-    let imageImportResult: { success: boolean; imageKitUrl?: string; error?: string } | null = null;
+    let imageImportResult: { success: boolean; imageKitUrl?: string; filename?: string; error?: string } | null = null;
     if (ressources?.merged?.image_url || ressources?.mal?.image_url || ressources?.nautiljon?.image_url) {
       // Prioritize MAL image, fallback to Nautiljon
       const imageUrl = ressources.merged?.image_url || ressources.mal?.image_url || ressources.nautiljon?.image_url;
