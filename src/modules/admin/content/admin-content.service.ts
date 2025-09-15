@@ -379,10 +379,16 @@ export class AdminContentService {
         r.id_fiche_depart,
         r.id_anime,
         r.id_manga,
-        r.type_relation,
         CASE 
-          WHEN r.id_anime IS NOT NULL THEN 'anime'::text
-          ELSE 'manga'::text
+          WHEN r.id_anime > 0 THEN r.id_anime
+          WHEN r.id_manga > 0 THEN r.id_manga
+          ELSE NULL
+        END as related_id,
+        'related'::text as type_relation,
+        CASE 
+          WHEN r.id_anime > 0 THEN 'anime'::text
+          WHEN r.id_manga > 0 THEN 'manga'::text
+          ELSE 'unknown'::text
         END as related_type,
         COALESCE(a.titre, m.titre) as related_title
       FROM ak_fiche_to_fiche r
@@ -410,20 +416,18 @@ export class AdminContentService {
     // - id_fiche_depart stores the source as 'anime<ID>' or 'manga<ID>'
     // - id_anime or id_manga stores the related target id
     const sourceKey = `${type}${id}`;
-    const targetAnimeId = related_type === 'anime' ? related_id : null;
-    const targetMangaId = related_type === 'manga' ? related_id : null;
+    const targetAnimeId = related_type === 'anime' ? related_id : 0;
+    const targetMangaId = related_type === 'manga' ? related_id : 0;
 
     await this.prisma.$queryRaw`
       INSERT INTO ak_fiche_to_fiche (
         id_fiche_depart,
         id_anime,
-        id_manga,
-        type_relation
+        id_manga
       ) VALUES (
         ${sourceKey},
         ${targetAnimeId},
-        ${targetMangaId},
-        ${relation_type}
+        ${targetMangaId}
       )
     `;
 
