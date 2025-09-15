@@ -95,6 +95,12 @@ export class CreateAdminAnimeDto {
   @IsString()
   titres_alternatifs?: string;
 
+  // Accept camelCase variant from frontend
+  @ApiPropertyOptional({ description: 'Titres alternatifs (camelCase)' })
+  @IsOptional()
+  @IsString()
+  titresAlternatifs?: string;
+
   @ApiPropertyOptional({ description: 'Site officiel (legacy only)' })
   @IsOptional()
   @IsString()

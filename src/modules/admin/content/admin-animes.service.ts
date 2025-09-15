@@ -99,6 +99,7 @@ export class AdminAnimesService {
     if (typeof dto.licence === 'number') data.licence = dto.licence;
     if (dto.titre_fr) data.titreFr = dto.titre_fr;
     if (dto.titres_alternatifs) data.titresAlternatifs = dto.titres_alternatifs;
+    if (dto.titresAlternatifs) data.titresAlternatifs = dto.titresAlternatifs;
     // Handle both camelCase and snake_case versions
     const episodeCount = dto.nbEpduree || dto.nb_epduree;
     if (episodeCount) data.nbEpduree = episodeCount;
