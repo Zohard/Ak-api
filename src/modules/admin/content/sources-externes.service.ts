@@ -1,10 +1,10 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../../shared/services/prisma.service';
 import {
-  NautiljonImportDto,
-  NautiljonAnimeComparisonDto,
-  CreateAnimeFromNautiljonDto
-} from './dto/nautiljon-import.dto';
+  SourcesExternesImportDto,
+  SourcesExternesAnimeComparisonDto,
+  CreateAnimeFromSourcesExternesDto
+} from './dto/sources-externes.dto';
 import { CreateAdminAnimeDto } from './dto/admin-anime.dto';
 import { AdminAnimesService } from './admin-animes.service';
 import { ImageKitService } from '../../media/imagekit.service';
@@ -13,14 +13,14 @@ import { promises as fs } from 'fs';
 import { join } from 'path';
 
 @Injectable()
-export class NautiljonImportService {
+export class SourcesExternesService {
   constructor(
     private prisma: PrismaService,
     private adminAnimesService: AdminAnimesService,
     private imageKitService: ImageKitService,
   ) {}
 
-  async importSeasonAnimes(importDto: NautiljonImportDto): Promise<NautiljonAnimeComparisonDto[]> {
+  async importSeasonAnimes(importDto: SourcesExternesImportDto): Promise<SourcesExternesAnimeComparisonDto[]> {
     let htmlContent: string;
 
     if (importDto.isUrl) {
@@ -42,7 +42,7 @@ export class NautiljonImportService {
     const animeList = this.extractAnimeTitlesFromHtml(htmlContent);
     
     // Compare with existing database
-    const comparisons: NautiljonAnimeComparisonDto[] = [];
+    const comparisons: SourcesExternesAnimeComparisonDto[] = [];
     
     for (const animeTitle of animeList) {
       const comparison = await this.compareAnimeWithDatabase(animeTitle);
@@ -91,7 +91,7 @@ export class NautiljonImportService {
     return [...new Set(titles)]; // Remove duplicates
   }
 
-  private async compareAnimeWithDatabase(title: string): Promise<NautiljonAnimeComparisonDto> {
+  private async compareAnimeWithDatabase(title: string): Promise<SourcesExternesAnimeComparisonDto> {
     // Search for anime in database using multiple fields
     const existingAnime = await this.prisma.akAnime.findFirst({
       where: {
@@ -111,7 +111,7 @@ export class NautiljonImportService {
       },
     });
 
-    const comparison: NautiljonAnimeComparisonDto = {
+    const comparison: SourcesExternesAnimeComparisonDto = {
       titre: title,
       exists: !!existingAnime,
       existingAnimeId: existingAnime?.idAnime,
@@ -210,7 +210,7 @@ export class NautiljonImportService {
   }
 
   async createAnimeFromNautiljon(
-    createDto: CreateAnimeFromNautiljonDto,
+    createDto: CreateAnimeFromSourcesExternesDto,
     user?: any,
   ): Promise<any> {
     // Extract fields from resources data

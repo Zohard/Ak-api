@@ -1,9 +1,9 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsString, IsOptional, IsUrl } from 'class-validator';
 
-export class NautiljonImportDto {
+export class SourcesExternesImportDto {
   @ApiProperty({ 
-    description: 'HTML content from Nautiljon page or URL to scrape',
+    description: 'HTML content from external source page or URL to scrape',
     example: '<html>...</html>' 
   })
   @IsString()
@@ -17,8 +17,8 @@ export class NautiljonImportDto {
   isUrl?: boolean = false;
 }
 
-export class NautiljonAnimeComparisonDto {
-  @ApiProperty({ description: 'Original title from Nautiljon' })
+export class SourcesExternesAnimeComparisonDto {
+  @ApiProperty({ description: 'Original title from external source' })
   titre: string;
 
   @ApiProperty({ description: 'Alternative titles if available' })
@@ -40,8 +40,8 @@ export class NautiljonAnimeComparisonDto {
   scrapedData?: any;
 }
 
-export class CreateAnimeFromNautiljonDto {
-  @ApiProperty({ description: 'Title from Nautiljon comparison' })
+export class CreateAnimeFromSourcesExternesDto {
+  @ApiProperty({ description: 'Title from external sources comparison' })
   @IsString()
   titre: string;
 
