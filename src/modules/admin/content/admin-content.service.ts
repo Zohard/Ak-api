@@ -289,12 +289,20 @@ export class AdminContentService {
         id,
       );
 
-      // Delete relationships
-      const idColumn = type === 'anime' ? 'id_anime' : 'id_manga';
-      await this.prisma.$queryRawUnsafe(
-        `DELETE FROM ak_fiche_to_fiche WHERE ${idColumn} = $1`,
-        id,
-      );
+      // Delete relationships (as source or as target)
+      if (type === 'anime') {
+        await this.prisma.$queryRawUnsafe(
+          `DELETE FROM ak_fiche_to_fiche WHERE id_fiche_depart = $1 OR id_anime = $2`,
+          `anime${id}`,
+          id,
+        );
+      } else {
+        await this.prisma.$queryRawUnsafe(
+          `DELETE FROM ak_fiche_to_fiche WHERE id_fiche_depart = $1 OR id_manga = $2`,
+          `manga${id}`,
+          id,
+        );
+      }
 
       // Delete business relationships
       const staffTable =
@@ -362,17 +370,24 @@ export class AdminContentService {
   }
 
   async getContentRelationships(id: number, type: string) {
+    // Relationships are stored with the source in id_fiche_depart as 'anime<ID>' or 'manga<ID>'
+    const sourceKey = `${type}${id}`;
     const relationships = await this.prisma.$queryRaw`
       SELECT 
-        r.*,
+        r.id_relation,
+        r.id_fiche_depart,
+        r.id_anime,
+        r.id_manga,
+        r.type_relation,
         CASE 
-          WHEN r.id_anime IS NOT NULL THEN a.titre
-          WHEN r.id_manga IS NOT NULL THEN m.titre
-        END as related_title
+          WHEN r.id_anime IS NOT NULL THEN 'anime'::text
+          ELSE 'manga'::text
+        END as related_type,
+        COALESCE(a.titre, m.titre) as related_title
       FROM ak_fiche_to_fiche r
       LEFT JOIN ak_animes a ON r.id_anime = a.id_anime
       LEFT JOIN ak_mangas m ON r.id_manga = m.id_manga
-      WHERE (r.id_anime = ${id} AND ${type === 'anime'}) OR (r.id_manga = ${id} AND ${type === 'manga'})
+      WHERE r.id_fiche_depart = ${sourceKey}
     `;
 
     return relationships;
@@ -390,29 +405,24 @@ export class AdminContentService {
     await this.getContentById(id, type);
     await this.getContentById(related_id, related_type);
 
-    // Create relationship
-    const animeId =
-      type === 'anime' ? id : related_type === 'anime' ? related_id : null;
-    const mangaId =
-      type === 'manga' ? id : related_type === 'manga' ? related_id : null;
-    const relatedAnimeId = related_type === 'anime' ? related_id : null;
-    const relatedMangaId = related_type === 'manga' ? related_id : null;
+    // Create relationship following actual schema:
+    // - id_fiche_depart stores the source as 'anime<ID>' or 'manga<ID>'
+    // - id_anime or id_manga stores the related target id
+    const sourceKey = `${type}${id}`;
+    const targetAnimeId = related_type === 'anime' ? related_id : null;
+    const targetMangaId = related_type === 'manga' ? related_id : null;
 
     await this.prisma.$queryRaw`
       INSERT INTO ak_fiche_to_fiche (
-        anime_id, 
-        manga_id, 
-        related_anime_id, 
-        related_manga_id, 
-        relation_type, 
-        description
+        id_fiche_depart,
+        id_anime,
+        id_manga,
+        type_relation
       ) VALUES (
-        ${animeId},
-        ${mangaId},
-        ${relatedAnimeId},
-        ${relatedMangaId},
-        ${relation_type},
-        ${description || null}
+        ${sourceKey},
+        ${targetAnimeId},
+        ${targetMangaId},
+        ${relation_type}
       )
     `;
 
@@ -421,7 +431,7 @@ export class AdminContentService {
 
   async deleteContentRelationship(relationshipId: number) {
     await this.prisma.$queryRaw`
-      DELETE FROM ak_fiche_to_fiche WHERE id = ${relationshipId}
+      DELETE FROM ak_fiche_to_fiche WHERE id_relation = ${relationshipId}
     `;
 
     return { message: 'Relationship deleted successfully' };
