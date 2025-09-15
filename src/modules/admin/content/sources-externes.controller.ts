@@ -11,52 +11,52 @@ import { ApiTags, ApiOperation, ApiResponse, ApiBody, ApiBearerAuth } from '@nes
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { AdminGuard } from '../../../common/guards/admin.guard';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
-import { NautiljonImportService } from './nautiljon-import.service';
+import { SourcesExternesService } from './sources-externes.service';
 import {
-  NautiljonImportDto,
-  NautiljonAnimeComparisonDto,
-  CreateAnimeFromNautiljonDto,
-} from './dto/nautiljon-import.dto';
+  SourcesExternesImportDto,
+  SourcesExternesAnimeComparisonDto,
+  CreateAnimeFromSourcesExternesDto,
+} from './dto/sources-externes.dto';
 
-@ApiTags('Admin - Nautiljon Import')
-@Controller('admin/nautiljon')
+@ApiTags('Admin - Sources Externes')
+@Controller('admin/sources-externes')
 @UseGuards(JwtAuthGuard, AdminGuard)
 @ApiBearerAuth()
-export class NautiljonImportController {
-  constructor(private readonly nautiljonImportService: NautiljonImportService) {}
+export class SourcesExternesController {
+  constructor(private readonly sourcesExternesService: SourcesExternesService) {}
 
   @Post('import-season')
   @ApiOperation({ 
-    summary: 'Import season anime list from Nautiljon',
-    description: 'Extract anime titles from Nautiljon HTML content or URL and compare with existing database'
+    summary: 'Import season anime list from external sources',
+    description: 'Extract anime titles from external sources HTML content or URL and compare with existing database'
   })
-  @ApiBody({ type: NautiljonImportDto })
+  @ApiBody({ type: SourcesExternesImportDto })
   @ApiResponse({ 
     status: 200, 
     description: 'List of anime with comparison results',
-    type: [NautiljonAnimeComparisonDto]
+    type: [SourcesExternesAnimeComparisonDto]
   })
   async importSeasonAnimes(
-    @Body() importDto: NautiljonImportDto,
-  ): Promise<NautiljonAnimeComparisonDto[]> {
-    return this.nautiljonImportService.importSeasonAnimes(importDto);
+    @Body() importDto: SourcesExternesImportDto,
+  ): Promise<SourcesExternesAnimeComparisonDto[]> {
+    return this.sourcesExternesService.importSeasonAnimes(importDto);
   }
 
   @Post('create-anime')
   @ApiOperation({ 
-    summary: 'Create anime from Nautiljon data',
-    description: 'Create a new anime entry using data scraped from Nautiljon'
+    summary: 'Create anime from external sources data',
+    description: 'Create a new anime entry using data scraped from external sources'
   })
-  @ApiBody({ type: CreateAnimeFromNautiljonDto })
+  @ApiBody({ type: CreateAnimeFromSourcesExternesDto })
   @ApiResponse({ 
     status: 201, 
     description: 'Anime created successfully'
   })
   async createAnimeFromNautiljon(
-    @Body() createDto: CreateAnimeFromNautiljonDto,
+    @Body() createDto: CreateAnimeFromSourcesExternesDto,
     @CurrentUser() user: any,
   ): Promise<any> {
-    return this.nautiljonImportService.createAnimeFromNautiljon(createDto, user);
+    return this.sourcesExternesService.createAnimeFromNautiljon(createDto, user);
   }
 
   @Get('anime/:id/resources')
@@ -71,7 +71,7 @@ export class NautiljonImportController {
   async getStaffAndTags(
     @Param('id', ParseIntPipe) animeId: number,
   ): Promise<any> {
-    return this.nautiljonImportService.getStaffAndTagsFromResources(animeId);
+    return this.sourcesExternesService.getStaffAndTagsFromResources(animeId);
   }
 
   @Get('anime/:id/characters-html')
@@ -86,7 +86,7 @@ export class NautiljonImportController {
   async getCharactersAsHtml(
     @Param('id', ParseIntPipe) animeId: number,
   ): Promise<{ html: string }> {
-    return this.nautiljonImportService.getCharactersAsHtml(animeId);
+    return this.sourcesExternesService.getCharactersAsHtml(animeId);
   }
 
   @Get('anime/:id/doublage')
@@ -101,7 +101,7 @@ export class NautiljonImportController {
   async getDoublageFromResources(
     @Param('id', ParseIntPipe) animeId: number,
   ): Promise<{ doublage: string }> {
-    return this.nautiljonImportService.getDoublageFromResources(animeId);
+    return this.sourcesExternesService.getDoublageFromResources(animeId);
   }
 
   @Post('anime/:id/import-staff')
@@ -117,7 +117,7 @@ export class NautiljonImportController {
     @Param('id', ParseIntPipe) animeId: number,
     @Body() importData: { staff: Array<{ businessId: number, role: string }> },
   ): Promise<any> {
-    return this.nautiljonImportService.importStaffFromResources(animeId, importData.staff);
+    return this.sourcesExternesService.importStaffFromResources(animeId, importData.staff);
   }
 
   @Get('tag-mappings')
@@ -130,13 +130,13 @@ export class NautiljonImportController {
     description: 'Tag mappings for frontend form'
   })
   async getTagMappings(): Promise<any> {
-    return this.nautiljonImportService.getTagMappings();
+    return this.sourcesExternesService.getTagMappings();
   }
 
   @Post('import-image')
   @ApiOperation({
     summary: 'Import anime image to ImageKit',
-    description: 'Download and upload an anime image from MAL/Nautiljon to ImageKit'
+    description: 'Download and upload an anime image from MAL/external sources to ImageKit'
   })
   @ApiBody({
     schema: {
@@ -155,6 +155,6 @@ export class NautiljonImportController {
   async importImage(
     @Body() importData: { imageUrl: string; animeTitle: string },
   ): Promise<any> {
-    return this.nautiljonImportService.importAnimeImage(importData.imageUrl, importData.animeTitle);
+    return this.sourcesExternesService.importAnimeImage(importData.imageUrl, importData.animeTitle);
   }
 }

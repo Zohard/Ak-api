@@ -7,15 +7,15 @@ import { AdminMangasController } from './admin-mangas.controller';
 import { AdminMangasService } from './admin-mangas.service';
 import { AdminBusinessController } from './admin-business.controller';
 import { AdminBusinessService } from './admin-business.service';
-import { NautiljonImportController } from './nautiljon-import.controller';
-import { NautiljonImportService } from './nautiljon-import.service';
+import { SourcesExternesController } from './sources-externes.controller';
+import { SourcesExternesService } from './sources-externes.service';
 import { PrismaService } from '../../../shared/services/prisma.service';
 import { MediaModule } from '../../media/media.module';
 
 @Module({
   imports: [MediaModule],
-  controllers: [AdminContentController, AdminAnimesController, AdminMangasController, AdminBusinessController, NautiljonImportController],
-  providers: [AdminContentService, AdminAnimesService, AdminMangasService, AdminBusinessService, NautiljonImportService, PrismaService],
+  controllers: [AdminContentController, AdminAnimesController, AdminMangasController, AdminBusinessController, SourcesExternesController],
+  providers: [AdminContentService, AdminAnimesService, AdminMangasService, AdminBusinessService, SourcesExternesService, PrismaService],
   exports: [AdminContentService],
 })
 export class AdminContentModule {}
