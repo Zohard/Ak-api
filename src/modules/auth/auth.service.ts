@@ -8,6 +8,7 @@ import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
 import * as crypto from 'crypto';
 import { PrismaService } from '../../shared/services/prisma.service';
+import { EmailService } from '../../shared/services/email.service';
 import { SmfMember } from '@prisma/client';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
@@ -20,6 +21,7 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
+    private readonly emailService: EmailService,
   ) {}
 
   async validateUser(emailOrUsername: string, password: string): Promise<any> {
@@ -264,16 +266,17 @@ export class AuthService {
       },
     });
 
-    // TODO: Send email with reset link
-    console.log(`Password reset token for ${user.emailAddress}: ${resetToken}`);
-    console.log(
-      `Reset link: ${this.configService.get('FRONTEND_URL') || 'http://localhost:3000'}/reset-password?token=${resetToken}`,
-    );
+    // Send email with reset link
+    try {
+      await this.emailService.sendForgotPasswordEmail(user.emailAddress, resetToken);
+    } catch (error) {
+      console.error('Failed to send password reset email:', error);
+      // Continue execution - don't fail the request if email fails
+    }
 
     return {
       message:
         'Si cette adresse email existe, vous recevrez un lien de réinitialisation',
-      resetToken, // Remove in production
     };
   }
 
