@@ -228,6 +228,17 @@ export class SourcesExternesService {
       commentaire: JSON.stringify(createDto.ressources), // Store resources as JSON string in commentaire field
     };
 
+    // Add Nautiljon title to alternative titles if it's different from the main title
+    if (ressources?.nautiljon?.title && ressources.nautiljon.title !== createDto.titre) {
+      const currentAltTitles = createDto.titresAlternatifs ? createDto.titresAlternatifs.split(',').map(t => t.trim()) : [];
+
+      // Only add if not already present
+      if (!currentAltTitles.includes(ressources.nautiljon.title)) {
+        currentAltTitles.push(ressources.nautiljon.title);
+        adminDto.titres_alternatifs = currentAltTitles.join(', ');
+      }
+    }
+
     // Extract additional data from ressources if available
     if (ressources) {
       // Extract year from various sources
