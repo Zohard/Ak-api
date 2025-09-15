@@ -303,12 +303,14 @@ model AkCritique {
 
 // Content Relations (Anime/Manga to Anime/Manga)
 model AkFicheToFiche {
-  idRelation      Int      @id @default(autoincrement()) @map("id_relation")
-  idFicheDepart   String   @map("id_fiche_depart") @db.VarChar(50)
-  idAnime         Int?     @map("id_anime")
-  idManga         Int?     @map("id_manga")
-  typeRelation    String?  @map("type_relation") @db.VarChar(50)
-  
+  idRelation    Int    @id @default(autoincrement()) @map("id_relation")
+  idFicheDepart String @map("id_fiche_depart") @db.VarChar(100)
+  idAnime       Int    @default(0) @map("id_anime")
+  idManga       Int    @default(0) @map("id_manga")
+  idOst         Int    @default(0) @map("id_ost")
+  idJeu         Int    @default(0) @map("id_jeu")
+  idBusiness    Int    @default(0) @map("id_business")
+
   @@map("ak_fiche_to_fiche")
 }
 

@@ -16,8 +16,8 @@ export class CreateContentRelationshipDto {
   @IsIn(['anime', 'manga'])
   related_type: string;
 
-  @ApiProperty({
-    description: 'Type of relationship',
+  @ApiPropertyOptional({
+    description: 'Type of relationship (currently ignored)',
     enum: [
       'sequel',
       'prequel',
@@ -27,6 +27,7 @@ export class CreateContentRelationshipDto {
       'other',
     ],
   })
+  @IsOptional()
   @IsString()
   @IsIn([
     'sequel',
@@ -36,7 +37,7 @@ export class CreateContentRelationshipDto {
     'adaptation',
     'other',
   ])
-  relation_type: string;
+  relation_type?: string;
 
   @ApiPropertyOptional({
     description: 'Optional description of the relationship',
@@ -48,7 +49,7 @@ export class CreateContentRelationshipDto {
 
 export class UpdateContentRelationshipDto {
   @ApiPropertyOptional({
-    description: 'Type of relationship',
+    description: 'Type of relationship (currently ignored)',
     enum: [
       'sequel',
       'prequel',
