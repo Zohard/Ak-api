@@ -419,15 +419,23 @@ export class AdminContentService {
     const targetAnimeId = related_type === 'anime' ? related_id : 0;
     const targetMangaId = related_type === 'manga' ? related_id : 0;
 
+    // Note: Some legacy DBs have NOT NULL without defaults on id_ost/id_jeu/id_business
+    // so we insert explicit zeros to satisfy constraints.
     await this.prisma.$queryRaw`
       INSERT INTO ak_fiche_to_fiche (
         id_fiche_depart,
         id_anime,
-        id_manga
+        id_manga,
+        id_ost,
+        id_jeu,
+        id_business
       ) VALUES (
         ${sourceKey},
         ${targetAnimeId},
-        ${targetMangaId}
+        ${targetMangaId},
+        0,
+        0,
+        0
       )
     `;
 
