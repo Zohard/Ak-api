@@ -307,6 +307,7 @@ export class AdminContentService {
       // Delete business relationships
       const staffTable =
         type === 'anime' ? 'ak_business_to_animes' : 'ak_business_to_mangas';
+      const idColumn = type === 'anime' ? 'id_anime' : 'id_manga';
       await this.prisma.$queryRawUnsafe(
         `DELETE FROM ${staffTable} WHERE ${idColumn} = $1`,
         id,
