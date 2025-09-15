@@ -7,9 +7,10 @@ export class EmailService {
   private transporter: nodemailer.Transporter;
 
   constructor(private readonly configService: ConfigService) {
-    this.transporter = nodemailer.createTransport({
+    this.transporter = nodemailer.createTransporter({
       host: this.configService.get<string>('MAILTRAP_HOST'),
       port: this.configService.get<number>('MAILTRAP_PORT'),
+      secure: false,
       auth: {
         user: this.configService.get<string>('MAILTRAP_USER'),
         pass: this.configService.get<string>('MAILTRAP_PASS'),
