@@ -241,16 +241,6 @@ export class AniListService {
       ?.map(staff => staff.name.full)
       ?.join(', ') || '';
 
-    // Clean description by removing HTML tags
-    let cleanDescription = '';
-    if (anilistAnime.description) {
-      cleanDescription = anilistAnime.description
-        .replace(/<br\s*\/?>/gi, '\n')
-        .replace(/<[^>]*>/g, '')
-        .replace(/&[a-zA-Z0-9#]+;/g, '')
-        .trim();
-    }
-
     return {
       titre: anilistAnime.title.romaji || anilistAnime.title.english || anilistAnime.title.native,
       titreOrig: anilistAnime.title.native,
@@ -264,7 +254,6 @@ export class AniListService {
         .filter((title, index, arr) => arr.indexOf(title) === index)
         .join('\n'),
       annee: anilistAnime.seasonYear || anilistAnime.startDate?.year,
-      synopsis: cleanDescription,
       image: anilistAnime.coverImage?.large || anilistAnime.coverImage?.medium,
       nbEp: anilistAnime.episodes,
       studio: studios,
@@ -282,6 +271,7 @@ export class AniListService {
           averageScore: anilistAnime.averageScore,
           meanScore: anilistAnime.meanScore,
           bannerImage: anilistAnime.bannerImage,
+          description: anilistAnime.description,
         },
       }),
     };
