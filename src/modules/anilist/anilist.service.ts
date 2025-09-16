@@ -39,12 +39,41 @@ export interface AniListAnime {
     }>;
   };
   staff: {
-    nodes: Array<{
+    edges: Array<{
       id: number;
-      name: {
-        full: string;
+      role: string;
+      node: {
+        id: number;
+        name: {
+          full: string;
+        };
+        primaryOccupations: string[];
       };
-      primaryOccupations: string[];
+    }>;
+  };
+  characters: {
+    edges: Array<{
+      id: number;
+      role: string;
+      node: {
+        id: number;
+        name: {
+          full: string;
+        };
+        image: {
+          large: string;
+        };
+      };
+      voiceActors: Array<{
+        id: number;
+        name: {
+          full: string;
+        };
+        language: string;
+        image: {
+          large: string;
+        };
+      }>;
     }>;
   };
   averageScore?: number;
@@ -117,13 +146,42 @@ export class AniListService {
                 isAnimationStudio
               }
             }
-            staff(perPage: 10) {
-              nodes {
+            staff(perPage: 20) {
+              edges {
                 id
-                name {
-                  full
+                role
+                node {
+                  id
+                  name {
+                    full
+                  }
+                  primaryOccupations
                 }
-                primaryOccupations
+              }
+            }
+            characters(perPage: 20, sort: [ROLE, RELEVANCE, ID]) {
+              edges {
+                id
+                role
+                node {
+                  id
+                  name {
+                    full
+                  }
+                  image {
+                    large
+                  }
+                }
+                voiceActors(language: JAPANESE, sort: [RELEVANCE, ID]) {
+                  id
+                  name {
+                    full
+                  }
+                  language
+                  image {
+                    large
+                  }
+                }
               }
             }
             averageScore
@@ -194,13 +252,42 @@ export class AniListService {
               isAnimationStudio
             }
           }
-          staff(perPage: 20) {
-            nodes {
+          staff(perPage: 30) {
+            edges {
               id
-              name {
-                full
+              role
+              node {
+                id
+                name {
+                  full
+                }
+                primaryOccupations
               }
-              primaryOccupations
+            }
+          }
+          characters(perPage: 25, sort: [ROLE, RELEVANCE, ID]) {
+            edges {
+              id
+              role
+              node {
+                id
+                name {
+                  full
+                }
+                image {
+                  large
+                }
+              }
+              voiceActors(language: JAPANESE, sort: [RELEVANCE, ID]) {
+                id
+                name {
+                  full
+                }
+                language
+                image {
+                  large
+                }
+              }
             }
           }
           averageScore
@@ -236,10 +323,27 @@ export class AniListService {
       ?.map(studio => studio.name)
       ?.join(', ') || '';
 
-    const directors = anilistAnime.staff?.nodes
-      ?.filter(staff => staff.primaryOccupations?.includes('Director'))
-      ?.map(staff => staff.name.full)
+    const directors = anilistAnime.staff?.edges
+      ?.filter(staff => staff.role?.toLowerCase().includes('director') || staff.node.primaryOccupations?.includes('Director'))
+      ?.map(staff => staff.node.name.full)
       ?.join(', ') || '';
+
+    const staffData = anilistAnime.staff?.edges?.map(staff => ({
+      name: staff.node.name.full,
+      role: staff.role,
+      primaryOccupations: staff.node.primaryOccupations,
+    })) || [];
+
+    const charactersData = anilistAnime.characters?.edges?.map(char => ({
+      name: char.node.name.full,
+      role: char.role,
+      image: char.node.image.large,
+      voiceActors: char.voiceActors?.map(va => ({
+        name: va.name.full,
+        language: va.language,
+        image: va.image.large,
+      })) || [],
+    })) || [];
 
     return {
       titre: anilistAnime.title.romaji || anilistAnime.title.english || anilistAnime.title.native,
@@ -273,6 +377,8 @@ export class AniListService {
           bannerImage: anilistAnime.bannerImage,
           description: anilistAnime.description,
         },
+        staff: staffData,
+        characters: charactersData,
       }),
     };
   }
