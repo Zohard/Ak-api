@@ -111,6 +111,39 @@ export class AdminContentController {
     );
   }
 
+  @Get('staff-roles/:type')
+  @ApiOperation({ summary: 'Get existing staff role types for autocomplete' })
+  @ApiParam({
+    name: 'type',
+    description: 'Content type',
+    enum: ['anime', 'manga'],
+  })
+  @ApiQuery({ name: 'q', required: false, description: 'Search query for role types' })
+  @ApiResponse({
+    status: 200,
+    description: 'Staff role types retrieved successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        items: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              type: { type: 'string' }
+            }
+          }
+        }
+      }
+    }
+  })
+  async getStaffRoleTypes(
+    @Param('type') type: string,
+    @Query('q') query?: string,
+  ) {
+    return this.adminContentService.getStaffRoleTypes(type, query);
+  }
+
   @Get(':type/:id')
   @ApiOperation({ summary: 'Get content details for admin management' })
   @ApiParam({
@@ -218,39 +251,6 @@ export class AdminContentController {
       type,
       relationshipDto,
     );
-  }
-
-  @Get('staff-roles/:type')
-  @ApiOperation({ summary: 'Get existing staff role types for autocomplete' })
-  @ApiParam({
-    name: 'type',
-    description: 'Content type',
-    enum: ['anime', 'manga'],
-  })
-  @ApiQuery({ name: 'q', required: false, description: 'Search query for role types' })
-  @ApiResponse({
-    status: 200,
-    description: 'Staff role types retrieved successfully',
-    schema: {
-      type: 'object',
-      properties: {
-        items: {
-          type: 'array',
-          items: {
-            type: 'object',
-            properties: {
-              type: { type: 'string' }
-            }
-          }
-        }
-      }
-    }
-  })
-  async getStaffRoleTypes(
-    @Param('type') type: string,
-    @Query('q') query?: string,
-  ) {
-    return this.adminContentService.getStaffRoleTypes(type, query);
   }
 
   // Staff management
