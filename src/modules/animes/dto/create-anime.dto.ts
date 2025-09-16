@@ -174,4 +174,12 @@ export class CreateAnimeDto {
   @IsOptional()
   @IsString()
   commentaire?: string;
+
+  @ApiPropertyOptional({
+    description: 'ID AniList pour importer automatiquement les données',
+    example: 16498,
+  })
+  @IsOptional()
+  @IsNumber()
+  anilistId?: number;
 }
