@@ -11,6 +11,7 @@ import { UpdateAnimeDto } from './dto/update-anime.dto';
 import { AnimeQueryDto } from './dto/anime-query.dto';
 import { RelatedContentItem, RelationsResponse } from '../shared/types/relations.types';
 import { ImageKitService } from '../media/imagekit.service';
+import { AniListService } from '../anilist/anilist.service';
 
 @Injectable()
 export class AnimesService extends BaseContentService<
@@ -23,6 +24,7 @@ export class AnimesService extends BaseContentService<
     prisma: PrismaService,
     private readonly cacheService: CacheService,
     private readonly imageKitService: ImageKitService,
+    private readonly aniListService: AniListService,
   ) {
     super(prisma);
   }
@@ -62,12 +64,37 @@ export class AnimesService extends BaseContentService<
   }
 
   async create(createAnimeDto: CreateAnimeDto, userId: number) {
+    let data: any = { ...createAnimeDto };
+
+    // If anilistId is provided, fetch data from AniList and merge it
+    if (createAnimeDto.anilistId) {
+      try {
+        const anilistAnime = await this.aniListService.getAnimeById(createAnimeDto.anilistId);
+        if (anilistAnime) {
+          const anilistData = this.aniListService.mapToCreateAnimeDto(anilistAnime);
+          // Merge AniList data with provided data, giving priority to provided data
+          data = {
+            ...anilistData,
+            ...data,
+            // Always preserve the AniList ID in the comment field
+            commentaire: JSON.stringify({
+              anilistId: createAnimeDto.anilistId,
+              ...(data.commentaire ? JSON.parse(data.commentaire) : {}),
+              originalData: anilistAnime,
+            }),
+          };
+        }
+      } catch (error) {
+        console.warn(`Failed to fetch AniList data for ID ${createAnimeDto.anilistId}:`, error.message);
+      }
+    }
+
     // Normalize incoming payload (handle legacy alias and format mapping already in DTO)
-    const data: any = { ...createAnimeDto };
     if (!data.titreOrig && data.titreOrign) {
       data.titreOrig = data.titreOrign;
     }
     delete data.titreOrign;
+    delete data.anilistId; // Remove anilistId from data before saving
 
     const anime = await this.prisma.akAnime.create({
       data: {
@@ -328,12 +355,37 @@ export class AnimesService extends BaseContentService<
       );
     }
 
+    let updateData: any = { ...updateAnimeDto };
+
+    // If anilistId is provided, fetch data from AniList and merge it
+    if (updateAnimeDto.anilistId) {
+      try {
+        const anilistAnime = await this.aniListService.getAnimeById(updateAnimeDto.anilistId);
+        if (anilistAnime) {
+          const anilistData = this.aniListService.mapToCreateAnimeDto(anilistAnime);
+          // Merge AniList data with provided data, giving priority to provided data
+          updateData = {
+            ...anilistData,
+            ...updateData,
+            // Always preserve the AniList ID in the comment field
+            commentaire: JSON.stringify({
+              anilistId: updateAnimeDto.anilistId,
+              ...(updateData.commentaire ? JSON.parse(updateData.commentaire) : {}),
+              originalData: anilistAnime,
+            }),
+          };
+        }
+      } catch (error) {
+        console.warn(`Failed to fetch AniList data for ID ${updateAnimeDto.anilistId}:`, error.message);
+      }
+    }
+
     // If replacing image and previous image is an ImageKit URL, attempt deletion in IK
     try {
       if (
-        typeof updateAnimeDto.image === 'string' &&
-        updateAnimeDto.image &&
-        updateAnimeDto.image !== anime.image &&
+        typeof updateData.image === 'string' &&
+        updateData.image &&
+        updateData.image !== anime.image &&
         typeof anime.image === 'string' &&
         anime.image &&
         /imagekit\.io/.test(anime.image)
@@ -346,11 +398,11 @@ export class AnimesService extends BaseContentService<
     }
 
     // Normalize incoming payload for update (handle legacy alias)
-    const updateData: any = { ...updateAnimeDto };
     if (!updateData.titreOrig && updateData.titreOrign) {
       updateData.titreOrig = updateData.titreOrign;
     }
     delete updateData.titreOrign;
+    delete updateData.anilistId; // Remove anilistId from data before saving
 
     const updatedAnime = await this.prisma.akAnime.update({
       where: { idAnime: id },
@@ -474,14 +526,14 @@ export class AnimesService extends BaseContentService<
 
   async getMostPopularAnimeTags(limit = 20) {
     const cacheKey = `popular_anime_tags:${limit}`;
-    
+
     const cached = await this.cacheService.get(cacheKey);
     if (cached) {
       return cached;
     }
 
     const tags = await this.prisma.$queryRaw`
-      SELECT 
+      SELECT
         t.id_tag,
         t.tag_name,
         t.tag_nice_url,
@@ -511,8 +563,23 @@ export class AnimesService extends BaseContentService<
     };
 
     await this.cacheService.set(cacheKey, result, 86400); // 24 hours
-    
+
     return result;
+  }
+
+  async searchAniList(query: string, limit = 10) {
+    try {
+      const results = await this.aniListService.searchAnime(query, limit);
+      return {
+        animes: results,
+        total: results.length,
+        query,
+        source: 'AniList',
+      };
+    } catch (error) {
+      console.error('Error searching AniList:', error.message);
+      throw new Error('Failed to search AniList');
+    }
   }
 
   async getAnimeTags(id: number) {

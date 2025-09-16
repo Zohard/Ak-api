@@ -4,9 +4,10 @@ import { AnimesController } from './animes.controller';
 import { PrismaService } from '../../shared/services/prisma.service';
 import { CacheService } from '../../shared/services/cache.service';
 import { MediaModule } from '../media/media.module';
+import { AniListModule } from '../anilist/anilist.module';
 
 @Module({
-  imports: [MediaModule],
+  imports: [MediaModule, AniListModule],
   controllers: [AnimesController],
   providers: [AnimesService, PrismaService, CacheService],
   exports: [AnimesService],

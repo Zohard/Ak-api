@@ -142,6 +142,30 @@ export class AnimesController {
     return this.animesService.autocomplete(query, exclude, parsedLimit);
   }
 
+  @Get('anilist/search')
+  @ApiOperation({ summary: 'Recherche animes sur AniList' })
+  @ApiQuery({
+    name: 'q',
+    required: true,
+    description: 'Terme de recherche',
+    example: 'attack on titan',
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    description: 'Nombre maximum de résultats',
+    example: 10,
+  })
+  @ApiResponse({ status: 200, description: 'Résultats de la recherche AniList' })
+  @ApiResponse({ status: 400, description: 'Requête invalide' })
+  async searchAniList(
+    @Query('q') query: string,
+    @Query('limit') limit?: string,
+  ) {
+    const parsedLimit = limit ? parseInt(limit) : 10;
+    return this.animesService.searchAniList(query, parsedLimit);
+  }
+
   @Get(':id/tags')
   @ApiOperation({ summary: 'Tags pour un anime spécifique' })
   @ApiParam({ name: 'id', description: "ID de l'anime", type: 'number' })
