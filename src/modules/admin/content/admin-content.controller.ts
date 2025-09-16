@@ -157,6 +157,14 @@ export class AdminContentController {
       req.user.id,
     );
   }
+  @Delete('relationships/:relationshipId')
+  @ApiOperation({ summary: 'Delete content relationship' })
+  @ApiParam({ name: 'relationshipId', description: 'Relationship ID' })
+  async deleteRelationship(
+    @Param('relationshipId', ParseIntPipe) relationshipId: number,
+  ) {
+    return this.adminContentService.deleteContentRelationship(relationshipId);
+  }
 
   @Delete(':type/:id')
   @ApiOperation({ summary: 'Delete content (admin only)' })
@@ -210,15 +218,6 @@ export class AdminContentController {
       type,
       relationshipDto,
     );
-  }
-
-  @Delete('relationships/:relationshipId')
-  @ApiOperation({ summary: 'Delete content relationship' })
-  @ApiParam({ name: 'relationshipId', description: 'Relationship ID' })
-  async deleteRelationship(
-    @Param('relationshipId', ParseIntPipe) relationshipId: number,
-  ) {
-    return this.adminContentService.deleteContentRelationship(relationshipId);
   }
 
   @Get('staff-roles/:type')
