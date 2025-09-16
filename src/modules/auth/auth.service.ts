@@ -9,6 +9,7 @@ import * as bcrypt from 'bcryptjs';
 import * as crypto from 'crypto';
 import { PrismaService } from '../../shared/services/prisma.service';
 import { EmailService } from '../../shared/services/email.service';
+import { ADMIN_GROUP_IDS } from '../../shared/constants/admin.constants';
 import { SmfMember } from '@prisma/client';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
@@ -113,7 +114,7 @@ export class AuthService {
       username: user.memberName,
       email: user.emailAddress,
       isAdmin:
-        user.idGroup === 1 || user.idMember === 1,
+        ADMIN_GROUP_IDS.has(user.idGroup) || user.idMember === 1,
     };
 
     const accessToken = this.jwtService.sign(payload);
@@ -216,7 +217,7 @@ export class AuthService {
       username: tokenRecord.user.memberName,
       email: tokenRecord.user.emailAddress,
       isAdmin:
-        tokenRecord.user.idGroup === 1 ||
+        ADMIN_GROUP_IDS.has(tokenRecord.user.idGroup) ||
         tokenRecord.user.idMember === 1 ||
         tokenRecord.user.idMember === 17667,
     };
@@ -351,7 +352,7 @@ export class AuthService {
       posts: user.posts,
       avatar: user.avatar,
       isAdmin:
-        user.idGroup === 1 || user.idMember === 1,
+        ADMIN_GROUP_IDS.has(user.idGroup) || user.idMember === 1,
     };
   }
 }
