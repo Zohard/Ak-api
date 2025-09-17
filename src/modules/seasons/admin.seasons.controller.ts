@@ -1,41 +1,12 @@
-import { Controller, Get, Param, ParseIntPipe, NotFoundException, Post, Body, UseGuards, Delete, Request } from '@nestjs/common';
+import { Body, Controller, Delete, NotFoundException, Param, ParseIntPipe, Post, UseGuards } from '@nestjs/common';
+import { SeasonsService } from './seasons.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { AdminGuard } from '../../common/guards/admin.guard';
-import { SeasonsService } from './seasons.service';
 
-@Controller('seasons')
-export class SeasonsController {
+@Controller('admin/seasons')
+export class AdminSeasonsController {
   constructor(private readonly seasonsService: SeasonsService) {}
 
-  @Get()
-  async getAllSeasons() {
-    return this.seasonsService.findAll();
-  }
-
-  @Get('current')
-  async getCurrentSeason() {
-    return this.seasonsService.findCurrent();
-  }
-
-  @Get(':id')
-  async getSeasonById(@Param('id', ParseIntPipe) id: number) {
-    const season = await this.seasonsService.findById(id);
-    if (!season) {
-      throw new NotFoundException(`Season with ID ${id} not found`);
-    }
-    return season;
-  }
-
-  @Get(':id/animes')
-  async getSeasonAnimes(@Param('id', ParseIntPipe) id: number) {
-    const season = await this.seasonsService.findById(id);
-    if (!season) {
-      throw new NotFoundException(`Season with ID ${id} not found`);
-    }
-    return this.seasonsService.getSeasonAnimes(id);
-  }
-
-  // Admin endpoints
   @UseGuards(JwtAuthGuard, AdminGuard)
   @Post()
   async createSeason(@Body() body: { annee: number; saison: number; statut?: number }) {
@@ -50,7 +21,6 @@ export class SeasonsController {
   async addAnime(
     @Param('id', ParseIntPipe) id: number,
     @Body() body: { animeId: number },
-    @Request() _req: any,
   ) {
     if (!body || typeof body.animeId !== 'number') {
       throw new NotFoundException('animeId is required')
@@ -71,3 +41,4 @@ export class SeasonsController {
     return this.seasonsService.removeAnimeFromSeason(id, animeId)
   }
 }
+
