@@ -173,4 +173,76 @@ export class SeasonsService {
       throw error;
     }
   }
+
+  // Admin: create a new season
+  async createSeason(data: { annee: number; saison: number; statut?: number }) {
+    const statut = typeof data.statut === 'number' ? data.statut : 0
+    const created = (await this.prisma.$queryRaw`INSERT INTO ak_animes_saisons (annee, saison, statut, json_data)
+      VALUES (${data.annee}, ${data.saison}, ${statut}, ${JSON.stringify({ animes: [] })}::jsonb)
+      RETURNING id_saison, saison, annee, statut, json_data`) as any
+
+    // Invalidate caches related to seasons lists/current
+    await this.cacheService.del('seasons:all')
+    await this.cacheService.del('seasons:current')
+    return Array.isArray(created) ? created[0] : created
+  }
+
+  private normalizeJsonData(json_data: any): { animes: number[] } {
+    let animeIds: number[] = []
+    if (json_data) {
+      try {
+        const jd = typeof json_data === 'string' ? JSON.parse(json_data) : json_data
+        if (Array.isArray(jd)) animeIds = jd
+        else if (Array.isArray(jd.animes)) animeIds = jd.animes
+        else if (Array.isArray(jd.anime_ids)) animeIds = jd.anime_ids
+      } catch {}
+    }
+    return { animes: animeIds }
+  }
+
+  // Admin: add an anime to a season (in json_data)
+  async addAnimeToSeason(seasonId: number, animeId: number) {
+    const season = await this.findById(seasonId)
+    if (!season) return null
+
+    const data = this.normalizeJsonData(season.json_data)
+    if (!data.animes.includes(animeId)) data.animes.push(animeId)
+
+    await this.prisma.$executeRaw`
+      UPDATE ak_animes_saisons
+      SET json_data = ${JSON.stringify(data)}::jsonb
+      WHERE id_saison = ${seasonId}
+    `
+
+    // Invalidate caches
+    await this.cacheService.del(`season:${seasonId}`)
+    await this.cacheService.del(`season_animes:${seasonId}`)
+    await this.cacheService.del('seasons:all')
+    await this.cacheService.del('seasons:current')
+
+    return { success: true, seasonId, animeId }
+  }
+
+  // Admin: remove an anime from a season
+  async removeAnimeFromSeason(seasonId: number, animeId: number) {
+    const season = await this.findById(seasonId)
+    if (!season) return null
+
+    const data = this.normalizeJsonData(season.json_data)
+    const before = data.animes.length
+    data.animes = data.animes.filter((id) => id !== animeId)
+
+    if (data.animes.length !== before) {
+      await this.prisma.$executeRaw`
+        UPDATE ak_animes_saisons
+        SET json_data = ${JSON.stringify(data)}::jsonb
+        WHERE id_saison = ${seasonId}
+      `
+      await this.cacheService.del(`season:${seasonId}`)
+      await this.cacheService.del(`season_animes:${seasonId}`)
+      await this.cacheService.del('seasons:all')
+      await this.cacheService.del('seasons:current')
+    }
+    return { success: true, seasonId, animeId }
+  }
 }
