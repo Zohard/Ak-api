@@ -175,11 +175,13 @@ export class SeasonsService {
   }
 
   // Admin: create a new season
-  async createSeason(data: { annee: number; saison: number; statut?: number }) {
+  async createSeason(data: { annee: number; saison: number; statut?: number; id_article?: number; json_auteurs?: string }) {
     const statut = typeof data.statut === 'number' ? data.statut : 0
-    const created = (await this.prisma.$queryRaw`INSERT INTO ak_animes_saisons (annee, saison, statut, json_data)
-      VALUES (${data.annee}, ${data.saison}, ${statut}, ${JSON.stringify({ animes: [] })}::jsonb)
-      RETURNING id_saison, saison, annee, statut, json_data`) as any
+    const id_article = typeof data.id_article === 'number' ? data.id_article : 0
+    const json_auteurs = data.json_auteurs || ''
+    const created = (await this.prisma.$queryRaw`INSERT INTO ak_animes_saisons (annee, saison, statut, json_data, id_article, json_auteurs)
+      VALUES (${data.annee}, ${data.saison}, ${statut}, ${JSON.stringify({ animes: [] })}, ${id_article}, ${json_auteurs})
+      RETURNING id_saison, saison, annee, statut, json_data, id_article, json_auteurs`) as any
 
     // Invalidate caches related to seasons lists/current
     await this.cacheService.del('seasons:all')
