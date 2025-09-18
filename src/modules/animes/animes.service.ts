@@ -570,13 +570,27 @@ export class AnimesService extends BaseContentService<
 
   async searchAniList(query: string, limit = 10) {
     try {
+      // Create cache key for AniList search
+      const cacheKey = `anilist_search:${this.hashQuery(query)}:${limit}`;
+
+      // Try to get from cache first
+      const cached = await this.cacheService.get(cacheKey);
+      if (cached) {
+        return cached;
+      }
+
       const results = await this.aniListService.searchAnime(query, limit);
-      return {
+      const result = {
         animes: results,
         total: results.length,
         query,
         source: 'AniList',
       };
+
+      // Cache the result for 2 hours (7200 seconds)
+      await this.cacheService.set(cacheKey, result, 7200);
+
+      return result;
     } catch (error) {
       console.error('Error searching AniList:', error.message);
       throw new Error('Failed to search AniList');
@@ -585,6 +599,15 @@ export class AnimesService extends BaseContentService<
 
   async importSeasonalAnimeFromAniList(season: string, year: number, limit = 50) {
     try {
+      // Create cache key for seasonal anime data
+      const cacheKey = `anilist_season:${season}:${year}:${limit}`;
+
+      // Try to get from cache first
+      const cached = await this.cacheService.get(cacheKey);
+      if (cached) {
+        return cached;
+      }
+
       const seasonalAnime = await this.aniListService.getAnimesBySeason(season, year, limit);
 
       const comparisons: any[] = [];
@@ -633,13 +656,18 @@ export class AnimesService extends BaseContentService<
         comparisons.push(comparison);
       }
 
-      return {
+      const result = {
         season,
         year,
         total: seasonalAnime.length,
         comparisons,
         source: 'AniList',
       };
+
+      // Cache the result for 5 minutes (300 seconds)
+      await this.cacheService.set(cacheKey, result, 300);
+
+      return result;
     } catch (error) {
       console.error('Error importing seasonal anime from AniList:', error.message);
       throw new Error('Failed to import seasonal anime from AniList');
@@ -836,6 +864,18 @@ export class AnimesService extends BaseContentService<
     await this.cacheService.invalidateAnime(id);
     // Also invalidate related caches
     await this.cacheService.invalidateSearchCache();
+  }
+
+  // Utility method to create consistent cache keys
+  private hashQuery(query: string): string {
+    // Simple hash function for query strings
+    let hash = 0;
+    for (let i = 0; i < query.length; i++) {
+      const char = query.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash; // Convert to 32-bit integer
+    }
+    return Math.abs(hash).toString(36);
   }
 
 }
