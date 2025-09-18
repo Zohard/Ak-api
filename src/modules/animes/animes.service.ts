@@ -592,7 +592,7 @@ export class AnimesService extends BaseContentService<
       for (const anilistAnime of seasonalAnime) {
         const primaryTitle = anilistAnime.title.romaji || anilistAnime.title.english || anilistAnime.title.native;
 
-        const orConditions = [];
+        const orConditions: any[] = [];
 
         if (primaryTitle) {
           orConditions.push({ titre: { equals: primaryTitle, mode: Prisma.QueryMode.insensitive } });
