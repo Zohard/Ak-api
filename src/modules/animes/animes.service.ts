@@ -12,7 +12,7 @@ import { AnimeQueryDto } from './dto/anime-query.dto';
 import { RelatedContentItem, RelationsResponse } from '../shared/types/relations.types';
 import { ImageKitService } from '../media/imagekit.service';
 import { AniListService } from '../anilist/anilist.service';
-import { QueryMode } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class AnimesService extends BaseContentService<
@@ -595,12 +595,12 @@ export class AnimesService extends BaseContentService<
         const existingAnime = await this.prisma.akAnime.findFirst({
           where: {
             OR: [
-              { titre: { equals: primaryTitle, mode: QueryMode.insensitive } },
-              { titreOrig: { equals: anilistAnime.title.native, mode: QueryMode.insensitive } },
-              { titreFr: { equals: anilistAnime.title.english, mode: QueryMode.insensitive } },
-              { titresAlternatifs: { contains: primaryTitle, mode: QueryMode.insensitive } },
-              { titresAlternatifs: { contains: anilistAnime.title.english, mode: QueryMode.insensitive } },
-              { titresAlternatifs: { contains: anilistAnime.title.native, mode: QueryMode.insensitive } },
+              { titre: { equals: primaryTitle, mode: Prisma.QueryMode.insensitive } },
+              { titreOrig: { equals: anilistAnime.title.native, mode: Prisma.QueryMode.insensitive } },
+              { titreFr: { equals: anilistAnime.title.english, mode: Prisma.QueryMode.insensitive } },
+              { titresAlternatifs: { contains: primaryTitle, mode: Prisma.QueryMode.insensitive } },
+              { titresAlternatifs: { contains: anilistAnime.title.english, mode: Prisma.QueryMode.insensitive } },
+              { titresAlternatifs: { contains: anilistAnime.title.native, mode: Prisma.QueryMode.insensitive } },
             ].filter(Boolean),
           },
           select: {
