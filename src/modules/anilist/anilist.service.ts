@@ -76,6 +76,12 @@ export interface AniListAnime {
       }>;
     }>;
   };
+  externalLinks: Array<{
+    id: number;
+    type: string;
+    site: string;
+    url: string;
+  }>;
   averageScore?: number;
   meanScore?: number;
   siteUrl: string;
@@ -184,6 +190,12 @@ export class AniListService {
                 }
               }
             }
+            externalLinks {
+              id
+              type
+              site
+              url
+            }
             averageScore
             meanScore
             siteUrl
@@ -290,6 +302,12 @@ export class AniListService {
               }
             }
           }
+          externalLinks {
+            id
+            type
+            site
+            url
+          }
           averageScore
           meanScore
           siteUrl
@@ -345,6 +363,11 @@ export class AniListService {
       })) || [],
     })) || [];
 
+    const officialWebsite = anilistAnime.externalLinks?.find(link =>
+      link.site?.toLowerCase().includes('official') ||
+      link.type === 'INFO'
+    )?.url || '';
+
     return {
       titre: anilistAnime.title.romaji || anilistAnime.title.english || anilistAnime.title.native,
       titreOrig: anilistAnime.title.native,
@@ -363,7 +386,7 @@ export class AniListService {
       studio: studios,
       realisateur: directors,
       format: this.mapFormat(anilistAnime.format),
-      officialSite: anilistAnime.siteUrl,
+      officialSite: officialWebsite,
       statut: 0, // Default to pending approval
       commentaire: JSON.stringify({
         anilistId: anilistAnime.id,
