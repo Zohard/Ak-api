@@ -406,6 +406,120 @@ export class AniListService {
     };
   }
 
+  async getAnimesBySeason(season: string, year: number, limit = 50): Promise<AniListAnime[]> {
+    const graphqlQuery = `
+      query ($season: MediaSeason, $year: Int, $perPage: Int) {
+        Page(page: 1, perPage: $perPage) {
+          media(season: $season, seasonYear: $year, type: ANIME, sort: [POPULARITY_DESC]) {
+            id
+            title {
+              romaji
+              english
+              native
+            }
+            description
+            seasonYear
+            episodes
+            duration
+            format
+            status
+            startDate {
+              year
+              month
+              day
+            }
+            endDate {
+              year
+              month
+              day
+            }
+            coverImage {
+              large
+              medium
+            }
+            bannerImage
+            genres
+            studios {
+              nodes {
+                id
+                name
+                isAnimationStudio
+              }
+            }
+            staff(perPage: 20) {
+              edges {
+                id
+                role
+                node {
+                  id
+                  name {
+                    full
+                  }
+                  primaryOccupations
+                }
+              }
+            }
+            characters(perPage: 20, sort: [ROLE, RELEVANCE, ID]) {
+              edges {
+                id
+                role
+                node {
+                  id
+                  name {
+                    full
+                  }
+                  image {
+                    large
+                  }
+                }
+                voiceActors(language: JAPANESE, sort: [RELEVANCE, ID]) {
+                  id
+                  name {
+                    full
+                  }
+                  language
+                  image {
+                    large
+                  }
+                }
+              }
+            }
+            externalLinks {
+              id
+              type
+              site
+              url
+            }
+            averageScore
+            meanScore
+            siteUrl
+          }
+        }
+      }
+    `;
+
+    try {
+      const response = await this.httpClient.post('', {
+        query: graphqlQuery,
+        variables: {
+          season: season.toUpperCase(),
+          year: year,
+          perPage: limit,
+        },
+      });
+
+      if (response.data.errors) {
+        this.logger.error('AniList API returned errors:', response.data.errors);
+        throw new Error('Failed to get seasonal anime from AniList');
+      }
+
+      return response.data.data.Page.media;
+    } catch (error) {
+      this.logger.error('Error fetching seasonal anime from AniList:', error.message);
+      throw new Error('Failed to connect to AniList API');
+    }
+  }
+
   private mapFormat(anilistFormat: string): string {
     const formatMap: Record<string, string> = {
       'TV': 'Série TV',
