@@ -183,8 +183,8 @@ export class AnimesController {
   @ApiQuery({
     name: 'limit',
     required: false,
-    description: 'Nombre maximum de résultats',
-    example: 50,
+    description: 'Nombre maximum de résultats (peut dépasser 50, utilise la pagination automatique)',
+    example: 200,
   })
   @ApiResponse({ status: 200, description: 'Animes de la saison avec comparaison base de données' })
   @ApiResponse({ status: 400, description: 'Paramètres invalides' })
@@ -198,7 +198,7 @@ export class AnimesController {
       throw new Error('Season must be one of: winter, spring, summer, fall');
     }
 
-    const parsedLimit = limit ? parseInt(limit) : 50;
+    const parsedLimit = limit ? parseInt(limit) : 100; // Increased default limit
     return this.animesService.importSeasonalAnimeFromAniList(season, year, parsedLimit);
   }
 
