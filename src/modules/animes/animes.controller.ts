@@ -166,6 +166,42 @@ export class AnimesController {
     return this.animesService.searchAniList(query, parsedLimit);
   }
 
+  @Get('anilist/season/:season/:year')
+  @ApiOperation({ summary: 'Import animes par saison depuis AniList' })
+  @ApiParam({
+    name: 'season',
+    description: 'Saison (winter, spring, summer, fall)',
+    example: 'fall',
+    enum: ['winter', 'spring', 'summer', 'fall'],
+  })
+  @ApiParam({
+    name: 'year',
+    description: 'Année',
+    example: 2024,
+    type: 'number',
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    description: 'Nombre maximum de résultats',
+    example: 50,
+  })
+  @ApiResponse({ status: 200, description: 'Animes de la saison avec comparaison base de données' })
+  @ApiResponse({ status: 400, description: 'Paramètres invalides' })
+  async getSeasonalAnimeFromAniList(
+    @Param('season') season: string,
+    @Param('year', ParseIntPipe) year: number,
+    @Query('limit') limit?: string,
+  ) {
+    const validSeasons = ['winter', 'spring', 'summer', 'fall'];
+    if (!validSeasons.includes(season.toLowerCase())) {
+      throw new Error('Season must be one of: winter, spring, summer, fall');
+    }
+
+    const parsedLimit = limit ? parseInt(limit) : 50;
+    return this.animesService.importSeasonalAnimeFromAniList(season, year, parsedLimit);
+  }
+
   @Get(':id/tags')
   @ApiOperation({ summary: 'Tags pour un anime spécifique' })
   @ApiParam({ name: 'id', description: "ID de l'anime", type: 'number' })

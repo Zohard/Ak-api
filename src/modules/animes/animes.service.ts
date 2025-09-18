@@ -582,6 +582,59 @@ export class AnimesService extends BaseContentService<
     }
   }
 
+  async importSeasonalAnimeFromAniList(season: string, year: number, limit = 50) {
+    try {
+      const seasonalAnime = await this.aniListService.getAnimesBySeason(season, year, limit);
+
+      const comparisons = [];
+
+      for (const anilistAnime of seasonalAnime) {
+        const primaryTitle = anilistAnime.title.romaji || anilistAnime.title.english || anilistAnime.title.native;
+
+        const existingAnime = await this.prisma.akAnime.findFirst({
+          where: {
+            OR: [
+              { titre: { equals: primaryTitle, mode: 'insensitive' } },
+              { titreOrig: { equals: anilistAnime.title.native, mode: 'insensitive' } },
+              { titreFr: { equals: anilistAnime.title.english, mode: 'insensitive' } },
+              { titresAlternatifs: { contains: primaryTitle, mode: 'insensitive' } },
+              { titresAlternatifs: { contains: anilistAnime.title.english, mode: 'insensitive' } },
+              { titresAlternatifs: { contains: anilistAnime.title.native, mode: 'insensitive' } },
+            ].filter(Boolean),
+          },
+          select: {
+            idAnime: true,
+            titre: true,
+            titreOrig: true,
+            titreFr: true,
+            titresAlternatifs: true,
+          },
+        });
+
+        const comparison = {
+          titre: primaryTitle,
+          exists: !!existingAnime,
+          existingAnimeId: existingAnime?.idAnime,
+          anilistData: anilistAnime,
+          scrapedData: this.aniListService.mapToCreateAnimeDto(anilistAnime),
+        };
+
+        comparisons.push(comparison);
+      }
+
+      return {
+        season,
+        year,
+        total: seasonalAnime.length,
+        comparisons,
+        source: 'AniList',
+      };
+    } catch (error) {
+      console.error('Error importing seasonal anime from AniList:', error.message);
+      throw new Error('Failed to import seasonal anime from AniList');
+    }
+  }
+
   async getAnimeTags(id: number) {
     return this.getTags(id, 'anime');
   }
