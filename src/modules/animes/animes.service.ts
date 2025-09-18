@@ -592,16 +592,26 @@ export class AnimesService extends BaseContentService<
       for (const anilistAnime of seasonalAnime) {
         const primaryTitle = anilistAnime.title.romaji || anilistAnime.title.english || anilistAnime.title.native;
 
+        const orConditions = [];
+
+        if (primaryTitle) {
+          orConditions.push({ titre: { equals: primaryTitle, mode: Prisma.QueryMode.insensitive } });
+          orConditions.push({ titresAlternatifs: { contains: primaryTitle, mode: Prisma.QueryMode.insensitive } });
+        }
+
+        if (anilistAnime.title.native) {
+          orConditions.push({ titreOrig: { equals: anilistAnime.title.native, mode: Prisma.QueryMode.insensitive } });
+          orConditions.push({ titresAlternatifs: { contains: anilistAnime.title.native, mode: Prisma.QueryMode.insensitive } });
+        }
+
+        if (anilistAnime.title.english) {
+          orConditions.push({ titreFr: { equals: anilistAnime.title.english, mode: Prisma.QueryMode.insensitive } });
+          orConditions.push({ titresAlternatifs: { contains: anilistAnime.title.english, mode: Prisma.QueryMode.insensitive } });
+        }
+
         const existingAnime = await this.prisma.akAnime.findFirst({
           where: {
-            OR: [
-              { titre: { equals: primaryTitle, mode: Prisma.QueryMode.insensitive } },
-              { titreOrig: { equals: anilistAnime.title.native, mode: Prisma.QueryMode.insensitive } },
-              { titreFr: { equals: anilistAnime.title.english, mode: Prisma.QueryMode.insensitive } },
-              { titresAlternatifs: { contains: primaryTitle, mode: Prisma.QueryMode.insensitive } },
-              { titresAlternatifs: { contains: anilistAnime.title.english, mode: Prisma.QueryMode.insensitive } },
-              { titresAlternatifs: { contains: anilistAnime.title.native, mode: Prisma.QueryMode.insensitive } },
-            ].filter(Boolean),
+            OR: orConditions,
           },
           select: {
             idAnime: true,
