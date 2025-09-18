@@ -407,9 +407,30 @@ export class AniListService {
   }
 
   async getAnimesBySeason(season: string, year: number, limit = 50): Promise<AniListAnime[]> {
+    const maxPerPage = 50; // AniList API limit
+    const totalPages = Math.ceil(limit / maxPerPage);
+    const allAnime: AniListAnime[] = [];
+
+    for (let page = 1; page <= totalPages; page++) {
+      const remainingItems = limit - allAnime.length;
+      const currentPageSize = Math.min(maxPerPage, remainingItems);
+
+      if (currentPageSize <= 0) break;
+
+      const pageAnime = await this.getAnimesPage(season, year, page, currentPageSize);
+      allAnime.push(...pageAnime);
+
+      // If we got fewer results than requested, we've reached the end
+      if (pageAnime.length < currentPageSize) break;
+    }
+
+    return allAnime.slice(0, limit);
+  }
+
+  private async getAnimesPage(season: string, year: number, page: number, perPage: number): Promise<AniListAnime[]> {
     const graphqlQuery = `
-      query ($season: MediaSeason, $year: Int, $perPage: Int) {
-        Page(page: 1, perPage: $perPage) {
+      query ($season: MediaSeason, $year: Int, $page: Int, $perPage: Int) {
+        Page(page: $page, perPage: $perPage) {
           media(season: $season, seasonYear: $year, type: ANIME, sort: [POPULARITY_DESC]) {
             id
             title {
@@ -504,7 +525,8 @@ export class AniListService {
         variables: {
           season: season.toUpperCase(),
           year: year,
-          perPage: limit,
+          page: page,
+          perPage: perPage,
         },
       });
 
