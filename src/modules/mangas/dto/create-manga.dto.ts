@@ -73,4 +73,12 @@ export class CreateMangaDto {
   @Min(0)
   @Max(2)
   statut?: number;
+
+  @ApiPropertyOptional({
+    description: 'ID AniList pour importer automatiquement les données',
+    example: 30011,
+  })
+  @IsOptional()
+  @IsNumber()
+  anilistId?: number;
 }

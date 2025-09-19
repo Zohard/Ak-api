@@ -11,6 +11,7 @@ import { UpdateMangaDto } from './dto/update-manga.dto';
 import { MangaQueryDto } from './dto/manga-query.dto';
 import { RelatedContentItem, RelationsResponse } from '../shared/types/relations.types';
 import { ImageKitService } from '../media/imagekit.service';
+import { AniListService } from '../anilist/anilist.service';
 
 @Injectable()
 export class MangasService extends BaseContentService<
@@ -23,6 +24,7 @@ export class MangasService extends BaseContentService<
     prisma: PrismaService,
     private readonly cacheService: CacheService,
     private readonly imageKitService: ImageKitService,
+    private readonly aniListService: AniListService,
   ) {
     super(prisma);
   }
@@ -64,11 +66,36 @@ export class MangasService extends BaseContentService<
   }
 
   async create(createMangaDto: CreateMangaDto, userId: number) {
+    // Merge with AniList if anilistId provided
+    let data: any = { ...createMangaDto };
+    if ((createMangaDto as any).anilistId) {
+      try {
+        const anilistId = Number((createMangaDto as any).anilistId);
+        const anilistManga = await this.aniListService.getMangaById(anilistId);
+        if (anilistManga) {
+          const anilistData = this.aniListService.mapToCreateMangaDto(anilistManga);
+          data = {
+            ...anilistData,
+            ...data,
+            commentaire: JSON.stringify({
+              ...(anilistData.commentaire ? JSON.parse(anilistData.commentaire) : {}),
+              anilistId,
+              originalData: anilistManga,
+            }),
+          };
+        }
+      } catch (error: any) {
+        console.warn(`Failed to fetch AniList manga for ID ${(createMangaDto as any).anilistId}:`, error.message);
+      }
+    }
+
+    delete (data as any).anilistId;
+
     const manga = await this.prisma.akManga.create({
       data: {
-        ...createMangaDto,
+        ...data,
         dateAjout: new Date(),
-        statut: createMangaDto.statut ?? 0,
+        statut: data.statut ?? 0,
       } as any,
       include: {
         reviews: {
@@ -292,9 +319,34 @@ export class MangasService extends BaseContentService<
       console.warn('Failed to delete previous ImageKit image (manga):', (e as Error).message);
     }
 
+    // Merge with AniList if anilistId provided in update
+    let updateData: any = { ...updateMangaDto };
+    if ((updateMangaDto as any).anilistId) {
+      try {
+        const anilistId = Number((updateMangaDto as any).anilistId);
+        const anilistManga = await this.aniListService.getMangaById(anilistId);
+        if (anilistManga) {
+          const anilistData = this.aniListService.mapToCreateMangaDto(anilistManga);
+          updateData = {
+            ...anilistData,
+            ...updateData,
+            commentaire: JSON.stringify({
+              ...(anilistData.commentaire ? JSON.parse(anilistData.commentaire) : {}),
+              anilistId,
+              originalData: anilistManga,
+            }),
+          };
+        }
+      } catch (error: any) {
+        console.warn(`Failed to fetch AniList manga for ID ${(updateMangaDto as any).anilistId}:`, error.message);
+      }
+    }
+
+    delete (updateData as any).anilistId;
+
     const updatedManga = await this.prisma.akManga.update({
       where: { idManga: id },
-      data: updateMangaDto,
+      data: updateData,
       include: {
         reviews: {
           include: {
@@ -382,6 +434,28 @@ export class MangasService extends BaseContentService<
     await this.cacheService.setTopContent('manga', limit, result, 900);
 
     return result;
+  }
+
+  async searchAniList(query: string, limit = 10) {
+    try {
+      const cacheKey = `anilist_manga_search:${this.hashQuery(query)}:${limit}`;
+      const cached = await this.cacheService.get(cacheKey);
+      if (cached) return cached;
+
+      const results = await this.aniListService.searchManga(query, limit);
+      const result = {
+        mangas: results,
+        total: results.length,
+        query,
+        source: 'AniList',
+      };
+
+      await this.cacheService.set(cacheKey, result, 7200);
+      return result;
+    } catch (error: any) {
+      console.error('Error searching AniList (manga):', error.message);
+      throw new Error('Failed to search AniList for manga');
+    }
   }
 
   // Use inherited autocomplete() method
@@ -620,5 +694,16 @@ export class MangasService extends BaseContentService<
     await this.cacheService.invalidateManga(id);
     // Also invalidate related caches
     await this.cacheService.invalidateSearchCache();
+  }
+
+  // Utility method to create consistent cache keys
+  private hashQuery(query: string): string {
+    let hash = 0;
+    for (let i = 0; i < query.length; i++) {
+      const char = query.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash;
+    }
+    return Math.abs(hash).toString(36);
   }
 }

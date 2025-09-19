@@ -119,6 +119,19 @@ export class MangasController {
     return this.mangasService.autocomplete(query, exclude, parsedLimit);
   }
 
+  @Get('anilist/search')
+  @ApiOperation({ summary: 'Recherche mangas sur AniList' })
+  @ApiQuery({ name: 'q', required: true, description: 'Terme de recherche', example: 'one piece' })
+  @ApiQuery({ name: 'limit', required: false, description: 'Nombre maximum de résultats', example: 10 })
+  @ApiResponse({ status: 200, description: 'Résultats de la recherche AniList' })
+  async searchAniList(
+    @Query('q') query: string,
+    @Query('limit') limit?: string,
+  ) {
+    const parsedLimit = limit ? parseInt(limit) : 10;
+    return this.mangasService.searchAniList(query, parsedLimit);
+  }
+
   @Get(':id/tags')
   @ApiOperation({ summary: 'Tags pour un manga spécifique' })
   @ApiParam({ name: 'id', description: 'ID du manga', type: 'number' })

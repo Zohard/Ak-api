@@ -88,6 +88,30 @@ export interface AniListAnime {
   siteUrl: string;
 }
 
+export interface AniListManga {
+  id: number;
+  title: { romaji: string; english?: string; native: string };
+  description?: string;
+  startDate?: { year?: number; month?: number; day?: number };
+  endDate?: { year?: number; month?: number; day?: number };
+  coverImage: { large: string; medium: string };
+  bannerImage?: string;
+  genres: string[];
+  chapters?: number;
+  volumes?: number;
+  staff: {
+    edges: Array<{
+      id: number;
+      role: string;
+      node: { id: number; name: { full: string }; primaryOccupations: string[] };
+    }>;
+  };
+  externalLinks: Array<{ id: number; type: string; site: string; url: string }>;
+  averageScore?: number;
+  meanScore?: number;
+  siteUrl: string;
+}
+
 export interface AniListSearchResult {
   data: {
     Page: {
@@ -691,6 +715,145 @@ export class AniListService {
       denomination: anilistStudio.name,
       type: 'Studio',
       siteOfficiel: anilistStudio.siteUrl,
+    };
+  }
+
+  async searchManga(query: string, limit = 10): Promise<AniListManga[]> {
+    const graphqlQuery = `
+      query ($search: String, $perPage: Int) {
+        Page(page: 1, perPage: $perPage) {
+          media(search: $search, type: MANGA) {
+            id
+            title { romaji english native }
+            description
+            startDate { year month day }
+            endDate { year month day }
+            coverImage { large medium }
+            bannerImage
+            genres
+            chapters
+            volumes
+            staff(perPage: 25) {
+              edges {
+                id
+                role
+                node { id name { full } primaryOccupations }
+              }
+            }
+            externalLinks { id type site url }
+            averageScore
+            meanScore
+            siteUrl
+          }
+        }
+      }
+    `;
+
+    try {
+      const response = await this.httpClient.post('', {
+        query: graphqlQuery,
+        variables: { search: query, perPage: limit },
+      });
+
+      if (response.data.errors) {
+        this.logger.error('AniList API returned errors:', response.data.errors);
+        throw new Error('Failed to search manga on AniList');
+      }
+
+      return response.data.data.Page.media;
+    } catch (error: any) {
+      this.logger.error('Error searching manga on AniList:', error.message);
+      throw new Error('Failed to connect to AniList API');
+    }
+  }
+
+  async getMangaById(anilistId: number): Promise<AniListManga | null> {
+    const graphqlQuery = `
+      query ($id: Int) {
+        Media(id: $id, type: MANGA) {
+          id
+          title { romaji english native }
+          description
+          startDate { year month day }
+          endDate { year month day }
+          coverImage { large medium }
+          bannerImage
+          genres
+          chapters
+          volumes
+          staff(perPage: 30) {
+            edges {
+              id
+              role
+              node { id name { full } primaryOccupations }
+            }
+          }
+          externalLinks { id type site url }
+          averageScore
+          meanScore
+          siteUrl
+        }
+      }
+    `;
+
+    try {
+      const response = await this.httpClient.post('', {
+        query: graphqlQuery,
+        variables: { id: anilistId },
+      });
+
+      if (response.data.errors) {
+        this.logger.error('AniList API returned errors:', response.data.errors);
+        return null;
+      }
+
+      return response.data.data.Media;
+    } catch (error: any) {
+      this.logger.error('Error fetching manga from AniList:', error.message);
+      return null;
+    }
+  }
+
+  mapToCreateMangaDto(anilistManga: AniListManga): Partial<any> {
+    const authors = anilistManga.staff?.edges
+      ?.filter(edge => {
+        const role = (edge.role || '').toLowerCase();
+        const occ = (edge.node.primaryOccupations || []).map(o => o.toLowerCase());
+        return (
+          role.includes('story') ||
+          role.includes('original') ||
+          role.includes('author') ||
+          occ.includes('mangaka') ||
+          occ.includes('author')
+        );
+      })
+      ?.map(edge => edge.node.name.full)
+      ?.join(', ') || '';
+
+    const officialWebsite = anilistManga.externalLinks?.find(link =>
+      link.site?.toLowerCase().includes('official') || link.type === 'INFO'
+    )?.url || '';
+
+    return {
+      titre: anilistManga.title.romaji || anilistManga.title.english || anilistManga.title.native,
+      annee: anilistManga.startDate?.year ? String(anilistManga.startDate.year) : undefined,
+      synopsis: anilistManga.description,
+      image: anilistManga.coverImage?.large || anilistManga.coverImage?.medium,
+      auteur: authors,
+      nbVolumes: anilistManga.volumes ? String(anilistManga.volumes) : undefined,
+      statut: 0,
+      commentaire: JSON.stringify({
+        anilistId: anilistManga.id,
+        originalData: {
+          chapters: anilistManga.chapters,
+          volumes: anilistManga.volumes,
+          genres: anilistManga.genres,
+          bannerImage: anilistManga.bannerImage,
+          description: anilistManga.description,
+          siteUrl: anilistManga.siteUrl,
+          officialSite: officialWebsite,
+        },
+      }),
     };
   }
 
