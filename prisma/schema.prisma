@@ -187,7 +187,7 @@ model AkBusiness {
   idBusiness            Int       @id @default(autoincrement()) @map("id_business")
   niceUrl               String?   @map("nice_url") @db.VarChar(255)
   type                  String?   @db.VarChar(255)
-  denomination          String?   @db.VarChar(255)
+  denomination          String?   @unique @db.VarChar(255)
   autresDenominations   String?   @map("autres_denominations") @db.Text
   image                 String?   @db.VarChar(255)
   date                  String?   @db.VarChar(255)
