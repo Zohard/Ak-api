@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../shared/services/prisma.service';
 import { CreateBusinessDto } from './dto/create-business.dto';
 import { UpdateBusinessDto } from './dto/update-business.dto';
@@ -11,6 +11,17 @@ export class BusinessService {
   constructor(private readonly prisma: PrismaService, private readonly imageKitService: ImageKitService) {}
 
   async create(createBusinessDto: CreateBusinessDto) {
+    // Check if denomination already exists
+    if (createBusinessDto.denomination) {
+      const existingBusiness = await this.prisma.akBusiness.findUnique({
+        where: { denomination: createBusinessDto.denomination },
+      });
+
+      if (existingBusiness) {
+        throw new BadRequestException(`Une entité business avec la dénomination "${createBusinessDto.denomination}" existe déjà`);
+      }
+    }
+
     const business = await this.prisma.akBusiness.create({
       data: {
         ...createBusinessDto,
@@ -93,6 +104,17 @@ export class BusinessService {
 
     if (!existingBusiness) {
       throw new NotFoundException('Entité business introuvable');
+    }
+
+    // Check if denomination is being changed and if it already exists
+    if (updateBusinessDto.denomination && updateBusinessDto.denomination !== existingBusiness.denomination) {
+      const denominationExists = await this.prisma.akBusiness.findUnique({
+        where: { denomination: updateBusinessDto.denomination },
+      });
+
+      if (denominationExists) {
+        throw new BadRequestException(`Une entité business avec la dénomination "${updateBusinessDto.denomination}" existe déjà`);
+      }
     }
 
     // Attempt to delete old ImageKit image if being replaced

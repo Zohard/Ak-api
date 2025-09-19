@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../../shared/services/prisma.service';
 import { AdminBusinessListQueryDto, CreateAdminBusinessDto, UpdateAdminBusinessDto } from './dto/admin-business.dto';
 
@@ -28,6 +28,17 @@ export class AdminBusinessService {
   }
 
   async create(dto: CreateAdminBusinessDto) {
+    // Check if denomination already exists
+    if (dto.denomination) {
+      const existingBusiness = await this.prisma.akBusiness.findUnique({
+        where: { denomination: dto.denomination },
+      });
+
+      if (existingBusiness) {
+        throw new BadRequestException(`Une entité business avec la dénomination "${dto.denomination}" existe déjà`);
+      }
+    }
+
     const data: any = { ...dto };
     if (!data.niceUrl && data.denomination) data.niceUrl = this.slugify(data.denomination);
     return this.prisma.akBusiness.create({ data });
@@ -36,6 +47,18 @@ export class AdminBusinessService {
   async update(id: number, dto: UpdateAdminBusinessDto) {
     const existing = await this.prisma.akBusiness.findUnique({ where: { idBusiness: id } });
     if (!existing) throw new NotFoundException('Fiche business introuvable');
+
+    // Check if denomination is being changed and if it already exists
+    if (dto.denomination && dto.denomination !== existing.denomination) {
+      const denominationExists = await this.prisma.akBusiness.findUnique({
+        where: { denomination: dto.denomination },
+      });
+
+      if (denominationExists) {
+        throw new BadRequestException(`Une entité business avec la dénomination "${dto.denomination}" existe déjà`);
+      }
+    }
+
     const data: any = { ...dto };
     if (dto.denomination && !dto.niceUrl) data.niceUrl = this.slugify(dto.denomination);
     return this.prisma.akBusiness.update({ where: { idBusiness: id }, data });
