@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../../shared/services/prisma.service';
+import { ImageKitService } from '../../media/imagekit.service';
 import {
   AdminMangaListQueryDto,
   CreateAdminMangaDto,
@@ -8,7 +9,10 @@ import {
 
 @Injectable()
 export class AdminMangasService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private imageKitService: ImageKitService,
+  ) {}
 
   async list(query: AdminMangaListQueryDto) {
     const { page = 1, limit = 20, search, annee, editeur, statut } = query;
@@ -72,6 +76,48 @@ export class AdminMangasService {
     if (!existing) throw new NotFoundException('Manga introuvable');
     await this.prisma.akManga.delete({ where: { idManga: id } });
     return { message: 'Manga supprimé' };
+  }
+
+  async importMangaImage(
+    imageUrl: string,
+    mangaTitle: string
+  ): Promise<{ success: boolean; imageKitUrl?: string; filename?: string; error?: string }> {
+    try {
+      if (!imageUrl || !imageUrl.trim()) {
+        return { success: false, error: 'No image URL provided' };
+      }
+
+      // Generate a clean filename from the manga title
+      const cleanTitle = mangaTitle
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/(^-|-$)+/g, '')
+        .substring(0, 50);
+
+      const timestamp = Date.now();
+      const filename = `${cleanTitle}-${timestamp}`;
+
+      // Use ImageKit service to upload from URL
+      const result = await this.imageKitService.uploadImageFromUrl(
+        imageUrl,
+        filename,
+        'images/mangas' // Store in mangas folder
+      );
+
+      return {
+        success: true,
+        imageKitUrl: result.url,
+        filename: result.filename, // Store the filename for database
+      };
+    } catch (error) {
+      console.warn('Failed to import manga image:', error.message);
+      return {
+        success: false,
+        error: error.message,
+      };
+    }
   }
 
   private slugify(text: string) {
