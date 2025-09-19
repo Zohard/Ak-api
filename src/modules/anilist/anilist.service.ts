@@ -733,7 +733,7 @@ export class AniListService {
             genres
             chapters
             volumes
-            staff(perPage: 25) {
+            staff(perPage: 30) {
               edges {
                 id
                 role
@@ -781,7 +781,7 @@ export class AniListService {
           genres
           chapters
           volumes
-          staff(perPage: 30) {
+          staff(perPage: 50) {
             edges {
               id
               role
@@ -815,43 +815,84 @@ export class AniListService {
   }
 
   mapToCreateMangaDto(anilistManga: AniListManga): Partial<any> {
-    const authors = anilistManga.staff?.edges
-      ?.filter(edge => {
-        const role = (edge.role || '').toLowerCase();
-        const occ = (edge.node.primaryOccupations || []).map(o => o.toLowerCase());
-        return (
-          role.includes('story') ||
-          role.includes('original') ||
-          role.includes('author') ||
-          occ.includes('mangaka') ||
-          occ.includes('author')
-        );
-      })
-      ?.map(edge => edge.node.name.full)
-      ?.join(', ') || '';
+    // Map staff roles to traditional functions
+    const staffMapping = (anilistManga.staff?.edges || []).reduce((acc: any, edge: any) => {
+      const role = String(edge.role || '').toLowerCase();
+      const name = edge.node?.name?.full;
+      const occupations = (edge.node.primaryOccupations || []).map((o: string) => o.toLowerCase());
 
-    const officialWebsite = anilistManga.externalLinks?.find(link =>
-      link.site?.toLowerCase().includes('official') || link.type === 'INFO'
-    )?.url || '';
+      if (!name) return acc;
+
+      // Map to traditional functions
+      if (role.includes('story') || role.includes('original creator') || occupations.includes('author')) {
+        if (!acc.auteur) acc.auteur = [];
+        if (role.includes('original') || occupations.includes('author')) {
+          acc.auteur.push({ name, role: 'Auteur' });
+        } else {
+          acc.auteur.push({ name, role: 'Scénariste' });
+        }
+      } else if (role.includes('art') || occupations.includes('mangaka') || occupations.includes('artist')) {
+        if (!acc.dessinateur) acc.dessinateur = [];
+        acc.dessinateur.push({ name, role: 'Dessinateur' });
+      } else if (role.includes('assistant')) {
+        if (!acc.assistance) acc.assistance = [];
+        acc.assistance.push({ name, role: 'Assistance' });
+      }
+
+      return acc;
+    }, {});
+
+    // Get publisher from external links or staff
+    const publishers = (anilistManga.staff?.edges || [])
+      .filter((edge: any) => {
+        const role = String(edge.role || '').toLowerCase();
+        return role.includes('publisher') || role.includes('serialization');
+      })
+      .map((edge: any) => edge.node?.name?.full)
+      .filter(Boolean);
+
+    // Get official website (not AniList URL)
+    const officialWebsite = (anilistManga.externalLinks || [])
+      .find((link: any) =>
+        link.site?.toLowerCase().includes('official') ||
+        link.type === 'INFO' ||
+        link.site?.toLowerCase().includes('website')
+      )?.url || '';
+
+    const staffData = {
+      ...staffMapping,
+      ...(publishers.length > 0 && { publisher: publishers })
+    };
 
     return {
       titre: anilistManga.title.romaji || anilistManga.title.english || anilistManga.title.native,
+      titreOriginal: anilistManga.title.native,
+      titreFrancais: anilistManga.title.english,
+      titresAlternatifs: [
+        anilistManga.title.native,
+        anilistManga.title.romaji,
+        anilistManga.title.english,
+      ]
+        .filter(Boolean)
+        .filter((title, index, arr) => arr.indexOf(title) === index)
+        .join('\n'),
       annee: anilistManga.startDate?.year ? String(anilistManga.startDate.year) : undefined,
-      synopsis: anilistManga.description,
       image: anilistManga.coverImage?.large || anilistManga.coverImage?.medium,
-      auteur: authors,
       nbVolumes: anilistManga.volumes ? String(anilistManga.volumes) : undefined,
+      siteOfficiel: officialWebsite,
       statut: 0,
       commentaire: JSON.stringify({
         anilistId: anilistManga.id,
+        source: 'AniList',
+        genres: anilistManga.genres,
+        score: anilistManga.averageScore,
+        staff: staffData,
         originalData: {
           chapters: anilistManga.chapters,
           volumes: anilistManga.volumes,
-          genres: anilistManga.genres,
           bannerImage: anilistManga.bannerImage,
-          description: anilistManga.description,
           siteUrl: anilistManga.siteUrl,
-          officialSite: officialWebsite,
+          officialWebsite,
         },
       }),
     };
