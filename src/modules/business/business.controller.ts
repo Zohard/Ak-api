@@ -33,6 +33,7 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { AdminGuard } from '../../common/guards/admin.guard';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ImageKitService } from '../media/imagekit.service';
+import { AniListService } from '../anilist/anilist.service';
 
 @ApiTags('Business')
 @Controller('business')
@@ -40,6 +41,7 @@ export class BusinessController {
   constructor(
     private readonly businessService: BusinessService,
     private readonly imageKitService: ImageKitService,
+    private readonly aniListService: AniListService,
   ) {}
 
   @Get('search')
@@ -210,5 +212,111 @@ export class BusinessController {
     const updated = await this.businessService.update(id, { image: result.url });
 
     return { message: 'Image uploaded', url: result.url, business: updated };
+  }
+
+  @Get('anilist/staff/search')
+  @ApiOperation({
+    summary: 'Search staff on AniList by name',
+    description: 'Search for staff members on AniList by name for import'
+  })
+  @ApiQuery({
+    name: 'q',
+    required: true,
+    description: 'Staff name to search',
+    example: 'Hayao Miyazaki'
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    description: 'Maximum number of results',
+    example: 10
+  })
+  @ApiResponse({ status: 200, description: 'Staff search results from AniList' })
+  async searchAniListStaff(
+    @Query('q') query: string,
+    @Query('limit') limit?: number
+  ) {
+    return this.aniListService.searchStaff(query, limit);
+  }
+
+  @Get('anilist/studios/search')
+  @ApiOperation({
+    summary: 'Search studios on AniList by name',
+    description: 'Search for studios on AniList by name for import'
+  })
+  @ApiQuery({
+    name: 'q',
+    required: true,
+    description: 'Studio name to search',
+    example: 'Studio Ghibli'
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    description: 'Maximum number of results',
+    example: 10
+  })
+  @ApiResponse({ status: 200, description: 'Studio search results from AniList' })
+  async searchAniListStudios(
+    @Query('q') query: string,
+    @Query('limit') limit?: number
+  ) {
+    return this.aniListService.searchStudios(query, limit);
+  }
+
+  @Post('import/anilist/staff/:id')
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Import staff from AniList by ID (Admin only)',
+    description: 'Import a staff member from AniList and create as business entity'
+  })
+  @ApiParam({
+    name: 'id',
+    description: 'AniList staff ID',
+    type: 'number'
+  })
+  @ApiResponse({ status: 201, description: 'Staff imported successfully' })
+  @ApiResponse({ status: 404, description: 'Staff not found on AniList' })
+  @ApiResponse({ status: 403, description: 'Admin access required' })
+  async importStaffFromAniList(@Param('id', ParseIntPipe) anilistId: number) {
+    const staffResults = await this.aniListService.searchStaff(`id:${anilistId}`, 1);
+
+    if (!staffResults || staffResults.length === 0) {
+      throw new BadRequestException('Staff not found on AniList');
+    }
+
+    const staff = staffResults[0];
+    const businessDto = this.aniListService.mapStaffToCreateBusinessDto(staff);
+
+    return this.businessService.create(businessDto);
+  }
+
+  @Post('import/anilist/studio/:id')
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Import studio from AniList by ID (Admin only)',
+    description: 'Import a studio from AniList and create as business entity'
+  })
+  @ApiParam({
+    name: 'id',
+    description: 'AniList studio ID',
+    type: 'number'
+  })
+  @ApiResponse({ status: 201, description: 'Studio imported successfully' })
+  @ApiResponse({ status: 404, description: 'Studio not found on AniList' })
+  @ApiResponse({ status: 403, description: 'Admin access required' })
+  async importStudioFromAniList(@Param('id', ParseIntPipe) anilistId: number) {
+    const studioResults = await this.aniListService.searchStudios(`id:${anilistId}`, 1);
+
+    if (!studioResults || studioResults.length === 0) {
+      throw new BadRequestException('Studio not found on AniList');
+    }
+
+    const studio = studioResults[0];
+    const businessDto = this.aniListService.mapStudioToCreateBusinessDto(studio);
+
+    return this.businessService.create(businessDto);
   }
 }

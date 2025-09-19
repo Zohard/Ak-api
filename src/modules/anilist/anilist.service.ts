@@ -95,6 +95,52 @@ export interface AniListSearchResult {
   };
 }
 
+export interface AniListStaff {
+  id: number;
+  name: {
+    full: string;
+    native?: string;
+  };
+  image: {
+    large: string;
+    medium: string;
+  };
+  description?: string;
+  primaryOccupations: string[];
+  dateOfBirth?: {
+    year?: number;
+    month?: number;
+    day?: number;
+  };
+  homeTown?: string;
+  bloodType?: string;
+  siteUrl: string;
+}
+
+export interface AniListStudio {
+  id: number;
+  name: string;
+  isAnimationStudio: boolean;
+  favourites: number;
+  siteUrl: string;
+}
+
+export interface AniListStaffSearchResult {
+  data: {
+    Page: {
+      staff: AniListStaff[];
+    };
+  };
+}
+
+export interface AniListStudioSearchResult {
+  data: {
+    Page: {
+      studios: AniListStudio[];
+    };
+  };
+}
+
 @Injectable()
 export class AniListService {
   private readonly logger = new Logger(AniListService.name);
@@ -540,6 +586,124 @@ export class AniListService {
       this.logger.error('Error fetching seasonal anime from AniList:', error.message);
       throw new Error('Failed to connect to AniList API');
     }
+  }
+
+  async searchStaff(query: string, limit = 10): Promise<AniListStaff[]> {
+    const graphqlQuery = `
+      query ($search: String, $perPage: Int) {
+        Page(page: 1, perPage: $perPage) {
+          staff(search: $search) {
+            id
+            name {
+              full
+              native
+            }
+            image {
+              large
+              medium
+            }
+            description
+            primaryOccupations
+            dateOfBirth {
+              year
+              month
+              day
+            }
+            homeTown
+            bloodType
+            siteUrl
+          }
+        }
+      }
+    `;
+
+    try {
+      const response = await this.httpClient.post('', {
+        query: graphqlQuery,
+        variables: {
+          search: query,
+          perPage: limit,
+        },
+      });
+
+      if (response.data.errors) {
+        this.logger.error('AniList API returned errors:', response.data.errors);
+        throw new Error('Failed to search staff on AniList');
+      }
+
+      return response.data.data.Page.staff;
+    } catch (error) {
+      this.logger.error('Error searching staff on AniList:', error.message);
+      throw new Error('Failed to connect to AniList API');
+    }
+  }
+
+  async searchStudios(query: string, limit = 10): Promise<AniListStudio[]> {
+    const graphqlQuery = `
+      query ($search: String, $perPage: Int) {
+        Page(page: 1, perPage: $perPage) {
+          studios(search: $search) {
+            id
+            name
+            isAnimationStudio
+            favourites
+            siteUrl
+          }
+        }
+      }
+    `;
+
+    try {
+      const response = await this.httpClient.post('', {
+        query: graphqlQuery,
+        variables: {
+          search: query,
+          perPage: limit,
+        },
+      });
+
+      if (response.data.errors) {
+        this.logger.error('AniList API returned errors:', response.data.errors);
+        throw new Error('Failed to search studios on AniList');
+      }
+
+      return response.data.data.Page.studios;
+    } catch (error) {
+      this.logger.error('Error searching studios on AniList:', error.message);
+      throw new Error('Failed to connect to AniList API');
+    }
+  }
+
+  mapStaffToCreateBusinessDto(anilistStaff: AniListStaff): Partial<any> {
+    return {
+      denomination: anilistStaff.name.full,
+      denominationOrig: anilistStaff.name.native || anilistStaff.name.full,
+      type: 'Personne',
+      image: anilistStaff.image?.large || anilistStaff.image?.medium,
+      descr: anilistStaff.description,
+      officialSite: anilistStaff.siteUrl,
+      commentaire: JSON.stringify({
+        anilistId: anilistStaff.id,
+        primaryOccupations: anilistStaff.primaryOccupations,
+        dateOfBirth: anilistStaff.dateOfBirth,
+        homeTown: anilistStaff.homeTown,
+        bloodType: anilistStaff.bloodType,
+      }),
+    };
+  }
+
+  mapStudioToCreateBusinessDto(anilistStudio: AniListStudio): Partial<any> {
+    return {
+      denomination: anilistStudio.name,
+      denominationOrig: anilistStudio.name,
+      type: 'Studio',
+      officialSite: anilistStudio.siteUrl,
+      commentaire: JSON.stringify({
+        anilistId: anilistStudio.id,
+        isAnimationStudio: anilistStudio.isAnimationStudio,
+        favourites: anilistStudio.favourites,
+      }),
+    };
   }
 
   private mapFormat(anilistFormat: string): string {
