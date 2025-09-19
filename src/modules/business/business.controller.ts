@@ -67,6 +67,17 @@ export class BusinessController {
     return this.businessService.search(searchDto);
   }
 
+  @Post('search')
+  @ApiOperation({
+    summary: "Recherche d'entités business via POST (pas d'auth requise)",
+    description:
+      'Endpoint public pour rechercher des entités business par dénomination via POST',
+  })
+  @ApiResponse({ status: 200, description: 'Résultats de recherche business' })
+  async searchPost(@Body() searchDto: BusinessSearchDto) {
+    return this.businessService.search(searchDto);
+  }
+
   @Post(':id/clicks')
   @ApiOperation({
     summary:
