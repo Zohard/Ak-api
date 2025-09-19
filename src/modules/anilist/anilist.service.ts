@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import axios, { AxiosInstance } from 'axios';
+import { CreateBusinessDto } from '../business/dto/create-business.dto';
 
 export interface AniListAnime {
   id: number;
@@ -674,7 +675,7 @@ export class AniListService {
     }
   }
 
-  mapStaffToCreateBusinessDto(anilistStaff: AniListStaff): Partial<any> {
+  mapStaffToCreateBusinessDto(anilistStaff: AniListStaff): CreateBusinessDto {
     return {
       denomination: anilistStaff.name.full,
       denominationOrig: anilistStaff.name.native || anilistStaff.name.full,
@@ -692,7 +693,7 @@ export class AniListService {
     };
   }
 
-  mapStudioToCreateBusinessDto(anilistStudio: AniListStudio): Partial<any> {
+  mapStudioToCreateBusinessDto(anilistStudio: AniListStudio): CreateBusinessDto {
     return {
       denomination: anilistStudio.name,
       denominationOrig: anilistStudio.name,
