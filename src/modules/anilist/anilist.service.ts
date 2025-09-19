@@ -678,32 +678,19 @@ export class AniListService {
   mapStaffToCreateBusinessDto(anilistStaff: AniListStaff): CreateBusinessDto {
     return {
       denomination: anilistStaff.name.full,
-      denominationOrig: anilistStaff.name.native || anilistStaff.name.full,
+      autresDenominations: anilistStaff.name.native || anilistStaff.name.full,
       type: 'Personne',
       image: anilistStaff.image?.large || anilistStaff.image?.medium,
-      descr: anilistStaff.description,
-      officialSite: anilistStaff.siteUrl,
-      commentaire: JSON.stringify({
-        anilistId: anilistStaff.id,
-        primaryOccupations: anilistStaff.primaryOccupations,
-        dateOfBirth: anilistStaff.dateOfBirth,
-        homeTown: anilistStaff.homeTown,
-        bloodType: anilistStaff.bloodType,
-      }),
+      notes: anilistStaff.description,
+      siteOfficiel: anilistStaff.siteUrl,
     };
   }
 
   mapStudioToCreateBusinessDto(anilistStudio: AniListStudio): CreateBusinessDto {
     return {
       denomination: anilistStudio.name,
-      denominationOrig: anilistStudio.name,
       type: 'Studio',
-      officialSite: anilistStudio.siteUrl,
-      commentaire: JSON.stringify({
-        anilistId: anilistStudio.id,
-        isAnimationStudio: anilistStudio.isAnimationStudio,
-        favourites: anilistStudio.favourites,
-      }),
+      siteOfficiel: anilistStudio.siteUrl,
     };
   }
 
