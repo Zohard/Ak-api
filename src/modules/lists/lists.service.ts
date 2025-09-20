@@ -160,18 +160,44 @@ export class ListsService {
     return result;
   }
   async getPublicListsPaged(mediaType: 'anime' | 'manga', sort: 'recent' | 'popular' = 'recent', type?: 'liste' | 'top', page = 1, limit = 30) {
-    const where: any = { statut: 1, animeOrManga: mediaType, ...(type ? { type } : {}) };
+    // Check cache first
+    const cachedResult = await this.cacheService.getPublicListsPaged(mediaType, sort, type || '', page, limit);
+    if (cachedResult) {
+      return cachedResult;
+    }
+
+    const where: any = {
+      statut: 1,
+      animeOrManga: mediaType,
+      ...(type ? { type } : {}),
+      membre: { isNot: null }
+    };
     const skip = (page - 1) * limit;
     const orderBy: any = sort === 'recent'
       ? { dateCreation: 'desc' }
       : [{ popularite: 'desc' }, { dateCreation: 'desc' }];
     const [total, rows] = await Promise.all([
       this.prisma.akListesTop.count({ where }),
-      this.prisma.akListesTop.findMany({ where, orderBy, skip, take: limit, include: { membre: { select: { idMember: true, memberName: true } } } }),
+      this.prisma.akListesTop.findMany({
+        where,
+        orderBy,
+        skip,
+        take: limit,
+        include: {
+          membre: {
+            select: { idMember: true, memberName: true }
+          }
+        }
+      }),
     ]);
     const items = rows.map((r) => this.formatList(r));
     const totalPages = Math.max(Math.ceil(total / limit), 1);
-    return { items, page, limit, total, totalPages };
+    const result = { items, page, limit, total, totalPages };
+
+    // Cache the result for 5 minutes
+    await this.cacheService.setPublicListsPaged(mediaType, sort, type || '', page, limit, result);
+
+    return result;
   }
 
   async getById(id: number) {
