@@ -22,7 +22,7 @@ import { CreateCollectionDto } from './dto/create-collection.dto';
 import { CollectionQueryDto } from './dto/collection-query.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { ImportMalDto } from './dto/import-mal.dto';
-import { Response } from 'express';
+import type { Response } from 'express';
 
 @ApiTags('collections')
 @Controller('collections')
