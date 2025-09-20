@@ -198,9 +198,23 @@ export class CacheService implements OnModuleInit {
     this.logger.debug('Search cache invalidation requested');
   }
 
+  // Paginated lists cache methods
+  async getPublicListsPaged(mediaType: string, sort: string, type: string, page: number, limit: number): Promise<any> {
+    const key = `lists_paged:${mediaType}:${sort}:${type || 'all'}:${page}:${limit}`;
+    return this.get(key);
+  }
+
+  async setPublicListsPaged(mediaType: string, sort: string, type: string, page: number, limit: number, lists: any, ttl = 300): Promise<void> {
+    const key = `lists_paged:${mediaType}:${sort}:${type || 'all'}:${page}:${limit}`;
+    await this.set(key, lists, ttl); // 5 minutes
+  }
+
   async invalidatePublicLists(mediaType: 'anime' | 'manga'): Promise<void> {
     // Invalidate all cached public lists for this media type
-    await this.delByPattern(`lists:${mediaType}:*`);
+    await Promise.all([
+      this.delByPattern(`lists:${mediaType}:*`),
+      this.delByPattern(`lists_paged:${mediaType}:*`)
+    ]);
     this.logger.debug(`Invalidated public lists cache for ${mediaType}`);
   }
 
