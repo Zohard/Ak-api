@@ -11,6 +11,7 @@ import {
   Request,
   HttpCode,
   HttpStatus,
+  Res,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam, ApiQuery } from '@nestjs/swagger';
 import { CollectionsService } from './collections.service';
@@ -20,6 +21,8 @@ import { AddToCollectionDto } from './dto/add-to-collection.dto';
 import { CreateCollectionDto } from './dto/create-collection.dto';
 import { CollectionQueryDto } from './dto/collection-query.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { ImportMalDto } from './dto/import-mal.dto';
+import { Response } from 'express';
 
 @ApiTags('collections')
 @Controller('collections')
@@ -143,6 +146,34 @@ export class CollectionsController {
       mediaId,
       mediaType,
     );
+  }
+
+  @Post('import/mal')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Import MAL list (client-parsed XML as JSON)' })
+  @ApiResponse({ status: 200, description: 'Import processed with summary' })
+  async importFromMal(@Body() body: ImportMalDto, @Request() req) {
+    return this.collectionsService.importFromMAL(req.user.id, body.items || []);
+  }
+
+  @Get('export/mal')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Export collections in MAL XML format' })
+  @ApiQuery({ name: 'mediaType', required: false, enum: ['anime', 'manga'], description: 'Type of media to export. Default: anime' })
+  @ApiResponse({ status: 200, description: 'MAL XML exported' })
+  async exportToMal(
+    @Query('mediaType') mediaType: 'anime' | 'manga' = 'anime',
+    @Request() req,
+    @Res() res: Response,
+  ) {
+    const xml = await this.collectionsService.exportToMAL(req.user.id, mediaType);
+    const ts = Math.floor(Date.now() / 1000);
+    const filename = `${mediaType === 'anime' ? 'animelist' : 'mangalist'}_${ts}_-_${req.user.id}.xml`;
+    res.setHeader('Content-Type', 'application/xml; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(xml);
   }
 
   @Get()
