@@ -77,6 +77,7 @@ export class ReviewsService {
             idMember: true,
             memberName: true,
             avatar: true,
+            _count: { select: { reviews: { where: { statut: 0 } } } },
           },
         },
         anime: idAnime
@@ -290,15 +291,16 @@ export class ReviewsService {
 
     const review = await this.prisma.akCritique.findUnique({
       where: { idCritique: id },
-      include: {
-        membre: {
-          select: {
-            idMember: true,
-            memberName: true,
-            avatar: true,
-            realName: true,
+        include: {
+          membre: {
+            select: {
+              idMember: true,
+              memberName: true,
+              avatar: true,
+              realName: true,
+              _count: { select: { reviews: { where: { statut: 0 } } } },
+            },
           },
-        },
         anime: {
           select: {
             idAnime: true,
@@ -341,6 +343,7 @@ export class ReviewsService {
             memberName: true,
             avatar: true,
             realName: true,
+            _count: { select: { reviews: { where: { statut: 0 } } } },
           },
         },
         anime: {
@@ -403,6 +406,7 @@ export class ReviewsService {
             idMember: true,
             memberName: true,
             avatar: true,
+            _count: { select: { reviews: { where: { statut: 0 } } } },
           },
         },
         anime: review.idAnime
@@ -490,6 +494,7 @@ export class ReviewsService {
             idMember: true,
             memberName: true,
             avatar: true,
+            _count: { select: { reviews: { where: { statut: 0 } } } },
           },
         },
         anime: {
@@ -699,6 +704,16 @@ export class ReviewsService {
       }
     }
 
+    // Map membre to frontend shape with counts
+    const mappedMembre = membre
+      ? {
+          id: membre.idMember,
+          pseudo: membre.memberName,
+          avatar: membre.avatar,
+          reviewsCount: (membre as any)._count?.reviews || 0,
+        }
+      : null
+
     return {
       id: idCritique,
       userId: idMembre,
@@ -706,7 +721,7 @@ export class ReviewsService {
       mangaId: idManga,
       reviewDate,
       critique,
-      membre: membre || null, // Handle null membre
+      membre: mappedMembre,
       ...otherFields,
     };
   }
