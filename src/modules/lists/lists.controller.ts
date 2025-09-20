@@ -161,20 +161,19 @@ export class ListsController {
   removeDislike(@Param('id', ParseIntPipe) id: number, @Request() req) {
     return this.listsService.removeDislike(id, req.user.id);
   }
-  // GET /lists/public/browse/:mediaType
-  ('public/browse/:mediaType')
-  ({ summary: 'Parcourir les listes publiques avec pagination' })
-  ({ name: 'mediaType', enum: ['anime', 'manga'] })
-  ({ name: 'sort', required: false, enum: ['recent', 'popular'] })
-  ({ name: 'type', required: false, enum: ['liste', 'top'] })
-  ({ name: 'page', required: false, type: Number })
-  ({ name: 'limit', required: false, type: Number })
+  @Get('public/browse/:mediaType')
+  @ApiOperation({ summary: 'Parcourir les listes publiques avec pagination' })
+  @ApiParam({ name: 'mediaType', enum: ['anime', 'manga'] })
+  @ApiQuery({ name: 'sort', required: false, enum: ['recent', 'popular'] })
+  @ApiQuery({ name: 'type', required: false, enum: ['liste', 'top'] })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
   browsePublic(
-    ('mediaType') mediaType: 'anime' | 'manga',
-    ('sort') sort: 'recent' | 'popular' = 'recent',
-    ('type') type?: 'liste' | 'top',
-    ('page') page = '1',
-    ('limit') limit = '30',
+    @Param('mediaType') mediaType: 'anime' | 'manga',
+    @Query('sort') sort: 'recent' | 'popular' = 'recent',
+    @Query('type') type?: 'liste' | 'top',
+    @Query('page') page = '1',
+    @Query('limit') limit = '30',
   ) {
     return this.listsService.getPublicListsPaged(
       mediaType,
