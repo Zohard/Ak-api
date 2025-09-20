@@ -841,14 +841,16 @@ export class ReviewsService {
     // Invalidate caches
     await this.invalidateReviewCache(reviewId, review.idAnime, review.idManga);
 
-    // Calculate current totals
+    // Calculate current totals and expose the caller's ratings
     const allQuestions = this.parseQuestions(updatedQuestionsJson);
     const totals = this.calculateRatingTotals(allQuestions);
+    const currentUserRatings = allQuestions[userId.toString()] || { c: 0, a: 0, o: 0, y: 0, n: 0 };
 
     return {
       ratingType,
-      active: userRatings[ratingType] === 1,
+      active: currentUserRatings[ratingType] === 1,
       totals,
+      userRatings: currentUserRatings,
       popularite: popularity,
     };
   }
