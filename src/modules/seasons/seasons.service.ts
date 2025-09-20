@@ -221,6 +221,8 @@ export class SeasonsService {
     await this.cacheService.del(`season_animes:${seasonId}`)
     await this.cacheService.del('seasons:all')
     await this.cacheService.del('seasons:current')
+    // Invalidate homepage cache since seasonal anime changed
+    await this.cacheService.del('homepage:v1')
 
     return { success: true, seasonId, animeId }
   }
@@ -244,6 +246,8 @@ export class SeasonsService {
       await this.cacheService.del(`season_animes:${seasonId}`)
       await this.cacheService.del('seasons:all')
       await this.cacheService.del('seasons:current')
+      // Invalidate homepage cache since seasonal anime changed
+      await this.cacheService.del('homepage:v1')
     }
     return { success: true, seasonId, animeId }
   }
