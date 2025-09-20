@@ -170,7 +170,7 @@ export class ListsService {
       statut: 1,
       animeOrManga: mediaType,
       ...(type ? { type } : {}),
-      membre: { isNot: null }
+      membre: { idMember: { gt: 0 } }
     };
     const skip = (page - 1) * limit;
     const orderBy: any = sort === 'recent'
