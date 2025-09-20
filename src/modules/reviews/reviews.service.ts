@@ -926,16 +926,17 @@ export class ReviewsService {
     const trendingScore = this.calculateTrendingScore(review);
     const qualityScore = this.calculateQualityScore(review);
 
+    const likes = totals.y;
+    const dislikes = totals.n;
+    const totalVotes = likes + dislikes;
+    const likeRatio = totalVotes > 0 ? likes / totalVotes : 0;
+
     return {
       reviewId: review.idCritique,
-      ratings: {
-        convaincante: totals.c,
-        amusante: totals.a,
-        originale: totals.o,
-        partageAvis: totals.y,
-        nePartageAvis: totals.n,
-        totalVotes: totals.y + totals.n,
-      },
+      likes,
+      dislikes,
+      totalVotes,
+      likeRatio,
       views: {
         total: review.nbClics || 0,
         day: review.nbClicsDay || 0,
