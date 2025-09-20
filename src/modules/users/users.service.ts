@@ -683,13 +683,33 @@ export class UsersService {
       throw new NotFoundException('Utilisateur introuvable');
     }
 
-    // Get public review stats only
+    // Get public review stats overall, and by media type
     const reviewStats = await this.prisma.$queryRaw`
       SELECT 
         notation as rating,
         COUNT(*) as count
       FROM ak_critique 
       WHERE id_membre = ${user.idMember} AND statut = 1
+      GROUP BY notation 
+      ORDER BY notation DESC
+    `;
+
+    const reviewStatsAnime = await this.prisma.$queryRaw`
+      SELECT 
+        notation as rating,
+        COUNT(*) as count
+      FROM ak_critique 
+      WHERE id_membre = ${user.idMember} AND statut = 1 AND id_anime IS NOT NULL AND id_anime > 0
+      GROUP BY notation 
+      ORDER BY notation DESC
+    `;
+
+    const reviewStatsManga = await this.prisma.$queryRaw`
+      SELECT 
+        notation as rating,
+        COUNT(*) as count
+      FROM ak_critique 
+      WHERE id_membre = ${user.idMember} AND statut = 1 AND id_manga IS NOT NULL AND id_manga > 0
       GROUP BY notation 
       ORDER BY notation DESC
     `;
@@ -702,12 +722,52 @@ export class UsersService {
       }
     });
 
+    // Top genres overall and by media (based on tags linked to reviewed content)
+    const topGenresAll = await this.prisma.$queryRaw`
+      SELECT t.tag_name as genre, COUNT(*) as count
+      FROM ak_critique c
+      LEFT JOIN ak_tag2fiche tf_a ON c.id_anime = tf_a.id_fiche AND tf_a.type = 'anime'
+      LEFT JOIN ak_tag2fiche tf_m ON c.id_manga = tf_m.id_fiche AND tf_m.type = 'manga'
+      LEFT JOIN ak_tags t ON (tf_a.id_tag = t.id_tag OR tf_m.id_tag = t.id_tag)
+      WHERE c.id_membre = ${user.idMember} AND c.statut = 1 AND t.tag_name IS NOT NULL
+      GROUP BY t.tag_name
+      ORDER BY count DESC, t.tag_name ASC
+      LIMIT 12
+    `;
+
+    const topGenresAnime = await this.prisma.$queryRaw`
+      SELECT t.tag_name as genre, COUNT(*) as count
+      FROM ak_critique c
+      JOIN ak_tag2fiche tf_a ON c.id_anime = tf_a.id_fiche AND tf_a.type = 'anime'
+      JOIN ak_tags t ON tf_a.id_tag = t.id_tag
+      WHERE c.id_membre = ${user.idMember} AND c.statut = 1
+      GROUP BY t.tag_name
+      ORDER BY count DESC, t.tag_name ASC
+      LIMIT 12
+    `;
+
+    const topGenresManga = await this.prisma.$queryRaw`
+      SELECT t.tag_name as genre, COUNT(*) as count
+      FROM ak_critique c
+      JOIN ak_tag2fiche tf_m ON c.id_manga = tf_m.id_fiche AND tf_m.type = 'manga'
+      JOIN ak_tags t ON tf_m.id_tag = t.id_tag
+      WHERE c.id_membre = ${user.idMember} AND c.statut = 1
+      GROUP BY t.tag_name
+      ORDER BY count DESC, t.tag_name ASC
+      LIMIT 12
+    `;
+
     return {
       totalReviews: totalReviewsResult,
       reviewStats: (reviewStats as any[]).map(stat => ({
         rating: stat.rating,
         count: Number(stat.count)
-      }))
+      })),
+      reviewStatsAnime: (reviewStatsAnime as any[]).map(stat => ({ rating: stat.rating, count: Number(stat.count) })),
+      reviewStatsManga: (reviewStatsManga as any[]).map(stat => ({ rating: stat.rating, count: Number(stat.count) })),
+      topGenresAll: (topGenresAll as any[]).map(g => ({ genre: g.genre, count: Number(g.count) })),
+      topGenresAnime: (topGenresAnime as any[]).map(g => ({ genre: g.genre, count: Number(g.count) })),
+      topGenresManga: (topGenresManga as any[]).map(g => ({ genre: g.genre, count: Number(g.count) })),
     };
   }
 
