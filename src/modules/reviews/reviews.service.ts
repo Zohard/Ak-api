@@ -879,15 +879,9 @@ export class ReviewsService {
 
     return {
       reviewId: review.idCritique,
-      totals: {
-        convaincante: totals.c,
-        amusante: totals.a,
-        originale: totals.o,
-        partageAvis: totals.y,
-        nePartageAvis: totals.n,
-      },
+      totals: { c: totals.c, a: totals.a, o: totals.o, y: totals.y, n: totals.n },
       userRatings,
-      canRate: userId && userId !== review.idMembre,
+      canRate: !!userId && userId !== review.idMembre,
     };
   }
 
