@@ -34,6 +34,7 @@ export class ListsService {
         ...(mediaType ? { animeOrManga: mediaType } : {}),
       },
       orderBy: { idListe: 'desc' },
+      include: { membre: { select: { idMember: true, memberName: true } } },
     });
     return rows.map((r) => this.formatList(r));
   }
@@ -135,6 +136,7 @@ export class ListsService {
         where: { statut: 1, animeOrManga: mediaType },
         orderBy: { dateCreation: 'desc' },
         take: limit,
+        include: { membre: { select: { idMember: true, memberName: true } } },
       });
       result = rows.map((r) => this.formatList(r));
     } else {
@@ -143,6 +145,7 @@ export class ListsService {
         where: { statut: 1, animeOrManga: mediaType },
         orderBy: { idListe: 'desc' },
         take: 100,
+        include: { membre: { select: { idMember: true, memberName: true } } },
       });
       const scored = lists
         .map((l) => ({ ...l, popularityScore: this.calculatePopularity(l.jaime, l.jaimepas, l.nbClics) }))
@@ -164,7 +167,7 @@ export class ListsService {
       : [{ popularite: 'desc' }, { dateCreation: 'desc' }];
     const [total, rows] = await Promise.all([
       this.prisma.akListesTop.count({ where }),
-      this.prisma.akListesTop.findMany({ where, orderBy, skip, take: limit }),
+      this.prisma.akListesTop.findMany({ where, orderBy, skip, take: limit, include: { membre: { select: { idMember: true, memberName: true } } } }),
     ]);
     const items = rows.map((r) => this.formatList(r));
     const totalPages = Math.max(Math.ceil(total / limit), 1);
@@ -172,7 +175,7 @@ export class ListsService {
   }
 
   async getById(id: number) {
-    const list = await this.prisma.akListesTop.findUnique({ where: { idListe: id } });
+    const list = await this.prisma.akListesTop.findUnique({ where: { idListe: id }, include: { membre: { select: { idMember: true, memberName: true } } } });
     if (!list) throw new NotFoundException('List not found');
     return this.formatList(list);
   }
@@ -276,6 +279,7 @@ export class ListsService {
       popularite: row.popularite,
       statut: row.statut,
       date_creation: row.dateCreation,
+      membre: row.membre ? { id: row.membre.idMember, pseudo: row.membre.memberName } : undefined,
     };
   }
 }
