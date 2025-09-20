@@ -325,8 +325,23 @@ export class ReviewsService {
       throw new NotFoundException('Critique introuvable');
     }
 
-    const formattedReview = this.formatReview(review);
-    
+    let formattedReview = this.formatReview(review);
+
+    // Compute author's visible reviews average rating
+    try {
+      const avg = await this.prisma.akCritique.aggregate({
+        where: { idMembre: review.idMembre, statut: 0, NOT: { notation: null } },
+        _avg: { notation: true },
+      })
+      const average = avg._avg?.notation ?? 0
+      if (formattedReview.membre) {
+        formattedReview = {
+          ...formattedReview,
+          membre: { ...formattedReview.membre, averageRating: Number(average) }
+        }
+      }
+    } catch {}
+
     // Cache the individual review for 10 minutes
     await this.cacheService.set(`review:${id}`, formattedReview, 600);
 
@@ -370,7 +385,18 @@ export class ReviewsService {
       throw new NotFoundException('Critique introuvable');
     }
 
-    return this.formatReview(review);
+    let formatted = this.formatReview(review);
+    try {
+      const avg = await this.prisma.akCritique.aggregate({
+        where: { idMembre: review.idMembre, statut: 0, NOT: { notation: null } },
+        _avg: { notation: true },
+      })
+      const average = avg._avg?.notation ?? 0
+      if (formatted.membre) {
+        formatted = { ...formatted, membre: { ...formatted.membre, averageRating: Number(average) } }
+      }
+    } catch {}
+    return formatted;
   }
 
   async update(
