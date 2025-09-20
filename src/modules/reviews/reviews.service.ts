@@ -758,15 +758,43 @@ export class ReviewsService {
   private parseQuestions(questionsJson?: string | null): any {
     if (!questionsJson) return {};
     try {
-      return JSON.parse(questionsJson);
+      const parsed = JSON.parse(questionsJson);
+      const normalized = {};
+
+      // Normalize each user's ratings
+      Object.keys(parsed).forEach(userId => {
+        const userRatings = parsed[userId];
+        normalized[userId] = {
+          c: this.normalizeRatingValue(userRatings.c),
+          a: this.normalizeRatingValue(userRatings.a),
+          o: this.normalizeRatingValue(userRatings.o),
+          // Handle both "yes"/"y" and "no"/"n" formats for backward compatibility
+          y: this.normalizeRatingValue(userRatings.y || userRatings.yes),
+          n: this.normalizeRatingValue(userRatings.n || userRatings.no),
+        };
+      });
+
+      return normalized;
     } catch {
       return {};
     }
   }
 
+  private normalizeRatingValue(value: any): number {
+    if (value === 1 || value === "1") return 1;
+    return 0;
+  }
+
   private updateQuestionsJson(questionsJson: string | null, userId: number, ratings: {c?: number, a?: number, o?: number, y?: number, n?: number}): string {
     const questions = this.parseQuestions(questionsJson);
-    questions[userId.toString()] = ratings;
+    // Store in the new format (y/n) but maintain backward compatibility when reading
+    questions[userId.toString()] = {
+      c: ratings.c || 0,
+      a: ratings.a || 0,
+      o: ratings.o || 0,
+      y: ratings.y || 0,
+      n: ratings.n || 0,
+    };
     return JSON.stringify(questions);
   }
 
@@ -784,7 +812,7 @@ export class ReviewsService {
     return totals;
   }
 
-  async rateReview(reviewId: number, userId: number, ratingType: 'c' | 'a' | 'o' | 'y' | 'n') {
+  async rateReview(reviewId: number, userId: number, ratingType: 'c' | 'a' | 'o' | 'y' | 'n' | 'yes' | 'no') {
     const review = await this.prisma.akCritique.findUnique({
       where: { idCritique: reviewId },
       select: {
@@ -811,14 +839,19 @@ export class ReviewsService {
 
     const questions = this.parseQuestions(review.questions);
     const userRatings = questions[userId.toString()] || {c: 0, a: 0, o: 0, y: 0, n: 0};
-    
+
+    // Convert legacy yes/no to y/n for internal processing
+    let normalizedRatingType = ratingType;
+    if (ratingType === 'yes') normalizedRatingType = 'y';
+    if (ratingType === 'no') normalizedRatingType = 'n';
+
     // Toggle the specific rating
-    userRatings[ratingType] = userRatings[ratingType] === 1 ? 0 : 1;
-    
+    userRatings[normalizedRatingType] = userRatings[normalizedRatingType] === 1 ? 0 : 1;
+
     // For y/n ratings, ensure only one is active
-    if (ratingType === 'y' && userRatings.y === 1) {
+    if (normalizedRatingType === 'y' && userRatings.y === 1) {
       userRatings.n = 0;
-    } else if (ratingType === 'n' && userRatings.n === 1) {
+    } else if (normalizedRatingType === 'n' && userRatings.n === 1) {
       userRatings.y = 0;
     }
 
@@ -848,7 +881,7 @@ export class ReviewsService {
 
     return {
       ratingType,
-      active: currentUserRatings[ratingType] === 1,
+      active: currentUserRatings[normalizedRatingType] === 1,
       totals,
       userRatings: currentUserRatings,
       popularite: popularity,
