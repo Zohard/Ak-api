@@ -439,9 +439,9 @@ export class UsersService {
 
     // Get recent reviews
     const recentReviews = await this.prisma.$queryRaw`
-      SELECT 
+      SELECT
         'review' as type,
-        c.date_critique as date,
+        EXTRACT(EPOCH FROM c.date_critique) as date,
         COALESCE(a.titre, m.titre) as title,
         c.id_critique as id
       FROM ak_critique c
@@ -456,37 +456,31 @@ export class UsersService {
     const recentCollections = await this.prisma.$queryRaw`
       (SELECT
         'anime_added' as type,
-        EXTRACT(EPOCH FROM ac.added_at) as date,
+        EXTRACT(EPOCH FROM ca.created_at) as date,
         a.titre as title,
-        ac.anime_id as id
-      FROM ak_collection_animes ac
-      LEFT JOIN ak_animes a ON ac.anime_id = a.id_anime
-      WHERE EXISTS (
-        SELECT 1 FROM ak_collections c
-        WHERE c.id = ac.collection_id AND c.user_id = ${id}
-      )
-      ORDER BY ac.added_at DESC
+        ca.id_anime as id
+      FROM collection_animes ca
+      LEFT JOIN ak_animes a ON ca.id_anime = a.id_anime
+      WHERE ca.id_membre = ${id}
+      ORDER BY ca.created_at DESC
       LIMIT ${Math.ceil(limit / 2)})
       UNION ALL
       (SELECT
         'manga_added' as type,
-        EXTRACT(EPOCH FROM mc.added_at) as date,
+        EXTRACT(EPOCH FROM cm.created_at) as date,
         m.titre as title,
-        mc.manga_id as id
-      FROM ak_collection_mangas mc
-      LEFT JOIN ak_mangas m ON mc.manga_id = m.id_manga
-      WHERE EXISTS (
-        SELECT 1 FROM ak_collections c
-        WHERE c.id = mc.collection_id AND c.user_id = ${id}
-      )
-      ORDER BY mc.added_at DESC
+        cm.id_manga as id
+      FROM collection_mangas cm
+      LEFT JOIN ak_mangas m ON cm.id_manga = m.id_manga
+      WHERE cm.id_membre = ${id}
+      ORDER BY cm.created_at DESC
       LIMIT ${Math.floor(limit / 2)})
     `;
 
     const allActivities = [
       ...(recentReviews as any[]),
       ...(recentCollections as any[])
-    ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+    ].sort((a, b) => new Date(b.date * 1000).getTime() - new Date(a.date * 1000).getTime())
       .slice(0, limit);
 
     return {
@@ -862,30 +856,24 @@ export class UsersService {
     const recentCollections = await this.prisma.$queryRaw`
       (SELECT
         'anime_added' as type,
-        EXTRACT(EPOCH FROM ac.added_at) as date,
+        EXTRACT(EPOCH FROM ca.created_at) as date,
         a.titre as title,
-        ac.anime_id as id
-      FROM ak_collection_animes ac
-      LEFT JOIN ak_animes a ON ac.anime_id = a.id_anime
-      WHERE EXISTS (
-        SELECT 1 FROM ak_collections c
-        WHERE c.id = ac.collection_id AND c.user_id = ${user.idMember} AND c.is_public = true
-      )
-      ORDER BY ac.added_at DESC
+        ca.id_anime as id
+      FROM collection_animes ca
+      LEFT JOIN ak_animes a ON ca.id_anime = a.id_anime
+      WHERE ca.id_membre = ${user.idMember} AND ca.is_public = true
+      ORDER BY ca.created_at DESC
       LIMIT ${Math.ceil(limit / 2)})
       UNION ALL
       (SELECT
         'manga_added' as type,
-        EXTRACT(EPOCH FROM mc.added_at) as date,
+        EXTRACT(EPOCH FROM cm.created_at) as date,
         m.titre as title,
-        mc.manga_id as id
-      FROM ak_collection_mangas mc
-      LEFT JOIN ak_mangas m ON mc.manga_id = m.id_manga
-      WHERE EXISTS (
-        SELECT 1 FROM ak_collections c
-        WHERE c.id = mc.collection_id AND c.user_id = ${user.idMember} AND c.is_public = true
-      )
-      ORDER BY mc.added_at DESC
+        cm.id_manga as id
+      FROM collection_mangas cm
+      LEFT JOIN ak_mangas m ON cm.id_manga = m.id_manga
+      WHERE cm.id_membre = ${user.idMember} AND cm.is_public = true
+      ORDER BY cm.created_at DESC
       LIMIT ${Math.floor(limit / 2)})
     `;
 
