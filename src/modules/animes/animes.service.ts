@@ -199,14 +199,18 @@ export class AnimesService extends BaseContentService<
 
       // Get anime IDs that have the specified genre tag
       const animeIdsWithGenre = await this.prisma.$queryRaw`
-        SELECT DISTINCT tf.id_fiche as idAnime
+        SELECT DISTINCT tf.id_fiche
         FROM ak_tags t
         INNER JOIN ak_tag2fiche tf ON t.id_tag = tf.id_tag
         WHERE LOWER(t.tag_name) = LOWER(${decodedGenre})
           AND tf.type = 'anime'
       `;
 
-      const animeIds = (animeIdsWithGenre as any[]).map(row => row.idAnime);
+      console.log('SQL Query Result:', JSON.stringify(animeIdsWithGenre.slice(0, 3), null, 2));
+      const animeIds = (animeIdsWithGenre as any[]).map(row => {
+        console.log('Row keys:', Object.keys(row));
+        return row.id_fiche || row.idFiche || row.ID_FICHE || row.idfiche;
+      }).filter(id => id !== undefined);
 
       if (animeIds.length > 0) {
         where.idAnime = { in: animeIds };
@@ -524,14 +528,14 @@ export class AnimesService extends BaseContentService<
 
     // Get anime IDs that have the specified genre tag
     const animeIdsWithGenre = await this.prisma.$queryRaw`
-      SELECT DISTINCT tf.id_fiche as idAnime
+      SELECT DISTINCT tf.id_fiche
       FROM ak_tags t
       INNER JOIN ak_tag2fiche tf ON t.id_tag = tf.id_tag
       WHERE LOWER(t.tag_name) = LOWER(${decodedGenre})
         AND tf.type = 'anime'
     `;
 
-    const animeIds = (animeIdsWithGenre as any[]).map(row => row.idAnime);
+    const animeIds = (animeIdsWithGenre as any[]).map(row => row.id_fiche);
 
     if (animeIds.length === 0) {
       return {
