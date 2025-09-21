@@ -454,26 +454,26 @@ export class UsersService {
 
     // Get recent collection additions
     const recentCollections = await this.prisma.$queryRaw`
-      (SELECT 
+      (SELECT
         'anime_added' as type,
-        now() as date,
+        COALESCE(ac.created_at, ac.updated_at, now()) as date,
         a.titre as title,
         ac.id_anime as id
       FROM collection_animes ac
       LEFT JOIN ak_animes a ON ac.id_anime = a.id_anime
       WHERE ac.id_membre = ${id}
-      ORDER BY ac.id_collection DESC
+      ORDER BY COALESCE(ac.created_at, ac.updated_at, now()) DESC
       LIMIT ${Math.ceil(limit / 2)})
       UNION ALL
-      (SELECT 
+      (SELECT
         'manga_added' as type,
-        now() as date,
+        COALESCE(mc.created_at, mc.updated_at, now()) as date,
         m.titre as title,
         mc.id_manga as id
       FROM collection_mangas mc
       LEFT JOIN ak_mangas m ON mc.id_manga = m.id_manga
       WHERE mc.id_membre = ${id}
-      ORDER BY mc.id_collection DESC
+      ORDER BY COALESCE(mc.created_at, mc.updated_at, now()) DESC
       LIMIT ${Math.floor(limit / 2)})
     `;
 
@@ -837,9 +837,9 @@ export class UsersService {
       throw new NotFoundException('Utilisateur introuvable');
     }
 
-    // Only show recent public reviews as activity
-    const activities = await this.prisma.$queryRaw`
-      SELECT 
+    // Get public reviews and collection activities
+    const recentReviews = await this.prisma.$queryRaw`
+      SELECT
         'review' as type,
         c.date_critique as date,
         COALESCE(a.titre, m.titre) as title,
@@ -851,6 +851,39 @@ export class UsersService {
       ORDER BY c.date_critique DESC
       LIMIT ${limit}
     `;
+
+    // Get public collection activities
+    const recentCollections = await this.prisma.$queryRaw`
+      (SELECT
+        'anime_added' as type,
+        COALESCE(ac.created_at, ac.updated_at, now()) as date,
+        a.titre as title,
+        ac.id_anime as id
+      FROM collection_animes ac
+      LEFT JOIN ak_animes a ON ac.id_anime = a.id_anime
+      WHERE ac.id_membre = ${user.idMember} AND ac.is_public = true
+      ORDER BY COALESCE(ac.created_at, ac.updated_at, now()) DESC
+      LIMIT ${Math.ceil(limit / 2)})
+      UNION ALL
+      (SELECT
+        'manga_added' as type,
+        COALESCE(mc.created_at, mc.updated_at, now()) as date,
+        m.titre as title,
+        mc.id_manga as id
+      FROM collection_mangas mc
+      LEFT JOIN ak_mangas m ON mc.id_manga = m.id_manga
+      WHERE mc.id_membre = ${user.idMember} AND mc.is_public = true
+      ORDER BY COALESCE(mc.created_at, mc.updated_at, now()) DESC
+      LIMIT ${Math.floor(limit / 2)})
+    `;
+
+    const allActivities = [
+      ...(recentReviews as any[]),
+      ...(recentCollections as any[])
+    ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+     .slice(0, limit);
+
+    const activities = allActivities;
 
     return {
       activities: activities
