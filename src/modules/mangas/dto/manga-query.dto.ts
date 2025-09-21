@@ -6,6 +6,7 @@ import {
   Min,
   Max,
   IsBoolean,
+  IsArray,
 } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
 
