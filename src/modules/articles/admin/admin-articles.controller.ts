@@ -32,6 +32,12 @@ import { CreateArticleDto } from '../dto/create-article.dto';
 import { UpdateArticleDto } from '../dto/update-article.dto';
 import { ArticleQueryDto } from '../dto/article-query.dto';
 import { PublishArticleDto } from '../dto/publish-article.dto';
+import {
+  ImportImageDto,
+  BulkImportImagesDto,
+  ImportImageKitDto,
+  BulkImportImageKitDto
+} from '../dto/import-image.dto';
 
 @ApiTags('Admin - Articles')
 @Controller('admin/articles')
@@ -302,5 +308,89 @@ export class AdminArticlesController {
       message: 'Bulk delete completed',
       results,
     };
+  }
+
+  @Post(':id/images/import-url')
+  @UseGuards(ArticlePermissionsGuard)
+  @CanEditArticles()
+  @ApiOperation({ summary: 'Import image from URL and upload to ImageKit' })
+  @ApiResponse({ status: 201, description: 'Image imported and uploaded successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Insufficient permissions' })
+  @ApiResponse({ status: 404, description: 'Article not found' })
+  importImageFromUrl(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() importImageDto: ImportImageDto,
+  ) {
+    return this.articlesService.importImageFromUrl(
+      id,
+      importImageDto.imageUrl,
+      importImageDto.customFileName
+    );
+  }
+
+  @Post(':id/images/import-imagekit')
+  @UseGuards(ArticlePermissionsGuard)
+  @CanEditArticles()
+  @ApiOperation({ summary: 'Associate existing ImageKit file with article' })
+  @ApiResponse({ status: 201, description: 'ImageKit file associated successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Insufficient permissions' })
+  @ApiResponse({ status: 404, description: 'Article not found' })
+  importImageKitFile(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() importImageKitDto: ImportImageKitDto,
+  ) {
+    return this.articlesService.importImageKitFile(id, importImageKitDto.imagePath);
+  }
+
+  @Post(':id/images/bulk-import-urls')
+  @UseGuards(ArticlePermissionsGuard)
+  @CanEditArticles()
+  @ApiOperation({ summary: 'Bulk import images from URLs and upload to ImageKit' })
+  @ApiResponse({ status: 201, description: 'Images imported and uploaded successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Insufficient permissions' })
+  @ApiResponse({ status: 404, description: 'Article not found' })
+  bulkImportImagesFromUrls(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() bulkImportDto: BulkImportImagesDto,
+  ) {
+    return this.articlesService.bulkImportImagesFromUrls(id, bulkImportDto.imageUrls);
+  }
+
+  @Post(':id/images/bulk-import-imagekit')
+  @UseGuards(ArticlePermissionsGuard)
+  @CanEditArticles()
+  @ApiOperation({ summary: 'Bulk associate existing ImageKit files with article' })
+  @ApiResponse({ status: 201, description: 'ImageKit files associated successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Insufficient permissions' })
+  @ApiResponse({ status: 404, description: 'Article not found' })
+  bulkImportImageKitFiles(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() bulkImportImageKitDto: BulkImportImageKitDto,
+  ) {
+    return this.articlesService.bulkImportImageKitFiles(id, bulkImportImageKitDto.imagePaths);
+  }
+
+  @Get(':id/images')
+  @ApiOperation({ summary: 'Get images for article' })
+  @ApiResponse({ status: 200, description: 'Images retrieved successfully' })
+  @ApiResponse({ status: 404, description: 'Article not found' })
+  getArticleImages(@Param('id', ParseIntPipe) id: number) {
+    return this.articlesService.getArticleImages(id);
+  }
+
+  @Delete('images/:imageId')
+  @UseGuards(ArticlePermissionsGuard)
+  @CanEditArticles()
+  @ApiOperation({ summary: 'Remove image from article' })
+  @ApiResponse({ status: 200, description: 'Image removed successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Insufficient permissions' })
+  @ApiResponse({ status: 404, description: 'Image not found' })
+  removeImage(@Param('imageId', ParseIntPipe) imageId: number) {
+    return this.articlesService.removeImage(imageId);
   }
 }

@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../shared/services/prisma.service';
 import { CacheService } from '../../shared/services/cache.service';
+import { ImageKitService } from '../media/imagekit.service';
 import { CreateArticleDto } from './dto/create-article.dto';
 import { UpdateArticleDto } from './dto/update-article.dto';
 import { ArticleQueryDto } from './dto/article-query.dto';
@@ -16,6 +17,7 @@ export class ArticlesService {
   constructor(
     private prisma: PrismaService,
     private cacheService: CacheService,
+    private imagekitService: ImageKitService,
   ) {}
 
   private serializeBigInt(obj: any): any {
@@ -347,6 +349,9 @@ export class ArticlesService {
           orderBy: { commentDate: 'asc' },
         },
         postMeta: true,
+        images: {
+          orderBy: { idImg: 'desc' },
+        },
       },
     });
 
@@ -407,6 +412,9 @@ export class ArticlesService {
           orderBy: { commentDate: 'asc' },
         },
         postMeta: true,
+        images: {
+          orderBy: { idImg: 'desc' },
+        },
       },
     });
 
@@ -791,6 +799,17 @@ export class ArticlesService {
       author: null, // TODO: Join with member if userId > 0
     })) || [];
 
+    // Transform images
+    const images = post.images?.map(image => ({
+      id: image.idImg,
+      filename: image.urlImg,
+      articleId: Number(image.idArt),
+      imagekitUrl: this.imagekitService.getImageUrl(image.urlImg),
+      thumbnailUrl: this.imagekitService.getImageUrl(image.urlImg, [
+        { height: '200', width: '200', crop: 'maintain_ratio' }
+      ]),
+    })) || [];
+
     return {
       idArt: Number(post.ID),
       ID: post.ID,
@@ -824,11 +843,12 @@ export class ArticlesService {
       },
       categories,
       comments,
+      images,
       content: includeContent ? post.postContent : undefined,
       contenu: includeContent ? post.postContent : undefined,
       postContent: includeContent ? post.postContent : undefined,
       texte: includeContent ? post.postContent : (post.postExcerpt || '').substring(0, 200),
-      imageCount: 0, // TODO: Count images in content if needed
+      imageCount: images.length,
     };
   }
 
@@ -860,10 +880,229 @@ export class ArticlesService {
 
   private transformImageUrl(imageUrl: string | null): string | null {
     if (!imageUrl) return null;
-    
-    // For now, return external URLs directly
-    // TODO: Implement proxy/caching system later
-    return imageUrl;
+
+    // If it's already a full URL, return as is
+    if (imageUrl.startsWith('http')) {
+      return imageUrl;
+    }
+
+    // If it's an ImageKit path, generate the full URL
+    return this.imagekitService.getImageUrl(imageUrl);
+  }
+
+  async importImageFromUrl(articleId: number, imageUrl: string, customFileName?: string): Promise<any> {
+    const article = await this.prisma.wpPost.findUnique({
+      where: { ID: BigInt(articleId) },
+    });
+
+    if (!article) {
+      throw new NotFoundException('Article not found');
+    }
+
+    try {
+      const fileName = customFileName || `article-${articleId}-${Date.now()}`;
+      const folder = 'webzine/articles';
+
+      const uploadResult = await this.imagekitService.uploadImageFromUrl(
+        imageUrl,
+        fileName,
+        folder
+      );
+
+      const image = await this.prisma.akWebzineImg.create({
+        data: {
+          idArt: BigInt(articleId),
+          urlImg: uploadResult.filename,
+        },
+      });
+
+      return {
+        message: 'Image imported and uploaded to ImageKit successfully',
+        image: {
+          id: image.idImg,
+          filename: image.urlImg,
+          articleId: Number(image.idArt),
+          imagekitUrl: uploadResult.url,
+          originalUrl: imageUrl,
+        },
+      };
+    } catch (error) {
+      throw new BadRequestException(`Failed to import image: ${error.message}`);
+    }
+  }
+
+  async importImageKitFile(articleId: number, imagePath: string): Promise<any> {
+    const article = await this.prisma.wpPost.findUnique({
+      where: { ID: BigInt(articleId) },
+    });
+
+    if (!article) {
+      throw new NotFoundException('Article not found');
+    }
+
+    const image = await this.prisma.akWebzineImg.create({
+      data: {
+        idArt: BigInt(articleId),
+        urlImg: imagePath,
+      },
+    });
+
+    return {
+      message: 'ImageKit file associated with article successfully',
+      image: {
+        id: image.idImg,
+        filename: image.urlImg,
+        articleId: Number(image.idArt),
+        imagekitUrl: this.imagekitService.getImageUrl(imagePath),
+      },
+    };
+  }
+
+  async bulkImportImagesFromUrls(articleId: number, imageUrls: string[]): Promise<any> {
+    const article = await this.prisma.wpPost.findUnique({
+      where: { ID: BigInt(articleId) },
+    });
+
+    if (!article) {
+      throw new NotFoundException('Article not found');
+    }
+
+    const results: Array<{
+      imageUrl: string;
+      status: string;
+      data?: any;
+      message?: string;
+    }> = [];
+
+    for (let i = 0; i < imageUrls.length; i++) {
+      const imageUrl = imageUrls[i];
+      try {
+        const fileName = `article-${articleId}-bulk-${i + 1}-${Date.now()}`;
+        const folder = 'webzine/articles';
+
+        const uploadResult = await this.imagekitService.uploadImageFromUrl(
+          imageUrl,
+          fileName,
+          folder
+        );
+
+        const image = await this.prisma.akWebzineImg.create({
+          data: {
+            idArt: BigInt(articleId),
+            urlImg: uploadResult.filename,
+          },
+        });
+
+        results.push({
+          imageUrl,
+          status: 'success',
+          data: {
+            id: image.idImg,
+            filename: image.urlImg,
+            articleId: Number(image.idArt),
+            imagekitUrl: uploadResult.url,
+            originalUrl: imageUrl,
+          },
+        });
+      } catch (error) {
+        results.push({
+          imageUrl,
+          status: 'error',
+          message: error.message,
+        });
+      }
+    }
+
+    return {
+      message: 'Bulk image import from URLs completed',
+      results,
+    };
+  }
+
+  async bulkImportImageKitFiles(articleId: number, imagePaths: string[]): Promise<any> {
+    const article = await this.prisma.wpPost.findUnique({
+      where: { ID: BigInt(articleId) },
+    });
+
+    if (!article) {
+      throw new NotFoundException('Article not found');
+    }
+
+    const results: Array<{
+      imagePath: string;
+      status: string;
+      data?: any;
+      message?: string;
+    }> = [];
+
+    for (const imagePath of imagePaths) {
+      try {
+        const image = await this.prisma.akWebzineImg.create({
+          data: {
+            idArt: BigInt(articleId),
+            urlImg: imagePath,
+          },
+        });
+
+        results.push({
+          imagePath,
+          status: 'success',
+          data: {
+            id: image.idImg,
+            filename: image.urlImg,
+            articleId: Number(image.idArt),
+            imagekitUrl: this.imagekitService.getImageUrl(imagePath),
+          },
+        });
+      } catch (error) {
+        results.push({
+          imagePath,
+          status: 'error',
+          message: error.message,
+        });
+      }
+    }
+
+    return {
+      message: 'Bulk ImageKit files association completed',
+      results,
+    };
+  }
+
+  async getArticleImages(articleId: number): Promise<any> {
+    const images = await this.prisma.akWebzineImg.findMany({
+      where: { idArt: BigInt(articleId) },
+      orderBy: { idImg: 'desc' },
+    });
+
+    return {
+      articleId,
+      images: images.map(image => ({
+        id: image.idImg,
+        filename: image.urlImg,
+        articleId: Number(image.idArt),
+        imagekitUrl: this.imagekitService.getImageUrl(image.urlImg),
+        thumbnailUrl: this.imagekitService.getImageUrl(image.urlImg, [
+          { height: '200', width: '200', crop: 'maintain_ratio' }
+        ]),
+      })),
+    };
+  }
+
+  async removeImage(imageId: number): Promise<any> {
+    const image = await this.prisma.akWebzineImg.findUnique({
+      where: { idImg: imageId },
+    });
+
+    if (!image) {
+      throw new NotFoundException('Image not found');
+    }
+
+    await this.prisma.akWebzineImg.delete({
+      where: { idImg: imageId },
+    });
+
+    return { message: 'Image removed successfully' };
   }
 
   private generateNiceUrl(title: string): string {

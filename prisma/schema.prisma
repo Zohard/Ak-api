@@ -366,6 +366,7 @@ model WpPost {
   comments             WpComment[]
   postMeta             WpPostMeta[]
   termRelationships    WpTermRelationship[]
+  images               AkWebzineImg[]
 
   @@map("wp_posts")
 }
@@ -541,4 +542,16 @@ model AkAnimesSaisons {
   statut       Int?   @default(0) @db.SmallInt
 
   @@map("ak_animes_saisons")
+}
+
+// Webzine Article Images
+model AkWebzineImg {
+  idImg        Int     @id @default(autoincrement()) @map("id_img")
+  idArt        BigInt  @map("id_art")
+  urlImg       String  @map("url_img") @db.VarChar(255)
+
+  // Relations
+  article      WpPost  @relation(fields: [idArt], references: [ID], onDelete: Cascade)
+
+  @@map("ak_webzine_img")
 }
