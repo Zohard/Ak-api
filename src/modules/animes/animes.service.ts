@@ -206,8 +206,9 @@ export class AnimesService extends BaseContentService<
           AND tf.type = 'anime'
       `;
 
-      console.log('SQL Query Result:', JSON.stringify(animeIdsWithGenre.slice(0, 3), null, 2));
-      const animeIds = (animeIdsWithGenre as any[]).map(row => {
+      const animeIdsArray = animeIdsWithGenre as any[];
+      console.log('SQL Query Result:', JSON.stringify(animeIdsArray.slice(0, 3), null, 2));
+      const animeIds = animeIdsArray.map(row => {
         console.log('Row keys:', Object.keys(row));
         return row.id_fiche || row.idFiche || row.ID_FICHE || row.idfiche;
       }).filter(id => id !== undefined);
