@@ -456,24 +456,30 @@ export class UsersService {
     const recentCollections = await this.prisma.$queryRaw`
       (SELECT
         'anime_added' as type,
-        COALESCE(ac.created_at, ac.updated_at, now()) as date,
+        EXTRACT(EPOCH FROM ac.added_at) as date,
         a.titre as title,
-        ac.id_anime as id
-      FROM collection_animes ac
-      LEFT JOIN ak_animes a ON ac.id_anime = a.id_anime
-      WHERE ac.id_membre = ${id}
-      ORDER BY COALESCE(ac.created_at, ac.updated_at, now()) DESC
+        ac.anime_id as id
+      FROM ak_collection_animes ac
+      LEFT JOIN ak_animes a ON ac.anime_id = a.id_anime
+      WHERE EXISTS (
+        SELECT 1 FROM ak_collections c
+        WHERE c.id = ac.collection_id AND c.user_id = ${id}
+      )
+      ORDER BY ac.added_at DESC
       LIMIT ${Math.ceil(limit / 2)})
       UNION ALL
       (SELECT
         'manga_added' as type,
-        COALESCE(mc.created_at, mc.updated_at, now()) as date,
+        EXTRACT(EPOCH FROM mc.added_at) as date,
         m.titre as title,
-        mc.id_manga as id
-      FROM collection_mangas mc
-      LEFT JOIN ak_mangas m ON mc.id_manga = m.id_manga
-      WHERE mc.id_membre = ${id}
-      ORDER BY COALESCE(mc.created_at, mc.updated_at, now()) DESC
+        mc.manga_id as id
+      FROM ak_collection_mangas mc
+      LEFT JOIN ak_mangas m ON mc.manga_id = m.id_manga
+      WHERE EXISTS (
+        SELECT 1 FROM ak_collections c
+        WHERE c.id = mc.collection_id AND c.user_id = ${id}
+      )
+      ORDER BY mc.added_at DESC
       LIMIT ${Math.floor(limit / 2)})
     `;
 
@@ -856,24 +862,30 @@ export class UsersService {
     const recentCollections = await this.prisma.$queryRaw`
       (SELECT
         'anime_added' as type,
-        COALESCE(ac.created_at, ac.updated_at, now()) as date,
+        EXTRACT(EPOCH FROM ac.added_at) as date,
         a.titre as title,
-        ac.id_anime as id
-      FROM collection_animes ac
-      LEFT JOIN ak_animes a ON ac.id_anime = a.id_anime
-      WHERE ac.id_membre = ${user.idMember} AND ac.is_public = true
-      ORDER BY COALESCE(ac.created_at, ac.updated_at, now()) DESC
+        ac.anime_id as id
+      FROM ak_collection_animes ac
+      LEFT JOIN ak_animes a ON ac.anime_id = a.id_anime
+      WHERE EXISTS (
+        SELECT 1 FROM ak_collections c
+        WHERE c.id = ac.collection_id AND c.user_id = ${user.idMember} AND c.is_public = true
+      )
+      ORDER BY ac.added_at DESC
       LIMIT ${Math.ceil(limit / 2)})
       UNION ALL
       (SELECT
         'manga_added' as type,
-        COALESCE(mc.created_at, mc.updated_at, now()) as date,
+        EXTRACT(EPOCH FROM mc.added_at) as date,
         m.titre as title,
-        mc.id_manga as id
-      FROM collection_mangas mc
-      LEFT JOIN ak_mangas m ON mc.id_manga = m.id_manga
-      WHERE mc.id_membre = ${user.idMember} AND mc.is_public = true
-      ORDER BY COALESCE(mc.created_at, mc.updated_at, now()) DESC
+        mc.manga_id as id
+      FROM ak_collection_mangas mc
+      LEFT JOIN ak_mangas m ON mc.manga_id = m.id_manga
+      WHERE EXISTS (
+        SELECT 1 FROM ak_collections c
+        WHERE c.id = mc.collection_id AND c.user_id = ${user.idMember} AND c.is_public = true
+      )
+      ORDER BY mc.added_at DESC
       LIMIT ${Math.floor(limit / 2)})
     `;
 
