@@ -11,8 +11,10 @@ import { AdminCommentsController } from './comments/admin/admin-comments.control
 import { ArticlePermissionsGuard } from './guards/article-permissions.guard';
 import { PrismaService } from '../../shared/services/prisma.service';
 import { CacheService } from '../../shared/services/cache.service';
+import { MediaModule } from '../media/media.module';
 
 @Module({
+  imports: [MediaModule],
   controllers: [
     ArticlesController,
     AdminArticlesController,
