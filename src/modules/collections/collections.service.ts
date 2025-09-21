@@ -1761,10 +1761,10 @@ export class CollectionsService {
       const volCount = e.manga?.nbVol ?? 0;
       return [
         '  <manga>',
-        `    <series_mangadb_id>${e.manga?.idManga ?? 0}</series_mangadb_id>`,
-        `    <series_title>${this.xmlEscape(e.manga?.titre || '')}</series_title>`,
-        `    <series_chapters>0</series_chapters>`,
-        `    <series_volumes>${volCount}</series_volumes>`,
+        `    <manga_mangadb_id>${e.manga?.idManga ?? 0}</manga_mangadb_id>`,
+        `    <manga_title>${this.xmlEscape(e.manga?.titre || '')}</manga_title>`,
+        `    <manga_chapters>0</manga_chapters>`,
+        `    <manga_volumes>${volCount}</manga_volumes>`,
         '    <my_id>0</my_id>',
         '    <my_read_chapters>0</my_read_chapters>',
         '    <my_read_volumes>0</my_read_volumes>',
