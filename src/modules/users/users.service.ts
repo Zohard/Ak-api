@@ -408,6 +408,9 @@ export class UsersService {
       ORDER BY notation DESC
     `;
 
+    // Compute collection-based tag stats (genres/themes) including weighted by user's collection ratings
+    const collectionTagStats = await this.getUserCollectionTagStatsInternal(id, true, 12);
+
     return {
       totalReviews: reviewStats._count,
       animeCount,
@@ -420,6 +423,7 @@ export class UsersService {
         rating: stat.rating,
         count: Number(stat.count)
       })),
+      collectionTagStats,
       joinDate: new Date(user.dateRegistered * 1000).toISOString(),
       lastLoginDate: user.lastLogin
         ? new Date(user.lastLogin * 1000).toISOString()
@@ -757,6 +761,9 @@ export class UsersService {
       LIMIT 12
     `;
 
+    // Collection-based tag stats for public profile (only public collection items considered)
+    const collectionTagStats = await this.getUserCollectionTagStatsInternal(user.idMember, false, 12);
+
     return {
       totalReviews: totalReviewsResult,
       reviewStats: (reviewStats as any[]).map(stat => ({
@@ -768,6 +775,98 @@ export class UsersService {
       topGenresAll: (topGenresAll as any[]).map(g => ({ genre: g.genre, count: Number(g.count) })),
       topGenresAnime: (topGenresAnime as any[]).map(g => ({ genre: g.genre, count: Number(g.count) })),
       topGenresManga: (topGenresManga as any[]).map(g => ({ genre: g.genre, count: Number(g.count) })),
+      collectionTagStats,
+    };
+  }
+
+  // Internal helper to compute collection-based tags stats for a user
+  private async getUserCollectionTagStatsInternal(userId: number, includePrivate: boolean, limit = 12) {
+    // Build visibility condition snippets (constant, not user-supplied)
+    const animeVisibility = includePrivate ? '' : 'AND ca.is_public = true';
+    const mangaVisibility = includePrivate ? '' : 'AND cm.is_public = true';
+
+    // Combined (anime + manga)
+    const combinedSql = `
+      SELECT
+        t.id_tag,
+        t.tag_name,
+        t.tag_nice_url,
+        t.categorie,
+        COUNT(*) AS item_count,
+        COALESCE(SUM(c.evaluation), 0) AS sum_rating,
+        AVG(NULLIF(c.evaluation, 0)) AS avg_rating
+      FROM (
+        SELECT ca.id_anime AS item_id, 'anime'::text AS type, ca.evaluation
+        FROM collection_animes ca
+        WHERE ca.id_membre = $1 ${animeVisibility}
+        UNION ALL
+        SELECT cm.id_manga AS item_id, 'manga'::text AS type, cm.evaluation
+        FROM collection_mangas cm
+        WHERE cm.id_membre = $1 ${mangaVisibility}
+      ) c
+      JOIN ak_tag2fiche tf ON tf.type = c.type AND tf.id_fiche = c.item_id
+      JOIN ak_tags t ON t.id_tag = tf.id_tag
+      WHERE t.categorie IN ('Genre', 'Thème')
+      GROUP BY t.id_tag, t.tag_name, t.tag_nice_url, t.categorie
+      ORDER BY sum_rating DESC, item_count DESC, t.tag_name ASC
+      LIMIT $2
+    `;
+    const combined = await this.prisma.$queryRawUnsafe<any[]>(combinedSql, userId, limit);
+
+    // Anime-only
+    const animeOnlySql = `
+      SELECT
+        t.id_tag,
+        t.tag_name,
+        t.tag_nice_url,
+        t.categorie,
+        COUNT(*) AS item_count,
+        COALESCE(SUM(ca.evaluation), 0) AS sum_rating,
+        AVG(NULLIF(ca.evaluation, 0)) AS avg_rating
+      FROM collection_animes ca
+      JOIN ak_tag2fiche tf ON tf.type = 'anime' AND tf.id_fiche = ca.id_anime
+      JOIN ak_tags t ON t.id_tag = tf.id_tag
+      WHERE ca.id_membre = $1 ${animeVisibility} AND t.categorie IN ('Genre', 'Thème')
+      GROUP BY t.id_tag, t.tag_name, t.tag_nice_url, t.categorie
+      ORDER BY sum_rating DESC, item_count DESC, t.tag_name ASC
+      LIMIT $2
+    `;
+    const animeOnly = await this.prisma.$queryRawUnsafe<any[]>(animeOnlySql, userId, limit);
+
+    // Manga-only
+    const mangaOnlySql = `
+      SELECT
+        t.id_tag,
+        t.tag_name,
+        t.tag_nice_url,
+        t.categorie,
+        COUNT(*) AS item_count,
+        COALESCE(SUM(cm.evaluation), 0) AS sum_rating,
+        AVG(NULLIF(cm.evaluation, 0)) AS avg_rating
+      FROM collection_mangas cm
+      JOIN ak_tag2fiche tf ON tf.type = 'manga' AND tf.id_fiche = cm.id_manga
+      JOIN ak_tags t ON t.id_tag = tf.id_tag
+      WHERE cm.id_membre = $1 ${mangaVisibility} AND t.categorie IN ('Genre', 'Thème')
+      GROUP BY t.id_tag, t.tag_name, t.tag_nice_url, t.categorie
+      ORDER BY sum_rating DESC, item_count DESC, t.tag_name ASC
+      LIMIT $2
+    `;
+    const mangaOnly = await this.prisma.$queryRawUnsafe<any[]>(mangaOnlySql, userId, limit);
+
+    const mapRow = (r: any) => ({
+      id: Number(r.id_tag),
+      name: r.tag_name,
+      niceUrl: r.tag_nice_url,
+      category: r.categorie,
+      count: Number(r.item_count || 0),
+      sumRating: Number(r.sum_rating || 0),
+      avgRating: r.avg_rating !== null ? Number(r.avg_rating) : null,
+    });
+
+    return {
+      combinedTop: (combined || []).map(mapRow),
+      animeTop: (animeOnly || []).map(mapRow),
+      mangaTop: (mangaOnly || []).map(mapRow),
     };
   }
 
