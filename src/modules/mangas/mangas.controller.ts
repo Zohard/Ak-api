@@ -95,6 +95,20 @@ export class MangasController {
     return this.mangasService.getMostPopularMangaTags(parsedLimit);
   }
 
+  @Get('most-popular-tags')
+  @ApiOperation({ summary: 'Tags les plus populaires pour les mangas (alias)' })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    description: 'Nombre de tags à retourner',
+    example: 20,
+  })
+  @ApiResponse({ status: 200, description: 'Liste des tags les plus populaires' })
+  async getMostPopularMangaTagsAlias(@Query('limit') limit?: string) {
+    const parsedLimit = limit ? parseInt(limit) : 20;
+    return this.mangasService.getMostPopularMangaTags(parsedLimit);
+  }
+
   @Get('genre/:genre')
   @ApiOperation({ summary: 'Mangas par genre' })
   @ApiParam({ name: 'genre', description: 'Nom du genre', example: 'action' })
