@@ -133,7 +133,11 @@ export class ListsService {
 
     if (sort === 'recent') {
       const rows = await this.prisma.akListesTop.findMany({
-        where: { statut: 1, animeOrManga: mediaType },
+        where: {
+          statut: 1,
+          animeOrManga: mediaType,
+          membre: { idMember: { gt: 0 } }
+        },
         orderBy: { dateCreation: 'desc' },
         take: limit,
         include: { membre: { select: { idMember: true, memberName: true } } },
@@ -142,7 +146,11 @@ export class ListsService {
     } else {
       // Popular: compute popularity score on the fly and sort in JS
       const lists = await this.prisma.akListesTop.findMany({
-        where: { statut: 1, animeOrManga: mediaType },
+        where: {
+          statut: 1,
+          animeOrManga: mediaType,
+          membre: { idMember: { gt: 0 } }
+        },
         orderBy: { idListe: 'desc' },
         take: 100,
         include: { membre: { select: { idMember: true, memberName: true } } },
