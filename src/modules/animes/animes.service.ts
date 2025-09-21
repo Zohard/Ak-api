@@ -193,30 +193,36 @@ export class AnimesService extends BaseContentService<
     }
 
     // Handle genre filtering via tags
-    if (genre) {
-      // URL decode the genre parameter
-      const decodedGenre = decodeURIComponent(genre.replace(/\+/g, ' '));
+    if (genre && genre.length > 0) {
+      // URL decode all genre parameters
+      const decodedGenres = genre.map(g => decodeURIComponent(g.replace(/\+/g, ' ')));
 
-      // Get anime IDs that have the specified genre tag
-      const animeIdsWithGenre = await this.prisma.$queryRaw`
-        SELECT DISTINCT tf.id_fiche
-        FROM ak_tags t
-        INNER JOIN ak_tag2fiche tf ON t.id_tag = tf.id_tag
-        WHERE LOWER(t.tag_name) = LOWER(${decodedGenre})
-          AND tf.type = 'anime'
-      `;
+      // Get anime IDs that have ALL the specified genre tags (AND logic)
+      let animeIdsWithGenres: any[];
 
-      const animeIdsArray = animeIdsWithGenre as any[];
-      console.log('SQL Query Result:', JSON.stringify(animeIdsArray.slice(0, 3), null, 2));
-      const animeIds = animeIdsArray.map(row => {
-        console.log('Row keys:', Object.keys(row));
-        return row.id_fiche || row.idFiche || row.ID_FICHE || row.idfiche;
-      }).filter(id => id !== undefined);
+      // Use a single grouped query to enforce AND semantics for multiple genres
+      if (decodedGenres.length > 0) {
+        const genresLower = decodedGenres.map(g => g.toLowerCase());
+        animeIdsWithGenres = await this.prisma.$queryRaw<Array<{ id_fiche: number }>>`
+          SELECT tf.id_fiche
+          FROM ak_tags t
+          INNER JOIN ak_tag2fiche tf ON t.id_tag = tf.id_tag
+          WHERE LOWER(t.tag_name) IN (${Prisma.join(genresLower)})
+            AND tf.type = 'anime'
+          GROUP BY tf.id_fiche
+          HAVING COUNT(DISTINCT LOWER(t.tag_name)) = ${genresLower.length}
+        `;
+      } else {
+        animeIdsWithGenres = [];
+      }
+
+      const animeIdsArray = (animeIdsWithGenres as any[]) || [];
+      const animeIds = animeIdsArray.map(row => row.id_fiche).filter(id => id !== undefined);
 
       if (animeIds.length > 0) {
         where.idAnime = { in: animeIds };
       } else {
-        // If no animes found with this genre, return empty result
+        // If no animes found with these genres, return empty result
         where.idAnime = { in: [] };
       }
     }
@@ -895,14 +901,15 @@ export class AnimesService extends BaseContentService<
       studio = '',
       annee = '',
       statut = '',
-      genre = '',
+      genre = [],
       sortBy = 'dateAjout',
       sortOrder = 'desc',
       includeReviews = false,
       includeEpisodes = false,
     } = query;
 
-    return `${page}_${limit}_${search}_${studio}_${annee}_${statut}_${genre}_${sortBy}_${sortOrder}_${includeReviews}_${includeEpisodes}`;
+    const genreKey = Array.isArray(genre) ? genre.sort().join(',') : (genre || '');
+    return `${page}_${limit}_${search}_${studio}_${annee}_${statut}_${genreKey}_${sortBy}_${sortOrder}_${includeReviews}_${includeEpisodes}`;
   }
 
   // Cache invalidation methods
