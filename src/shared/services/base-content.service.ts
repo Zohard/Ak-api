@@ -37,17 +37,20 @@ export abstract class BaseContentService<T, CreateDto, UpdateDto, QueryDto> {
   }
 
   async getItemsByGenre(genre: string, limit = 20, statusFilter = 1) {
+    // URL decode the genre parameter
+    const decodedGenre = decodeURIComponent(genre.replace(/\+/g, ' '));
+
     const items = await this.model.findMany({
       where: {
         statut: statusFilter,
-        genre: { contains: genre, mode: 'insensitive' },
+        genre: { contains: decodedGenre, mode: 'insensitive' },
       },
       take: limit,
       orderBy: { note: 'desc' },
     });
 
     return {
-      genre,
+      genre: decodedGenre,
       [this.tableName]: items.map(this.formatItem.bind(this)),
       count: items.length,
     };

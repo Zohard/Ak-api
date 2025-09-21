@@ -171,12 +171,15 @@ export class MangasService extends BaseContentService<
 
     // Handle genre filtering via tags
     if (genre) {
+      // URL decode the genre parameter
+      const decodedGenre = decodeURIComponent(genre.replace(/\+/g, ' '));
+
       // Get manga IDs that have the specified genre tag
       const mangaIdsWithGenre = await this.prisma.$queryRaw`
         SELECT DISTINCT tf.id_fiche as manga_id
         FROM ak_tags t
         INNER JOIN ak_tag2fiche tf ON t.id_tag = tf.id_tag
-        WHERE LOWER(t.tag_name) = LOWER(${genre})
+        WHERE LOWER(t.tag_name) = LOWER(${decodedGenre})
           AND tf.type = 'manga'
           AND t.categorie = 'Genre'
       `;
@@ -607,6 +610,46 @@ export class MangasService extends BaseContentService<
   }
 
   // Use inherited getGenres() method
+
+  async getItemsByGenre(genre: string, limit = 20, statusFilter = 1) {
+    // URL decode the genre parameter
+    const decodedGenre = decodeURIComponent(genre.replace(/\+/g, ' '));
+
+    // Get manga IDs that have the specified genre tag
+    const mangaIdsWithGenre = await this.prisma.$queryRaw`
+      SELECT DISTINCT tf.id_fiche as manga_id
+      FROM ak_tags t
+      INNER JOIN ak_tag2fiche tf ON t.id_tag = tf.id_tag
+      WHERE LOWER(t.tag_name) = LOWER(${decodedGenre})
+        AND tf.type = 'manga'
+        AND t.categorie = 'Genre'
+    `;
+
+    const mangaIds = (mangaIdsWithGenre as any[]).map(row => row.manga_id);
+
+    if (mangaIds.length === 0) {
+      return {
+        genre: decodedGenre,
+        ak_mangas: [],
+        count: 0,
+      };
+    }
+
+    const mangas = await this.prisma.akManga.findMany({
+      where: {
+        idManga: { in: mangaIds },
+        statut: statusFilter,
+      },
+      take: limit,
+      orderBy: { moyenneNotes: 'desc' },
+    });
+
+    return {
+      genre: decodedGenre,
+      ak_mangas: mangas.map(this.formatManga.bind(this)),
+      count: mangas.length,
+    };
+  }
 
   async getMangasByGenre(genre: string, limit = 20) {
     const result = await this.getItemsByGenre(genre, limit);
