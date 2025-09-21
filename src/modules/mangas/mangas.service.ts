@@ -169,27 +169,31 @@ export class MangasService extends BaseContentService<
       where.statut = statut;
     }
 
-    // Handle genre filtering via tags
-    if (genre) {
-      // URL decode the genre parameter
-      const decodedGenre = decodeURIComponent(genre.replace(/\+/g, ' '));
+    // Handle genre filtering via tags (supports multiple genres, AND logic)
+    if (genre && genre.length > 0) {
+      // URL decode all genre parameters
+      const decodedGenres = genre.map(g => decodeURIComponent(g.replace(/\+/g, ' ')));
 
-      // Get manga IDs that have the specified genre tag
-      const mangaIdsWithGenre = await this.prisma.$queryRaw`
-        SELECT DISTINCT tf.id_fiche as manga_id
-        FROM ak_tags t
-        INNER JOIN ak_tag2fiche tf ON t.id_tag = tf.id_tag
-        WHERE LOWER(t.tag_name) = LOWER(${decodedGenre})
-          AND tf.type = 'manga'
-          AND t.categorie = 'Genre'
-      `;
-      
-      const mangaIds = (mangaIdsWithGenre as any[]).map(row => row.manga_id);
-      
+      let mangaIdsWithGenres: any[] = [];
+
+      if (decodedGenres.length > 0) {
+        const genresLower = decodedGenres.map(g => g.toLowerCase());
+        mangaIdsWithGenres = await this.prisma.$queryRaw<Array<{ manga_id: number }>>`
+          SELECT tf.id_fiche AS manga_id
+          FROM ak_tags t
+          INNER JOIN ak_tag2fiche tf ON t.id_tag = tf.id_tag
+          WHERE LOWER(t.tag_name) IN (${Prisma.join(genresLower)})
+            AND tf.type = 'manga'
+          GROUP BY tf.id_fiche
+          HAVING COUNT(DISTINCT LOWER(t.tag_name)) = ${genresLower.length}
+        `;
+      }
+
+      const mangaIds = (mangaIdsWithGenres as any[]).map(row => row.manga_id).filter((id: number) => id !== undefined);
+
       if (mangaIds.length > 0) {
         where.idManga = { in: mangaIds };
       } else {
-        // If no mangas found with this genre, return empty result
         where.idManga = { in: [] };
       }
     }
@@ -622,7 +626,6 @@ export class MangasService extends BaseContentService<
       INNER JOIN ak_tag2fiche tf ON t.id_tag = tf.id_tag
       WHERE LOWER(t.tag_name) = LOWER(${decodedGenre})
         AND tf.type = 'manga'
-        AND t.categorie = 'Genre'
     `;
 
     const mangaIds = (mangaIdsWithGenre as any[]).map(row => row.manga_id);
@@ -723,13 +726,14 @@ export class MangasService extends BaseContentService<
       auteur = '',
       annee = '',
       statut = '',
-      genre = '',
+      genre = [],
       sortBy = 'dateAjout',
       sortOrder = 'desc',
       includeReviews = false,
     } = query;
 
-    return `${page}_${limit}_${search}_${auteur}_${annee}_${statut}_${genre}_${sortBy}_${sortOrder}_${includeReviews}`;
+    const genreKey = Array.isArray(genre) ? genre.sort().join(',') : (genre as any || '');
+    return `${page}_${limit}_${search}_${auteur}_${annee}_${statut}_${genreKey}_${sortBy}_${sortOrder}_${includeReviews}`;
   }
 
   // Cache invalidation methods

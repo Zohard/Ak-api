@@ -73,13 +73,29 @@ export class AnimeQueryDto {
   statut?: number;
 
   @ApiPropertyOptional({
-    description: 'Filtrer par genre',
+    description: 'Filtrer par genre (un seul genre ou plusieurs séparés par des virgules)',
     example: 'Action',
+    examples: {
+      single: { value: 'Action', description: 'Un seul genre' },
+      multiple: { value: 'Action,Romance,Comédie', description: 'Plusieurs genres séparés par des virgules' }
+    }
   })
   @IsOptional()
-  @IsString()
-  @Transform(({ value }) => value === '' ? undefined : value)
-  genre?: string;
+  @IsArray()
+  @IsString({ each: true })
+  @Transform(({ value }) => {
+    if (!value || value === '') return undefined;
+    // Handle comma-separated genres
+    if (typeof value === 'string') {
+      return value.split(',').map(g => g.trim()).filter(g => g !== '');
+    }
+    // Handle array (from multiple query params)
+    if (Array.isArray(value)) {
+      return value.filter(v => v && v !== '');
+    }
+    return undefined;
+  })
+  genre?: string[];
 
   @ApiPropertyOptional({
     description: 'Trier par',

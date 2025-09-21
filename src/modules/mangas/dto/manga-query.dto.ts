@@ -72,13 +72,27 @@ export class MangaQueryDto {
   statut?: number;
 
   @ApiPropertyOptional({
-    description: 'Filtrer par genre',
+    description: 'Filtrer par genre (un ou plusieurs, séparés par des virgules)',
     example: 'Action',
+    examples: {
+      single: { value: 'Action', description: 'Un seul genre' },
+      multiple: { value: 'Action,Romance,Comédie', description: 'Plusieurs genres séparés par des virgules' },
+    },
   })
   @IsOptional()
-  @IsString()
-  @Transform(({ value }) => value === '' ? undefined : value)
-  genre?: string;
+  @IsArray()
+  @IsString({ each: true })
+  @Transform(({ value }) => {
+    if (!value || value === '') return undefined;
+    if (typeof value === 'string') {
+      return value.split(',').map((g: string) => g.trim()).filter((g: string) => g !== '');
+    }
+    if (Array.isArray(value)) {
+      return value.filter((v: string) => v && v !== '');
+    }
+    return undefined;
+  })
+  genre?: string[];
 
   @ApiPropertyOptional({
     description: 'Champ pour le tri',
