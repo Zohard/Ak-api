@@ -559,6 +559,16 @@ export class ArticlesService {
       },
     });
 
+    // If an image is provided, create an entry in ak_webzine_img
+    if (articleData.img) {
+      await this.prisma.akWebzineImg.create({
+        data: {
+          idArt: article.ID,
+          urlImg: articleData.img,
+        },
+      });
+    }
+
     return this.transformPost(article, true);
   }
 
@@ -620,6 +630,30 @@ export class ArticlesService {
         postMeta: true,
       },
     });
+
+    // Handle image update if provided
+    if (updateData.img) {
+      // First check if an image entry already exists for this article
+      const existingImage = await this.prisma.akWebzineImg.findFirst({
+        where: { idArt: BigInt(id) },
+      });
+
+      if (existingImage) {
+        // Update existing image
+        await this.prisma.akWebzineImg.update({
+          where: { idImg: existingImage.idImg },
+          data: { urlImg: updateData.img },
+        });
+      } else {
+        // Create new image entry
+        await this.prisma.akWebzineImg.create({
+          data: {
+            idArt: BigInt(id),
+            urlImg: updateData.img,
+          },
+        });
+      }
+    }
 
     return this.transformPost(updatedArticle, true);
   }
