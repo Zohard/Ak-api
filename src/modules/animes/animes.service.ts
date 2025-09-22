@@ -142,6 +142,7 @@ export class AnimesService extends BaseContentService<
       studio,
       annee,
       statut,
+      format,
       genre,
       sortBy,
       sortOrder,
@@ -190,6 +191,10 @@ export class AnimesService extends BaseContentService<
 
     if (statut !== undefined) {
       where.statut = statut;
+    }
+
+    if (format) {
+      where.format = format;
     }
 
     // Handle genre filtering via tags
