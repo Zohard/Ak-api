@@ -122,7 +122,7 @@ export class AdminArticlesController {
   @ApiResponse({ status: 200, description: 'Article retrieved successfully' })
   @ApiResponse({ status: 404, description: 'Article not found' })
   findOne(@Param('id', ParseIntPipe) id: number) {
-    return this.articlesService.getById(id);
+    return this.articlesService.getById(id, true);
   }
 
   @Patch(':id')
