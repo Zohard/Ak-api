@@ -359,6 +359,17 @@ export class ArticlesService {
       throw new NotFoundException('Article not found');
     }
 
+    // Debug logging for article 3920
+    if (id === 3920) {
+      console.log('Article 3920 from database:', {
+        ID: post.ID,
+        postTitle: post.postTitle,
+        postContentLength: post.postContent ? post.postContent.length : 'null/undefined',
+        postExcerptLength: post.postExcerpt ? post.postExcerpt.length : 'null/undefined',
+        includeContent
+      });
+    }
+
     // Increment view count
     await this.incrementViewCount(id);
 
