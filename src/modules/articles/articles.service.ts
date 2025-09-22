@@ -561,12 +561,21 @@ export class ArticlesService {
 
     // If an image is provided, create an entry in ak_webzine_img
     if (articleData.img) {
-      await this.prisma.akWebzineImg.create({
-        data: {
-          idArt: article.ID,
-          urlImg: articleData.img,
-        },
-      });
+      console.log('Creating ak_webzine_img entry for article:', article.ID, 'with image:', articleData.img);
+      try {
+        const imageEntry = await this.prisma.akWebzineImg.create({
+          data: {
+            idArt: article.ID,
+            urlImg: articleData.img,
+          },
+        });
+        console.log('Successfully created ak_webzine_img entry:', imageEntry);
+      } catch (error) {
+        console.error('Error creating ak_webzine_img entry:', error);
+        throw error;
+      }
+    } else {
+      console.log('No image provided in articleData.img');
     }
 
     return this.transformPost(article, true);
@@ -633,26 +642,38 @@ export class ArticlesService {
 
     // Handle image update if provided
     if (updateData.img) {
-      // First check if an image entry already exists for this article
-      const existingImage = await this.prisma.akWebzineImg.findFirst({
-        where: { idArt: BigInt(id) },
-      });
+      console.log('Updating image for article:', id, 'with image:', updateData.img);
+      try {
+        // First check if an image entry already exists for this article
+        const existingImage = await this.prisma.akWebzineImg.findFirst({
+          where: { idArt: BigInt(id) },
+        });
 
-      if (existingImage) {
-        // Update existing image
-        await this.prisma.akWebzineImg.update({
-          where: { idImg: existingImage.idImg },
-          data: { urlImg: updateData.img },
-        });
-      } else {
-        // Create new image entry
-        await this.prisma.akWebzineImg.create({
-          data: {
-            idArt: BigInt(id),
-            urlImg: updateData.img,
-          },
-        });
+        if (existingImage) {
+          // Update existing image
+          console.log('Updating existing ak_webzine_img entry:', existingImage.idImg);
+          await this.prisma.akWebzineImg.update({
+            where: { idImg: existingImage.idImg },
+            data: { urlImg: updateData.img },
+          });
+          console.log('Successfully updated ak_webzine_img entry');
+        } else {
+          // Create new image entry
+          console.log('Creating new ak_webzine_img entry for article:', id);
+          const imageEntry = await this.prisma.akWebzineImg.create({
+            data: {
+              idArt: BigInt(id),
+              urlImg: updateData.img,
+            },
+          });
+          console.log('Successfully created ak_webzine_img entry:', imageEntry);
+        }
+      } catch (error) {
+        console.error('Error handling image update:', error);
+        throw error;
       }
+    } else {
+      console.log('No image provided in updateData.img for article:', id);
     }
 
     return this.transformPost(updatedArticle, true);
