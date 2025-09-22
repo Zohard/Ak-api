@@ -218,7 +218,12 @@ export class UsersService {
     // Handle other fields
     Object.entries(otherFields).forEach(([key, value]) => {
       if (value !== undefined) {
-        updateData[key] = value;
+        if (key === 'birthdate' && typeof value === 'string') {
+          // Convert YYYY-MM-DD string to DateTime for Prisma
+          updateData[key] = new Date(value + 'T00:00:00.000Z');
+        } else {
+          updateData[key] = value;
+        }
       }
     });
 
