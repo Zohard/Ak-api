@@ -73,6 +73,16 @@ export class AnimeQueryDto {
   statut?: number;
 
   @ApiPropertyOptional({
+    description: 'Filtrer par format',
+    example: 'Série TV',
+    enum: ['Série TV', 'Film', 'OAV', 'ONA', 'Clip', 'Spécial'],
+  })
+  @IsOptional()
+  @IsString()
+  @IsIn(['Série TV', 'Film', 'OAV', 'ONA', 'Clip', 'Spécial'])
+  format?: string;
+
+  @ApiPropertyOptional({
     description: 'Filtrer par genre (un seul genre ou plusieurs séparés par des virgules)',
     example: 'Action',
     examples: {
