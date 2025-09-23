@@ -151,24 +151,35 @@ export abstract class BaseContentService<T, CreateDto, UpdateDto, QueryDto> {
       );
     }
 
-    // Get tags using raw SQL for now (until we have proper relations)
-    const tags = await this.prisma.$queryRaw`
-      SELECT 
-        t.id_tag,
-        t.tag_name,
-        t.tag_nice_url,
-        t.description,
-        t.categorie
-      FROM ak_tags t
-      INNER JOIN ak_tag2fiche tf ON t.id_tag = tf.id_tag
-      WHERE tf.id_fiche = ${id} AND tf.type = ${type}
-      ORDER BY t.categorie, t.tag_name
-    `;
+    // For now, return empty tags since the tag tables don't exist in the current schema
+    // TODO: Implement proper tag system when tag tables are created
+    try {
+      // Try to get tags using raw SQL (this will fail if tables don't exist)
+      const tags = await this.prisma.$queryRaw`
+        SELECT
+          t.id_tag,
+          t.tag_name,
+          t.tag_nice_url,
+          t.description,
+          t.categorie
+        FROM ak_tags t
+        INNER JOIN ak_tag2fiche tf ON t.id_tag = tf.id_tag
+        WHERE tf.id_fiche = ${id} AND tf.type = ${type}
+        ORDER BY t.categorie, t.tag_name
+      `;
 
-    return {
-      [`${type}_id`]: id,
-      tags,
-    };
+      return {
+        [`${type}_id`]: id,
+        tags,
+      };
+    } catch (error) {
+      // If tag tables don't exist, return empty tags instead of throwing error
+      console.warn(`Tag tables not found, returning empty tags for ${type} ${id}`);
+      return {
+        [`${type}_id`]: id,
+        tags: [],
+      };
+    }
   }
 
   protected abstract getAutocompleteSelectFields(): any;
