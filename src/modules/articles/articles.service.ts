@@ -212,6 +212,14 @@ export class ArticlesService {
             },
             take: 10, // Limit meta fields
           },
+          // Include webzine images
+          akWebzineImgs: {
+            select: {
+              idImg: true,
+              urlImg: true,
+            },
+            take: 1, // Only get the first image for the article
+          },
           // Simplified comment count
           _count: {
             select: {
@@ -249,8 +257,9 @@ export class ArticlesService {
           niceUrl: rel.termTaxonomy.term.slug,
         }));
 
-      // Get the best image URL (prioritize ak_img, then img, then thumbnail)
-      const imageUrl = akImgMeta?.metaValue || imgMeta?.metaValue || thumbnailMeta?.metaValue;
+      // Get the best image URL (prioritize ak_webzine_img, then ak_img, then img, then thumbnail)
+      const webzineImageUrl = post.akWebzineImgs?.[0]?.urlImg;
+      const imageUrl = webzineImageUrl || akImgMeta?.metaValue || imgMeta?.metaValue || thumbnailMeta?.metaValue;
 
       return {
         idArt: Number(post.ID),
@@ -352,6 +361,14 @@ export class ArticlesService {
         images: {
           orderBy: { idImg: 'desc' },
         },
+        // Include webzine images
+        akWebzineImgs: {
+          select: {
+            idImg: true,
+            urlImg: true,
+          },
+          orderBy: { idImg: 'desc' },
+        },
       },
     });
 
@@ -426,6 +443,14 @@ export class ArticlesService {
         images: {
           orderBy: { idImg: 'desc' },
         },
+        // Include webzine images
+        akWebzineImgs: {
+          select: {
+            idImg: true,
+            urlImg: true,
+          },
+          orderBy: { idImg: 'desc' },
+        },
       },
     });
 
@@ -486,6 +511,14 @@ export class ArticlesService {
           },
         },
         postMeta: true,
+        // Include webzine images
+        akWebzineImgs: {
+          select: {
+            idImg: true,
+            urlImg: true,
+          },
+          take: 1, // Only get the first image for the article
+        },
         _count: {
           select: {
             comments: {
@@ -885,7 +918,7 @@ export class ArticlesService {
       postName: post.postName,
       date: post.postDate.toISOString(),
       postDate: post.postDate.toISOString(),
-      img: this.transformImageUrl(akImgMeta?.metaValue || imgMeta?.metaValue || thumbnailMeta?.metaValue),
+      img: this.transformImageUrl(post.akWebzineImgs?.[0]?.urlImg || akImgMeta?.metaValue || imgMeta?.metaValue || thumbnailMeta?.metaValue),
       imgunebig: imgunebigMeta?.metaValue || null,
       imgunebig2: null,
       auteur: post.postAuthor,
