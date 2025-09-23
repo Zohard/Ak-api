@@ -208,17 +208,26 @@ export class ArticlesService {
                 { metaKey: 'ak_img' },
                 { metaKey: 'img' },
                 { metaKey: 'views' },
+                { metaKey: 'excerpt' },
               ],
             },
             take: 10, // Limit meta fields
           },
           // Include webzine images
-          akWebzineImgs: {
+          images: {
             select: {
               idImg: true,
               urlImg: true,
             },
             take: 1, // Only get the first image for the article
+          },
+          // Include WordPress author
+          wpAuthor: {
+            select: {
+              ID: true,
+              userLogin: true,
+              displayName: true,
+            },
           },
           // Simplified comment count
           _count: {
@@ -258,7 +267,7 @@ export class ArticlesService {
         }));
 
       // Get the best image URL (prioritize ak_webzine_img, then ak_img, then img, then thumbnail)
-      const webzineImageUrl = post.akWebzineImgs?.[0]?.urlImg;
+      const webzineImageUrl = post.images?.[0]?.urlImg;
       const imageUrl = webzineImageUrl || akImgMeta?.metaValue || imgMeta?.metaValue || thumbnailMeta?.metaValue;
 
       return {
@@ -358,11 +367,8 @@ export class ArticlesService {
           orderBy: { commentDate: 'asc' },
         },
         postMeta: true,
-        images: {
-          orderBy: { idImg: 'desc' },
-        },
         // Include webzine images
-        akWebzineImgs: {
+        images: {
           select: {
             idImg: true,
             urlImg: true,
@@ -440,11 +446,8 @@ export class ArticlesService {
           orderBy: { commentDate: 'asc' },
         },
         postMeta: true,
-        images: {
-          orderBy: { idImg: 'desc' },
-        },
         // Include webzine images
-        akWebzineImgs: {
+        images: {
           select: {
             idImg: true,
             urlImg: true,
@@ -512,7 +515,7 @@ export class ArticlesService {
         },
         postMeta: true,
         // Include webzine images
-        akWebzineImgs: {
+        images: {
           select: {
             idImg: true,
             urlImg: true,
@@ -918,7 +921,7 @@ export class ArticlesService {
       postName: post.postName,
       date: post.postDate.toISOString(),
       postDate: post.postDate.toISOString(),
-      img: this.transformImageUrl(post.akWebzineImgs?.[0]?.urlImg || akImgMeta?.metaValue || imgMeta?.metaValue || thumbnailMeta?.metaValue),
+      img: this.transformImageUrl(post.images?.[0]?.urlImg || akImgMeta?.metaValue || imgMeta?.metaValue || thumbnailMeta?.metaValue),
       imgunebig: imgunebigMeta?.metaValue || null,
       imgunebig2: null,
       auteur: post.postAuthor,
