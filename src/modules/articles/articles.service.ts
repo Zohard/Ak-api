@@ -221,14 +221,6 @@ export class ArticlesService {
             },
             take: 1, // Only get the first image for the article
           },
-          // Include WordPress author
-          wpAuthor: {
-            select: {
-              ID: true,
-              userLogin: true,
-              displayName: true,
-            },
-          },
           // Simplified comment count
           _count: {
             select: {
