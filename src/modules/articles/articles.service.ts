@@ -258,9 +258,13 @@ export class ArticlesService {
           niceUrl: rel.termTaxonomy.term.slug,
         }));
 
-      // Get the best image URL (prioritize ak_webzine_img, then ak_img, then img, then thumbnail)
+      // Get the best image URL (prioritize ak_webzine_img, then ak_img, then img, then thumbnail, then extract from content)
       const webzineImageUrl = post.images?.[0]?.urlImg;
-      const imageUrl = webzineImageUrl || akImgMeta?.metaValue || imgMeta?.metaValue || thumbnailMeta?.metaValue;
+      const imageUrl = webzineImageUrl ||
+        akImgMeta?.metaValue ||
+        imgMeta?.metaValue ||
+        thumbnailMeta?.metaValue ||
+        this.extractFirstImageFromContent(post.postContent);
 
       return {
         idArt: Number(post.ID),
@@ -324,7 +328,6 @@ export class ArticlesService {
   }
 
   async getById(id: number, includeContent: boolean = true) {
-    // Check cache first
     const cached = await this.cacheService.getArticle(id);
     if (cached) {
       return cached;
@@ -389,8 +392,7 @@ export class ArticlesService {
     await this.incrementViewCount(id);
 
     const result = this.transformPost(post, includeContent);
-    
-    // Cache the result for 30 minutes
+
     await this.cacheService.setArticle(id, result, 1800);
 
     return result;
@@ -916,7 +918,19 @@ export class ArticlesService {
       postName: post.postName,
       date: post.postDate.toISOString(),
       postDate: post.postDate.toISOString(),
-      img: this.transformImageUrl(post.images?.[0]?.urlImg || akImgMeta?.metaValue || imgMeta?.metaValue || thumbnailMeta?.metaValue),
+      img: (() => {
+        const webzineImg = post.images?.[0]?.urlImg;
+        const akImg = akImgMeta?.metaValue;
+        const img = imgMeta?.metaValue;
+        const thumbnail = thumbnailMeta?.metaValue;
+        const extracted = this.extractFirstImageFromContent(post.postContent);
+
+        console.log(`Article ${post.ID} image sources:`, {
+          webzineImg, akImg, img, thumbnail, extracted
+        });
+
+        return this.transformImageUrl(webzineImg || akImg || img || thumbnail || extracted);
+      })(),
       imgunebig: imgunebigMeta?.metaValue || null,
       imgunebig2: null,
       auteur: post.postAuthor,
@@ -985,6 +999,21 @@ export class ArticlesService {
 
     // If it's an ImageKit path, generate the full URL
     return this.imagekitService.getImageUrl(imageUrl);
+  }
+
+  private extractFirstImageFromContent(content: string | null): string | null {
+    if (!content) return null;
+
+    // Extract the first image src from HTML content
+    const imgRegex = /<img[^>]+src=["']([^"']+)["'][^>]*>/i;
+    const match = content.match(imgRegex);
+
+    if (match && match[1]) {
+      console.log('Extracted image from content:', match[1]);
+      return match[1];
+    }
+
+    return null;
   }
 
   async importImageFromUrl(articleId: number, imageUrl: string, customFileName?: string): Promise<any> {
