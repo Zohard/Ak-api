@@ -760,6 +760,9 @@ export class ArticlesService {
       where: { ID: BigInt(id) },
     });
 
+    // Invalidate cache for this article
+    await this.cacheService.invalidateArticle(id);
+
     return { message: 'Article deleted successfully' };
   }
 

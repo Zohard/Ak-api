@@ -330,6 +330,15 @@ export class CacheService implements OnModuleInit {
     await this.set('featured_articles', articles, ttl); // 1 hour for featured articles
   }
 
+  async invalidateArticle(id: number): Promise<void> {
+    await Promise.all([
+      this.del(`article:${id}`),
+      this.delByPattern(`articles_list:*`), // Invalidate all article lists
+      this.del('featured_articles'), // Invalidate featured articles
+    ]);
+    this.logger.debug(`Invalidated article cache for ID: ${id}`);
+  }
+
   // Health check method
   async isHealthy(): Promise<boolean> {
     if (!this.redis) return false;
