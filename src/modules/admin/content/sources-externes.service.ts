@@ -61,7 +61,7 @@ export class SourcesExternesService {
     
     eltMatches.forEach((eltHtml) => {
       // Extract title from h2 > a within title div
-      const titleMatch = eltHtml.match(/<div[^>]*class="[^"]*title[^"]*"[^>]*>[\s\S]*?<h2[^>]*>[\s\S]*?<a[^>]*>([^<]+)<\/a>/i) as RegExpMatchArray | null;
+      const titleMatch = eltHtml.match(/<div[^>]*class="[^"]*title[^"]*"[^>]*>[\s\S]*?<h2[^>]*>[\s\S]*?<a[^>]*>([^<]+)<\/a>/i);
       if (titleMatch && titleMatch[1]) {
         let title = titleMatch[1].trim();
         // Remove anything in parentheses
@@ -76,7 +76,7 @@ export class SourcesExternesService {
     if (titles.length === 0) {
       const h2Matches = htmlContent.match(/<h2[^>]*>[\s\S]*?<a[^>]*>([^<]+)<\/a>[\s\S]*?<\/h2>/gi) || [];
       h2Matches.forEach((h2Html) => {
-        const titleMatch = h2Html.match(/<a[^>]*>([^<]+)<\/a>/i) as RegExpMatchArray | null;
+        const titleMatch = h2Html.match(/<a[^>]*>([^<]+)<\/a>/i);
         if (titleMatch && titleMatch[1]) {
           let title = titleMatch[1].trim();
           // Remove anything in parentheses
