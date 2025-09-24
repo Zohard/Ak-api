@@ -24,6 +24,7 @@ import { ScrapeModule } from './modules/scrape/scrape.module';
 import { FriendsModule } from './modules/friends/friends.module';
 import { LegacyModule } from './modules/legacy/legacy.module';
 import { SynopsisModule } from './modules/synopsis/synopsis.module';
+import { MetricsModule } from './modules/metrics/metrics.module';
 import { PrismaService } from './shared/services/prisma.service';
 import { CacheService } from './shared/services/cache.service';
 import databaseConfig from './config/database.config';
@@ -58,6 +59,7 @@ import jwtConfig from './config/jwt.config';
     SynopsisModule,
     ScrapeModule,
     LegacyModule,
+    MetricsModule,
   ],
   controllers: [AppController],
   providers: [AppService, PrismaService, CacheService],
