@@ -54,6 +54,17 @@ export class MetricsService {
   }
 
   /**
+   * Track general page view
+   */
+  trackPageView(page: string, userId?: string) {
+    this.pageViewCounter.inc({
+      section: 'pageview',
+      item_type: 'page',
+      item_id: page
+    });
+  }
+
+  /**
    * Track API request duration
    */
   trackApiDuration(method: string, route: string, statusCode: number, durationMs: number) {
