@@ -364,7 +364,6 @@ model WpPost {
 
   // Relations
   wpAuthor             WpUser? @relation(fields: [postAuthor], references: [ID], onDelete: SetNull)
-  postAuthorSmfMember  SmfMember? @relation("PostAuthor", fields: [postAuthor], references: [idMember], onDelete: SetNull)
   comments             WpComment[]
   postMeta             WpPostMeta[]
   termRelationships    WpTermRelationship[]
