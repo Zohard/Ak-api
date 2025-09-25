@@ -340,6 +340,7 @@ model AdminAuditLog {
 model WpPost {
   ID                    BigInt    @id @default(autoincrement())
   postAuthor           BigInt?   @map("post_author")
+  smfAuthorId          Int?      @map("smf_author_id")
   postDate             DateTime  @map("post_date") @db.Timestamp
   postDateGmt          DateTime  @map("post_date_gmt") @db.Timestamp
   postContent          String?   @map("post_content") @db.Text
@@ -364,6 +365,7 @@ model WpPost {
 
   // Relations
   wpAuthor             WpUser? @relation(fields: [postAuthor], references: [ID], onDelete: SetNull)
+  smfAuthor            SmfMember? @relation("PostAuthor", fields: [smfAuthorId], references: [idMember], onDelete: SetNull)
   comments             WpComment[]
   postMeta             WpPostMeta[]
   termRelationships    WpTermRelationship[]
