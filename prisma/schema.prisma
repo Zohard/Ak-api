@@ -44,6 +44,7 @@ model SmfMember {
   mangaCollections CollectionManga[] @relation("UserMangaCollection")
   synopsisSubmissions AkSynopsis[]   @relation("UserSynopsis")
   listesTop        AkListesTop[]
+  authoredPosts    WpPost[] @relation("PostAuthor")
 
   @@map("smf_members")
 }
@@ -363,6 +364,7 @@ model WpPost {
 
   // Relations
   wpAuthor             WpUser? @relation(fields: [postAuthor], references: [ID], onDelete: SetNull)
+  postAuthorSmfMember  SmfMember? @relation("PostAuthor", fields: [postAuthor], references: [idMember], onDelete: SetNull)
   comments             WpComment[]
   postMeta             WpPostMeta[]
   termRelationships    WpTermRelationship[]
