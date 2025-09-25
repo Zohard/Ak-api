@@ -170,12 +170,12 @@ export class ArticlesService {
       this.prisma.wpPost.findMany({
         where,
         include: {
-          // Include author relationship
-          wpAuthor: {
+          // Include author relationship from SMF members instead of wp_users
+          postAuthorSmfMember: {
             select: {
-              ID: true,
-              userLogin: true,
-              displayName: true,
+              idMember: true,
+              memberName: true,
+              realName: true,
             },
           },
           // Only load category relationships to reduce joins
@@ -288,10 +288,10 @@ export class ArticlesService {
         nbClics: viewsMeta ? parseInt(viewsMeta.metaValue || '0') : 0,
         statut: post.postStatus === 'publish' ? 1 : 0,
         postStatus: post.postStatus,
-        author: post.wpAuthor ? {
-          idMember: Number(post.wpAuthor.ID),
-          memberName: post.wpAuthor.userLogin,
-          realName: post.wpAuthor.displayName,
+        author: post.postAuthorSmfMember ? {
+          idMember: post.postAuthorSmfMember.idMember,
+          memberName: post.postAuthorSmfMember.memberName,
+          realName: post.postAuthorSmfMember.realName,
         } : {
           idMember: null,
           memberName: 'Unknown',
@@ -336,11 +336,11 @@ export class ArticlesService {
     const post = await this.prisma.wpPost.findUnique({
       where: { ID: BigInt(id) },
       include: {
-        wpAuthor: {
+        postAuthorSmfMember: {
           select: {
-            ID: true,
-            userLogin: true,
-            displayName: true,
+            idMember: true,
+            memberName: true,
+            realName: true,
           },
         },
         termRelationships: {
@@ -414,11 +414,11 @@ export class ArticlesService {
         postStatus: 'publish'
       },
       include: {
-        wpAuthor: {
+        postAuthorSmfMember: {
           select: {
-            ID: true,
-            userLogin: true,
-            displayName: true,
+            idMember: true,
+            memberName: true,
+            realName: true,
           },
         },
         termRelationships: {
@@ -486,11 +486,11 @@ export class ArticlesService {
         },
       },
       include: {
-        wpAuthor: {
+        postAuthorSmfMember: {
           select: {
-            ID: true,
-            userLogin: true,
-            displayName: true,
+            idMember: true,
+            memberName: true,
+            realName: true,
           },
         },
         termRelationships: {
@@ -575,11 +575,11 @@ export class ArticlesService {
     const article = await this.prisma.wpPost.create({
       data: createData,
       include: {
-        wpAuthor: {
+        postAuthorSmfMember: {
           select: {
-            ID: true,
-            userLogin: true,
-            displayName: true,
+            idMember: true,
+            memberName: true,
+            realName: true,
           },
         },
         comments: {
@@ -647,11 +647,11 @@ export class ArticlesService {
       where: { ID: BigInt(id) },
       data: updatePayload,
       include: {
-        wpAuthor: {
+        postAuthorSmfMember: {
           select: {
-            ID: true,
-            userLogin: true,
-            displayName: true,
+            idMember: true,
+            memberName: true,
+            realName: true,
           },
         },
         termRelationships: {
@@ -943,10 +943,10 @@ export class ArticlesService {
       nbClics: viewsMeta ? parseInt(viewsMeta.metaValue || '0') : 0,
       statut: post.postStatus === 'publish' ? 1 : 0,
       postStatus: post.postStatus,
-      author: post.wpAuthor ? {
-        idMember: Number(post.wpAuthor.ID),
-        memberName: post.wpAuthor.userLogin,
-        realName: post.wpAuthor.displayName,
+      author: post.postAuthorSmfMember ? {
+        idMember: post.postAuthorSmfMember.idMember,
+        memberName: post.postAuthorSmfMember.memberName,
+        realName: post.postAuthorSmfMember.realName,
       } : {
         idMember: null,
         memberName: 'Unknown',
