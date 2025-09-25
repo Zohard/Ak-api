@@ -171,11 +171,11 @@ export class ArticlesService {
         where,
         include: {
           // Include author relationship from SMF members instead of wp_users
-          postAuthorSmfMember: {
+          wpAuthor: {
             select: {
-              idMember: true,
-              memberName: true,
-              realName: true,
+              ID: true,
+              userLogin: true,
+              displayName: true,
             },
           },
           // Only load category relationships to reduce joins
@@ -288,14 +288,14 @@ export class ArticlesService {
         nbClics: viewsMeta ? parseInt(viewsMeta.metaValue || '0') : 0,
         statut: post.postStatus === 'publish' ? 1 : 0,
         postStatus: post.postStatus,
-        author: post.postAuthorSmfMember ? {
-          idMember: post.postAuthorSmfMember.idMember,
-          memberName: post.postAuthorSmfMember.memberName,
-          realName: post.postAuthorSmfMember.realName,
+        author: post.wpAuthor ? {
+          id: post.wpAuthor.ID,
+          username: post.wpAuthor.userLogin,
+          displayName: post.wpAuthor.displayName,
         } : {
-          idMember: null,
-          memberName: 'Unknown',
-          realName: 'Unknown',
+          id: null,
+          username: 'Unknown',
+          displayName: 'Unknown',
         },
         categories,
         content: includeContent ? post.postContent : undefined,
@@ -336,11 +336,11 @@ export class ArticlesService {
     const post = await this.prisma.wpPost.findUnique({
       where: { ID: BigInt(id) },
       include: {
-        postAuthorSmfMember: {
+        wpAuthor: {
           select: {
-            idMember: true,
-            memberName: true,
-            realName: true,
+            ID: true,
+            userLogin: true,
+            displayName: true,
           },
         },
         termRelationships: {
@@ -414,11 +414,11 @@ export class ArticlesService {
         postStatus: 'publish'
       },
       include: {
-        postAuthorSmfMember: {
+        wpAuthor: {
           select: {
-            idMember: true,
-            memberName: true,
-            realName: true,
+            ID: true,
+            userLogin: true,
+            displayName: true,
           },
         },
         termRelationships: {
@@ -486,11 +486,11 @@ export class ArticlesService {
         },
       },
       include: {
-        postAuthorSmfMember: {
+        wpAuthor: {
           select: {
-            idMember: true,
-            memberName: true,
-            realName: true,
+            ID: true,
+            userLogin: true,
+            displayName: true,
           },
         },
         termRelationships: {
@@ -575,11 +575,11 @@ export class ArticlesService {
     const article = await this.prisma.wpPost.create({
       data: createData,
       include: {
-        postAuthorSmfMember: {
+        wpAuthor: {
           select: {
-            idMember: true,
-            memberName: true,
-            realName: true,
+            ID: true,
+            userLogin: true,
+            displayName: true,
           },
         },
         comments: {
@@ -647,11 +647,11 @@ export class ArticlesService {
       where: { ID: BigInt(id) },
       data: updatePayload,
       include: {
-        postAuthorSmfMember: {
+        wpAuthor: {
           select: {
-            idMember: true,
-            memberName: true,
-            realName: true,
+            ID: true,
+            userLogin: true,
+            displayName: true,
           },
         },
         termRelationships: {
@@ -943,14 +943,14 @@ export class ArticlesService {
       nbClics: viewsMeta ? parseInt(viewsMeta.metaValue || '0') : 0,
       statut: post.postStatus === 'publish' ? 1 : 0,
       postStatus: post.postStatus,
-      author: post.postAuthorSmfMember ? {
-        idMember: post.postAuthorSmfMember.idMember,
-        memberName: post.postAuthorSmfMember.memberName,
-        realName: post.postAuthorSmfMember.realName,
+      author: post.wpAuthor ? {
+        id: post.wpAuthor.ID,
+        username: post.wpAuthor.userLogin,
+        displayName: post.wpAuthor.displayName,
       } : {
-        idMember: null,
-        memberName: 'Unknown',
-        realName: 'Unknown',
+        id: null,
+        username: 'Unknown',
+        displayName: 'Unknown',
       },
       categories,
       comments,
