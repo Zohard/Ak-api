@@ -1,15 +1,28 @@
 import { Controller, Get, Post, Body, HttpCode, HttpStatus } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { IsString, IsNotEmpty, IsOptional } from 'class-validator';
 import { MetricsService } from '../../shared/services/metrics.service';
 
 export class TrackViewClickDto {
+  @IsString()
+  @IsNotEmpty()
   section: string;
+
+  @IsString()
+  @IsNotEmpty()
   itemType: string;
+
+  @IsNotEmpty()
   itemId: string | number;
 }
 
 export class TrackPageViewDto {
+  @IsString()
+  @IsNotEmpty()
   page: string;
+
+  @IsOptional()
+  @IsString()
   userId?: string;
 }
 
