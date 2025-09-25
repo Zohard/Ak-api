@@ -8,6 +8,11 @@ export class TrackViewClickDto {
   itemId: string | number;
 }
 
+export class TrackPageViewDto {
+  page: string;
+  userId?: string;
+}
+
 @ApiTags('metrics')
 @Controller('metrics')
 export class MetricsController {
@@ -18,6 +23,14 @@ export class MetricsController {
   @ApiResponse({ status: 200, description: 'Metrics in Prometheus format' })
   async getMetrics(): Promise<string> {
     return this.metricsService.getMetrics();
+  }
+
+  @Post('pageview')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Track page view' })
+  @ApiResponse({ status: 204, description: 'Page view tracked successfully' })
+  async trackPageView(@Body() dto: TrackPageViewDto): Promise<void> {
+    this.metricsService.trackPageView(dto.page, dto.userId);
   }
 
   @Post('homepage/view-click')
