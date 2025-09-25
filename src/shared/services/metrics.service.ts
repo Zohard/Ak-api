@@ -6,7 +6,7 @@ import { ConfigService } from '@nestjs/config';
 export class MetricsService {
   private readonly pageViewCounter: Counter<string>;
   private readonly apiDuration: Histogram<string>;
-  private readonly gateway: Pushgateway<string> | null = null;
+  private readonly gateway: Pushgateway | null = null;
 
   constructor(private readonly configService: ConfigService) {
     // Enable default metrics collection (memory, CPU, etc.)
