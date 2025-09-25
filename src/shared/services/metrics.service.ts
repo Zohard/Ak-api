@@ -1,14 +1,28 @@
 import { Injectable } from '@nestjs/common';
-import { register, Counter, Histogram, collectDefaultMetrics } from 'prom-client';
+import { register, Counter, Histogram, collectDefaultMetrics, Pushgateway } from 'prom-client';
+import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class MetricsService {
   private readonly pageViewCounter: Counter<string>;
   private readonly apiDuration: Histogram<string>;
+  private readonly gateway: Pushgateway<string> | null = null;
 
-  constructor() {
+  constructor(private readonly configService: ConfigService) {
     // Enable default metrics collection (memory, CPU, etc.)
     collectDefaultMetrics({ register });
+
+    // Setup Grafana push gateway if configured
+    const grafanaUrl = this.configService.get('GRAFANA_PUSH_URL');
+    const grafanaUser = this.configService.get('GRAFANA_PUSH_USER');
+    const grafanaPassword = this.configService.get('GRAFANA_PUSH_PASSWORD');
+
+    if (grafanaUrl && grafanaUser && grafanaPassword) {
+      this.gateway = new Pushgateway(grafanaUrl, {
+        username: grafanaUser,
+        password: grafanaPassword
+      });
+    }
 
     // Page view counter
     this.pageViewCounter = new Counter({
