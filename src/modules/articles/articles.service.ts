@@ -1349,15 +1349,17 @@ export class ArticlesService {
 
     return {
       articleId,
-      images: images.map(image => ({
-        id: image.idImg,
-        filename: image.urlImg,
-        articleId: Number(image.idArt),
-        imagekitUrl: this.imagekitService.getImageUrl(image.urlImg),
-        thumbnailUrl: this.imagekitService.getImageUrl(image.urlImg, [
-          { height: '200', width: '200', crop: 'maintain_ratio' }
-        ]),
-      })),
+      images: images
+        .filter(image => image.urlImg !== null)
+        .map(image => ({
+          id: image.idImg,
+          filename: image.urlImg,
+          articleId: Number(image.idArt),
+          imagekitUrl: this.imagekitService.getImageUrl(image.urlImg!),
+          thumbnailUrl: this.imagekitService.getImageUrl(image.urlImg!, [
+            { height: '200', width: '200', crop: 'maintain_ratio' }
+          ]),
+        })),
     };
   }
 
