@@ -550,6 +550,11 @@ export class ArticlesService {
       throw new BadRequestException('An article with this URL already exists');
     }
 
+    // Validate categories if provided
+    if (articleData.categoryIds && articleData.categoryIds.length > 0) {
+      await this.validateCategories(articleData.categoryIds);
+    }
+
     // Create WordPress post
     const createData = {
       postTitle: articleData.titre,
@@ -586,8 +591,27 @@ export class ArticlesService {
           where: { commentApproved: '1' },
         },
         postMeta: true,
+        termRelationships: {
+          include: {
+            termTaxonomy: {
+              include: {
+                term: true,
+              },
+            },
+          },
+          where: {
+            termTaxonomy: {
+              taxonomy: 'category',
+            },
+          },
+        },
       },
     });
+
+    // Assign categories if provided
+    if (articleData.categoryIds && articleData.categoryIds.length > 0) {
+      await this.assignCategoriesToArticle(Number(article.ID), articleData.categoryIds);
+    }
 
     // If an image is provided, create an entry in ak_webzine_img
     if (articleData.img) {
@@ -608,7 +632,45 @@ export class ArticlesService {
       console.log('No image provided in articleData.img');
     }
 
-    return this.transformPost(article, true);
+    // Re-fetch the article with categories to return complete data
+    const articleWithCategories = await this.prisma.wpPost.findUnique({
+      where: { ID: article.ID },
+      include: {
+        wpAuthor: {
+          select: {
+            ID: true,
+            userLogin: true,
+            displayName: true,
+          },
+        },
+        termRelationships: {
+          include: {
+            termTaxonomy: {
+              include: {
+                term: true,
+              },
+            },
+          },
+          where: {
+            termTaxonomy: {
+              taxonomy: 'category',
+            },
+          },
+        },
+        comments: {
+          where: { commentApproved: '1' },
+        },
+        postMeta: true,
+        images: {
+          select: {
+            idImg: true,
+            urlImg: true,
+          },
+        },
+      },
+    });
+
+    return this.transformPost(articleWithCategories, true);
   }
 
   async update(
@@ -630,6 +692,11 @@ export class ArticlesService {
       throw new ForbiddenException(
         'You can only edit your own articles',
       );
+    }
+
+    // Validate categories if provided
+    if (updateData.categoryIds && updateData.categoryIds.length > 0) {
+      await this.validateCategories(updateData.categoryIds);
     }
 
     // Prepare update data
@@ -670,6 +737,17 @@ export class ArticlesService {
       },
     });
 
+    // Update categories if provided
+    if (updateData.categoryIds !== undefined) {
+      // Remove existing category assignments
+      await this.removeAllCategoriesFromArticle(id);
+
+      // Assign new categories if any provided
+      if (updateData.categoryIds.length > 0) {
+        await this.assignCategoriesToArticle(id, updateData.categoryIds);
+      }
+    }
+
     // Handle image update if provided
     if (updateData.img) {
       console.log('Updating image for article:', id, 'with image:', updateData.img);
@@ -706,7 +784,45 @@ export class ArticlesService {
       console.log('No image provided in updateData.img for article:', id);
     }
 
-    return this.transformPost(updatedArticle, true);
+    // Re-fetch the article with updated categories
+    const articleWithCategories = await this.prisma.wpPost.findUnique({
+      where: { ID: BigInt(id) },
+      include: {
+        wpAuthor: {
+          select: {
+            ID: true,
+            userLogin: true,
+            displayName: true,
+          },
+        },
+        termRelationships: {
+          include: {
+            termTaxonomy: {
+              include: {
+                term: true,
+              },
+            },
+          },
+          where: {
+            termTaxonomy: {
+              taxonomy: 'category',
+            },
+          },
+        },
+        comments: {
+          where: { commentApproved: '1' },
+        },
+        postMeta: true,
+        images: {
+          select: {
+            idImg: true,
+            urlImg: true,
+          },
+        },
+      },
+    });
+
+    return this.transformPost(articleWithCategories, true);
   }
 
   async publish(
@@ -1236,5 +1352,95 @@ export class ArticlesService {
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-+|-+$/g, '');
+  }
+
+  private async validateCategories(categoryIds: number[]): Promise<void> {
+    const existingCategories = await this.prisma.wpTerm.findMany({
+      where: {
+        termId: { in: categoryIds },
+        termTaxonomies: {
+          some: {
+            taxonomy: 'category',
+          },
+        },
+      },
+    });
+
+    if (existingCategories.length !== categoryIds.length) {
+      const foundIds = existingCategories.map(cat => cat.termId);
+      const missingIds = categoryIds.filter(id => !foundIds.includes(id));
+      throw new BadRequestException(`Categories not found: ${missingIds.join(', ')}`);
+    }
+  }
+
+  private async assignCategoriesToArticle(articleId: number, categoryIds: number[]): Promise<void> {
+    // Get term taxonomy IDs for the given category IDs
+    const termTaxonomies = await this.prisma.wpTermTaxonomy.findMany({
+      where: {
+        termId: { in: categoryIds },
+        taxonomy: 'category',
+      },
+    });
+
+    // Create relationships
+    const relationshipData = termTaxonomies.map(tt => ({
+      objectId: BigInt(articleId),
+      termTaxonomyId: tt.termTaxonomyId,
+      termOrder: 0,
+    }));
+
+    await this.prisma.wpTermRelationship.createMany({
+      data: relationshipData,
+      skipDuplicates: true,
+    });
+
+    // Update category counts
+    for (const termTaxonomy of termTaxonomies) {
+      await this.prisma.wpTermTaxonomy.update({
+        where: { termTaxonomyId: termTaxonomy.termTaxonomyId },
+        data: {
+          count: {
+            increment: 1,
+          },
+        },
+      });
+    }
+  }
+
+  private async removeAllCategoriesFromArticle(articleId: number): Promise<void> {
+    // Get existing category relationships for this article
+    const existingRelationships = await this.prisma.wpTermRelationship.findMany({
+      where: {
+        objectId: BigInt(articleId),
+        termTaxonomy: {
+          taxonomy: 'category',
+        },
+      },
+      include: {
+        termTaxonomy: true,
+      },
+    });
+
+    // Remove relationships
+    await this.prisma.wpTermRelationship.deleteMany({
+      where: {
+        objectId: BigInt(articleId),
+        termTaxonomy: {
+          taxonomy: 'category',
+        },
+      },
+    });
+
+    // Update category counts
+    for (const relationship of existingRelationships) {
+      await this.prisma.wpTermTaxonomy.update({
+        where: { termTaxonomyId: relationship.termTaxonomy.termTaxonomyId },
+        data: {
+          count: {
+            decrement: 1,
+          },
+        },
+      });
+    }
   }
 }
