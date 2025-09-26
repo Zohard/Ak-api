@@ -548,7 +548,7 @@ model AkAnimesSaisons {
 model AkWebzineImg {
   idImg        Int     @id @default(autoincrement()) @map("id_img")
   idArt        BigInt  @map("id_art")
-  urlImg       String  @map("url_img") @db.VarChar(255)
+  urlImg       String? @map("url_img") @db.VarChar(255)
 
   // Relations
   article      WpPost  @relation(fields: [idArt], references: [ID], onDelete: Cascade)
