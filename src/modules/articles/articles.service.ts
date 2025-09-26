@@ -170,7 +170,7 @@ export class ArticlesService {
       this.prisma.wpPost.findMany({
         where,
         include: {
-          // Include author relationship from SMF members instead of wp_users
+          // Include author relationship from wp_users
           wpAuthor: {
             select: {
               ID: true,
