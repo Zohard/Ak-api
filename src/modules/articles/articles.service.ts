@@ -213,8 +213,13 @@ export class ArticlesService {
             },
             take: 10, // Limit meta fields
           },
-          // Include webzine images
+          // Include webzine images (filter out null urlImg values)
           images: {
+            where: {
+              urlImg: {
+                not: null,
+              },
+            },
             select: {
               idImg: true,
               urlImg: true,
@@ -362,8 +367,13 @@ export class ArticlesService {
           orderBy: { commentDate: 'asc' },
         },
         postMeta: true,
-        // Include webzine images
+        // Include webzine images (filter out null urlImg values)
         images: {
+          where: {
+            urlImg: {
+              not: null,
+            },
+          },
           select: {
             idImg: true,
             urlImg: true,
@@ -400,7 +410,7 @@ export class ArticlesService {
 
   async getByNiceUrl(niceUrl: string, includeContent: boolean = true) {
     console.log('ArticlesService.getByNiceUrl called with:', niceUrl);
-    
+
     // Check cache first
     const cached = await this.cacheService.getArticleBySlug(niceUrl);
     if (cached) {
@@ -408,7 +418,7 @@ export class ArticlesService {
     }
 
     const post = await this.prisma.wpPost.findFirst({
-      where: { 
+      where: {
         postName: niceUrl,
         postType: 'post',
         postStatus: 'publish'
@@ -440,8 +450,13 @@ export class ArticlesService {
           orderBy: { commentDate: 'asc' },
         },
         postMeta: true,
-        // Include webzine images
+        // Include webzine images (filter out null urlImg values)
         images: {
+          where: {
+            urlImg: {
+              not: null,
+            },
+          },
           select: {
             idImg: true,
             urlImg: true,
@@ -508,8 +523,13 @@ export class ArticlesService {
           },
         },
         postMeta: true,
-        // Include webzine images
+        // Include webzine images (filter out null urlImg values)
         images: {
+          where: {
+            urlImg: {
+              not: null,
+            },
+          },
           select: {
             idImg: true,
             urlImg: true,
@@ -662,6 +682,11 @@ export class ArticlesService {
         },
         postMeta: true,
         images: {
+          where: {
+            urlImg: {
+              not: null,
+            },
+          },
           select: {
             idImg: true,
             urlImg: true,
@@ -814,6 +839,11 @@ export class ArticlesService {
         },
         postMeta: true,
         images: {
+          where: {
+            urlImg: {
+              not: null,
+            },
+          },
           select: {
             idImg: true,
             urlImg: true,
