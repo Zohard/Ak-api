@@ -102,7 +102,9 @@ export class AdminWritersService {
       sort = 'date_registered',
       order = 'DESC',
     } = query;
-    const offset = (page - 1) * limit;
+    const pageNum = Number(page);
+    const limitNum = Number(limit);
+    const offset = (pageNum - 1) * limitNum;
 
     const whereConditions: string[] = [];
     const params: any[] = [];
@@ -148,7 +150,7 @@ export class AdminWritersService {
       LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
     `;
 
-    params.push(limit, offset);
+    params.push(limitNum, offset);
 
     const countQuery = `
       SELECT COUNT(*) as total
@@ -162,16 +164,16 @@ export class AdminWritersService {
     ]);
 
     const total = Number((countResult as any)[0]?.total || 0);
-    const totalPages = Math.ceil(total / limit);
+    const totalPages = Math.ceil(total / limitNum);
 
     return {
       members: this.convertBigIntToNumber(members),
       pagination: {
-        currentPage: page,
+        currentPage: pageNum,
         totalPages,
         totalItems: total,
-        hasNext: page < totalPages,
-        hasPrevious: page > 1,
+        hasNext: pageNum < totalPages,
+        hasPrevious: pageNum > 1,
       },
     };
   }
