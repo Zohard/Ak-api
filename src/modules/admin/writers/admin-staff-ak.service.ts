@@ -224,6 +224,11 @@ export class AdminStaffAkService {
       `;
     }
 
+    // Fix sequence issue by ensuring it's set to the correct next value
+    await this.prisma.$executeRaw`
+      SELECT setval(pg_get_serial_sequence('wp_users', 'ID'), COALESCE(MAX("ID"), 0) + 1, false) FROM wp_users
+    `;
+
     const newStaffAk = await this.prisma.$queryRawUnsafe(
       `
       INSERT INTO wp_users (
