@@ -2,7 +2,7 @@ import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { IsOptional, IsInt, Min, IsString, IsIn } from 'class-validator';
 
-export class WriterQueryDto {
+export class StaffAkQueryDto {
   @ApiProperty({
     description: 'Page number for pagination',
     required: false,
@@ -26,7 +26,7 @@ export class WriterQueryDto {
   limit?: number = 20;
 
   @ApiProperty({
-    description: 'Search term to filter writers by username, email, or display name',
+    description: 'Search term to filter staff AK members by username, email, or display name',
     required: false,
   })
   @IsOptional()

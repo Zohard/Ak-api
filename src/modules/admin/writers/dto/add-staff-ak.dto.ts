@@ -1,9 +1,9 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsOptional, IsString, IsEmail, IsInt, Min, Max } from 'class-validator';
 
-export class AddWriterDto {
+export class AddStaffAkDto {
   @ApiProperty({
-    description: 'Custom username for the writer (optional, uses SMF member_name if not provided)',
+    description: 'Custom username for the staff AK member (optional, uses SMF member_name if not provided)',
     required: false,
   })
   @IsOptional()
@@ -11,7 +11,7 @@ export class AddWriterDto {
   user_login?: string;
 
   @ApiProperty({
-    description: 'Password for the writer account (optional, generates random if not provided)',
+    description: 'Password for the staff AK account (optional, generates random if not provided)',
     required: false,
   })
   @IsOptional()
@@ -68,4 +68,13 @@ export class AddWriterDto {
   @IsOptional()
   @IsString()
   display_name?: string;
+
+  @ApiProperty({
+    description: 'SMF Member Group ID (optional, will update the user\'s group in SMF)',
+    required: false,
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  id_group?: number;
 }

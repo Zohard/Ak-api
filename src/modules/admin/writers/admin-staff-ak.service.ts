@@ -5,15 +5,15 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '../../../shared/services/prisma.service';
-import { AddWriterDto } from './dto/add-writer.dto';
-import { WriterQueryDto } from './dto/writer-query.dto';
+import { AddStaffAkDto } from './dto/add-staff-ak.dto';
+import { StaffAkQueryDto } from './dto/staff-ak-query.dto';
 import * as bcrypt from 'bcrypt';
 
 @Injectable()
-export class AdminWritersService {
+export class AdminStaffAkService {
   constructor(private prisma: PrismaService) {}
 
-  async findAllWriters(query: WriterQueryDto) {
+  async findAllStaffAk(query: StaffAkQueryDto) {
     const {
       page = 1,
       limit = 20,
@@ -50,7 +50,7 @@ export class AdminWritersService {
     const sortField = validSortFields.includes(sort) ? sort : 'user_registered';
     const sortOrder = order === 'ASC' ? 'ASC' : 'DESC';
 
-    const writersQuery = `
+    const staffAkQuery = `
       SELECT
         "ID",
         user_login,
@@ -74,8 +74,8 @@ export class AdminWritersService {
       ${whereClause}
     `;
 
-    const [writers, countResult] = await Promise.all([
-      this.prisma.$queryRawUnsafe(writersQuery, ...params),
+    const [staffAk, countResult] = await Promise.all([
+      this.prisma.$queryRawUnsafe(staffAkQuery, ...params),
       this.prisma.$queryRawUnsafe(countQuery, ...params.slice(0, -2)),
     ]);
 
@@ -83,7 +83,7 @@ export class AdminWritersService {
     const totalPages = Math.ceil(total / limit);
 
     return {
-      writers: this.convertBigIntToNumber(writers),
+      staffAk: this.convertBigIntToNumber(staffAk),
       pagination: {
         currentPage: page,
         totalPages,
@@ -142,9 +142,13 @@ export class AdminWritersService {
         sm.date_registered,
         sm.posts,
         sm.is_activated,
-        CASE WHEN wu.user_login IS NOT NULL THEN true ELSE false END as is_writer
+        sm.id_group,
+        smg.group_name,
+        smg.online_color,
+        CASE WHEN wu.user_login IS NOT NULL THEN true ELSE false END as is_staff_ak
       FROM smf_members sm
       LEFT JOIN wp_users wu ON sm.member_name = wu.user_login
+      LEFT JOIN smf_membergroups smg ON sm.id_group = smg.id_group
       ${whereClause}
       ORDER BY sm.${sortField} ${sortOrder}
       LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
@@ -178,9 +182,9 @@ export class AdminWritersService {
     };
   }
 
-  async addSmfMemberAsWriter(
+  async addSmfMemberAsStaffAk(
     memberId: number,
-    addWriterDto: AddWriterDto,
+    addStaffAkDto: AddStaffAkDto,
     adminId: number,
   ) {
     const smfMember = await this.prisma.$queryRaw`
@@ -199,19 +203,28 @@ export class AdminWritersService {
 
     if (existingWriter && (existingWriter as any[]).length > 0) {
       throw new ConflictException(
-        `User ${member.member_name} already exists as a writer`,
+        `User ${member.member_name} already exists as staff AK`,
       );
     }
 
-    const userLogin = addWriterDto.user_login || member.member_name;
-    const userEmail = addWriterDto.user_email || member.email_address;
-    const userNicename = addWriterDto.user_nicename || member.real_name || member.member_name;
-    const displayName = addWriterDto.display_name || member.real_name || member.member_name;
-    const userPass = addWriterDto.user_pass || await this.generateRandomPassword();
+    const userLogin = addStaffAkDto.user_login || member.member_name;
+    const userEmail = addStaffAkDto.user_email || member.email_address;
+    const userNicename = addStaffAkDto.user_nicename || member.real_name || member.member_name;
+    const displayName = addStaffAkDto.display_name || member.real_name || member.member_name;
+    const userPass = addStaffAkDto.user_pass || await this.generateRandomPassword();
 
     const hashedPassword = await bcrypt.hash(userPass, 10);
 
-    const newWriter = await this.prisma.$queryRawUnsafe(
+    // Update the SMF member's group if id_group is provided
+    if (addStaffAkDto.id_group !== undefined) {
+      await this.prisma.$executeRaw`
+        UPDATE smf_members
+        SET id_group = ${addStaffAkDto.id_group}
+        WHERE id_member = ${memberId}
+      `;
+    }
+
+    const newStaffAk = await this.prisma.$queryRawUnsafe(
       `
       INSERT INTO wp_users (
         user_login,
@@ -230,31 +243,36 @@ export class AdminWritersService {
       hashedPassword,
       userNicename,
       userEmail,
-      addWriterDto.user_url || '',
-      addWriterDto.user_activation_key || '',
-      addWriterDto.user_status || 0,
+      addStaffAkDto.user_url || '',
+      addStaffAkDto.user_activation_key || '',
+      addStaffAkDto.user_status || 0,
       displayName,
     );
 
-    await this.logWriterAction(
+    await this.logStaffAkAction(
       {
-        action: 'add_writer',
+        action: 'add_staff_ak',
         target_user_id: memberId,
-        reason: `Added SMF member ${member.member_name} as writer`,
-        metadata: { smf_member_id: memberId, wp_user_login: userLogin },
+        reason: `Added SMF member ${member.member_name} as staff AK`,
+        metadata: {
+          smf_member_id: memberId,
+          wp_user_login: userLogin,
+          id_group_changed: addStaffAkDto.id_group !== undefined ? addStaffAkDto.id_group : null,
+          previous_id_group: member.id_group
+        },
       },
       adminId,
     );
 
     return {
-      writer: this.convertBigIntToNumber((newWriter as any[])[0]),
-      message: 'Writer added successfully',
+      staffAk: this.convertBigIntToNumber((newStaffAk as any[])[0]),
+      message: 'Staff AK added successfully',
     };
   }
 
-  async bulkAddSmfMembersAsWriters(
+  async bulkAddSmfMembersAsStaffAk(
     memberIds: number[],
-    writerOptions: AddWriterDto,
+    staffAkOptions: AddStaffAkDto,
     adminId: number,
   ) {
     const results = {
@@ -265,7 +283,7 @@ export class AdminWritersService {
 
     for (const memberId of memberIds) {
       try {
-        await this.addSmfMemberAsWriter(memberId, writerOptions, adminId);
+        await this.addSmfMemberAsStaffAk(memberId, staffAkOptions, adminId);
         results.successful++;
       } catch (error) {
         results.failed++;
@@ -282,19 +300,19 @@ export class AdminWritersService {
     };
   }
 
-  async removeWriter(writerId: number, adminId: number) {
-    const writer = await this.prisma.$queryRaw`
-      SELECT * FROM wp_users WHERE "ID" = ${writerId}
+  async removeStaffAk(staffAkId: number, adminId: number) {
+    const staffAk = await this.prisma.$queryRaw`
+      SELECT * FROM wp_users WHERE "ID" = ${staffAkId}
     `;
 
-    if (!writer || (writer as any[]).length === 0) {
-      throw new NotFoundException(`Writer with ID ${writerId} not found`);
+    if (!staffAk || (staffAk as any[]).length === 0) {
+      throw new NotFoundException(`Staff AK with ID ${staffAkId} not found`);
     }
 
-    const writerData = (writer as any[])[0];
+    const staffAkData = (staffAk as any[])[0];
 
     const articlesCount = await this.prisma.$queryRaw`
-      SELECT COUNT(*) as count FROM wp_posts WHERE post_author = ${writerId}
+      SELECT COUNT(*) as count FROM wp_posts WHERE post_author = ${staffAkId}
     `;
 
     const count = Number((articlesCount as any[])[0]?.count || 0);
@@ -306,49 +324,49 @@ export class AdminWritersService {
     }
 
     await this.prisma.$executeRaw`
-      DELETE FROM wp_users WHERE "ID" = ${writerId}
+      DELETE FROM wp_users WHERE "ID" = ${staffAkId}
     `;
 
-    await this.logWriterAction(
+    await this.logStaffAkAction(
       {
-        action: 'remove_writer',
-        target_user_id: writerId,
-        reason: `Removed writer ${writerData.user_login}`,
-        metadata: { wp_user_id: writerId, user_login: writerData.user_login },
+        action: 'remove_staff_ak',
+        target_user_id: staffAkId,
+        reason: `Removed staff AK ${staffAkData.user_login}`,
+        metadata: { wp_user_id: staffAkId, user_login: staffAkData.user_login },
       },
       adminId,
     );
 
-    return { message: 'Writer removed successfully' };
+    return { message: 'Staff AK removed successfully' };
   }
 
-  async findOne(writerId: number) {
-    const writer = await this.prisma.$queryRaw`
+  async findOne(staffAkId: number) {
+    const staffAk = await this.prisma.$queryRaw`
       SELECT
         wu.*,
         COUNT(DISTINCT wp.ID) as article_count,
         MAX(wp.post_date) as last_article_date
       FROM wp_users wu
       LEFT JOIN wp_posts wp ON wu."ID" = wp.post_author AND wp.post_type = 'post' AND wp.post_status = 'publish'
-      WHERE wu."ID" = ${writerId}
+      WHERE wu."ID" = ${staffAkId}
       GROUP BY wu."ID", wu.user_login, wu.user_pass, wu.user_nicename, wu.user_email, wu.user_url, wu.user_registered, wu.user_activation_key, wu.user_status, wu.display_name
     `;
 
-    if (!writer || (writer as any[]).length === 0) {
-      throw new NotFoundException(`Writer with ID ${writerId} not found`);
+    if (!staffAk || (staffAk as any[]).length === 0) {
+      throw new NotFoundException(`Staff AK with ID ${staffAkId} not found`);
     }
 
     return {
-      writer: this.convertBigIntToNumber((writer as any[])[0]),
+      staffAk: this.convertBigIntToNumber((staffAk as any[])[0]),
     };
   }
 
-  async getWriterStats() {
+  async getStaffAkStats() {
     const stats = await this.prisma.$queryRaw`
       SELECT
-        COUNT(DISTINCT wu."ID") as total_writers,
+        COUNT(DISTINCT wu."ID") as total_staff_ak,
         COUNT(DISTINCT sm.id_member) as total_smf_members,
-        COUNT(DISTINCT CASE WHEN wu.user_registered > NOW() - interval '30 days' THEN wu."ID" END) as writers_added_this_month,
+        COUNT(DISTINCT CASE WHEN wu.user_registered > NOW() - interval '30 days' THEN wu."ID" END) as staff_ak_added_this_month,
         COUNT(DISTINCT CASE WHEN wp.post_date > NOW() - interval '30 days' THEN wp.ID END) as articles_this_month
       FROM wp_users wu
       CROSS JOIN smf_members sm
@@ -358,10 +376,69 @@ export class AdminWritersService {
     const result = (stats as any[])[0];
 
     return {
-      total_writers: Number(result.total_writers),
+      total_staff_ak: Number(result.total_staff_ak),
       total_smf_members: Number(result.total_smf_members),
-      writers_added_this_month: Number(result.writers_added_this_month),
+      staff_ak_added_this_month: Number(result.staff_ak_added_this_month),
       articles_this_month: Number(result.articles_this_month),
+    };
+  }
+
+  async getSmfMembergroups() {
+    try {
+      const membergroups = await this.prisma.$queryRaw`
+        SELECT * FROM smf_membergroups ORDER BY id_group ASC
+      `;
+      return this.convertBigIntToNumber(membergroups);
+    } catch (error) {
+      console.error('Failed to fetch SMF membergroups:', error);
+      return [];
+    }
+  }
+
+  async updateSmfMemberGroup(memberId: number, newGroupId: number, adminId: number) {
+    // Check if the member exists
+    const smfMember = await this.prisma.$queryRaw`
+      SELECT * FROM smf_members WHERE id_member = ${memberId}
+    `;
+
+    if (!smfMember || (smfMember as any[]).length === 0) {
+      throw new NotFoundException(`SMF member with ID ${memberId} not found`);
+    }
+
+    const member = (smfMember as any[])[0];
+    const previousGroupId = member.id_group;
+
+    // Update the member's group
+    await this.prisma.$executeRaw`
+      UPDATE smf_members
+      SET id_group = ${newGroupId}
+      WHERE id_member = ${memberId}
+    `;
+
+    // Log the action
+    await this.logStaffAkAction(
+      {
+        action: 'update_member_group',
+        target_user_id: memberId,
+        reason: `Updated SMF member ${member.member_name} group from ${previousGroupId} to ${newGroupId}`,
+        metadata: {
+          smf_member_id: memberId,
+          previous_id_group: previousGroupId,
+          new_id_group: newGroupId,
+          member_name: member.member_name
+        },
+      },
+      adminId,
+    );
+
+    return {
+      message: 'Member group updated successfully',
+      member: {
+        id_member: memberId,
+        member_name: member.member_name,
+        previous_id_group: previousGroupId,
+        new_id_group: newGroupId
+      }
     };
   }
 
@@ -388,7 +465,7 @@ export class AdminWritersService {
     return obj;
   }
 
-  private async logWriterAction(actionLog: any, adminId: number) {
+  private async logStaffAkAction(actionLog: any, adminId: number) {
     try {
       const metadataJson = actionLog.metadata
         ? JSON.stringify(actionLog.metadata)
@@ -408,13 +485,13 @@ export class AdminWritersService {
       `,
         adminId,
         actionLog.action,
-        'writer',
+        'staff_ak',
         actionLog.target_user_id,
         actionLog.reason || null,
         metadataJson,
       );
     } catch (error) {
-      console.error('Failed to log writer action:', error);
+      console.error('Failed to log staff AK action:', error);
     }
   }
 }
