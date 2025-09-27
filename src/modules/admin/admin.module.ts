@@ -4,11 +4,11 @@ import { AdminService } from './admin.service';
 import { AdminUsersModule } from './users/admin-users.module';
 import { AdminContentModule } from './content/admin-content.module';
 import { AdminModerationModule } from './moderation/admin-moderation.module';
-import { AdminWritersModule } from './writers/admin-writers.module';
+import { AdminStaffAkModule } from './writers/admin-staff-ak.module';
 import { PrismaService } from '../../shared/services/prisma.service';
 
 @Module({
-  imports: [AdminUsersModule, AdminContentModule, AdminModerationModule, AdminWritersModule],
+  imports: [AdminUsersModule, AdminContentModule, AdminModerationModule, AdminStaffAkModule],
   controllers: [AdminController],
   providers: [AdminService, PrismaService],
   exports: [
@@ -16,7 +16,7 @@ import { PrismaService } from '../../shared/services/prisma.service';
     AdminUsersModule,
     AdminContentModule,
     AdminModerationModule,
-    AdminWritersModule,
+    AdminStaffAkModule,
   ],
 })
 export class AdminModule {}

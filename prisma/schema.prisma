@@ -11,6 +11,24 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
+// SMF Member Groups
+model SmfMembergroup {
+  idGroup         Int      @id @map("id_group")
+  groupName       String   @map("group_name") @db.VarChar(80)
+  onlineColor     String?  @map("online_color") @db.VarChar(20)
+  minPosts        Int      @map("min_posts") @default(-1)
+  maxMessages     Int      @map("max_messages") @default(-1)
+  stars           String?  @db.VarChar(255)
+  minPosts2       Int      @map("min_posts2") @default(0)
+  maxMessages2    Int      @map("max_messages2") @default(0)
+  groupType       Int      @map("group_type") @default(-1)
+
+  // Relations
+  members         SmfMember[]
+
+  @@map("smf_membergroups")
+}
+
 // SMF Members (Users)
 model SmfMember {
   idMember         Int      @id @map("id_member")
@@ -36,6 +54,7 @@ model SmfMember {
   experience       Int      @default(0)
 
   // Relations
+  membergroup      SmfMembergroup? @relation(fields: [idGroup], references: [idGroup])
   refreshTokens    AkRefreshToken[]
   passwordResetTokens AkPasswordResetToken[]
   reviews          AkCritique[]
