@@ -8,7 +8,7 @@ import { JwtStrategy } from './strategies/jwt.strategy';
 import { LocalStrategy } from './strategies/local.strategy';
 import { PrismaService } from '../../shared/services/prisma.service';
 import { EmailService } from '../../shared/services/email.service';
-import { MetricsService } from '../../shared/services/metrics.service';
+import { MetricsModule } from '../metrics/metrics.module';
 
 @Module({
   imports: [
@@ -23,9 +23,10 @@ import { MetricsService } from '../../shared/services/metrics.service';
         },
       }),
     }),
+    MetricsModule,
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy, LocalStrategy, PrismaService, EmailService, MetricsService],
+  providers: [AuthService, JwtStrategy, LocalStrategy, PrismaService, EmailService],
   exports: [AuthService, JwtModule],
 })
 export class AuthModule {}
