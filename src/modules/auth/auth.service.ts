@@ -9,6 +9,7 @@ import * as bcrypt from 'bcryptjs';
 import * as crypto from 'crypto';
 import { PrismaService } from '../../shared/services/prisma.service';
 import { EmailService } from '../../shared/services/email.service';
+import { MetricsService } from '../../shared/services/metrics.service';
 import { ADMIN_GROUP_IDS } from '../../shared/constants/admin.constants';
 import { SmfMember } from '@prisma/client';
 import { RegisterDto } from './dto/register.dto';
@@ -23,6 +24,7 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly emailService: EmailService,
+    private readonly metricsService: MetricsService,
   ) {}
 
   async validateUser(emailOrUsername: string, password: string): Promise<any> {
@@ -100,8 +102,13 @@ export class AuthService {
     );
 
     if (!user) {
+      // Track failed login attempt
+      this.metricsService.trackAuthAttempt('login', 'failure', 'local');
       throw new UnauthorizedException('Invalid credentials');
     }
+
+    // Track successful login attempt
+    this.metricsService.trackAuthAttempt('login', 'success', 'local');
 
     // Update last login
     await this.prisma.smfMember.update({
@@ -147,6 +154,8 @@ export class AuthService {
     });
 
     if (existingUser) {
+      // Track failed registration attempt
+      this.metricsService.trackAuthAttempt('register', 'failure', 'local');
       throw new BadRequestException(
         'User with this email or username already exists',
       );
@@ -166,6 +175,9 @@ export class AuthService {
         idGroup: 0,
       } as any, // Temporary fix for Prisma type issue
     });
+
+    // Track successful registration attempt
+    this.metricsService.trackAuthAttempt('register', 'success', 'local');
 
     const payload = {
       sub: user.idMember,
@@ -203,8 +215,13 @@ export class AuthService {
     });
 
     if (!tokenRecord) {
+      // Track failed refresh token attempt
+      this.metricsService.trackAuthAttempt('refresh', 'failure', 'jwt');
       throw new UnauthorizedException('Invalid refresh token');
     }
+
+    // Track successful refresh token attempt
+    this.metricsService.trackAuthAttempt('refresh', 'success', 'jwt');
 
     // Revoke the used refresh token
     await this.prisma.akRefreshToken.update({
@@ -317,6 +334,31 @@ export class AuthService {
     });
 
     return { message: 'Mot de passe réinitialisé avec succès' };
+  }
+
+  async logout(refreshToken: string) {
+    try {
+      // Revoke the refresh token
+      const result = await this.prisma.akRefreshToken.updateMany({
+        where: {
+          token: refreshToken,
+          isRevoked: false
+        },
+        data: { isRevoked: true },
+      });
+
+      // Track logout attempt
+      if (result.count > 0) {
+        this.metricsService.trackAuthAttempt('logout', 'success', 'local');
+      } else {
+        this.metricsService.trackAuthAttempt('logout', 'failure', 'local');
+      }
+
+      return { message: 'Logged out successfully' };
+    } catch (error) {
+      this.metricsService.trackAuthAttempt('logout', 'failure', 'local');
+      throw new BadRequestException('Logout failed');
+    }
   }
 
   private async generateRefreshToken(

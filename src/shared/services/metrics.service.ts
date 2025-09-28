@@ -1,11 +1,16 @@
 import { Injectable } from '@nestjs/common';
-import { register, Counter, Histogram, collectDefaultMetrics, Pushgateway, PrometheusContentType } from 'prom-client';
+import { register, Counter, Histogram, Gauge, collectDefaultMetrics, Pushgateway, PrometheusContentType } from 'prom-client';
 import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class MetricsService {
   private readonly pageViewCounter: Counter<string>;
   private readonly apiDuration: Histogram<string>;
+  private readonly authCounter: Counter<string>;
+  private readonly dbQueryDuration: Histogram<string>;
+  private readonly cacheHitRatio: Counter<string>;
+  private readonly businessMetrics: Counter<string>;
+  private readonly errorCounter: Counter<string>;
   private readonly gateway: Pushgateway<PrometheusContentType> | null = null;
 
   constructor(private readonly configService: ConfigService) {
@@ -38,6 +43,47 @@ export class MetricsService {
       help: 'Duration of HTTP requests in seconds',
       labelNames: ['method', 'route', 'status_code'],
       buckets: [0.1, 0.3, 0.5, 0.7, 1, 3, 5, 7, 10],
+      registers: [register]
+    });
+
+    // Authentication metrics
+    this.authCounter = new Counter({
+      name: 'auth_attempts_total',
+      help: 'Total number of authentication attempts',
+      labelNames: ['type', 'status', 'method'],
+      registers: [register]
+    });
+
+    // Database query performance
+    this.dbQueryDuration = new Histogram({
+      name: 'db_query_duration_seconds',
+      help: 'Duration of database queries in seconds',
+      labelNames: ['operation', 'table', 'endpoint'],
+      buckets: [0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1, 2, 5],
+      registers: [register]
+    });
+
+    // Cache hit/miss tracking
+    this.cacheHitRatio = new Counter({
+      name: 'cache_operations_total',
+      help: 'Total cache operations',
+      labelNames: ['operation', 'key_type', 'result'],
+      registers: [register]
+    });
+
+    // Business metrics
+    this.businessMetrics = new Counter({
+      name: 'business_events_total',
+      help: 'Total business events',
+      labelNames: ['event_type', 'category', 'user_type'],
+      registers: [register]
+    });
+
+    // Error tracking
+    this.errorCounter = new Counter({
+      name: 'application_errors_total',
+      help: 'Total application errors',
+      labelNames: ['endpoint', 'error_type', 'severity'],
       registers: [register]
     });
   }
@@ -79,6 +125,60 @@ export class MetricsService {
    */
   async getMetrics(): Promise<string> {
     return register.metrics();
+  }
+
+  /**
+   * Track authentication attempts
+   */
+  trackAuthAttempt(type: 'login' | 'register' | 'logout', status: 'success' | 'failure', method: string = 'local') {
+    this.authCounter.inc({
+      type,
+      status,
+      method
+    });
+  }
+
+  /**
+   * Track database query performance
+   */
+  trackDbQuery(operation: string, table: string, endpoint: string, durationMs: number) {
+    this.dbQueryDuration.observe(
+      { operation, table, endpoint },
+      durationMs / 1000
+    );
+  }
+
+  /**
+   * Track cache operations
+   */
+  trackCacheOperation(operation: 'get' | 'set' | 'del', keyType: string, result: 'hit' | 'miss' | 'success' | 'error') {
+    this.cacheHitRatio.inc({
+      operation,
+      key_type: keyType,
+      result
+    });
+  }
+
+  /**
+   * Track business events
+   */
+  trackBusinessEvent(eventType: string, category: string, userType: string = 'anonymous') {
+    this.businessMetrics.inc({
+      event_type: eventType,
+      category,
+      user_type: userType
+    });
+  }
+
+  /**
+   * Track application errors
+   */
+  trackError(endpoint: string, errorType: string, severity: 'low' | 'medium' | 'high' | 'critical') {
+    this.errorCounter.inc({
+      endpoint,
+      error_type: errorType,
+      severity
+    });
   }
 
   /**
