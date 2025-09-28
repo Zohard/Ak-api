@@ -10,12 +10,15 @@ import {
   HttpStatus,
   ParseIntPipe,
 } from '@nestjs/common';
+import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { MessagesService } from './messages.service';
 import { CreateMessageDto } from './dto/create-message.dto';
 import { GetMessagesDto, SearchMessagesDto, MarkReadDto } from './dto/get-messages.dto';
 import { SmfMessage, MessageUser, MessageResponse, ConversationMessage } from './interfaces/message.interface';
 
 @Controller('messages')
+@UseGuards(JwtAuthGuard)
 export class MessagesController {
   constructor(private readonly messagesService: MessagesService) {}
 
@@ -26,8 +29,13 @@ export class MessagesController {
   }
 
   @Get()
-  async getMessages(@Query() getMessagesDto: GetMessagesDto): Promise<{ messages: SmfMessage[] }> {
-    const messages = await this.messagesService.getMessages(getMessagesDto);
+  async getMessages(
+    @Query() getMessagesDto: GetMessagesDto,
+    @CurrentUser() user: any,
+  ): Promise<{ messages: SmfMessage[] }> {
+    // Use authenticated user's ID if not provided in query
+    const messagesDto = { ...getMessagesDto, userId: getMessagesDto.userId || user.id };
+    const messages = await this.messagesService.getMessages(messagesDto);
     return { messages };
   }
 
