@@ -144,22 +144,21 @@ export class ListsService {
       });
       result = rows.map((r) => this.formatList(r));
     } else {
-      // Popular: compute popularity score on the fly and sort in JS
-      const lists = await this.prisma.akListesTop.findMany({
+      // Popular: use pre-calculated popularite field and sort at database level
+      const rows = await this.prisma.akListesTop.findMany({
         where: {
           statut: 1,
           animeOrManga: mediaType,
           membre: { idMember: { gt: 0 } }
         },
-        orderBy: { idListe: 'desc' },
-        take: 100,
+        orderBy: [
+          { popularite: 'desc' },
+          { dateCreation: 'desc' }  // tiebreaker for same popularity
+        ],
+        take: limit,
         include: { membre: { select: { idMember: true, memberName: true } } },
       });
-      const scored = lists
-        .map((l) => ({ ...l, popularityScore: this.calculatePopularity(l.jaime, l.jaimepas, l.nbClics) }))
-        .sort((a, b) => b.popularityScore - a.popularityScore)
-        .slice(0, limit);
-      result = scored.map((r) => this.formatList(r));
+      result = rows.map((r) => this.formatList(r));
     }
 
     // Cache the result for 4 hours
@@ -295,6 +294,23 @@ export class ListsService {
     const dislikes = this.parseVotes(list.jaimepas).length;
     const popularity = this.calculatePopularity((list as any).jaime, (list as any).jaimepas, (list as any).nb_clics);
     return { likes, dislikes, nb_clics: (list as any).nb_clics, popularite: popularity };
+  }
+
+  async recalculateAllPopularity() {
+    // Utility method to recalculate popularity for all public lists
+    const lists = await this.prisma.akListesTop.findMany({
+      where: { statut: 1 }
+    });
+
+    for (const list of lists) {
+      const popularity = this.calculatePopularity(list.jaime, list.jaimepas, list.nbClics);
+      await this.prisma.akListesTop.update({
+        where: { idListe: list.idListe },
+        data: { popularite: popularity }
+      });
+    }
+
+    return { updated: lists.length };
   }
 
   private formatList(row: any) {
