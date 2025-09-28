@@ -606,7 +606,6 @@ model SmfPmRecipient {
   isRead    Int  @default(0) @map("is_read")
   isNew     Int  @default(1) @map("is_new")
   deleted   Int  @default(0)
-  inInbox   Int  @default(1) @map("in_inbox")
 
   // Relations
   message   SmfPersonalMessage @relation(fields: [idPm], references: [idPm], onDelete: Cascade)
