@@ -177,8 +177,8 @@ export class MessagesService {
       message: message.body,
       created_at: new Date(message.msgtime * 1000).toISOString(),
       timestamp: message.msgtime,
-      is_read: message.isRead,
-      is_new: message.isNew,
+      is_read: message.recipients[0]?.isRead || 0,
+      is_new: message.recipients[0]?.isNew || 0,
       recipients: message.recipients.map(r => r.member.memberName).join(', ')
     }));
   }
@@ -348,8 +348,8 @@ export class MessagesService {
         message: message.body,
         created_at: new Date(message.msgtime * 1000).toISOString(),
         timestamp: message.msgtime,
-        is_read: message.isRead,
-        is_new: message.isNew,
+        is_read: message.recipients[0]?.isRead || 0,
+        is_new: message.recipients[0]?.isNew || 0,
         type: message.idMemberFrom === userId ? 'sent' : 'received'
       }));
     } catch (error) {
