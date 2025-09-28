@@ -52,6 +52,9 @@ model SmfMember {
   nbSynopsis       Int      @default(0) @map("nb_synopsis")
   nbContributions  Int      @default(0) @map("nb_contributions")
   experience       Int      @default(0)
+  instantMessages  Int      @default(0) @map("instant_messages")
+  unreadMessages   Int      @default(0) @map("unread_messages")
+  newPm            Int      @default(0) @map("new_pm")
 
   // Relations
   membergroup      SmfMembergroup? @relation(fields: [idGroup], references: [idGroup])
@@ -63,6 +66,8 @@ model SmfMember {
   mangaCollections CollectionManga[] @relation("UserMangaCollection")
   synopsisSubmissions AkSynopsis[]   @relation("UserSynopsis")
   listesTop        AkListesTop[]
+  sentMessages     SmfPersonalMessage[] @relation("SentMessages")
+  receivedMessages SmfPmRecipient[] @relation("ReceivedMessages")
 
   @@map("smf_members")
 }
@@ -573,4 +578,40 @@ model AkWebzineImg {
   article      WpPost  @relation(fields: [idArt], references: [ID], onDelete: Cascade)
 
   @@map("ak_webzine_img")
+}
+
+// SMF Private Messages
+model SmfPersonalMessage {
+  idPm            Int      @id @default(autoincrement()) @map("id_pm")
+  idPmHead        Int      @map("id_pm_head") @default(0)
+  idMemberFrom    Int      @map("id_member_from")
+  fromName        String   @map("from_name") @db.VarChar(255)
+  msgtime         Int
+  subject         String   @db.VarChar(255)
+  body            String   @db.Text
+  deletedBySender Int      @default(0) @map("deleted_by_sender")
+
+  // Relations
+  sender          SmfMember @relation("SentMessages", fields: [idMemberFrom], references: [idMember], onDelete: Cascade)
+  recipients      SmfPmRecipient[]
+
+  @@map("smf_personal_messages")
+}
+
+// SMF PM Recipients
+model SmfPmRecipient {
+  idPm      Int  @map("id_pm")
+  idMember  Int  @map("id_member")
+  bcc       Int  @default(0)
+  isRead    Int  @default(0) @map("is_read")
+  isNew     Int  @default(1) @map("is_new")
+  deleted   Int  @default(0)
+  inInbox   Int  @default(1) @map("in_inbox")
+
+  // Relations
+  message   SmfPersonalMessage @relation(fields: [idPm], references: [idPm], onDelete: Cascade)
+  member    SmfMember @relation("ReceivedMessages", fields: [idMember], references: [idMember], onDelete: Cascade)
+
+  @@id([idPm, idMember])
+  @@map("smf_pm_recipients")
 }
