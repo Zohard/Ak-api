@@ -89,6 +89,11 @@ export class MessagesService {
   async getMessages(getMessagesDto: GetMessagesDto): Promise<SmfMessage[]> {
     const { userId, type, limit = 20, offset = 0 } = getMessagesDto;
 
+    // userId should always be provided at this point from the controller
+    if (!userId) {
+      throw new BadRequestException('User ID is required');
+    }
+
     try {
       if (type === 'inbox') {
         return await this.getInboxMessages(userId, limit, offset);
