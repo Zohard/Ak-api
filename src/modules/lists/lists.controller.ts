@@ -184,4 +184,12 @@ export class ListsController {
     );
   }
 
+  // POST /lists/recalculate-popularity - Admin utility endpoint
+  @Post('recalculate-popularity')
+  @ApiOperation({ summary: 'Recalculer la popularité de toutes les listes (admin)' })
+  @ApiResponse({ status: 200, description: 'Popularité recalculée avec succès' })
+  recalculatePopularity() {
+    return this.listsService.recalculateAllPopularity();
+  }
+
 }
