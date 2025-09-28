@@ -109,7 +109,10 @@ export class MessagesService {
     const messages = await this.prisma.smfPmRecipient.findMany({
       where: {
         idMember: userId,
-        deleted: 0
+        deleted: 0,
+        message: {
+          isNot: null
+        }
       },
       include: {
         message: {
