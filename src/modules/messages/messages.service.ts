@@ -171,10 +171,14 @@ export class MessagesService {
     return messages.map(message => ({
       id: message.idPm,
       thread_id: message.idPmHead,
+      sender_id: message.idMemberFrom,
+      sender_name: message.fromName,
       subject: message.subject,
       message: message.body,
       created_at: new Date(message.msgtime * 1000).toISOString(),
       timestamp: message.msgtime,
+      is_read: message.isRead,
+      is_new: message.isNew,
       recipients: message.recipients.map(r => r.member.memberName).join(', ')
     }));
   }
@@ -343,6 +347,9 @@ export class MessagesService {
         subject: message.subject,
         message: message.body,
         created_at: new Date(message.msgtime * 1000).toISOString(),
+        timestamp: message.msgtime,
+        is_read: message.isRead,
+        is_new: message.isNew,
         type: message.idMemberFrom === userId ? 'sent' : 'received'
       }));
     } catch (error) {
