@@ -59,8 +59,7 @@ export class MessagesService {
             bcc: 0,
             isRead: 0,
             isNew: 1,
-            deleted: 0,
-            inInbox: 1
+            deleted: 0
           }
         });
 
@@ -110,8 +109,7 @@ export class MessagesService {
     const messages = await this.prisma.smfPmRecipient.findMany({
       where: {
         idMember: userId,
-        deleted: 0,
-        inInbox: 1
+        deleted: 0
       },
       include: {
         message: {
