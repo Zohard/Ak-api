@@ -25,6 +25,10 @@ import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 
+export class LogoutDto {
+  refreshToken: string;
+}
+
 @ApiTags('Authentication')
 @Controller('auth')
 export class AuthController {
@@ -172,5 +176,14 @@ export class AuthController {
   @ApiResponse({ status: 401, description: 'Token invalide' })
   async verifyToken(@Request() req) {
     return { valid: true, user: req.user };
+  }
+
+  @Post('logout')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Déconnexion utilisateur' })
+  @ApiResponse({ status: 200, description: 'Déconnexion réussie' })
+  @ApiResponse({ status: 400, description: 'Échec de la déconnexion' })
+  async logout(@Body() logoutDto: LogoutDto) {
+    return this.authService.logout(logoutDto.refreshToken);
   }
 }
