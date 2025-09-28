@@ -130,7 +130,7 @@ export class MetricsService {
   /**
    * Track authentication attempts
    */
-  trackAuthAttempt(type: 'login' | 'register' | 'logout', status: 'success' | 'failure', method: string = 'local') {
+  trackAuthAttempt(type: 'login' | 'register' | 'logout' | 'refresh', status: 'success' | 'failure', method: string = 'local') {
     this.authCounter.inc({
       type,
       status,
