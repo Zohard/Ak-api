@@ -1,5 +1,5 @@
 import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
-import { MySqlService } from '../../shared/services/mysql.service';
+import { PrismaService } from '../../shared/services/prisma.service';
 import { CreateMessageDto } from './dto/create-message.dto';
 import { GetMessagesDto, SearchMessagesDto, MarkReadDto } from './dto/get-messages.dto';
 import { SmfMessage, MessageUser, MessageResponse, ConversationMessage } from './interfaces/message.interface';
@@ -8,60 +8,71 @@ import { SmfMessage, MessageUser, MessageResponse, ConversationMessage } from '.
 export class MessagesService {
   private readonly logger = new Logger(MessagesService.name);
 
-  constructor(private readonly mysqlService: MySqlService) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async sendMessage(createMessageDto: CreateMessageDto): Promise<MessageResponse> {
     const { senderId, recipientId, subject, message, threadId } = createMessageDto;
 
     try {
-      return await this.mysqlService.transaction(async (connection) => {
+      return await this.prisma.$transaction(async (prisma) => {
         // Get sender info
-        const [senderRows] = await connection.execute(
-          'SELECT member_name, real_name FROM smf_members WHERE id_member = ?',
-          [senderId]
-        );
+        const sender = await prisma.smfMember.findUnique({
+          where: { idMember: senderId },
+          select: { memberName: true, realName: true }
+        });
 
-        if (!senderRows || (senderRows as any[]).length === 0) {
+        if (!sender) {
           throw new NotFoundException('Sender not found');
         }
 
-        const sender = (senderRows as any[])[0];
-        const senderName = sender.real_name || sender.member_name;
+        const senderName = sender.realName || sender.memberName;
         const msgTime = Math.floor(Date.now() / 1000);
         const pmHead = threadId || 0;
 
         // Insert message
-        const [messageResult] = await connection.execute(`
-          INSERT INTO smf_personal_messages
-          (id_pm_head, id_member_from, from_name, msgtime, subject, body)
-          VALUES (?, ?, ?, ?, ?, ?)
-        `, [pmHead, senderId, senderName, msgTime, subject, message]);
+        const newMessage = await prisma.smfPersonalMessage.create({
+          data: {
+            idPmHead: pmHead,
+            idMemberFrom: senderId,
+            fromName: senderName,
+            msgtime: msgTime,
+            subject,
+            body: message
+          }
+        });
 
-        const messageId = (messageResult as any).insertId;
+        const messageId = newMessage.idPm;
 
         // If this is the first message in a thread, update the pm_head
         if (!threadId) {
-          await connection.execute(
-            'UPDATE smf_personal_messages SET id_pm_head = ? WHERE id_pm = ?',
-            [messageId, messageId]
-          );
+          await prisma.smfPersonalMessage.update({
+            where: { idPm: messageId },
+            data: { idPmHead: messageId }
+          });
         }
 
         // Add recipient
-        await connection.execute(`
-          INSERT INTO smf_pm_recipients
-          (id_pm, id_member, bcc, is_read, is_new, deleted, in_inbox)
-          VALUES (?, ?, 0, 0, 1, 0, 1)
-        `, [messageId, recipientId]);
+        await prisma.smfPmRecipient.create({
+          data: {
+            idPm: messageId,
+            idMember: recipientId,
+            bcc: 0,
+            isRead: 0,
+            isNew: 1,
+            deleted: 0,
+            inInbox: 1
+          }
+        });
 
         // Update recipient's message counts
-        await connection.execute(`
-          UPDATE smf_members
-          SET instant_messages = instant_messages + 1,
-              unread_messages = unread_messages + 1,
-              new_pm = 1
-          WHERE id_member = ?
-        `, [recipientId]);
+        await prisma.smfMember.update({
+          where: { idMember: recipientId },
+          data: {
+            instantMessages: { increment: 1 },
+            unreadMessages: { increment: 1 },
+            newPm: 1
+          }
+        });
 
         return {
           success: true,
@@ -76,7 +87,7 @@ export class MessagesService {
   }
 
   async getMessages(getMessagesDto: GetMessagesDto): Promise<SmfMessage[]> {
-    const { userId, type, limit, offset } = getMessagesDto;
+    const { userId, type, limit = 20, offset = 0 } = getMessagesDto;
 
     try {
       if (type === 'inbox') {
@@ -91,86 +102,137 @@ export class MessagesService {
   }
 
   private async getInboxMessages(userId: number, limit: number, offset: number): Promise<SmfMessage[]> {
-    const query = `
-      SELECT
-        pm.id_pm as id,
-        pm.id_pm_head as thread_id,
-        pm.id_member_from as sender_id,
-        pm.from_name as sender_name,
-        sender.member_name as sender_username,
-        pm.subject,
-        pm.body as message,
-        FROM_UNIXTIME(pm.msgtime) as created_at,
-        pm.msgtime as timestamp,
-        pr.is_read,
-        pr.is_new,
-        pr.bcc
-      FROM smf_personal_messages pm
-      JOIN smf_pm_recipients pr ON pm.id_pm = pr.id_pm
-      LEFT JOIN smf_members sender ON pm.id_member_from = sender.id_member
-      WHERE pr.id_member = ?
-        AND pr.deleted = 0
-        AND pr.in_inbox = 1
-      ORDER BY pm.msgtime DESC
-      LIMIT ? OFFSET ?
-    `;
+    const messages = await this.prisma.smfPmRecipient.findMany({
+      where: {
+        idMember: userId,
+        deleted: 0,
+        inInbox: 1
+      },
+      include: {
+        message: {
+          include: {
+            sender: {
+              select: {
+                memberName: true
+              }
+            }
+          }
+        }
+      },
+      orderBy: {
+        message: {
+          msgtime: 'desc'
+        }
+      },
+      skip: offset,
+      take: limit
+    });
 
-    return await this.mysqlService.query<SmfMessage>(query, [userId, limit, offset]);
+    return messages.map(recipient => ({
+      id: recipient.message.idPm,
+      thread_id: recipient.message.idPmHead,
+      sender_id: recipient.message.idMemberFrom,
+      sender_name: recipient.message.fromName,
+      sender_username: recipient.message.sender.memberName,
+      subject: recipient.message.subject,
+      message: recipient.message.body,
+      created_at: new Date(recipient.message.msgtime * 1000).toISOString(),
+      timestamp: recipient.message.msgtime,
+      is_read: recipient.isRead,
+      is_new: recipient.isNew,
+      bcc: recipient.bcc
+    }));
   }
 
   private async getSentMessages(userId: number, limit: number, offset: number): Promise<SmfMessage[]> {
-    const query = `
-      SELECT DISTINCT
-        pm.id_pm as id,
-        pm.id_pm_head as thread_id,
-        pm.subject,
-        pm.body as message,
-        FROM_UNIXTIME(pm.msgtime) as created_at,
-        pm.msgtime as timestamp,
-        GROUP_CONCAT(DISTINCT recipient.member_name) as recipients
-      FROM smf_personal_messages pm
-      JOIN smf_pm_recipients pr ON pm.id_pm = pr.id_pm
-      LEFT JOIN smf_members recipient ON pr.id_member = recipient.id_member
-      WHERE pm.id_member_from = ?
-        AND pm.deleted_by_sender = 0
-      GROUP BY pm.id_pm
-      ORDER BY pm.msgtime DESC
-      LIMIT ? OFFSET ?
-    `;
+    const messages = await this.prisma.smfPersonalMessage.findMany({
+      where: {
+        idMemberFrom: userId,
+        deletedBySender: 0
+      },
+      include: {
+        recipients: {
+          include: {
+            member: {
+              select: {
+                memberName: true
+              }
+            }
+          }
+        }
+      },
+      orderBy: {
+        msgtime: 'desc'
+      },
+      skip: offset,
+      take: limit
+    });
 
-    return await this.mysqlService.query<SmfMessage>(query, [userId, limit, offset]);
+    return messages.map(message => ({
+      id: message.idPm,
+      thread_id: message.idPmHead,
+      subject: message.subject,
+      message: message.body,
+      created_at: new Date(message.msgtime * 1000).toISOString(),
+      timestamp: message.msgtime,
+      recipients: message.recipients.map(r => r.member.memberName).join(', ')
+    }));
   }
 
   async getConversationThread(threadId: number, userId: number): Promise<ConversationMessage[]> {
-    const query = `
-      SELECT
-        pm.id_pm as id,
-        pm.id_pm_head as thread_id,
-        pm.id_member_from as sender_id,
-        pm.from_name as sender_name,
-        sender.member_name as sender_username,
-        pm.subject,
-        pm.body as message,
-        FROM_UNIXTIME(pm.msgtime) as created_at,
-        pr.is_read,
-        pr.id_member as recipient_id,
-        recipient.member_name as recipient_username
-      FROM smf_personal_messages pm
-      JOIN smf_pm_recipients pr ON pm.id_pm = pr.id_pm
-      LEFT JOIN smf_members sender ON pm.id_member_from = sender.id_member
-      LEFT JOIN smf_members recipient ON pr.id_member = recipient.id_member
-      WHERE pm.id_pm_head = ?
-        AND (pm.id_member_from = ? OR pr.id_member = ?)
-        AND ((pm.id_member_from = ? AND pm.deleted_by_sender = 0) OR
-             (pr.id_member = ? AND pr.deleted = 0))
-      ORDER BY pm.msgtime ASC
-    `;
-
     try {
-      return await this.mysqlService.query<ConversationMessage>(
-        query,
-        [threadId, userId, userId, userId, userId]
-      );
+      const messages = await this.prisma.smfPersonalMessage.findMany({
+        where: {
+          idPmHead: threadId,
+          OR: [
+            {
+              idMemberFrom: userId,
+              deletedBySender: 0
+            },
+            {
+              recipients: {
+                some: {
+                  idMember: userId,
+                  deleted: 0
+                }
+              }
+            }
+          ]
+        },
+        include: {
+          sender: {
+            select: {
+              memberName: true
+            }
+          },
+          recipients: {
+            include: {
+              member: {
+                select: {
+                  memberName: true
+                }
+              }
+            }
+          }
+        },
+        orderBy: {
+          msgtime: 'asc'
+        }
+      });
+
+      return messages.map(message => ({
+        id: message.idPm,
+        thread_id: message.idPmHead,
+        sender_id: message.idMemberFrom,
+        sender_name: message.fromName,
+        sender_username: message.sender.memberName,
+        subject: message.subject,
+        message: message.body,
+        created_at: new Date(message.msgtime * 1000).toISOString(),
+        is_read: message.recipients.find(r => r.idMember === userId)?.isRead || 0,
+        recipient_id: message.recipients[0]?.idMember || 0,
+        recipient_username: message.recipients[0]?.member.memberName || ''
+      }));
     } catch (error) {
       this.logger.error('Failed to get conversation thread:', error);
       throw new BadRequestException('Failed to retrieve conversation');
@@ -181,19 +243,27 @@ export class MessagesService {
     const { messageId, userId } = markReadDto;
 
     try {
-      await this.mysqlService.transaction(async (connection) => {
-        await connection.execute(`
-          UPDATE smf_pm_recipients
-          SET is_read = 1, is_new = 0
-          WHERE id_pm = ? AND id_member = ?
-        `, [messageId, userId]);
+      await this.prisma.$transaction(async (prisma) => {
+        await prisma.smfPmRecipient.update({
+          where: {
+            idPm_idMember: {
+              idPm: messageId,
+              idMember: userId
+            }
+          },
+          data: {
+            isRead: 1,
+            isNew: 0
+          }
+        });
 
         // Update user's unread count
-        await connection.execute(`
-          UPDATE smf_members
-          SET unread_messages = GREATEST(0, unread_messages - 1)
-          WHERE id_member = ?
-        `, [userId]);
+        await prisma.smfMember.update({
+          where: { idMember: userId },
+          data: {
+            unreadMessages: { decrement: 1 }
+          }
+        });
       });
     } catch (error) {
       this.logger.error('Failed to mark message as read:', error);
@@ -203,12 +273,12 @@ export class MessagesService {
 
   async getUnreadCount(userId: number): Promise<number> {
     try {
-      const results = await this.mysqlService.query<{ unread_messages: number }>(
-        'SELECT unread_messages FROM smf_members WHERE id_member = ?',
-        [userId]
-      );
+      const user = await this.prisma.smfMember.findUnique({
+        where: { idMember: userId },
+        select: { unreadMessages: true }
+      });
 
-      return results.length > 0 ? results[0].unread_messages : 0;
+      return user?.unreadMessages || 0;
     } catch (error) {
       this.logger.error('Failed to get unread count:', error);
       throw new BadRequestException('Failed to get unread count');
@@ -216,38 +286,65 @@ export class MessagesService {
   }
 
   async searchMessages(searchDto: SearchMessagesDto): Promise<SmfMessage[]> {
-    const { userId, searchTerm, limit, offset } = searchDto;
-    const searchPattern = `%${searchTerm}%`;
-
-    const query = `
-      SELECT DISTINCT
-        pm.id_pm as id,
-        pm.id_pm_head as thread_id,
-        pm.id_member_from as sender_id,
-        pm.from_name as sender_name,
-        pm.subject,
-        pm.body as message,
-        FROM_UNIXTIME(pm.msgtime) as created_at,
-        CASE
-          WHEN pm.id_member_from = ? THEN 'sent'
-          ELSE 'received'
-        END as type
-      FROM smf_personal_messages pm
-      LEFT JOIN smf_pm_recipients pr ON pm.id_pm = pr.id_pm
-      WHERE (pm.subject LIKE ? OR pm.body LIKE ?)
-        AND (
-          (pm.id_member_from = ? AND pm.deleted_by_sender = 0) OR
-          (pr.id_member = ? AND pr.deleted = 0)
-        )
-      ORDER BY pm.msgtime DESC
-      LIMIT ? OFFSET ?
-    `;
+    const { userId, searchTerm, limit = 20, offset = 0 } = searchDto;
 
     try {
-      return await this.mysqlService.query<SmfMessage>(
-        query,
-        [userId, searchPattern, searchPattern, userId, userId, limit, offset]
-      );
+      const messages = await this.prisma.smfPersonalMessage.findMany({
+        where: {
+          AND: [
+            {
+              OR: [
+                { subject: { contains: searchTerm, mode: 'insensitive' } },
+                { body: { contains: searchTerm, mode: 'insensitive' } }
+              ]
+            },
+            {
+              OR: [
+                {
+                  idMemberFrom: userId,
+                  deletedBySender: 0
+                },
+                {
+                  recipients: {
+                    some: {
+                      idMember: userId,
+                      deleted: 0
+                    }
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        include: {
+          sender: {
+            select: {
+              memberName: true
+            }
+          },
+          recipients: {
+            where: {
+              idMember: userId
+            }
+          }
+        },
+        orderBy: {
+          msgtime: 'desc'
+        },
+        skip: offset,
+        take: limit
+      });
+
+      return messages.map(message => ({
+        id: message.idPm,
+        thread_id: message.idPmHead,
+        sender_id: message.idMemberFrom,
+        sender_name: message.fromName,
+        subject: message.subject,
+        message: message.body,
+        created_at: new Date(message.msgtime * 1000).toISOString(),
+        type: message.idMemberFrom === userId ? 'sent' : 'received'
+      }));
     } catch (error) {
       this.logger.error('Failed to search messages:', error);
       throw new BadRequestException('Failed to search messages');
@@ -255,27 +352,36 @@ export class MessagesService {
   }
 
   async getUsers(searchTerm?: string, limit: number = 50): Promise<MessageUser[]> {
-    let query = `
-      SELECT
-        id_member as id,
-        member_name as username,
-        real_name as displayName
-      FROM smf_members
-      WHERE id_member > 0
-    `;
-    const params: any[] = [];
-
-    if (searchTerm) {
-      query += ' AND (member_name LIKE ? OR real_name LIKE ?)';
-      const searchPattern = `%${searchTerm}%`;
-      params.push(searchPattern, searchPattern);
-    }
-
-    query += ' ORDER BY member_name LIMIT ?';
-    params.push(limit);
-
     try {
-      return await this.mysqlService.query<MessageUser>(query, params);
+      const whereClause: any = {
+        idMember: { gt: 0 }
+      };
+
+      if (searchTerm) {
+        whereClause.OR = [
+          { memberName: { contains: searchTerm, mode: 'insensitive' } },
+          { realName: { contains: searchTerm, mode: 'insensitive' } }
+        ];
+      }
+
+      const users = await this.prisma.smfMember.findMany({
+        where: whereClause,
+        select: {
+          idMember: true,
+          memberName: true,
+          realName: true
+        },
+        orderBy: {
+          memberName: 'asc'
+        },
+        take: limit
+      });
+
+      return users.map(user => ({
+        id: user.idMember,
+        username: user.memberName,
+        displayName: user.realName || user.memberName
+      }));
     } catch (error) {
       this.logger.error('Failed to get users:', error);
       throw new BadRequestException('Failed to retrieve users');
