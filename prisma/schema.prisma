@@ -644,7 +644,6 @@ model SmfBoard {
   idLastMsg        Int      @map("id_last_msg") @default(0)
   idMsgUpdated     Int      @map("id_msg_updated") @default(0)
   memberGroups     String   @map("member_groups") @default("-1,0") @db.VarChar(255)
-  denyMemberGroups String   @map("deny_member_groups") @default("") @db.VarChar(255)
   idProfile        Int      @map("id_profile") @default(1)
   name             String   @db.VarChar(255)
   description      String?  @db.Text
