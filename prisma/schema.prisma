@@ -15,6 +15,7 @@ datasource db {
 model SmfMembergroup {
   idGroup         Int      @id @map("id_group")
   groupName       String   @map("group_name") @db.VarChar(80)
+  description     String?  @db.Text
   onlineColor     String?  @map("online_color") @db.VarChar(20)
   minPosts        Int      @map("min_posts") @default(-1)
   maxMessages     Int      @map("max_messages") @default(-1)
@@ -39,6 +40,8 @@ model SmfMember {
   dateRegistered   Int      @map("date_registered")
   lastLogin        Int?     @map("last_login")
   idGroup          Int      @map("id_group") @default(0)
+  idPostGroup      Int?     @map("id_post_group")
+  additionalGroups String?  @map("additional_groups") @db.VarChar(255)
   avatar           String?  @db.Text
   signature        String?  @db.Text
   personalText     String?  @map("personal_text") @db.Text
@@ -633,23 +636,24 @@ model SmfCategory {
 
 // SMF Boards/Forums
 model SmfBoard {
-  idBoard        Int      @id @map("id_board")
-  idCat          Int      @map("id_cat")
-  childLevel     Int      @map("child_level") @default(0)
-  idParent       Int      @map("id_parent") @default(0)
-  boardOrder     Int      @map("board_order") @default(0)
-  idLastMsg      Int      @map("id_last_msg") @default(0)
-  idMsgUpdated   Int      @map("id_msg_updated") @default(0)
-  memberGroups   String   @map("member_groups") @default("-1,0") @db.VarChar(255)
-  idProfile      Int      @map("id_profile") @default(1)
-  name           String   @db.VarChar(255)
-  description    String?  @db.Text
-  numTopics      Int      @map("num_topics") @default(0)
-  numPosts       Int      @map("num_posts") @default(0)
-  countPosts     Int      @map("count_posts") @default(0)
-  idTheme        Int      @map("id_theme") @default(0)
-  override_theme Int     @map("override_theme") @default(0)
-  redirect       String?  @db.VarChar(255)
+  idBoard          Int      @id @map("id_board")
+  idCat            Int      @map("id_cat")
+  childLevel       Int      @map("child_level") @default(0)
+  idParent         Int      @map("id_parent") @default(0)
+  boardOrder       Int      @map("board_order") @default(0)
+  idLastMsg        Int      @map("id_last_msg") @default(0)
+  idMsgUpdated     Int      @map("id_msg_updated") @default(0)
+  memberGroups     String   @map("member_groups") @default("-1,0") @db.VarChar(255)
+  denyMemberGroups String   @map("deny_member_groups") @default("") @db.VarChar(255)
+  idProfile        Int      @map("id_profile") @default(1)
+  name             String   @db.VarChar(255)
+  description      String?  @db.Text
+  numTopics        Int      @map("num_topics") @default(0)
+  numPosts         Int      @map("num_posts") @default(0)
+  countPosts       Int      @map("count_posts") @default(0)
+  idTheme          Int      @map("id_theme") @default(0)
+  override_theme   Int      @map("override_theme") @default(0)
+  redirect         String?  @db.VarChar(255)
 
   // Relations
   category       SmfCategory @relation(fields: [idCat], references: [idCat], onDelete: Cascade)
