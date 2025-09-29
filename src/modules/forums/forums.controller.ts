@@ -26,9 +26,11 @@ export class ForumsController {
   async getBoardWithTopics(
     @Param('boardId', ParseIntPipe) boardId: number,
     @Query('page') page: string = '1',
-    @Query('limit') limit: string = '20'
+    @Query('limit') limit: string = '20',
+    @Request() req?
   ) {
-    return this.forumsService.getBoardWithTopics(boardId, parseInt(page), parseInt(limit));
+    const userId = req?.user?.id || null;
+    return this.forumsService.getBoardWithTopics(boardId, parseInt(page), parseInt(limit), userId);
   }
 
   @Get('topics/:topicId')
@@ -40,9 +42,11 @@ export class ForumsController {
   async getTopicWithPosts(
     @Param('topicId', ParseIntPipe) topicId: number,
     @Query('page') page: string = '1',
-    @Query('limit') limit: string = '15'
+    @Query('limit') limit: string = '15',
+    @Request() req?
   ) {
-    return this.forumsService.getTopicWithPosts(topicId, parseInt(page), parseInt(limit));
+    const userId = req?.user?.id || null;
+    return this.forumsService.getTopicWithPosts(topicId, parseInt(page), parseInt(limit), userId);
   }
 
   @Post('topics/:topicId/view')
