@@ -1,7 +1,8 @@
-import { Controller, Get, Post, Query, Param, ParseIntPipe } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiQuery, ApiResponse, ApiParam } from '@nestjs/swagger';
+import { Controller, Get, Post, Query, Param, ParseIntPipe, UseGuards, Request } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiQuery, ApiResponse, ApiParam, ApiBearerAuth } from '@nestjs/swagger';
 import { ForumsService } from './forums.service';
 import { ForumMessageQueryDto } from './dto/forum-message.dto';
+import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 
 @ApiTags('Forums')
 @Controller('forums')
@@ -11,8 +12,9 @@ export class ForumsController {
   @Get('categories')
   @ApiOperation({ summary: 'Get forum categories with boards' })
   @ApiResponse({ status: 200, description: 'Forum categories retrieved successfully' })
-  async getCategories() {
-    return this.forumsService.getCategories();
+  async getCategories(@Request() req?) {
+    const userId = req?.user?.id || null;
+    return this.forumsService.getCategories(userId);
   }
 
   @Get('boards/:boardId')
@@ -67,5 +69,26 @@ export class ForumsController {
   @ApiResponse({ status: 200, description: 'Forum boards retrieved successfully' })
   async getBoardList() {
     return await this.forumsService.getBoardList();
+  }
+
+  @Get('user/info')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get current user forum information' })
+  @ApiResponse({ status: 200, description: 'User forum information retrieved successfully' })
+  async getUserForumInfo(@Request() req) {
+    const userId = req.user.id;
+    return await this.forumsService.getUserForumInfo(userId);
+  }
+
+  @Get('user/recent-activity')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get current user recent forum activity' })
+  @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Number of activities to return (default: 10)' })
+  @ApiResponse({ status: 200, description: 'User recent activity retrieved successfully' })
+  async getUserRecentActivity(@Request() req, @Query('limit') limit: string = '10') {
+    const userId = req.user.id;
+    return await this.forumsService.getUserRecentActivity(userId, parseInt(limit));
   }
 }

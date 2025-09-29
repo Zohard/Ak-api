@@ -8,7 +8,7 @@ export class ForumsService {
 
   constructor(private readonly prisma: PrismaService) {}
 
-  async getCategories() {
+  async getCategories(userId?: number) {
     try {
       const categories = await this.prisma.smfCategory.findMany({
         orderBy: { catOrder: 'asc' },
@@ -366,9 +366,87 @@ export class ForumsService {
     }
   }
 
+  async getUserForumInfo(userId: number): Promise<any> {
+    try {
+      const user = await this.prisma.smfMember.findUnique({
+        where: { idMember: userId },
+        include: {
+          membergroup: true,
+          _count: {
+            select: {
+              messages: true,
+              startedTopics: true
+            }
+          }
+        }
+      });
+
+      if (!user) {
+        return null;
+      }
+
+      return {
+        id: user.idMember,
+        memberName: user.memberName,
+        realName: user.realName,
+        posts: user.posts,
+        dateRegistered: user.dateRegistered,
+        lastLogin: user.lastLogin,
+        avatar: user.avatar,
+        signature: user.signature,
+        personalText: user.personalText,
+        group: {
+          name: user.membergroup?.groupName || 'Member',
+          color: user.membergroup?.onlineColor || null
+        },
+        stats: {
+          totalMessages: user._count.messages,
+          topicsStarted: user._count.startedTopics
+        }
+      };
+    } catch (error) {
+      this.logger.error('Error fetching user forum info:', error);
+      return null;
+    }
+  }
+
+  async getUserRecentActivity(userId: number, limit: number = 10): Promise<any> {
+    try {
+      const recentMessages = await this.prisma.smfMessage.findMany({
+        where: { idMember: userId },
+        take: limit,
+        orderBy: { posterTime: 'desc' },
+        include: {
+          topic: {
+            include: {
+              board: true
+            }
+          }
+        }
+      });
+
+      return recentMessages.map(message => ({
+        id: message.idMsg,
+        subject: message.subject,
+        posterTime: message.posterTime,
+        topic: {
+          id: message.topic.idTopic,
+          subject: message.topic.firstMessage?.subject || 'Untitled',
+          board: {
+            id: message.topic.board.idBoard,
+            name: message.topic.board.name
+          }
+        }
+      }));
+    } catch (error) {
+      this.logger.error('Error fetching user recent activity:', error);
+      return [];
+    }
+  }
+
   private stripSmfBBCode(text: string): string {
     if (!text) return '';
-    
+
     return text
       // Remove BBCode tags
       .replace(/\[\/?\w+.*?\]/g, '')
