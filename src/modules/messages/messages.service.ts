@@ -111,7 +111,7 @@ export class MessagesService {
         idMember: userId,
         deleted: 0,
         message: {
-          isNot: null
+          isNot: undefined
         }
       },
       include: {
@@ -135,15 +135,15 @@ export class MessagesService {
     });
 
     return messages.map(recipient => ({
-      id: recipient.message.idPm,
-      thread_id: recipient.message.idPmHead,
-      sender_id: recipient.message.idMemberFrom,
-      sender_name: recipient.message.fromName,
-      sender_username: recipient.message.sender.memberName,
-      subject: recipient.message.subject,
-      message: recipient.message.body,
-      created_at: new Date(recipient.message.msgtime * 1000).toISOString(),
-      timestamp: recipient.message.msgtime,
+      id: recipient.message!.idPm,
+      thread_id: recipient.message!.idPmHead,
+      sender_id: recipient.message!.idMemberFrom,
+      sender_name: recipient.message!.fromName,
+      sender_username: recipient.message!.sender.memberName,
+      subject: recipient.message!.subject,
+      message: recipient.message!.body,
+      created_at: new Date(recipient.message!.msgtime * 1000).toISOString(),
+      timestamp: recipient.message!.msgtime,
       is_read: recipient.isRead,
       is_new: recipient.isNew,
       bcc: recipient.bcc
