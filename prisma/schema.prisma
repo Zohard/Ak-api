@@ -19,8 +19,6 @@ model SmfMembergroup {
   minPosts        Int      @map("min_posts") @default(-1)
   maxMessages     Int      @map("max_messages") @default(-1)
   stars           String?  @db.VarChar(255)
-  minPosts2       Int      @map("min_posts2") @default(0)
-  maxMessages2    Int      @map("max_messages2") @default(0)
   groupType       Int      @map("group_type") @default(-1)
 
   // Relations
