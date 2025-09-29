@@ -106,45 +106,52 @@ export class MessagesService {
   }
 
   private async getInboxMessages(userId: number, limit: number, offset: number): Promise<SmfMessage[]> {
-    const messages = await this.prisma.smfPmRecipient.findMany({
+    const messages = await this.prisma.smfPersonalMessage.findMany({
       where: {
-        idMember: userId,
-        deleted: 0
+        recipients: {
+          some: {
+            idMember: userId,
+            deleted: 0
+          }
+        }
       },
       include: {
-        message: {
-          include: {
-            sender: {
-              select: {
-                memberName: true
-              }
-            }
+        sender: {
+          select: {
+            memberName: true
+          }
+        },
+        recipients: {
+          where: {
+            idMember: userId,
+            deleted: 0
           }
         }
       },
       orderBy: {
-        message: {
-          msgtime: 'desc'
-        }
+        msgtime: 'desc'
       },
       skip: offset,
       take: limit
     });
 
-    return messages.map(recipient => ({
-      id: recipient.message.idPm,
-      thread_id: recipient.message.idPmHead,
-      sender_id: recipient.message.idMemberFrom,
-      sender_name: recipient.message.fromName,
-      sender_username: recipient.message.sender.memberName,
-      subject: recipient.message.subject,
-      message: recipient.message.body,
-      created_at: new Date(recipient.message.msgtime * 1000).toISOString(),
-      timestamp: recipient.message.msgtime,
-      is_read: recipient.isRead,
-      is_new: recipient.isNew,
-      bcc: recipient.bcc
-    }));
+    return messages.map(message => {
+      const recipient = message.recipients[0]; // Should only be one recipient for this user
+      return {
+        id: message.idPm,
+        thread_id: message.idPmHead,
+        sender_id: message.idMemberFrom,
+        sender_name: message.fromName,
+        sender_username: message.sender.memberName,
+        subject: message.subject,
+        message: message.body,
+        created_at: new Date(message.msgtime * 1000).toISOString(),
+        timestamp: message.msgtime,
+        is_read: recipient?.isRead || 0,
+        is_new: recipient?.isNew || 0,
+        bcc: recipient?.bcc || 0
+      };
+    });
   }
 
   private async getSentMessages(userId: number, limit: number, offset: number): Promise<SmfMessage[]> {
