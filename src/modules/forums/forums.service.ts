@@ -55,6 +55,12 @@ export class ForumsService {
             category.boards.map(async board => {
               const hasAccess = await this.checkBoardAccess(board.idBoard, userId);
               this.logger.log(`Board ${board.idBoard} (${board.name}) access for user ${userId}: ${hasAccess}`);
+
+              // Special logging for Team AK boards
+              if (category.name === 'Team AK') {
+                this.logger.warn(`🔍 TEAM AK BOARD DETECTED: ${board.idBoard} (${board.name}) - access: ${hasAccess} - member_groups: "${board.memberGroups}"`);
+              }
+
               return hasAccess ? {
                 id: board.idBoard,
                 name: board.name,
@@ -579,7 +585,10 @@ export class ForumsService {
         }
       });
 
+      this.logger.debug(`getUserGroups for user ${userId}: raw data = ${JSON.stringify(user)}`);
+
       if (!user) {
+        this.logger.debug(`getUserGroups: user ${userId} not found, returning guest group [0]`);
         return [0]; // Guest group
       }
 
@@ -588,6 +597,7 @@ export class ForumsService {
       // Add post group if different from main group
       if (user.idPostGroup && user.idPostGroup !== user.idGroup) {
         groups.push(user.idPostGroup);
+        this.logger.debug(`getUserGroups: added post group ${user.idPostGroup} for user ${userId}`);
       }
 
       // Add additional groups
@@ -597,9 +607,12 @@ export class ForumsService {
           .map(g => parseInt(g.trim()))
           .filter(g => !isNaN(g) && g > 0);
         groups.push(...additionalGroups);
+        this.logger.debug(`getUserGroups: added additional groups [${additionalGroups.join(',')}] for user ${userId}`);
       }
 
-      return [...new Set(groups)]; // Remove duplicates
+      const finalGroups = [...new Set(groups)]; // Remove duplicates
+      this.logger.debug(`getUserGroups: final groups for user ${userId} = [${finalGroups.join(',')}]`);
+      return finalGroups;
     } catch (error) {
       this.logger.error('Error getting user groups:', error);
       return [0]; // Default to guest group on error
