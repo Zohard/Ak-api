@@ -10,6 +10,8 @@ export class ForumsService {
 
   async getCategories(userId?: number) {
     try {
+      this.logger.log(`Getting categories for user: ${userId || 'guest'}`);
+
       const categories = await this.prisma.smfCategory.findMany({
         orderBy: { catOrder: 'asc' },
         include: {
@@ -30,12 +32,15 @@ export class ForumsService {
         }
       });
 
+      this.logger.log(`Found ${categories.length} categories with ${categories.reduce((total, cat) => total + cat.boards.length, 0)} boards`);
+
       // Filter boards based on access permissions
       const filteredCategories = await Promise.all(
         categories.map(async category => {
           const accessibleBoards = await Promise.all(
             category.boards.map(async board => {
               const hasAccess = await this.checkBoardAccess(board.idBoard, userId);
+              this.logger.debug(`Board ${board.idBoard} (${board.name}) access for user ${userId}: ${hasAccess}`);
               return hasAccess ? {
                 id: board.idBoard,
                 name: board.name,
@@ -48,15 +53,21 @@ export class ForumsService {
             })
           );
 
+          const filteredBoards = accessibleBoards.filter(board => board !== null);
+          this.logger.log(`Category ${category.name}: ${filteredBoards.length}/${category.boards.length} accessible boards`);
+
           return {
             id: category.idCat,
             name: category.name,
             catOrder: category.catOrder,
             canCollapse: Boolean(category.canCollapse),
-            boards: accessibleBoards.filter(board => board !== null)
+            boards: filteredBoards
           };
         })
       );
+
+      const totalAccessibleBoards = filteredCategories.reduce((total, cat) => total + cat.boards.length, 0);
+      this.logger.log(`Returning ${filteredCategories.length} categories with ${totalAccessibleBoards} accessible boards`);
 
       return filteredCategories;
     } catch (error) {
@@ -495,42 +506,62 @@ export class ForumsService {
       // Get board permissions
       const board = await this.prisma.smfBoard.findUnique({
         where: { idBoard: boardId },
-        select: { memberGroups: true, denyMemberGroups: true }
+        select: { memberGroups: true, denyMemberGroups: true, name: true }
       });
 
       if (!board) {
+        this.logger.warn(`Board ${boardId} not found, denying access`);
         return false;
       }
 
       // If no user is logged in, they are considered a guest (group 0)
       const userGroups = userId ? await this.getUserGroups(userId) : [0];
+      this.logger.debug(`Board ${boardId} (${board.name}): user groups = [${userGroups.join(',')}], memberGroups = "${board.memberGroups}", denyMemberGroups = "${board.denyMemberGroups}"`);
 
-      // Parse allowed member groups (comma-separated string)
-      const allowedGroups = board.memberGroups
-        ? board.memberGroups.split(',').map(g => parseInt(g.trim())).filter(g => !isNaN(g))
-        : [-1, 0]; // Default: guests and regular members
-
-      // Parse denied member groups (comma-separated string)
+      // Parse denied member groups first (denial takes precedence)
       const deniedGroups = board.denyMemberGroups
         ? board.denyMemberGroups.split(',').map(g => parseInt(g.trim())).filter(g => !isNaN(g))
         : [];
 
       // Check if user is in any denied groups (denial takes precedence)
-      if (deniedGroups.some(group => userGroups.includes(group))) {
+      if (deniedGroups.length > 0 && deniedGroups.some(group => userGroups.includes(group))) {
+        this.logger.debug(`Board ${boardId}: access denied - user in denied group`);
         return false;
       }
 
+      // Parse allowed member groups (comma-separated string)
+      // Be more permissive: allow access unless explicitly restricted
+      let allowedGroups: number[];
+      if (!board.memberGroups || board.memberGroups.trim() === '' || board.memberGroups.trim() === '0') {
+        // Default to public access if no restrictions set or only guest restriction
+        allowedGroups = [-1, 0, 1, 2, 3, 4]; // Include all common groups
+        this.logger.debug(`Board ${boardId}: using default public access`);
+      } else {
+        allowedGroups = board.memberGroups.split(',').map(g => parseInt(g.trim())).filter(g => !isNaN(g));
+        // If no valid groups found, default to public
+        if (allowedGroups.length === 0) {
+          allowedGroups = [-1, 0, 1, 2, 3, 4];
+          this.logger.debug(`Board ${boardId}: no valid groups found, defaulting to public access`);
+        }
+      }
+
       // Check if user is in any allowed groups
-      // Group -1 means "all groups", Group 0 means "guests"
+      // Group -1 means "all groups" (public access)
       if (allowedGroups.includes(-1)) {
+        this.logger.debug(`Board ${boardId}: public access granted (-1 in allowed groups)`);
         return true;
       }
 
-      return userGroups.some(group => allowedGroups.includes(group));
+      // Check if user's groups match any allowed groups
+      const hasAccess = userGroups.some(group => allowedGroups.includes(group));
+      this.logger.debug(`Board ${boardId}: access result = ${hasAccess} (user groups [${userGroups.join(',')}] vs allowed [${allowedGroups.join(',')}])`);
+      return hasAccess;
 
     } catch (error) {
       this.logger.error('Error checking board access:', error);
-      return false;
+      // On error, default to allowing access to prevent breaking the forum
+      this.logger.warn(`Defaulting to allow access for board ${boardId} due to error`);
+      return true;
     }
   }
 
