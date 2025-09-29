@@ -109,10 +109,7 @@ export class MessagesService {
     const messages = await this.prisma.smfPmRecipient.findMany({
       where: {
         idMember: userId,
-        deleted: 0,
-        message: {
-          isNot: null
-        }
+        deleted: 0
       },
       include: {
         message: {
@@ -134,16 +131,16 @@ export class MessagesService {
       take: limit
     });
 
-    return messages.filter(recipient => recipient.message !== null).map(recipient => ({
-      id: recipient.message!.idPm,
-      thread_id: recipient.message!.idPmHead,
-      sender_id: recipient.message!.idMemberFrom,
-      sender_name: recipient.message!.fromName,
-      sender_username: recipient.message!.sender.memberName,
-      subject: recipient.message!.subject,
-      message: recipient.message!.body,
-      created_at: new Date(recipient.message!.msgtime * 1000).toISOString(),
-      timestamp: recipient.message!.msgtime,
+    return messages.map(recipient => ({
+      id: recipient.message.idPm,
+      thread_id: recipient.message.idPmHead,
+      sender_id: recipient.message.idMemberFrom,
+      sender_name: recipient.message.fromName,
+      sender_username: recipient.message.sender.memberName,
+      subject: recipient.message.subject,
+      message: recipient.message.body,
+      created_at: new Date(recipient.message.msgtime * 1000).toISOString(),
+      timestamp: recipient.message.msgtime,
       is_read: recipient.isRead,
       is_new: recipient.isNew,
       bcc: recipient.bcc
