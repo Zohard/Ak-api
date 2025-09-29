@@ -48,7 +48,7 @@ export class AdminForumsService {
         description: board.description || '',
         categoryName: board.category.name,
         allowedGroups: board.memberGroups || '-1,0',
-        deniedGroups: '' || '',
+        deniedGroups: '',
         numTopics: board.numTopics,
         numPosts: board.numPosts
       }));
@@ -245,7 +245,7 @@ export class AdminForumsService {
           description: board.description || '',
           categoryName: board.category.name,
           allowedGroups: board.memberGroups || '',
-          deniedGroups: '' || '',
+          deniedGroups: '',
           numTopics: board.numTopics,
           numPosts: board.numPosts
         },
