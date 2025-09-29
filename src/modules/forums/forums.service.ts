@@ -576,7 +576,8 @@ export class ForumsService {
 
   private async getUserGroups(userId: number): Promise<number[]> {
     try {
-      const user = await this.prisma.smfMember.findUnique({
+      // First try to find user in smf_members table
+      const smfUser = await this.prisma.smfMember.findUnique({
         where: { idMember: userId },
         select: {
           idGroup: true,
@@ -585,34 +586,53 @@ export class ForumsService {
         }
       });
 
-      this.logger.debug(`getUserGroups for user ${userId}: raw data = ${JSON.stringify(user)}`);
+      this.logger.debug(`getUserGroups for user ${userId}: SMF data = ${JSON.stringify(smfUser)}`);
 
-      if (!user) {
-        this.logger.debug(`getUserGroups: user ${userId} not found, returning guest group [0]`);
-        return [0]; // Guest group
+      if (smfUser) {
+        // User found in SMF table, use SMF groups
+        const groups = [smfUser.idGroup];
+
+        // Add post group if different from main group
+        if (smfUser.idPostGroup && smfUser.idPostGroup !== smfUser.idGroup) {
+          groups.push(smfUser.idPostGroup);
+          this.logger.debug(`getUserGroups: added post group ${smfUser.idPostGroup} for user ${userId}`);
+        }
+
+        // Add additional groups
+        if (smfUser.additionalGroups) {
+          const additionalGroups = smfUser.additionalGroups
+            .split(',')
+            .map(g => parseInt(g.trim()))
+            .filter(g => !isNaN(g) && g > 0);
+          groups.push(...additionalGroups);
+          this.logger.debug(`getUserGroups: added additional groups [${additionalGroups.join(',')}] for user ${userId}`);
+        }
+
+        const finalGroups = [...new Set(groups)]; // Remove duplicates
+        this.logger.debug(`getUserGroups: final SMF groups for user ${userId} = [${finalGroups.join(',')}]`);
+        return finalGroups;
       }
 
-      const groups = [user.idGroup];
+      // User not found in SMF table, try main users table as fallback
+      this.logger.debug(`getUserGroups: user ${userId} not found in SMF table, checking main users table`);
 
-      // Add post group if different from main group
-      if (user.idPostGroup && user.idPostGroup !== user.idGroup) {
-        groups.push(user.idPostGroup);
-        this.logger.debug(`getUserGroups: added post group ${user.idPostGroup} for user ${userId}`);
+      const mainUser = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: {
+          idGroup: true
+        }
+      });
+
+      this.logger.debug(`getUserGroups for user ${userId}: main user data = ${JSON.stringify(mainUser)}`);
+
+      if (mainUser && mainUser.idGroup) {
+        this.logger.debug(`getUserGroups: using main user table group ${mainUser.idGroup} for user ${userId}`);
+        return [mainUser.idGroup];
       }
 
-      // Add additional groups
-      if (user.additionalGroups) {
-        const additionalGroups = user.additionalGroups
-          .split(',')
-          .map(g => parseInt(g.trim()))
-          .filter(g => !isNaN(g) && g > 0);
-        groups.push(...additionalGroups);
-        this.logger.debug(`getUserGroups: added additional groups [${additionalGroups.join(',')}] for user ${userId}`);
-      }
-
-      const finalGroups = [...new Set(groups)]; // Remove duplicates
-      this.logger.debug(`getUserGroups: final groups for user ${userId} = [${finalGroups.join(',')}]`);
-      return finalGroups;
+      // User not found in either table, default to guest
+      this.logger.debug(`getUserGroups: user ${userId} not found in any table, returning guest group [0]`);
+      return [0]; // Guest group
     } catch (error) {
       this.logger.error('Error getting user groups:', error);
       return [0]; // Default to guest group on error
