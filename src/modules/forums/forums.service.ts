@@ -30,29 +30,49 @@ export class ForumsService {
         }
       });
 
-      return categories.map(category => ({
-        id: category.idCat,
-        name: category.name,
-        catOrder: category.catOrder,
-        canCollapse: Boolean(category.canCollapse),
-        boards: category.boards.map(board => ({
-          id: board.idBoard,
-          name: board.name,
-          description: board.description,
-          numTopics: board.numTopics,
-          numPosts: board.numPosts,
-          redirect: board.redirect,
-          lastMessageId: board.idLastMsg || null
-        }))
-      }));
+      // Filter boards based on access permissions
+      const filteredCategories = await Promise.all(
+        categories.map(async category => {
+          const accessibleBoards = await Promise.all(
+            category.boards.map(async board => {
+              const hasAccess = await this.checkBoardAccess(board.idBoard, userId);
+              return hasAccess ? {
+                id: board.idBoard,
+                name: board.name,
+                description: board.description,
+                numTopics: board.numTopics,
+                numPosts: board.numPosts,
+                redirect: board.redirect,
+                lastMessageId: board.idLastMsg || null
+              } : null;
+            })
+          );
+
+          return {
+            id: category.idCat,
+            name: category.name,
+            catOrder: category.catOrder,
+            canCollapse: Boolean(category.canCollapse),
+            boards: accessibleBoards.filter(board => board !== null)
+          };
+        })
+      );
+
+      return filteredCategories;
     } catch (error) {
       this.logger.error('Error fetching categories:', error);
       return [];
     }
   }
 
-  async getBoardWithTopics(boardId: number, page: number = 1, limit: number = 20) {
+  async getBoardWithTopics(boardId: number, page: number = 1, limit: number = 20, userId?: number) {
     try {
+      // Check board access permissions
+      const hasAccess = await this.checkBoardAccess(boardId, userId);
+      if (!hasAccess) {
+        throw new Error('Access denied to this board');
+      }
+
       const offset = (page - 1) * limit;
 
       const [board, topics, totalTopics] = await Promise.all([
@@ -133,7 +153,7 @@ export class ForumsService {
     }
   }
 
-  async getTopicWithPosts(topicId: number, page: number = 1, limit: number = 15) {
+  async getTopicWithPosts(topicId: number, page: number = 1, limit: number = 15, userId?: number) {
     try {
       const offset = (page - 1) * limit;
 
@@ -169,6 +189,12 @@ export class ForumsService {
 
       if (!topic) {
         throw new Error('Topic not found');
+      }
+
+      // Check board access permissions for the topic's board
+      const hasAccess = await this.checkBoardAccess(topic.board.idBoard, userId);
+      if (!hasAccess) {
+        throw new Error('Access denied to this topic');
       }
 
       return {
@@ -462,5 +488,87 @@ export class ForumsService {
       .replace(/&quot;/g, '"')
       .replace(/&#039;/g, "'")
       .trim();
+  }
+
+  async checkBoardAccess(boardId: number, userId?: number): Promise<boolean> {
+    try {
+      // Get board permissions
+      const board = await this.prisma.smfBoard.findUnique({
+        where: { idBoard: boardId },
+        select: { memberGroups: true, denyMemberGroups: true }
+      });
+
+      if (!board) {
+        return false;
+      }
+
+      // If no user is logged in, they are considered a guest (group 0)
+      const userGroups = userId ? await this.getUserGroups(userId) : [0];
+
+      // Parse allowed member groups (comma-separated string)
+      const allowedGroups = board.memberGroups
+        ? board.memberGroups.split(',').map(g => parseInt(g.trim())).filter(g => !isNaN(g))
+        : [-1, 0]; // Default: guests and regular members
+
+      // Parse denied member groups (comma-separated string)
+      const deniedGroups = board.denyMemberGroups
+        ? board.denyMemberGroups.split(',').map(g => parseInt(g.trim())).filter(g => !isNaN(g))
+        : [];
+
+      // Check if user is in any denied groups (denial takes precedence)
+      if (deniedGroups.some(group => userGroups.includes(group))) {
+        return false;
+      }
+
+      // Check if user is in any allowed groups
+      // Group -1 means "all groups", Group 0 means "guests"
+      if (allowedGroups.includes(-1)) {
+        return true;
+      }
+
+      return userGroups.some(group => allowedGroups.includes(group));
+
+    } catch (error) {
+      this.logger.error('Error checking board access:', error);
+      return false;
+    }
+  }
+
+  private async getUserGroups(userId: number): Promise<number[]> {
+    try {
+      const user = await this.prisma.smfMember.findUnique({
+        where: { idMember: userId },
+        select: {
+          idGroup: true,
+          idPostGroup: true,
+          additionalGroups: true
+        }
+      });
+
+      if (!user) {
+        return [0]; // Guest group
+      }
+
+      const groups = [user.idGroup];
+
+      // Add post group if different from main group
+      if (user.idPostGroup && user.idPostGroup !== user.idGroup) {
+        groups.push(user.idPostGroup);
+      }
+
+      // Add additional groups
+      if (user.additionalGroups) {
+        const additionalGroups = user.additionalGroups
+          .split(',')
+          .map(g => parseInt(g.trim()))
+          .filter(g => !isNaN(g) && g > 0);
+        groups.push(...additionalGroups);
+      }
+
+      return [...new Set(groups)]; // Remove duplicates
+    } catch (error) {
+      this.logger.error('Error getting user groups:', error);
+      return [0]; // Default to guest group on error
+    }
   }
 }
