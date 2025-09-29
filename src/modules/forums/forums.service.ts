@@ -419,7 +419,8 @@ export class ForumsService {
         include: {
           topic: {
             include: {
-              board: true
+              board: true,
+              firstMessage: true
             }
           }
         }
