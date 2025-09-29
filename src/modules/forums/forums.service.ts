@@ -9,8 +9,10 @@ export class ForumsService {
   constructor(private readonly prisma: PrismaService) {}
 
   async getCategories(userId?: number) {
+    this.logger.log(`=== STARTING getCategories for user: ${userId || 'guest'} ===`);
+
     try {
-      this.logger.log(`Getting categories for user: ${userId || 'guest'}`);
+      this.logger.log('About to query database for categories...');
 
       const categories = await this.prisma.smfCategory.findMany({
         orderBy: { catOrder: 'asc' },
@@ -32,15 +34,27 @@ export class ForumsService {
         }
       });
 
-      this.logger.log(`Found ${categories.length} categories with ${categories.reduce((total, cat) => total + cat.boards.length, 0)} boards`);
+      this.logger.log(`=== DATABASE QUERY RESULT: Found ${categories.length} categories ===`);
+      categories.forEach((cat, index) => {
+        this.logger.log(`Category ${index + 1}: ID=${cat.idCat}, Name="${cat.name}", Boards=${cat.boards.length}`);
+      });
+
+      if (categories.length === 0) {
+        this.logger.error('NO CATEGORIES FOUND IN DATABASE!');
+        return [];
+      }
+
+      this.logger.log(`Total boards across all categories: ${categories.reduce((total, cat) => total + cat.boards.length, 0)}`);
 
       // Filter boards based on access permissions
       const filteredCategories = await Promise.all(
         categories.map(async category => {
+          this.logger.log(`Processing category: ${category.name} with ${category.boards.length} boards`);
+
           const accessibleBoards = await Promise.all(
             category.boards.map(async board => {
               const hasAccess = await this.checkBoardAccess(board.idBoard, userId);
-              this.logger.debug(`Board ${board.idBoard} (${board.name}) access for user ${userId}: ${hasAccess}`);
+              this.logger.log(`Board ${board.idBoard} (${board.name}) access for user ${userId}: ${hasAccess}`);
               return hasAccess ? {
                 id: board.idBoard,
                 name: board.name,
@@ -67,12 +81,12 @@ export class ForumsService {
       );
 
       const totalAccessibleBoards = filteredCategories.reduce((total, cat) => total + cat.boards.length, 0);
-      this.logger.log(`Returning ${filteredCategories.length} categories with ${totalAccessibleBoards} accessible boards`);
+      this.logger.log(`=== FINAL RESULT: Returning ${filteredCategories.length} categories with ${totalAccessibleBoards} accessible boards ===`);
 
       return filteredCategories;
     } catch (error) {
-      this.logger.error('Error fetching categories:', error);
-      return [];
+      this.logger.error('=== ERROR in getCategories ===', error);
+      throw error; // Re-throw to see the full error in API response
     }
   }
 
