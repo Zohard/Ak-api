@@ -69,6 +69,11 @@ model SmfMember {
   sentMessages     SmfPersonalMessage[] @relation("SentMessages")
   receivedMessages SmfPmRecipient[] @relation("ReceivedMessages")
 
+  // Forum relations
+  messages         SmfMessage[] @relation("MessageAuthor")
+  startedTopics    SmfTopic[] @relation("TopicStarter")
+  updatedTopics    SmfTopic[] @relation("TopicUpdater")
+
   @@map("smf_members")
 }
 
@@ -614,3 +619,107 @@ model SmfPmRecipient {
   @@id([idPm, idMember])
   @@map("smf_pm_recipients")
 }
+
+// SMF Categories
+model SmfCategory {
+  idCat      Int      @id @map("id_cat")
+  catOrder   Int      @map("cat_order") @default(0)
+  name       String   @db.VarChar(255)
+  canCollapse Int     @map("can_collapse") @default(1)
+
+  // Relations
+  boards     SmfBoard[]
+
+  @@map("smf_categories")
+}
+
+// SMF Boards/Forums
+model SmfBoard {
+  idBoard        Int      @id @map("id_board")
+  idCat          Int      @map("id_cat")
+  childLevel     Int      @map("child_level") @default(0)
+  idParent       Int      @map("id_parent") @default(0)
+  boardOrder     Int      @map("board_order") @default(0)
+  idLastMsg      Int      @map("id_last_msg") @default(0)
+  idMsgUpdated   Int      @map("id_msg_updated") @default(0)
+  memberGroups   String   @map("member_groups") @default("-1,0") @db.VarChar(255)
+  idProfile      Int      @map("id_profile") @default(1)
+  name           String   @db.VarChar(255)
+  description    String?  @db.Text
+  numTopics      Int      @map("num_topics") @default(0)
+  numPosts       Int      @map("num_posts") @default(0)
+  countPosts     Int      @map("count_posts") @default(0)
+  idTheme        Int      @map("id_theme") @default(0)
+  override_theme Int     @map("override_theme") @default(0)
+  redirect       String?  @db.VarChar(255)
+
+  // Relations
+  category       SmfCategory @relation(fields: [idCat], references: [idCat], onDelete: Cascade)
+  topics         SmfTopic[]
+  messages       SmfMessage[]
+
+  @@map("smf_boards")
+}
+
+// SMF Topics
+model SmfTopic {
+  idTopic          Int      @id @map("id_topic")
+  isSticky         Int      @map("is_sticky") @default(0)
+  idBoard          Int      @map("id_board")
+  idFirstMsg       Int      @map("id_first_msg") @default(0)
+  idLastMsg        Int      @map("id_last_msg") @default(0)
+  idMemberStarted  Int      @map("id_member_started") @default(0)
+  idMemberUpdated  Int      @map("id_member_updated") @default(0)
+  idPoll           Int      @map("id_poll") @default(0)
+  idPreviousBoard  Int      @map("id_previous_board") @default(0)
+  idPreviousTopic  Int      @map("id_previous_topic") @default(0)
+  numReplies       Int      @map("num_replies") @default(0)
+  numViews         Int      @map("num_views") @default(0)
+  locked           Int      @default(0)
+  approved         Int      @default(1)
+  unapprovedPosts  Int      @map("unapproved_posts") @default(0)
+
+  // Relations
+  board            SmfBoard @relation(fields: [idBoard], references: [idBoard], onDelete: Cascade)
+  messages         SmfMessage[]
+
+  // Computed relations for convenience
+  firstMessage     SmfMessage? @relation("TopicFirstMessage", fields: [idFirstMsg], references: [idMsg])
+  lastMessage      SmfMessage? @relation("TopicLastMessage", fields: [idLastMsg], references: [idMsg])
+  starter          SmfMember?  @relation("TopicStarter", fields: [idMemberStarted], references: [idMember])
+  lastUpdater      SmfMember?  @relation("TopicUpdater", fields: [idMemberUpdated], references: [idMember])
+
+  @@map("smf_topics")
+}
+
+// SMF Messages/Posts
+model SmfMessage {
+  idMsg         Int      @id @map("id_msg")
+  idTopic       Int      @map("id_topic")
+  idBoard       Int      @map("id_board")
+  posterTime    Int      @map("poster_time")
+  idMember      Int      @map("id_member") @default(0)
+  idMsgModified Int      @map("id_msg_modified") @default(0)
+  subject       String   @db.VarChar(255)
+  posterName    String   @map("poster_name") @db.VarChar(255)
+  posterEmail   String   @map("poster_email") @db.VarChar(255)
+  posterIp      String   @map("poster_ip") @db.VarChar(255)
+  smileysEnabled Int     @map("smileys_enabled") @default(1)
+  modifiedTime  Int      @map("modified_time") @default(0)
+  modifiedName  String?  @map("modified_name") @db.VarChar(255)
+  body          String   @db.Text
+  icon          String   @db.VarChar(16) @default("xx")
+  approved      Int      @default(1)
+
+  // Relations
+  topic         SmfTopic @relation(fields: [idTopic], references: [idTopic], onDelete: Cascade)
+  board         SmfBoard @relation(fields: [idBoard], references: [idBoard], onDelete: Cascade)
+  member        SmfMember? @relation("MessageAuthor", fields: [idMember], references: [idMember])
+
+  // Reverse relations for first/last message lookups
+  topicsAsFirst SmfTopic[] @relation("TopicFirstMessage")
+  topicsAsLast  SmfTopic[] @relation("TopicLastMessage")
+
+  @@map("smf_messages")
+}
+

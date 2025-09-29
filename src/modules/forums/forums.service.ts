@@ -8,6 +8,235 @@ export class ForumsService {
 
   constructor(private readonly prisma: PrismaService) {}
 
+  async getCategories() {
+    try {
+      const categories = await this.prisma.smfCategory.findMany({
+        orderBy: { catOrder: 'asc' },
+        include: {
+          boards: {
+            where: {
+              OR: [
+                { redirect: null },
+                { redirect: '' }
+              ]
+            },
+            orderBy: { boardOrder: 'asc' },
+            include: {
+              _count: {
+                select: { topics: true, messages: true }
+              }
+            }
+          }
+        }
+      });
+
+      return categories.map(category => ({
+        id: category.idCat,
+        name: category.name,
+        catOrder: category.catOrder,
+        canCollapse: Boolean(category.canCollapse),
+        boards: category.boards.map(board => ({
+          id: board.idBoard,
+          name: board.name,
+          description: board.description,
+          numTopics: board.numTopics,
+          numPosts: board.numPosts,
+          redirect: board.redirect,
+          lastMessageId: board.idLastMsg || null
+        }))
+      }));
+    } catch (error) {
+      this.logger.error('Error fetching categories:', error);
+      return [];
+    }
+  }
+
+  async getBoardWithTopics(boardId: number, page: number = 1, limit: number = 20) {
+    try {
+      const offset = (page - 1) * limit;
+
+      const [board, topics, totalTopics] = await Promise.all([
+        this.prisma.smfBoard.findUnique({
+          where: { idBoard: boardId },
+          include: {
+            category: true
+          }
+        }),
+        this.prisma.smfTopic.findMany({
+          where: { idBoard: boardId },
+          skip: offset,
+          take: limit,
+          orderBy: [
+            { isSticky: 'desc' },
+            { idLastMsg: 'desc' }
+          ],
+          include: {
+            firstMessage: {
+              include: {
+                member: true
+              }
+            },
+            lastMessage: {
+              include: {
+                member: true
+              }
+            },
+            starter: true,
+            lastUpdater: true
+          }
+        }),
+        this.prisma.smfTopic.count({
+          where: { idBoard: boardId }
+        })
+      ]);
+
+      if (!board) {
+        throw new Error('Board not found');
+      }
+
+      return {
+        board: {
+          id: board.idBoard,
+          name: board.name,
+          description: board.description,
+          categoryName: board.category.name,
+          numTopics: board.numTopics,
+          numPosts: board.numPosts
+        },
+        topics: topics.map(topic => ({
+          id: topic.idTopic,
+          subject: topic.firstMessage?.subject || 'Untitled',
+          isSticky: Boolean(topic.isSticky),
+          locked: Boolean(topic.locked),
+          numReplies: topic.numReplies,
+          numViews: topic.numViews,
+          starter: {
+            id: topic.starter?.idMember || 0,
+            name: topic.starter?.memberName || topic.firstMessage?.posterName || 'Unknown'
+          },
+          lastMessage: topic.lastMessage ? {
+            time: topic.lastMessage.posterTime,
+            author: topic.lastMessage.member?.memberName || topic.lastMessage.posterName
+          } : null,
+          firstMessageTime: topic.firstMessage?.posterTime || 0
+        })),
+        pagination: {
+          currentPage: page,
+          totalPages: Math.ceil(totalTopics / limit),
+          totalItems: totalTopics,
+          itemsPerPage: limit
+        }
+      };
+    } catch (error) {
+      this.logger.error('Error fetching board with topics:', error);
+      throw error;
+    }
+  }
+
+  async getTopicWithPosts(topicId: number, page: number = 1, limit: number = 15) {
+    try {
+      const offset = (page - 1) * limit;
+
+      const [topic, posts, totalPosts] = await Promise.all([
+        this.prisma.smfTopic.findUnique({
+          where: { idTopic: topicId },
+          include: {
+            board: {
+              include: {
+                category: true
+              }
+            },
+            firstMessage: true
+          }
+        }),
+        this.prisma.smfMessage.findMany({
+          where: { idTopic: topicId },
+          skip: offset,
+          take: limit,
+          orderBy: { idMsg: 'asc' },
+          include: {
+            member: {
+              include: {
+                membergroup: true
+              }
+            }
+          }
+        }),
+        this.prisma.smfMessage.count({
+          where: { idTopic: topicId }
+        })
+      ]);
+
+      if (!topic) {
+        throw new Error('Topic not found');
+      }
+
+      return {
+        topic: {
+          id: topic.idTopic,
+          subject: topic.firstMessage?.subject || 'Untitled',
+          isSticky: Boolean(topic.isSticky),
+          locked: Boolean(topic.locked),
+          numReplies: topic.numReplies,
+          numViews: topic.numViews,
+          board: {
+            id: topic.board.idBoard,
+            name: topic.board.name,
+            categoryName: topic.board.category.name
+          }
+        },
+        posts: posts.map((post, index) => ({
+          id: post.idMsg,
+          subject: post.subject,
+          body: post.body,
+          posterTime: post.posterTime,
+          modifiedTime: post.modifiedTime || null,
+          modifiedName: post.modifiedName || null,
+          postNumber: offset + index + 1,
+          author: {
+            id: post.member?.idMember || 0,
+            memberName: post.member?.memberName || post.posterName,
+            realName: post.member?.realName || null,
+            avatar: post.member?.avatar || null,
+            signature: post.member?.signature || null,
+            personalText: post.member?.personalText || null,
+            posts: post.member?.posts || 0,
+            dateRegistered: post.member?.dateRegistered || 0,
+            group: {
+              name: post.member?.membergroup?.groupName || 'Member',
+              color: post.member?.membergroup?.onlineColor || null
+            }
+          }
+        })),
+        pagination: {
+          currentPage: page,
+          totalPages: Math.ceil(totalPosts / limit),
+          totalItems: totalPosts,
+          itemsPerPage: limit
+        }
+      };
+    } catch (error) {
+      this.logger.error('Error fetching topic with posts:', error);
+      throw error;
+    }
+  }
+
+  async incrementTopicViews(topicId: number): Promise<void> {
+    try {
+      await this.prisma.smfTopic.update({
+        where: { idTopic: topicId },
+        data: {
+          numViews: {
+            increment: 1
+          }
+        }
+      });
+    } catch (error) {
+      this.logger.error('Error incrementing topic views:', error);
+      // Don't throw error - view counting is not critical
+    }
+  }
+
   async getLatestMessages(query: ForumMessageQueryDto): Promise<ForumMessageResponse> {
     const { limit = 10, offset = 0, boardId } = query;
 
