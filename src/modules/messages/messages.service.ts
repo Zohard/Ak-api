@@ -111,7 +111,7 @@ export class MessagesService {
         idMember: userId,
         deleted: 0,
         message: {
-          isNot: undefined
+          isNot: null
         }
       },
       include: {
@@ -134,7 +134,7 @@ export class MessagesService {
       take: limit
     });
 
-    return messages.map(recipient => ({
+    return messages.filter(recipient => recipient.message !== null).map(recipient => ({
       id: recipient.message!.idPm,
       thread_id: recipient.message!.idPmHead,
       sender_id: recipient.message!.idMemberFrom,
