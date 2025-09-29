@@ -48,7 +48,7 @@ export class AdminForumsService {
         description: board.description || '',
         categoryName: board.category.name,
         allowedGroups: board.memberGroups || '-1,0',
-        deniedGroups: board.denyMemberGroups || '',
+        deniedGroups: '' || '',
         numTopics: board.numTopics,
         numPosts: board.numPosts
       }));
@@ -134,8 +134,8 @@ export class AdminForumsService {
       const updatedBoard = await this.prisma.smfBoard.update({
         where: { idBoard: dto.boardId },
         data: {
-          memberGroups: dto.allowedGroups,
-          denyMemberGroups: dto.deniedGroups || ''
+          memberGroups: dto.allowedGroups
+          // denyMemberGroups column does not exist in database
         },
         include: { category: true }
       });
@@ -148,7 +148,7 @@ export class AdminForumsService {
         description: updatedBoard.description || '',
         categoryName: updatedBoard.category.name,
         allowedGroups: updatedBoard.memberGroups || '',
-        deniedGroups: updatedBoard.denyMemberGroups || '',
+        deniedGroups: '', // Column does not exist in database
         numTopics: updatedBoard.numTopics,
         numPosts: updatedBoard.numPosts
       };
@@ -235,7 +235,7 @@ export class AdminForumsService {
 
       const [allowedGroupNames, deniedGroupNames] = await Promise.all([
         this.getGroupNames(board.memberGroups),
-        this.getGroupNames(board.denyMemberGroups)
+        Promise.resolve([]) // deny_member_groups column does not exist
       ]);
 
       return {
@@ -245,7 +245,7 @@ export class AdminForumsService {
           description: board.description || '',
           categoryName: board.category.name,
           allowedGroups: board.memberGroups || '',
-          deniedGroups: board.denyMemberGroups || '',
+          deniedGroups: '' || '',
           numTopics: board.numTopics,
           numPosts: board.numPosts
         },
