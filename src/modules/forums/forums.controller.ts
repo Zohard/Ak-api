@@ -129,4 +129,25 @@ export class ForumsController {
       createPostDto.body
     );
   }
+
+  @Get('stats')
+  @ApiOperation({ summary: 'Get forum statistics' })
+  @ApiResponse({ status: 200, description: 'Forum statistics retrieved successfully' })
+  async getForumStats() {
+    return await this.forumsService.getForumStats();
+  }
+
+  @Get('online')
+  @ApiOperation({ summary: 'Get online users' })
+  @ApiResponse({ status: 200, description: 'Online users retrieved successfully' })
+  async getOnlineUsers() {
+    return await this.forumsService.getOnlineUsers();
+  }
+
+  @Get('birthdays')
+  @ApiOperation({ summary: 'Get upcoming birthdays' })
+  @ApiResponse({ status: 200, description: 'Upcoming birthdays retrieved successfully' })
+  async getUpcomingBirthdays() {
+    return await this.forumsService.getUpcomingBirthdays();
+  }
 }
