@@ -1010,4 +1010,179 @@ export class ForumsService {
       return [];
     }
   }
+
+  async updatePost(messageId: number, userId: number, subject: string, body: string): Promise<any> {
+    try {
+      // Get the message to check permissions
+      const message = await this.prisma.smfMessage.findUnique({
+        where: { idMsg: messageId },
+        include: {
+          topic: true
+        }
+      });
+
+      if (!message) {
+        throw new Error('Message not found');
+      }
+
+      // Check if user owns this message (or is admin)
+      if (message.idMember !== userId) {
+        // Check if user is admin
+        const userGroups = await this.getUserGroups(userId);
+        const isAdmin = userGroups.includes(1); // Group 1 is admin
+
+        if (!isAdmin) {
+          throw new Error('You can only edit your own messages');
+        }
+      }
+
+      // Check if topic is locked
+      if (message.topic.locked) {
+        throw new Error('Cannot edit message in a locked topic');
+      }
+
+      // Get user info
+      const user = await this.prisma.smfMember.findUnique({
+        where: { idMember: userId },
+        select: { memberName: true }
+      });
+
+      if (!user) {
+        throw new Error('User not found');
+      }
+
+      const currentTime = Math.floor(Date.now() / 1000);
+
+      // Update the message
+      const updatedMessage = await this.prisma.smfMessage.update({
+        where: { idMsg: messageId },
+        data: {
+          subject: subject || message.subject,
+          body: body,
+          modifiedTime: currentTime,
+          modifiedName: user.memberName
+        }
+      });
+
+      return {
+        messageId: updatedMessage.idMsg,
+        subject: updatedMessage.subject,
+        success: true
+      };
+    } catch (error) {
+      this.logger.error('Error updating post:', error);
+      throw error;
+    }
+  }
+
+  async deletePost(messageId: number, userId: number): Promise<any> {
+    try {
+      // Get the message to check permissions
+      const message = await this.prisma.smfMessage.findUnique({
+        where: { idMsg: messageId },
+        include: {
+          topic: {
+            include: {
+              board: true
+            }
+          }
+        }
+      });
+
+      if (!message) {
+        throw new Error('Message not found');
+      }
+
+      // Check if user owns this message (or is admin)
+      if (message.idMember !== userId) {
+        // Check if user is admin
+        const userGroups = await this.getUserGroups(userId);
+        const isAdmin = userGroups.includes(1); // Group 1 is admin
+
+        if (!isAdmin) {
+          throw new Error('You can only delete your own messages');
+        }
+      }
+
+      // Check if this is the first message of the topic
+      if (message.topic.idFirstMsg === messageId) {
+        // If it's the first message, we need to delete the entire topic
+        await this.prisma.$transaction(async (prisma) => {
+          // Delete all messages in the topic
+          await prisma.smfMessage.deleteMany({
+            where: { idTopic: message.idTopic }
+          });
+
+          // Delete the topic
+          await prisma.smfTopic.delete({
+            where: { idTopic: message.idTopic }
+          });
+
+          // Update board stats
+          await prisma.smfBoard.update({
+            where: { idBoard: message.idBoard },
+            data: {
+              numTopics: { decrement: 1 },
+              numPosts: { decrement: message.topic.numReplies + 1 }
+            }
+          });
+
+          // Update user post count
+          await prisma.smfMember.update({
+            where: { idMember: message.idMember },
+            data: {
+              posts: { decrement: 1 }
+            }
+          });
+        });
+
+        return {
+          success: true,
+          topicDeleted: true,
+          boardId: message.idBoard
+        };
+      } else {
+        // Regular reply - just delete the message
+        await this.prisma.$transaction(async (prisma) => {
+          // Delete the message
+          await prisma.smfMessage.delete({
+            where: { idMsg: messageId }
+          });
+
+          // Update topic stats
+          await prisma.smfTopic.update({
+            where: { idTopic: message.idTopic },
+            data: {
+              numReplies: { decrement: 1 }
+            }
+          });
+
+          // Update board stats
+          await prisma.smfBoard.update({
+            where: { idBoard: message.idBoard },
+            data: {
+              numPosts: { decrement: 1 }
+            }
+          });
+
+          // Update user post count
+          await prisma.smfMember.update({
+            where: { idMember: message.idMember },
+            data: {
+              posts: { decrement: 1 }
+            }
+          });
+        });
+
+        return {
+          success: true,
+          topicDeleted: false,
+          topicId: message.idTopic
+        };
+      }
+    } catch (error) {
+      this.logger.error('Error deleting post:', error);
+      throw error;
+    }
+  }
 }
