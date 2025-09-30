@@ -1,9 +1,10 @@
-import { Controller, Get, Post, Query, Param, ParseIntPipe, UseGuards, Request, Body } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Query, Param, ParseIntPipe, UseGuards, Request, Body } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiQuery, ApiResponse, ApiParam, ApiBearerAuth } from '@nestjs/swagger';
 import { ForumsService } from './forums.service';
 import { ForumMessageQueryDto } from './dto/forum-message.dto';
 import { CreateTopicDto } from './dto/create-topic.dto';
 import { CreatePostDto } from './dto/create-post.dto';
+import { UpdatePostDto } from './dto/update-post.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 
 @ApiTags('Forums')
@@ -149,5 +150,41 @@ export class ForumsController {
   @ApiResponse({ status: 200, description: 'Upcoming birthdays retrieved successfully' })
   async getUpcomingBirthdays() {
     return await this.forumsService.getUpcomingBirthdays();
+  }
+
+  @Put('posts/:messageId')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Update a forum post' })
+  @ApiParam({ name: 'messageId', type: 'number', description: 'Message ID' })
+  @ApiResponse({ status: 200, description: 'Post updated successfully' })
+  @ApiResponse({ status: 403, description: 'Access denied - not your post' })
+  async updatePost(
+    @Param('messageId', ParseIntPipe) messageId: number,
+    @Request() req,
+    @Body() updatePostDto: UpdatePostDto
+  ) {
+    const userId = req.user.id;
+    return await this.forumsService.updatePost(
+      messageId,
+      userId,
+      updatePostDto.subject || '',
+      updatePostDto.body
+    );
+  }
+
+  @Delete('posts/:messageId')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Delete a forum post' })
+  @ApiParam({ name: 'messageId', type: 'number', description: 'Message ID' })
+  @ApiResponse({ status: 200, description: 'Post deleted successfully' })
+  @ApiResponse({ status: 403, description: 'Access denied - not your post' })
+  async deletePost(
+    @Param('messageId', ParseIntPipe) messageId: number,
+    @Request() req
+  ) {
+    const userId = req.user.id;
+    return await this.forumsService.deletePost(messageId, userId);
   }
 }
