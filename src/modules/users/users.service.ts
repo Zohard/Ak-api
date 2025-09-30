@@ -416,6 +416,37 @@ export class UsersService {
     // Compute collection-based tag stats (genres/themes) including weighted by user's collection ratings
     const collectionTagStats = await this.getUserCollectionTagStatsInternal(id, true, 12);
 
+    // Get forum statistics - popularity by message count
+    const forumPopularityByMessages = await this.prisma.$queryRaw`
+      SELECT
+        b.id_board as "boardId",
+        b.name as "boardName",
+        COUNT(m.id_msg) as "messageCount",
+        (COUNT(m.id_msg)::float / NULLIF(${user.posts}, 0) * 100) as "percentage"
+      FROM smf_messages m
+      JOIN smf_boards b ON m.id_board = b.id_board
+      WHERE m.id_member = ${id}
+      GROUP BY b.id_board, b.name
+      ORDER BY "messageCount" DESC
+      LIMIT 10
+    `;
+
+    // Get forum statistics - popularity by activity (percentage of board total)
+    const forumPopularityByActivity = await this.prisma.$queryRaw`
+      SELECT
+        b.id_board as "boardId",
+        b.name as "boardName",
+        COUNT(m.id_msg) as "userMessageCount",
+        b.num_posts as "boardTotalPosts",
+        (COUNT(m.id_msg)::float / NULLIF(b.num_posts, 0) * 100) as "activityPercentage"
+      FROM smf_messages m
+      JOIN smf_boards b ON m.id_board = b.id_board
+      WHERE m.id_member = ${id}
+      GROUP BY b.id_board, b.name, b.num_posts
+      ORDER BY "activityPercentage" DESC
+      LIMIT 10
+    `;
+
     return {
       totalReviews: reviewStats._count,
       animeCount,
@@ -429,6 +460,22 @@ export class UsersService {
         count: Number(stat.count)
       })),
       collectionTagStats,
+      forumStats: {
+        totalPosts: user.posts,
+        popularityByMessages: (forumPopularityByMessages as any[]).map(stat => ({
+          boardId: Number(stat.boardId),
+          boardName: stat.boardName,
+          messageCount: Number(stat.messageCount),
+          percentage: stat.percentage ? Number(stat.percentage).toFixed(2) : '0.00'
+        })),
+        popularityByActivity: (forumPopularityByActivity as any[]).map(stat => ({
+          boardId: Number(stat.boardId),
+          boardName: stat.boardName,
+          userMessageCount: Number(stat.userMessageCount),
+          boardTotalPosts: Number(stat.boardTotalPosts),
+          activityPercentage: stat.activityPercentage ? Number(stat.activityPercentage).toFixed(2) : '0.00'
+        }))
+      },
       joinDate: new Date(user.dateRegistered * 1000).toISOString(),
       lastLoginDate: user.lastLogin
         ? new Date(user.lastLogin * 1000).toISOString()
@@ -769,6 +816,41 @@ export class UsersService {
     // Collection-based tag stats for public profile (only public collection items considered)
     const collectionTagStats = await this.getUserCollectionTagStatsInternal(user.idMember, false, 12);
 
+    // Get forum statistics for public profile
+    const userPosts = await this.prisma.smfMember.findUnique({
+      where: { idMember: user.idMember },
+      select: { posts: true }
+    });
+
+    const forumPopularityByMessages = await this.prisma.$queryRaw`
+      SELECT
+        b.id_board as "boardId",
+        b.name as "boardName",
+        COUNT(m.id_msg) as "messageCount",
+        (COUNT(m.id_msg)::float / NULLIF(${userPosts?.posts || 0}, 0) * 100) as "percentage"
+      FROM smf_messages m
+      JOIN smf_boards b ON m.id_board = b.id_board
+      WHERE m.id_member = ${user.idMember}
+      GROUP BY b.id_board, b.name
+      ORDER BY "messageCount" DESC
+      LIMIT 10
+    `;
+
+    const forumPopularityByActivity = await this.prisma.$queryRaw`
+      SELECT
+        b.id_board as "boardId",
+        b.name as "boardName",
+        COUNT(m.id_msg) as "userMessageCount",
+        b.num_posts as "boardTotalPosts",
+        (COUNT(m.id_msg)::float / NULLIF(b.num_posts, 0) * 100) as "activityPercentage"
+      FROM smf_messages m
+      JOIN smf_boards b ON m.id_board = b.id_board
+      WHERE m.id_member = ${user.idMember}
+      GROUP BY b.id_board, b.name, b.num_posts
+      ORDER BY "activityPercentage" DESC
+      LIMIT 10
+    `;
+
     return {
       totalReviews: totalReviewsResult,
       reviewStats: (reviewStats as any[]).map(stat => ({
@@ -781,6 +863,22 @@ export class UsersService {
       topGenresAnime: (topGenresAnime as any[]).map(g => ({ genre: g.genre, count: Number(g.count) })),
       topGenresManga: (topGenresManga as any[]).map(g => ({ genre: g.genre, count: Number(g.count) })),
       collectionTagStats,
+      forumStats: {
+        totalPosts: userPosts?.posts || 0,
+        popularityByMessages: (forumPopularityByMessages as any[]).map(stat => ({
+          boardId: Number(stat.boardId),
+          boardName: stat.boardName,
+          messageCount: Number(stat.messageCount),
+          percentage: stat.percentage ? Number(stat.percentage).toFixed(2) : '0.00'
+        })),
+        popularityByActivity: (forumPopularityByActivity as any[]).map(stat => ({
+          boardId: Number(stat.boardId),
+          boardName: stat.boardName,
+          userMessageCount: Number(stat.userMessageCount),
+          boardTotalPosts: Number(stat.boardTotalPosts),
+          activityPercentage: stat.activityPercentage ? Number(stat.activityPercentage).toFixed(2) : '0.00'
+        }))
+      },
     };
   }
 
