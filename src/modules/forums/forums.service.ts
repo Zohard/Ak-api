@@ -946,6 +946,20 @@ export class ForumsService {
     }
   }
 
+  async updateUserActivity(userId: number): Promise<void> {
+    try {
+      const currentTime = Math.floor(Date.now() / 1000);
+
+      await this.prisma.smfMember.update({
+        where: { idMember: userId },
+        data: { lastLogin: currentTime }
+      });
+    } catch (error) {
+      this.logger.error('Error updating user activity:', error);
+      // Don't throw - activity tracking is not critical
+    }
+  }
+
   async getUpcomingBirthdays(): Promise<any> {
     try {
       const today = new Date();
