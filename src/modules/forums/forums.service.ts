@@ -1334,7 +1334,8 @@ export class ForumsService {
         await prisma.smfBoard.update({
           where: { idBoard: sourceBoardId },
           data: {
-            idLastMsg: sourceLastMessage?.idMsg || 0
+            idLastMsg: sourceLastMessage?.idMsg || 0,
+            idMsgUpdated: sourceLastMessage?.idMsg || 0
           }
         });
 
@@ -1348,7 +1349,8 @@ export class ForumsService {
         await prisma.smfBoard.update({
           where: { idBoard: targetBoardId },
           data: {
-            idLastMsg: targetLastMessage?.idMsg || 0
+            idLastMsg: targetLastMessage?.idMsg || 0,
+            idMsgUpdated: targetLastMessage?.idMsg || 0
           }
         });
       });
