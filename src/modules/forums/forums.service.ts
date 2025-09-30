@@ -634,4 +634,210 @@ export class ForumsService {
       return [0]; // Default to guest group on error
     }
   }
+
+  async createTopic(boardId: number, userId: number, subject: string, body: string): Promise<any> {
+    try {
+      // Check board access
+      const hasAccess = await this.checkBoardAccess(boardId, userId);
+      if (!hasAccess) {
+        throw new Error('Access denied to this board');
+      }
+
+      // Get user info
+      const user = await this.prisma.smfMember.findUnique({
+        where: { idMember: userId },
+        select: { memberName: true, emailAddress: true }
+      });
+
+      if (!user) {
+        throw new Error('User not found');
+      }
+
+      // Get next message ID
+      const lastMessage = await this.prisma.smfMessage.findFirst({
+        orderBy: { idMsg: 'desc' },
+        select: { idMsg: true }
+      });
+      const nextMsgId = (lastMessage?.idMsg || 0) + 1;
+
+      // Get next topic ID
+      const lastTopic = await this.prisma.smfTopic.findFirst({
+        orderBy: { idTopic: 'desc' },
+        select: { idTopic: true }
+      });
+      const nextTopicId = (lastTopic?.idTopic || 0) + 1;
+
+      const currentTime = Math.floor(Date.now() / 1000);
+
+      // Create topic and first message in a transaction
+      const result = await this.prisma.$transaction(async (prisma) => {
+        // Create the first message
+        const message = await prisma.smfMessage.create({
+          data: {
+            idMsg: nextMsgId,
+            idTopic: nextTopicId,
+            idBoard: boardId,
+            posterTime: currentTime,
+            idMember: userId,
+            subject: subject,
+            posterName: user.memberName,
+            posterEmail: user.emailAddress,
+            body: body,
+            approved: 1
+          }
+        });
+
+        // Create the topic
+        const topic = await prisma.smfTopic.create({
+          data: {
+            idTopic: nextTopicId,
+            idBoard: boardId,
+            idFirstMsg: nextMsgId,
+            idLastMsg: nextMsgId,
+            idMemberStarted: userId,
+            idMemberUpdated: userId,
+            numReplies: 0,
+            numViews: 0,
+            approved: 1
+          }
+        });
+
+        // Update board stats
+        await prisma.smfBoard.update({
+          where: { idBoard: boardId },
+          data: {
+            numTopics: { increment: 1 },
+            numPosts: { increment: 1 },
+            idLastMsg: nextMsgId
+          }
+        });
+
+        // Update user post count
+        await prisma.smfMember.update({
+          where: { idMember: userId },
+          data: {
+            posts: { increment: 1 }
+          }
+        });
+
+        return { topic, message };
+      });
+
+      return {
+        topicId: result.topic.idTopic,
+        messageId: result.message.idMsg,
+        subject: subject
+      };
+    } catch (error) {
+      this.logger.error('Error creating topic:', error);
+      throw error;
+    }
+  }
+
+  async createPost(topicId: number, userId: number, subject: string, body: string): Promise<any> {
+    try {
+      // Get topic info
+      const topic = await this.prisma.smfTopic.findUnique({
+        where: { idTopic: topicId },
+        include: {
+          firstMessage: true,
+          board: true
+        }
+      });
+
+      if (!topic) {
+        throw new Error('Topic not found');
+      }
+
+      // Check if topic is locked
+      if (topic.locked) {
+        throw new Error('Topic is locked');
+      }
+
+      // Check board access
+      const hasAccess = await this.checkBoardAccess(topic.idBoard, userId);
+      if (!hasAccess) {
+        throw new Error('Access denied to this board');
+      }
+
+      // Get user info
+      const user = await this.prisma.smfMember.findUnique({
+        where: { idMember: userId },
+        select: { memberName: true, emailAddress: true }
+      });
+
+      if (!user) {
+        throw new Error('User not found');
+      }
+
+      // Get next message ID
+      const lastMessage = await this.prisma.smfMessage.findFirst({
+        orderBy: { idMsg: 'desc' },
+        select: { idMsg: true }
+      });
+      const nextMsgId = (lastMessage?.idMsg || 0) + 1;
+
+      const currentTime = Math.floor(Date.now() / 1000);
+
+      // Use topic subject with "Re: " prefix if no subject provided
+      const postSubject = subject || `Re: ${topic.firstMessage?.subject || 'Untitled'}`;
+
+      // Create post in a transaction
+      const result = await this.prisma.$transaction(async (prisma) => {
+        // Create the message
+        const message = await prisma.smfMessage.create({
+          data: {
+            idMsg: nextMsgId,
+            idTopic: topicId,
+            idBoard: topic.idBoard,
+            posterTime: currentTime,
+            idMember: userId,
+            subject: postSubject,
+            posterName: user.memberName,
+            posterEmail: user.emailAddress,
+            body: body,
+            approved: 1
+          }
+        });
+
+        // Update topic stats
+        await prisma.smfTopic.update({
+          where: { idTopic: topicId },
+          data: {
+            numReplies: { increment: 1 },
+            idLastMsg: nextMsgId,
+            idMemberUpdated: userId
+          }
+        });
+
+        // Update board stats
+        await prisma.smfBoard.update({
+          where: { idBoard: topic.idBoard },
+          data: {
+            numPosts: { increment: 1 },
+            idLastMsg: nextMsgId
+          }
+        });
+
+        // Update user post count
+        await prisma.smfMember.update({
+          where: { idMember: userId },
+          data: {
+            posts: { increment: 1 }
+          }
+        });
+
+        return message;
+      });
+
+      return {
+        messageId: result.idMsg,
+        subject: postSubject,
+        topicId: topicId
+      };
+    } catch (error) {
+      this.logger.error('Error creating post:', error);
+      throw error;
+    }
+  }
 }
