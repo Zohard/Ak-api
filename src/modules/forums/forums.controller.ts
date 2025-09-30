@@ -6,6 +6,7 @@ import { CreateTopicDto } from './dto/create-topic.dto';
 import { CreatePostDto } from './dto/create-post.dto';
 import { UpdatePostDto } from './dto/update-post.dto';
 import { MoveTopicDto } from './dto/move-topic.dto';
+import { LockTopicDto } from './dto/lock-topic.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 
 @ApiTags('Forums')
@@ -217,6 +218,27 @@ export class ForumsController {
     return await this.forumsService.moveTopic(
       topicId,
       moveTopicDto.targetBoardId,
+      userId
+    );
+  }
+
+  @Put('topics/:topicId/lock')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Lock or unlock a topic (Admin, Global Moderator, Moderator only)' })
+  @ApiParam({ name: 'topicId', type: 'number', description: 'Topic ID to lock/unlock' })
+  @ApiResponse({ status: 200, description: 'Topic lock status updated successfully' })
+  @ApiResponse({ status: 403, description: 'Access denied - insufficient permissions' })
+  @ApiResponse({ status: 404, description: 'Topic not found' })
+  async lockTopic(
+    @Param('topicId', ParseIntPipe) topicId: number,
+    @Request() req,
+    @Body() lockTopicDto: LockTopicDto
+  ) {
+    const userId = req.user.id;
+    return await this.forumsService.lockTopic(
+      topicId,
+      lockTopicDto.locked,
       userId
     );
   }
