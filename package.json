@@ -45,6 +45,7 @@
     "cheerio": "^1.0.0",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.2",
+    "csv-parse": "^6.1.0",
     "csv-parser": "^3.2.0",
     "express-rate-limit": "^8.0.1",
     "imagekit": "^6.0.0",
