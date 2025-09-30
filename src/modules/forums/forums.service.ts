@@ -61,15 +61,43 @@ export class ForumsService {
                 this.logger.warn(`🔍 TEAM AK BOARD DETECTED: ${board.idBoard} (${board.name}) - access: ${hasAccess} - member_groups: "${board.memberGroups}"`);
               }
 
-              return hasAccess ? {
+              if (!hasAccess) return null;
+
+              // Fetch last message details if available
+              let lastMessage = null;
+              if (board.idLastMsg) {
+                const lastMsg = await this.prisma.smfMessage.findUnique({
+                  where: { idMsg: board.idLastMsg },
+                  include: {
+                    topic: {
+                      include: {
+                        firstMessage: true
+                      }
+                    }
+                  }
+                });
+
+                if (lastMsg) {
+                  lastMessage = {
+                    id: lastMsg.idMsg,
+                    subject: lastMsg.subject,
+                    topicId: lastMsg.idTopic,
+                    topicSubject: lastMsg.topic?.firstMessage?.subject || lastMsg.subject,
+                    author: lastMsg.posterName,
+                    time: lastMsg.posterTime
+                  };
+                }
+              }
+
+              return {
                 id: board.idBoard,
                 name: board.name,
                 description: board.description,
                 numTopics: board.numTopics,
                 numPosts: board.numPosts,
                 redirect: board.redirect,
-                lastMessageId: board.idLastMsg || null
-              } : null;
+                lastMessage: lastMessage
+              };
             })
           );
 
