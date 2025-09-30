@@ -704,7 +704,7 @@ model SmfMessage {
   subject       String   @db.VarChar(255)
   posterName    String   @map("poster_name") @db.VarChar(255)
   posterEmail   String   @map("poster_email") @db.VarChar(255)
-  posterIp      String   @map("poster_ip") @db.VarChar(255)
+  posterIp      String?  @map("poster_ip") @db.VarChar(255)
   smileysEnabled Int     @map("smileys_enabled") @default(1)
   modifiedTime  Int      @map("modified_time") @default(0)
   modifiedName  String?  @map("modified_name") @db.VarChar(255)
