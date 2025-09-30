@@ -145,6 +145,17 @@ export class ForumsController {
     return await this.forumsService.getOnlineUsers();
   }
 
+  @Post('activity')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Update user activity timestamp' })
+  @ApiResponse({ status: 200, description: 'Activity updated successfully' })
+  async updateUserActivity(@Request() req) {
+    const userId = req.user.id;
+    await this.forumsService.updateUserActivity(userId);
+    return { success: true };
+  }
+
   @Get('birthdays')
   @ApiOperation({ summary: 'Get upcoming birthdays' })
   @ApiResponse({ status: 200, description: 'Upcoming birthdays retrieved successfully' })
