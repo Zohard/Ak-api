@@ -1323,6 +1323,34 @@ export class ForumsService {
             numPosts: { increment: messageCount }
           }
         });
+
+        // Recalculate last message for source board
+        const sourceLastMessage = await prisma.smfMessage.findFirst({
+          where: { idBoard: sourceBoardId },
+          orderBy: { posterTime: 'desc' },
+          select: { idMsg: true }
+        });
+
+        await prisma.smfBoard.update({
+          where: { idBoard: sourceBoardId },
+          data: {
+            idLastMsg: sourceLastMessage?.idMsg || 0
+          }
+        });
+
+        // Recalculate last message for target board
+        const targetLastMessage = await prisma.smfMessage.findFirst({
+          where: { idBoard: targetBoardId },
+          orderBy: { posterTime: 'desc' },
+          select: { idMsg: true }
+        });
+
+        await prisma.smfBoard.update({
+          where: { idBoard: targetBoardId },
+          data: {
+            idLastMsg: targetLastMessage?.idMsg || 0
+          }
+        });
       });
 
       this.logger.log(`Topic ${topicId} moved from board ${sourceBoardId} to board ${targetBoardId} by user ${userId}`);
