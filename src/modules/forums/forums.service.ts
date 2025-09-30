@@ -431,26 +431,31 @@ export class ForumsService {
     }
   }
 
-  async getBoardList(): Promise<{ id: number; name: string; description: string }[]> {
+  async getBoardList(): Promise<{ id: number; name: string; boards: { id: number; name: string; description: string }[] }[]> {
     try {
-      const boardsQuery = `
-        SELECT 
-          b.id_board as id,
-          b.name,
-          b.description
-        FROM smf_boards b
-        WHERE (b.redirect = '' OR b.redirect IS NULL)
-        AND b.id_board > 0
-        ORDER BY b.board_order ASC
-        LIMIT 20
-      `;
+      const categories = await this.prisma.smfCategory.findMany({
+        orderBy: { catOrder: 'asc' },
+        include: {
+          boards: {
+            where: {
+              OR: [
+                { redirect: null },
+                { redirect: '' }
+              ]
+            },
+            orderBy: { boardOrder: 'asc' }
+          }
+        }
+      });
 
-      const result = await this.prisma.$queryRawUnsafe(boardsQuery);
-      
-      return (result as any[]).map(row => ({
-        id: Number(row.id),
-        name: row.name || 'Unknown Board',
-        description: row.description || '',
+      return categories.map(category => ({
+        id: category.idCat,
+        name: category.name,
+        boards: category.boards.map(board => ({
+          id: board.idBoard,
+          name: board.name,
+          description: board.description || ''
+        }))
       }));
     } catch (error) {
       this.logger.error('Error fetching board list:', error);
