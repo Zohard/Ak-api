@@ -1371,4 +1371,58 @@ export class ForumsService {
       throw error;
     }
   }
+
+  async lockTopic(topicId: number, locked: boolean, userId: number): Promise<any> {
+    try {
+      // Check if user has permission to lock topics (Administrator, Global Moderator, or Moderator)
+      const userGroups = await this.getUserGroups(userId);
+      const canLockTopic = userGroups.some(group => [1, 2, 3].includes(group));
+
+      if (!canLockTopic) {
+        throw new Error('You do not have permission to lock/unlock topics');
+      }
+
+      // Get the topic
+      const topic = await this.prisma.smfTopic.findUnique({
+        where: { idTopic: topicId },
+        include: {
+          board: true,
+          firstMessage: true
+        }
+      });
+
+      if (!topic) {
+        throw new Error('Topic not found');
+      }
+
+      // Check if user has access to the board
+      const hasAccess = await this.checkBoardAccess(topic.idBoard, userId);
+      if (!hasAccess) {
+        throw new Error('You do not have access to this topic');
+      }
+
+      // Update the topic lock status
+      const updatedTopic = await this.prisma.smfTopic.update({
+        where: { idTopic: topicId },
+        data: {
+          locked: locked ? 1 : 0
+        }
+      });
+
+      const action = locked ? 'locked' : 'unlocked';
+      this.logger.log(`Topic ${topicId} ${action} by user ${userId}`);
+
+      return {
+        success: true,
+        topicId: topicId,
+        subject: topic.firstMessage?.subject || 'Untitled',
+        locked: Boolean(updatedTopic.locked),
+        boardId: topic.idBoard,
+        boardName: topic.board.name
+      };
+    } catch (error) {
+      this.logger.error('Error locking/unlocking topic:', error);
+      throw error;
+    }
+  }
 }
