@@ -64,7 +64,14 @@ export class ForumsService {
               if (!hasAccess) return null;
 
               // Fetch last message details if available
-              let lastMessage = null;
+              let lastMessage: {
+                id: number;
+                subject: string;
+                topicId: number;
+                topicSubject: string;
+                author: string;
+                time: number;
+              } | null = null;
               if (board.idLastMsg) {
                 const lastMsg = await this.prisma.smfMessage.findUnique({
                   where: { idMsg: board.idLastMsg },
