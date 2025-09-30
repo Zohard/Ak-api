@@ -1234,4 +1234,105 @@ export class ForumsService {
       throw error;
     }
   }
+
+  async moveTopic(topicId: number, targetBoardId: number, userId: number): Promise<any> {
+    try {
+      // Check if user has permission to move topics (Administrator, Global Moderator, or Moderator)
+      const userGroups = await this.getUserGroups(userId);
+      const canMoveTopic = userGroups.some(group => [1, 2, 3].includes(group));
+
+      if (!canMoveTopic) {
+        throw new Error('You do not have permission to move topics');
+      }
+
+      // Get the topic with its current board info
+      const topic = await this.prisma.smfTopic.findUnique({
+        where: { idTopic: topicId },
+        include: {
+          board: true
+        }
+      });
+
+      if (!topic) {
+        throw new Error('Topic not found');
+      }
+
+      // Check if target board exists and get its info
+      const targetBoard = await this.prisma.smfBoard.findUnique({
+        where: { idBoard: targetBoardId }
+      });
+
+      if (!targetBoard) {
+        throw new Error('Target board not found');
+      }
+
+      // Check if topic is already in the target board
+      if (topic.idBoard === targetBoardId) {
+        throw new Error('Topic is already in the target board');
+      }
+
+      // Check if user has access to both source and target boards
+      const hasSourceAccess = await this.checkBoardAccess(topic.idBoard, userId);
+      const hasTargetAccess = await this.checkBoardAccess(targetBoardId, userId);
+
+      if (!hasSourceAccess || !hasTargetAccess) {
+        throw new Error('You do not have access to move topics between these boards');
+      }
+
+      const sourceBoardId = topic.idBoard;
+
+      // Count messages in this topic
+      const messageCount = await this.prisma.smfMessage.count({
+        where: { idTopic: topicId }
+      });
+
+      // Move the topic in a transaction
+      await this.prisma.$transaction(async (prisma) => {
+        // Update all messages to the new board
+        await prisma.smfMessage.updateMany({
+          where: { idTopic: topicId },
+          data: { idBoard: targetBoardId }
+        });
+
+        // Update the topic to the new board
+        await prisma.smfTopic.update({
+          where: { idTopic: topicId },
+          data: { idBoard: targetBoardId }
+        });
+
+        // Update source board stats (decrement)
+        await prisma.smfBoard.update({
+          where: { idBoard: sourceBoardId },
+          data: {
+            numTopics: { decrement: 1 },
+            numPosts: { decrement: messageCount }
+          }
+        });
+
+        // Update target board stats (increment)
+        await prisma.smfBoard.update({
+          where: { idBoard: targetBoardId },
+          data: {
+            numTopics: { increment: 1 },
+            numPosts: { increment: messageCount }
+          }
+        });
+      });
+
+      this.logger.log(`Topic ${topicId} moved from board ${sourceBoardId} to board ${targetBoardId} by user ${userId}`);
+
+      return {
+        success: true,
+        topicId: topicId,
+        sourceBoardId: sourceBoardId,
+        sourceBoardName: topic.board.name,
+        targetBoardId: targetBoardId,
+        targetBoardName: targetBoard.name,
+        messageCount: messageCount
+      };
+    } catch (error) {
+      this.logger.error('Error moving topic:', error);
+      throw error;
+    }
+  }
 }
