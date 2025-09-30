@@ -1,7 +1,9 @@
-import { Controller, Get, Post, Query, Param, ParseIntPipe, UseGuards, Request } from '@nestjs/common';
+import { Controller, Get, Post, Query, Param, ParseIntPipe, UseGuards, Request, Body } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiQuery, ApiResponse, ApiParam, ApiBearerAuth } from '@nestjs/swagger';
 import { ForumsService } from './forums.service';
 import { ForumMessageQueryDto } from './dto/forum-message.dto';
+import { CreateTopicDto } from './dto/create-topic.dto';
+import { CreatePostDto } from './dto/create-post.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 
 @ApiTags('Forums')
@@ -94,5 +96,37 @@ export class ForumsController {
   async getUserRecentActivity(@Request() req, @Query('limit') limit: string = '10') {
     const userId = req.user.id;
     return await this.forumsService.getUserRecentActivity(userId, parseInt(limit));
+  }
+
+  @Post('topics')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Create a new topic' })
+  @ApiResponse({ status: 201, description: 'Topic created successfully' })
+  @ApiResponse({ status: 403, description: 'Access denied to this board' })
+  async createTopic(@Request() req, @Body() createTopicDto: CreateTopicDto) {
+    const userId = req.user.id;
+    return await this.forumsService.createTopic(
+      createTopicDto.boardId,
+      userId,
+      createTopicDto.subject,
+      createTopicDto.body
+    );
+  }
+
+  @Post('posts')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Create a new post/reply' })
+  @ApiResponse({ status: 201, description: 'Post created successfully' })
+  @ApiResponse({ status: 403, description: 'Access denied or topic locked' })
+  async createPost(@Request() req, @Body() createPostDto: CreatePostDto) {
+    const userId = req.user.id;
+    return await this.forumsService.createPost(
+      createPostDto.topicId,
+      userId,
+      createPostDto.subject || '',
+      createPostDto.body
+    );
   }
 }
