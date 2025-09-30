@@ -840,4 +840,174 @@ export class ForumsService {
       throw error;
     }
   }
+
+  async getForumStats(): Promise<any> {
+    try {
+      // Get total messages, topics, and members
+      const [totalMessages, totalTopics, totalMembers, latestMember, latestMessage] = await Promise.all([
+        this.prisma.smfMessage.count(),
+        this.prisma.smfTopic.count(),
+        this.prisma.smfMember.count(),
+        // Get latest member
+        this.prisma.smfMember.findFirst({
+          orderBy: { dateRegistered: 'desc' },
+          select: {
+            idMember: true,
+            memberName: true,
+            dateRegistered: true
+          }
+        }),
+        // Get latest message with topic and board info
+        this.prisma.smfMessage.findFirst({
+          orderBy: { posterTime: 'desc' },
+          include: {
+            topic: {
+              include: {
+                firstMessage: true
+              }
+            },
+            board: true
+          }
+        })
+      ]);
+
+      return {
+        totalMessages,
+        totalTopics,
+        totalMembers,
+        latestMember: latestMember ? {
+          id: latestMember.idMember,
+          name: latestMember.memberName,
+          dateRegistered: latestMember.dateRegistered
+        } : null,
+        latestMessage: latestMessage ? {
+          id: latestMessage.idMsg,
+          subject: latestMessage.topic?.firstMessage?.subject || latestMessage.subject,
+          posterName: latestMessage.posterName,
+          posterTime: latestMessage.posterTime,
+          topicId: latestMessage.idTopic,
+          boardName: latestMessage.board?.name || 'Unknown'
+        } : null
+      };
+    } catch (error) {
+      this.logger.error('Error fetching forum stats:', error);
+      return {
+        totalMessages: 0,
+        totalTopics: 0,
+        totalMembers: 0,
+        latestMember: null,
+        latestMessage: null
+      };
+    }
+  }
+
+  async getOnlineUsers(): Promise<any> {
+    try {
+      const currentTime = Math.floor(Date.now() / 1000);
+      const fifteenMinutesAgo = currentTime - (15 * 60);
+
+      // Get users who logged in within the last 15 minutes
+      const onlineMembers = await this.prisma.smfMember.findMany({
+        where: {
+          lastLogin: {
+            gte: fifteenMinutesAgo
+          }
+        },
+        select: {
+          idMember: true,
+          memberName: true,
+          lastLogin: true
+        },
+        orderBy: {
+          lastLogin: 'desc'
+        }
+      });
+
+      // For guests count, we'll need to track this separately
+      // For now, we'll return 0 guests as we don't have session tracking
+      // You can implement this later with session tracking
+
+      return {
+        members: onlineMembers.map(m => ({
+          id: m.idMember,
+          name: m.memberName,
+          lastSeen: m.lastLogin
+        })),
+        totalMembers: onlineMembers.length,
+        totalGuests: 0 // Placeholder - needs session tracking
+      };
+    } catch (error) {
+      this.logger.error('Error fetching online users:', error);
+      return {
+        members: [],
+        totalMembers: 0,
+        totalGuests: 0
+      };
+    }
+  }
+
+  async getUpcomingBirthdays(): Promise<any> {
+    try {
+      const today = new Date();
+      const nextWeek = new Date();
+      nextWeek.setDate(today.getDate() + 7);
+
+      // Get members with birthdays in the next 7 days
+      const members = await this.prisma.smfMember.findMany({
+        where: {
+          birthdate: {
+            not: null
+          }
+        },
+        select: {
+          idMember: true,
+          memberName: true,
+          birthdate: true
+        }
+      });
+
+      // Filter and calculate ages
+      const upcomingBirthdays = members
+        .filter(member => {
+          if (!member.birthdate) return false;
+
+          const birthDate = new Date(member.birthdate);
+          const thisYearBirthday = new Date(
+            today.getFullYear(),
+            birthDate.getMonth(),
+            birthDate.getDate()
+          );
+
+          // Check if birthday is within the next 7 days
+          return thisYearBirthday >= today && thisYearBirthday <= nextWeek;
+        })
+        .map(member => {
+          const birthDate = new Date(member.birthdate!);
+          const age = today.getFullYear() - birthDate.getFullYear();
+
+          return {
+            id: member.idMember,
+            name: member.memberName,
+            birthdate: member.birthdate,
+            age: age
+          };
+        })
+        .sort((a, b) => {
+          const aDate = new Date(a.birthdate!);
+          const bDate = new Date(b.birthdate!);
+          const aMonth = aDate.getMonth();
+          const bMonth = bDate.getMonth();
+          const aDay = aDate.getDate();
+          const bDay = bDate.getDate();
+
+          if (aMonth !== bMonth) return aMonth - bMonth;
+          return aDay - bDay;
+        });
+
+      return upcomingBirthdays;
+    } catch (error) {
+      this.logger.error('Error fetching upcoming birthdays:', error);
+      return [];
+    }
+  }
 }
