@@ -487,6 +487,7 @@ export class ForumsService {
         avatar: user.avatar,
         signature: user.signature,
         personalText: user.personalText,
+        idGroup: user.idGroup,
         group: {
           name: user.membergroup?.groupName || 'Member',
           color: user.membergroup?.onlineColor || null
