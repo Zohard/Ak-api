@@ -82,6 +82,7 @@ export class CollectionsService {
       animeCount: number;
       mangaCount: number;
       totalCount: number;
+      sampleImage: string | null;
       createdAt: Date;
       updatedAt: Date;
     }> = [];
@@ -108,6 +109,32 @@ export class CollectionsService {
 
     let totalCount = 0;
 
+    // Get sample images for each collection type
+    const sampleImages = await Promise.all(
+      Array.from(allTypes).map(async (type) => {
+        // Try to get an anime first, then manga
+        const animeItem = await this.prisma.collectionAnime.findFirst({
+          where: { idMembre: userId, type },
+          include: { anime: { select: { image: true } } },
+          orderBy: { id: 'desc' }
+        });
+
+        if (animeItem?.anime?.image) {
+          return { type, image: animeItem.anime.image };
+        }
+
+        const mangaItem = await this.prisma.collectionManga.findFirst({
+          where: { idMembre: userId, type },
+          include: { manga: { select: { image: true } } },
+          orderBy: { id: 'desc' }
+        });
+
+        return { type, image: mangaItem?.manga?.image || null };
+      })
+    );
+
+    const imageMap = new Map(sampleImages.map(item => [item.type, item.image]));
+
     for (const type of allTypes) {
       const animeCount = animeCountMap.get(type) || 0;
       const mangaCount = mangaCountMap.get(type) || 0;
@@ -132,7 +159,7 @@ export class CollectionsService {
           statusCounts['on-hold'] = typeTotal;
           break;
       }
-      
+
       collections.push({
         id: type,
         name: typeNames[type] || 'Collection personnalisée',
@@ -142,6 +169,7 @@ export class CollectionsService {
         animeCount,
         mangaCount,
         totalCount: typeTotal,
+        sampleImage: imageMap.get(type) || null,
         createdAt: new Date(),
         updatedAt: new Date(),
       });
