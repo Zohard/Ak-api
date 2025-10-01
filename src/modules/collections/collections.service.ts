@@ -37,9 +37,9 @@ export class CollectionsService {
       return this.getUserCollectionsFromDB(userId, query);
     }
 
-    // Create cache key
-    const cacheKey = `user_collections:${userId}:${page}:${limit}`;
-    
+    // Create cache key with version for sample images
+    const cacheKey = `user_collections:v2:${userId}:${page}:${limit}`;
+
     // Try to get from cache
     const cached = await this.cacheService.get(cacheKey);
     if (cached) {
@@ -114,9 +114,17 @@ export class CollectionsService {
       Array.from(allTypes).map(async (type) => {
         // Try to get an anime first, then manga
         const animeItem = await this.prisma.collectionAnime.findFirst({
-          where: { idMembre: userId, type },
+          where: {
+            idMembre: userId,
+            type,
+            anime: {
+              image: {
+                not: null
+              }
+            }
+          },
           include: { anime: { select: { image: true } } },
-          orderBy: { id: 'desc' }
+          orderBy: { idCollection: 'desc' }
         });
 
         if (animeItem?.anime?.image) {
@@ -124,9 +132,17 @@ export class CollectionsService {
         }
 
         const mangaItem = await this.prisma.collectionManga.findFirst({
-          where: { idMembre: userId, type },
+          where: {
+            idMembre: userId,
+            type,
+            manga: {
+              image: {
+                not: null
+              }
+            }
+          },
           include: { manga: { select: { image: true } } },
-          orderBy: { id: 'desc' }
+          orderBy: { idCollection: 'desc' }
         });
 
         return { type, image: mangaItem?.manga?.image || null };
