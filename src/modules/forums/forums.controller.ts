@@ -7,6 +7,7 @@ import { CreatePostDto } from './dto/create-post.dto';
 import { UpdatePostDto } from './dto/update-post.dto';
 import { MoveTopicDto } from './dto/move-topic.dto';
 import { LockTopicDto } from './dto/lock-topic.dto';
+import { ReportMessageDto, GetReportsQueryDto } from './dto/report-message.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 
 @ApiTags('Forums')
@@ -241,5 +242,80 @@ export class ForumsController {
       lockTopicDto.locked,
       userId
     );
+  }
+
+  @Post('posts/:messageId/report')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Report a message to moderators' })
+  @ApiParam({ name: 'messageId', type: 'number', description: 'Message ID to report' })
+  @ApiResponse({ status: 201, description: 'Message reported successfully' })
+  @ApiResponse({ status: 403, description: 'Access denied or already reported' })
+  @ApiResponse({ status: 404, description: 'Message not found' })
+  async reportMessage(
+    @Param('messageId', ParseIntPipe) messageId: number,
+    @Request() req,
+    @Body() reportMessageDto: ReportMessageDto
+  ) {
+    const userId = req.user.id;
+    return await this.forumsService.reportMessage(
+      messageId,
+      userId,
+      reportMessageDto.comment
+    );
+  }
+
+  @Get('reports')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get all message reports (Admin, Global Moderator, Moderator only)' })
+  @ApiQuery({ name: 'status', required: false, type: Number, description: 'Filter by status: 0 = open, 1 = closed' })
+  @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Number of reports to return (default: 20)' })
+  @ApiQuery({ name: 'offset', required: false, type: Number, description: 'Number of reports to skip (default: 0)' })
+  @ApiResponse({ status: 200, description: 'Reports retrieved successfully' })
+  @ApiResponse({ status: 403, description: 'Access denied - insufficient permissions' })
+  async getReports(
+    @Request() req,
+    @Query() query: GetReportsQueryDto
+  ) {
+    const userId = req.user.id;
+    return await this.forumsService.getReports(
+      userId,
+      query.status,
+      query.limit || 20,
+      query.offset || 0
+    );
+  }
+
+  @Get('reports/:reportId')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get a specific report by ID (Admin, Global Moderator, Moderator only)' })
+  @ApiParam({ name: 'reportId', type: 'number', description: 'Report ID' })
+  @ApiResponse({ status: 200, description: 'Report retrieved successfully' })
+  @ApiResponse({ status: 403, description: 'Access denied - insufficient permissions' })
+  @ApiResponse({ status: 404, description: 'Report not found' })
+  async getReportById(
+    @Param('reportId', ParseIntPipe) reportId: number,
+    @Request() req
+  ) {
+    const userId = req.user.id;
+    return await this.forumsService.getReportById(reportId, userId);
+  }
+
+  @Put('reports/:reportId/close')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Close a report (Admin, Global Moderator, Moderator only)' })
+  @ApiParam({ name: 'reportId', type: 'number', description: 'Report ID to close' })
+  @ApiResponse({ status: 200, description: 'Report closed successfully' })
+  @ApiResponse({ status: 403, description: 'Access denied - insufficient permissions' })
+  @ApiResponse({ status: 404, description: 'Report not found' })
+  async closeReport(
+    @Param('reportId', ParseIntPipe) reportId: number,
+    @Request() req
+  ) {
+    const userId = req.user.id;
+    return await this.forumsService.closeReport(reportId, userId);
   }
 }

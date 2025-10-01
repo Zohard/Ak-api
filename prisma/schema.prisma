@@ -74,6 +74,8 @@ model SmfMember {
   messages         SmfMessage[] @relation("MessageAuthor")
   startedTopics    SmfTopic[] @relation("TopicStarter")
   updatedTopics    SmfTopic[] @relation("TopicUpdater")
+  reportsSubmitted SmfMessageReport[] @relation("ReportedBy")
+  reportsClosed    SmfMessageReport[] @relation("ReportClosedBy")
 
   @@map("smf_members")
 }
@@ -720,7 +722,27 @@ model SmfMessage {
   // Reverse relations for first/last message lookups
   topicsAsFirst SmfTopic[] @relation("TopicFirstMessage")
   topicsAsLast  SmfTopic[] @relation("TopicLastMessage")
+  reports       SmfMessageReport[]
 
   @@map("smf_messages")
+}
+
+// SMF Message Reports
+model SmfMessageReport {
+  idReport    Int      @id @default(autoincrement()) @map("id_report")
+  idMsg       Int      @map("id_msg")
+  idMember    Int      @map("id_member")
+  comment     String   @db.Text
+  timeStarted Int      @map("time_started")
+  closed      Int      @default(0) // 0 = open, 1 = closed/resolved
+  closedBy    Int?     @map("closed_by")
+  timeClose   Int?     @map("time_closed")
+
+  // Relations
+  message     SmfMessage @relation(fields: [idMsg], references: [idMsg], onDelete: Cascade)
+  reporter    SmfMember  @relation("ReportedBy", fields: [idMember], references: [idMember], onDelete: Cascade)
+  closer      SmfMember? @relation("ReportClosedBy", fields: [closedBy], references: [idMember], onDelete: SetNull)
+
+  @@map("smf_message_reports")
 }
 
