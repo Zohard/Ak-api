@@ -1,5 +1,6 @@
-import { IsString, IsNotEmpty, MinLength, MaxLength } from 'class-validator';
+import { IsString, IsNotEmpty, MinLength, MaxLength, IsOptional, IsInt } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
 
 export class ReportMessageDto {
   @ApiProperty({
@@ -73,12 +74,21 @@ export class MessageReportDetails {
 
 export class GetReportsQueryDto {
   @ApiProperty({ required: false, description: 'Filter by status: 0 = open, 1 = closed', example: 0 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
   status?: number;
 
   @ApiProperty({ required: false, description: 'Limit number of results', example: 20 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
   limit?: number;
 
   @ApiProperty({ required: false, description: 'Offset for pagination', example: 0 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
   offset?: number;
 }
 
