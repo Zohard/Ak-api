@@ -725,8 +725,8 @@ export class CollectionsService {
     // Only show collections if it's the current user or collections are public
     const isOwnCollection = currentUserId === userId;
     
-    // Create cache key - different keys for own vs public view, with version for sample images
-    const cacheKey = `find_user_collections:v2:${userId}:${isOwnCollection ? 'own' : 'public'}`;
+    // Create cache key - different keys for own vs public view, with version for separate anime/manga sample images
+    const cacheKey = `find_user_collections:v3:${userId}:${isOwnCollection ? 'own' : 'public'}`;
 
     // Try to get from cache
     const cached = await this.cacheService.get(cacheKey);
@@ -777,7 +777,7 @@ export class CollectionsService {
       }
     });
 
-    // Get sample images for each collection type that has items
+    // Get sample images for each collection type that has items (separate for anime and manga)
     const typesWithItems = collectionTypes
       .map(ct => ct.type)
       .filter(type => {
@@ -788,7 +788,7 @@ export class CollectionsService {
 
     const sampleImages = await Promise.all(
       typesWithItems.map(async (type) => {
-        // Try to get an anime first, then manga
+        // Get anime sample image
         const animeItem = await this.prisma.collectionAnime.findFirst({
           where: {
             idMembre: userId,
@@ -804,10 +804,7 @@ export class CollectionsService {
           orderBy: { idCollection: 'desc' }
         });
 
-        if (animeItem?.anime?.image) {
-          return { type, image: animeItem.anime.image };
-        }
-
+        // Get manga sample image
         const mangaItem = await this.prisma.collectionManga.findFirst({
           where: {
             idMembre: userId,
@@ -823,11 +820,16 @@ export class CollectionsService {
           orderBy: { idCollection: 'desc' }
         });
 
-        return { type, image: mangaItem?.manga?.image || null };
+        return {
+          type,
+          animeImage: animeItem?.anime?.image || null,
+          mangaImage: mangaItem?.manga?.image || null
+        };
       })
     );
 
-    const imageMap = new Map(sampleImages.map(item => [item.type, item.image]));
+    const animeImageMap = new Map(sampleImages.map(item => [item.type, item.animeImage]));
+    const mangaImageMap = new Map(sampleImages.map(item => [item.type, item.mangaImage]));
 
     // Create collection objects
     const collections = collectionTypes.map(collectionType => {
@@ -844,7 +846,9 @@ export class CollectionsService {
         animeCount,
         mangaCount,
         totalCount: animeCount + mangaCount,
-        sampleImage: imageMap.get(collectionType.type) || null
+        sampleImage: animeImageMap.get(collectionType.type) || mangaImageMap.get(collectionType.type) || null,
+        animeSampleImage: animeImageMap.get(collectionType.type) || null,
+        mangaSampleImage: mangaImageMap.get(collectionType.type) || null
       };
     });
 
