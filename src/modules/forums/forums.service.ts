@@ -121,10 +121,13 @@ export class ForumsService {
         })
       );
 
-      const totalAccessibleBoards = filteredCategories.reduce((total, cat) => total + cat.boards.length, 0);
-      this.logger.log(`=== FINAL RESULT: Returning ${filteredCategories.length} categories with ${totalAccessibleBoards} accessible boards ===`);
+      // Filter out categories with no accessible boards
+      const categoriesWithBoards = filteredCategories.filter(category => category.boards.length > 0);
 
-      return filteredCategories;
+      const totalAccessibleBoards = categoriesWithBoards.reduce((total, cat) => total + cat.boards.length, 0);
+      this.logger.log(`=== FINAL RESULT: Returning ${categoriesWithBoards.length} categories (filtered from ${filteredCategories.length}) with ${totalAccessibleBoards} accessible boards ===`);
+
+      return categoriesWithBoards;
     } catch (error) {
       this.logger.error('=== ERROR in getCategories ===', error);
       throw error; // Re-throw to see the full error in API response
@@ -605,12 +608,6 @@ export class ForumsService {
       // Check if user's groups match any allowed groups
       const hasAccess = userGroups.some(group => allowedGroups.includes(group));
       this.logger.debug(`Board ${boardId}: access result = ${hasAccess} (user groups [${userGroups.join(',')}] vs allowed [${allowedGroups.join(',')}])`);
-
-      // TEMPORARY: If this is a Team AK board and user is authenticated, grant access for debugging
-      if (!hasAccess && userId && board.memberGroups === "1,2,3,9,11,12,13") {
-        this.logger.warn(`🔧 TEMP FIX: Granting access to Team AK board ${boardId} for authenticated user ${userId}`);
-        return true;
-      }
 
       return hasAccess;
 
