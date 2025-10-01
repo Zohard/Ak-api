@@ -896,15 +896,26 @@ export class ForumsService {
           }
         }),
         // Get latest message with topic and board info
+        // Use the topic's current board to ensure moved topics show the correct board
         this.prisma.smfMessage.findFirst({
           orderBy: { posterTime: 'desc' },
+          where: {
+            topic: {
+              board: {
+                OR: [
+                  { redirect: null },
+                  { redirect: '' }
+                ]
+              }
+            }
+          },
           include: {
             topic: {
               include: {
-                firstMessage: true
+                firstMessage: true,
+                board: true  // Include the topic's board instead of message's board
               }
-            },
-            board: true
+            }
           }
         })
       ]);
@@ -924,7 +935,7 @@ export class ForumsService {
           posterName: latestMessage.posterName,
           posterTime: latestMessage.posterTime,
           topicId: latestMessage.idTopic,
-          boardName: latestMessage.board?.name || 'Unknown'
+          boardName: latestMessage.topic?.board?.name || 'Unknown'  // Use topic's board, not message's board
         } : null
       };
     } catch (error) {
@@ -1419,6 +1430,291 @@ export class ForumsService {
       };
     } catch (error) {
       this.logger.error('Error locking/unlocking topic:', error);
+      throw error;
+    }
+  }
+
+  async reportMessage(messageId: number, userId: number, comment: string): Promise<any> {
+    try {
+      // Get the message to verify it exists and check board access
+      const message = await this.prisma.smfMessage.findUnique({
+        where: { idMsg: messageId },
+        include: {
+          topic: {
+            include: {
+              board: true
+            }
+          }
+        }
+      });
+
+      if (!message) {
+        throw new Error('Message not found');
+      }
+
+      // Check if user has access to the board where this message is posted
+      const hasAccess = await this.checkBoardAccess(message.idBoard, userId);
+      if (!hasAccess) {
+        throw new Error('Access denied to this message');
+      }
+
+      // Check if user has already reported this message
+      const existingReport = await this.prisma.smfMessageReport.findFirst({
+        where: {
+          idMsg: messageId,
+          idMember: userId,
+          closed: 0 // Only check open reports
+        }
+      });
+
+      if (existingReport) {
+        throw new Error('You have already reported this message');
+      }
+
+      const currentTime = Math.floor(Date.now() / 1000);
+
+      // Create the report
+      const report = await this.prisma.smfMessageReport.create({
+        data: {
+          idMsg: messageId,
+          idMember: userId,
+          comment: comment,
+          timeStarted: currentTime,
+          closed: 0
+        }
+      });
+
+      this.logger.log(`Message ${messageId} reported by user ${userId} (report ID: ${report.idReport})`);
+
+      return {
+        success: true,
+        reportId: report.idReport,
+        messageId: messageId
+      };
+    } catch (error) {
+      this.logger.error('Error reporting message:', error);
+      throw error;
+    }
+  }
+
+  async getReports(userId: number, status?: number, limit: number = 20, offset: number = 0): Promise<any> {
+    try {
+      // Check if user has permission to view reports (Administrator, Global Moderator, or Moderator)
+      const userGroups = await this.getUserGroups(userId);
+      const canViewReports = userGroups.some(group => [1, 2, 3].includes(group));
+
+      if (!canViewReports) {
+        throw new Error('You do not have permission to view reports');
+      }
+
+      // Build where clause
+      const whereClause: any = {};
+      if (status !== undefined) {
+        whereClause.closed = status;
+      }
+
+      // Get reports with related data
+      const [reports, totalReports] = await Promise.all([
+        this.prisma.smfMessageReport.findMany({
+          where: whereClause,
+          skip: offset,
+          take: limit,
+          orderBy: { timeStarted: 'desc' },
+          include: {
+            reporter: {
+              select: {
+                idMember: true,
+                memberName: true,
+                emailAddress: true
+              }
+            },
+            message: {
+              include: {
+                topic: {
+                  include: {
+                    board: true
+                  }
+                }
+              }
+            },
+            closer: {
+              select: {
+                idMember: true,
+                memberName: true
+              }
+            }
+          }
+        }),
+        this.prisma.smfMessageReport.count({
+          where: whereClause
+        })
+      ]);
+
+      return {
+        reports: reports.map(report => ({
+          idReport: report.idReport,
+          idMsg: report.idMsg,
+          comment: report.comment,
+          timeStarted: report.timeStarted,
+          closed: report.closed,
+          closedBy: report.closedBy,
+          timeClose: report.timeClose,
+          reporter: {
+            id: report.reporter.idMember,
+            memberName: report.reporter.memberName,
+            emailAddress: report.reporter.emailAddress
+          },
+          message: {
+            id: report.message.idMsg,
+            subject: report.message.subject,
+            body: report.message.body.substring(0, 200), // Truncate for list view
+            posterName: report.message.posterName,
+            posterTime: report.message.posterTime,
+            topicId: report.message.idTopic,
+            boardId: report.message.idBoard,
+            boardName: report.message.topic.board.name
+          },
+          closer: report.closer ? {
+            id: report.closer.idMember,
+            memberName: report.closer.memberName
+          } : null
+        })),
+        total: totalReports,
+        limit,
+        offset
+      };
+    } catch (error) {
+      this.logger.error('Error fetching reports:', error);
+      throw error;
+    }
+  }
+
+  async getReportById(reportId: number, userId: number): Promise<any> {
+    try {
+      // Check if user has permission to view reports (Administrator, Global Moderator, or Moderator)
+      const userGroups = await this.getUserGroups(userId);
+      const canViewReports = userGroups.some(group => [1, 2, 3].includes(group));
+
+      if (!canViewReports) {
+        throw new Error('You do not have permission to view reports');
+      }
+
+      // Get the report with all related data
+      const report = await this.prisma.smfMessageReport.findUnique({
+        where: { idReport: reportId },
+        include: {
+          reporter: {
+            select: {
+              idMember: true,
+              memberName: true,
+              emailAddress: true
+            }
+          },
+          message: {
+            include: {
+              topic: {
+                include: {
+                  board: true,
+                  firstMessage: true
+                }
+              }
+            }
+          },
+          closer: {
+            select: {
+              idMember: true,
+              memberName: true
+            }
+          }
+        }
+      });
+
+      if (!report) {
+        throw new Error('Report not found');
+      }
+
+      return {
+        idReport: report.idReport,
+        idMsg: report.idMsg,
+        comment: report.comment,
+        timeStarted: report.timeStarted,
+        closed: report.closed,
+        closedBy: report.closedBy,
+        timeClose: report.timeClose,
+        reporter: {
+          id: report.reporter.idMember,
+          memberName: report.reporter.memberName,
+          emailAddress: report.reporter.emailAddress
+        },
+        message: {
+          id: report.message.idMsg,
+          subject: report.message.subject,
+          body: report.message.body,
+          posterName: report.message.posterName,
+          posterTime: report.message.posterTime,
+          topicId: report.message.idTopic,
+          boardId: report.message.idBoard,
+          topic: {
+            id: report.message.topic.idTopic,
+            subject: report.message.topic.firstMessage?.subject || 'Untitled',
+            boardName: report.message.topic.board.name
+          }
+        },
+        closer: report.closer ? {
+          id: report.closer.idMember,
+          memberName: report.closer.memberName
+        } : null
+      };
+    } catch (error) {
+      this.logger.error('Error fetching report:', error);
+      throw error;
+    }
+  }
+
+  async closeReport(reportId: number, userId: number): Promise<any> {
+    try {
+      // Check if user has permission to close reports (Administrator, Global Moderator, or Moderator)
+      const userGroups = await this.getUserGroups(userId);
+      const canCloseReports = userGroups.some(group => [1, 2, 3].includes(group));
+
+      if (!canCloseReports) {
+        throw new Error('You do not have permission to close reports');
+      }
+
+      // Get the report
+      const report = await this.prisma.smfMessageReport.findUnique({
+        where: { idReport: reportId }
+      });
+
+      if (!report) {
+        throw new Error('Report not found');
+      }
+
+      if (report.closed) {
+        throw new Error('Report is already closed');
+      }
+
+      const currentTime = Math.floor(Date.now() / 1000);
+
+      // Close the report
+      const updatedReport = await this.prisma.smfMessageReport.update({
+        where: { idReport: reportId },
+        data: {
+          closed: 1,
+          closedBy: userId,
+          timeClose: currentTime
+        }
+      });
+
+      this.logger.log(`Report ${reportId} closed by user ${userId}`);
+
+      return {
+        success: true,
+        reportId: updatedReport.idReport,
+        closed: Boolean(updatedReport.closed)
+      };
+    } catch (error) {
+      this.logger.error('Error closing report:', error);
       throw error;
     }
   }
