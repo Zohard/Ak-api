@@ -265,6 +265,17 @@ export class ForumsController {
     );
   }
 
+  @Get('reports/count')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get count of pending message reports (Admin, Global Moderator, Moderator only)' })
+  @ApiResponse({ status: 200, description: 'Count retrieved successfully' })
+  @ApiResponse({ status: 403, description: 'Access denied - insufficient permissions' })
+  async getReportsCount(@Request() req) {
+    const userId = req.user.id;
+    return await this.forumsService.getReportsCount(userId);
+  }
+
   @Get('reports')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()

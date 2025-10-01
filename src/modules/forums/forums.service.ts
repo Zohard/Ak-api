@@ -1497,6 +1497,28 @@ export class ForumsService {
     }
   }
 
+  async getReportsCount(userId: number): Promise<{ count: number }> {
+    try {
+      // Check if user has permission to view reports (Administrator, Global Moderator, or Moderator)
+      const userGroups = await this.getUserGroups(userId);
+      const canViewReports = userGroups.some(group => [1, 2, 3].includes(group));
+
+      if (!canViewReports) {
+        throw new Error('You do not have permission to view reports');
+      }
+
+      // Count only open reports (closed = 0)
+      const count = await this.prisma.smfMessageReport.count({
+        where: { closed: 0 }
+      });
+
+      return { count };
+    } catch (error) {
+      console.error('Error getting reports count:', error);
+      throw error;
+    }
+  }
+
   async getReports(userId: number, status?: number, limit: number = 20, offset: number = 0): Promise<any> {
     try {
       // Check if user has permission to view reports (Administrator, Global Moderator, or Moderator)
