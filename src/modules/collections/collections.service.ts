@@ -889,23 +889,23 @@ export class CollectionsService {
     } : {};
 
     // Build sort clause
-    let orderBy: any = { pseudo: 'asc' };
+    let orderBy: any = { memberName: 'asc' };
     if (sortBy) {
       switch (sortBy) {
         case 'username':
-          orderBy = { pseudo: 'asc' };
+          orderBy = { memberName: 'asc' };
           break;
         case '-username':
-          orderBy = { pseudo: 'desc' };
+          orderBy = { memberName: 'desc' };
           break;
         case 'totalItems':
-          orderBy = { id: 'desc' }; // We'll sort by total items in memory
+          orderBy = { idMember: 'desc' }; // We'll sort by total items in memory
           break;
         case '-totalItems':
-          orderBy = { id: 'asc' }; // We'll sort by total items in memory
+          orderBy = { idMember: 'asc' }; // We'll sort by total items in memory
           break;
         default:
-          orderBy = { pseudo: 'asc' };
+          orderBy = { memberName: 'asc' };
       }
     }
 
