@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -28,6 +28,8 @@ import { MetricsModule } from './modules/metrics/metrics.module';
 import { MessagesModule } from './modules/messages/messages.module';
 import { PrismaService } from './shared/services/prisma.service';
 import { CacheService } from './shared/services/cache.service';
+import { ActivityTrackerService } from './shared/services/activity-tracker.service';
+import { ActivityTrackerMiddleware } from './common/middleware/activity-tracker.middleware';
 import databaseConfig from './config/database.config';
 import jwtConfig from './config/jwt.config';
 
@@ -64,6 +66,13 @@ import jwtConfig from './config/jwt.config';
     MessagesModule,
   ],
   controllers: [AppController],
-  providers: [AppService, PrismaService, CacheService],
+  providers: [AppService, PrismaService, CacheService, ActivityTrackerService],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    // Apply activity tracking middleware to all routes
+    consumer
+      .apply(ActivityTrackerMiddleware)
+      .forRoutes('*');
+  }
+}
