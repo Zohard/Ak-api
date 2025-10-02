@@ -118,8 +118,8 @@ export class HomePageService {
         stats: payload.stats
       });
 
-      // Cache for 2 hours (7200 seconds)
-      await this.cache.setHomepageData(cacheKey, payload, 7200);
+      // Cache for 30 minutes (1800 seconds)
+      await this.cache.setHomepageData(cacheKey, payload, 1800);
       return payload;
     } catch (error) {
       this.logger.error('Homepage aggregation error:', error);
