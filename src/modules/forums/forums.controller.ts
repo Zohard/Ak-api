@@ -151,13 +151,6 @@ export class ForumsController {
     return await this.forumsService.getForumStats();
   }
 
-  @Get('online')
-  @ApiOperation({ summary: 'Get online users' })
-  @ApiResponse({ status: 200, description: 'Online users retrieved successfully' })
-  async getOnlineUsers() {
-    return await this.forumsService.getOnlineUsers();
-  }
-
   @Post('activity')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
