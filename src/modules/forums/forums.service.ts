@@ -627,7 +627,8 @@ export class ForumsService {
         select: {
           idGroup: true,
           idPostGroup: true,
-          additionalGroups: true
+          additionalGroups: true,
+          memberName: true
         }
       });
 
@@ -655,6 +656,7 @@ export class ForumsService {
 
         const finalGroups = [...new Set(groups)]; // Remove duplicates
         this.logger.debug(`getUserGroups: final SMF groups for user ${userId} = [${finalGroups.join(',')}]`);
+
         return finalGroups;
       }
 

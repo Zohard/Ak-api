@@ -9,6 +9,7 @@ import { MoveTopicDto } from './dto/move-topic.dto';
 import { LockTopicDto } from './dto/lock-topic.dto';
 import { ReportMessageDto, GetReportsQueryDto } from './dto/report-message.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { OptionalJwtAuthGuard } from '../../common/guards/optional-jwt-auth.guard';
 
 @ApiTags('Forums')
 @Controller('forums')
@@ -16,10 +17,13 @@ export class ForumsController {
   constructor(private readonly forumsService: ForumsService) {}
 
   @Get('categories')
+  @UseGuards(OptionalJwtAuthGuard)
   @ApiOperation({ summary: 'Get forum categories with boards' })
   @ApiResponse({ status: 200, description: 'Forum categories retrieved successfully' })
-  async getCategories(@Request() req?) {
+  async getCategories(@Request() req) {
     const userId = req?.user?.id || null;
+    console.log('🔥 CATEGORIES ENDPOINT - req.user:', req?.user);
+    console.log('🔥 CATEGORIES ENDPOINT - userId extracted:', userId);
     return this.forumsService.getCategories(userId);
   }
 
