@@ -118,7 +118,8 @@ export class ForumsController {
       createTopicDto.boardId,
       userId,
       createTopicDto.subject,
-      createTopicDto.body
+      createTopicDto.body,
+      createTopicDto.poll
     );
   }
 
@@ -332,5 +333,36 @@ export class ForumsController {
   ) {
     const userId = req.user.id;
     return await this.forumsService.closeReport(reportId, userId);
+  }
+
+  @Post('polls/:pollId/vote')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Vote on a poll' })
+  @ApiParam({ name: 'pollId', type: 'number', description: 'Poll ID' })
+  @ApiResponse({ status: 200, description: 'Vote recorded successfully' })
+  @ApiResponse({ status: 403, description: 'Cannot vote - poll locked, expired, or already voted' })
+  @ApiResponse({ status: 404, description: 'Poll not found' })
+  async votePoll(
+    @Param('pollId', ParseIntPipe) pollId: number,
+    @Request() req,
+    @Body() voteDto: any
+  ) {
+    const userId = req.user.id;
+    return await this.forumsService.votePoll(pollId, userId, voteDto.choices);
+  }
+
+  @Get('polls/:pollId')
+  @UseGuards(OptionalJwtAuthGuard)
+  @ApiOperation({ summary: 'Get poll data' })
+  @ApiParam({ name: 'pollId', type: 'number', description: 'Poll ID' })
+  @ApiResponse({ status: 200, description: 'Poll data retrieved successfully' })
+  @ApiResponse({ status: 404, description: 'Poll not found' })
+  async getPoll(
+    @Param('pollId', ParseIntPipe) pollId: number,
+    @Request() req
+  ) {
+    const userId = req?.user?.id || null;
+    return await this.forumsService.getPollData(pollId, userId);
   }
 }
