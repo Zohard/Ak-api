@@ -205,6 +205,7 @@ export class ForumsService {
             name: topic.starter?.memberName || topic.firstMessage?.posterName || 'Unknown'
           },
           lastMessage: topic.lastMessage ? {
+            id: topic.lastMessage.idMsg,
             time: topic.lastMessage.posterTime,
             author: topic.lastMessage.member?.memberName || topic.lastMessage.posterName
           } : null,
