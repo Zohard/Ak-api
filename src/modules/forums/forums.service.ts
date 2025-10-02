@@ -1924,6 +1924,44 @@ export class ForumsService {
     }
   }
 
+  async getPollVoters(pollId: number): Promise<any> {
+    try {
+      // Get unique member IDs who voted on this poll
+      const voteRecords = await this.prisma.smfLogPoll.findMany({
+        where: { idPoll: pollId },
+        select: { idMember: true },
+        distinct: ['idMember']
+      });
+
+      const memberIds = voteRecords.map(v => v.idMember);
+
+      // Get member details
+      const members = await this.prisma.smfMember.findMany({
+        where: {
+          idMember: { in: memberIds }
+        },
+        select: {
+          idMember: true,
+          memberName: true,
+          realName: true
+        }
+      });
+
+      return {
+        pollId,
+        totalVoters: members.length,
+        voters: members.map(m => ({
+          id: m.idMember,
+          username: m.memberName,
+          realName: m.realName
+        }))
+      };
+    } catch (error) {
+      this.logger.error('Error getting poll voters:', error);
+      throw error;
+    }
+  }
+
   async createPoll(pollData: any, userId: number): Promise<number> {
     try {
       const user = await this.prisma.smfMember.findUnique({

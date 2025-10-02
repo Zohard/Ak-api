@@ -365,4 +365,15 @@ export class ForumsController {
     const userId = req?.user?.id || null;
     return await this.forumsService.getPollData(pollId, userId);
   }
+
+  @Get('polls/:pollId/voters')
+  @ApiOperation({ summary: 'Get list of users who voted on a poll' })
+  @ApiParam({ name: 'pollId', type: 'number', description: 'Poll ID' })
+  @ApiResponse({ status: 200, description: 'Poll voters retrieved successfully' })
+  @ApiResponse({ status: 404, description: 'Poll not found' })
+  async getPollVoters(
+    @Param('pollId', ParseIntPipe) pollId: number
+  ) {
+    return await this.forumsService.getPollVoters(pollId);
+  }
 }
