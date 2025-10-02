@@ -1796,6 +1796,17 @@ export class ForumsService {
         isUserChoice: userVotes.includes(choice.idChoice)
       }));
 
+      // Calculate if user can view results based on hide_results setting
+      // 0 = always visible, 1 = after voting, 2 = after poll expires
+      let canViewResults = true;
+      if (poll.hideResults === 1) {
+        // Hide until user votes (or poll expires)
+        canViewResults = userVoted || isExpired;
+      } else if (poll.hideResults === 2) {
+        // Hide until poll expires
+        canViewResults = isExpired;
+      }
+
       return {
         id: poll.idPoll,
         question: poll.question,
@@ -1814,6 +1825,7 @@ export class ForumsService {
         userVoted,
         userChoices: userVoted ? userVotes : undefined,
         canVote: !isExpired && !poll.votingLocked && (!userVoted || poll.changeVote === 1),
+        canViewResults,
         isExpired
       };
     } catch (error) {
