@@ -110,7 +110,7 @@ export class ActivityTrackerService {
       ]);
 
       // Process entries
-      const users = [];
+      const users: any[] = [];
       let guestCount = 0;
 
       for (const entry of onlineEntries) {
@@ -230,7 +230,7 @@ export class ActivityTrackerService {
         }
       });
 
-      const members = [];
+      const members: any[] = [];
       let guestCount = 0;
 
       for (const entry of onlineEntries) {
