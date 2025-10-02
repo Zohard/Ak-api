@@ -197,6 +197,7 @@ export class ForumsService {
           subject: topic.firstMessage?.subject || 'Untitled',
           isSticky: Boolean(topic.isSticky),
           locked: Boolean(topic.locked),
+          hasPoll: topic.idPoll > 0,
           numReplies: topic.numReplies,
           numViews: topic.numViews,
           starter: {
@@ -266,6 +267,12 @@ export class ForumsService {
         throw new Error('Access denied to this topic');
       }
 
+      // Get poll data if topic has a poll
+      let pollData = null;
+      if (topic.idPoll > 0) {
+        pollData = await this.getPollData(topic.idPoll, userId);
+      }
+
       return {
         topic: {
           id: topic.idTopic,
@@ -274,12 +281,14 @@ export class ForumsService {
           locked: Boolean(topic.locked),
           numReplies: topic.numReplies,
           numViews: topic.numViews,
+          hasPoll: topic.idPoll > 0,
           board: {
             id: topic.board.idBoard,
             name: topic.board.name,
             categoryName: topic.board.category.name
           }
         },
+        poll: pollData,
         posts: posts.map((post, index) => ({
           id: post.idMsg,
           subject: post.subject,
@@ -675,7 +684,7 @@ export class ForumsService {
     }
   }
 
-  async createTopic(boardId: number, userId: number, subject: string, body: string): Promise<any> {
+  async createTopic(boardId: number, userId: number, subject: string, body: string, pollData?: any): Promise<any> {
     try {
       // Check board access
       const hasAccess = await this.checkBoardAccess(boardId, userId);
@@ -709,6 +718,12 @@ export class ForumsService {
 
       const currentTime = Math.floor(Date.now() / 1000);
 
+      // Create poll if provided
+      let pollId = 0;
+      if (pollData) {
+        pollId = await this.createPoll(pollData, userId);
+      }
+
       // Create topic and first message in a transaction
       const result = await this.prisma.$transaction(async (prisma) => {
         // Create the first message
@@ -736,6 +751,7 @@ export class ForumsService {
             idLastMsg: nextMsgId,
             idMemberStarted: userId,
             idMemberUpdated: userId,
+            idPoll: pollId,
             numReplies: 0,
             numViews: 0,
             approved: 1
@@ -766,7 +782,8 @@ export class ForumsService {
       return {
         topicId: result.topic.idTopic,
         messageId: result.message.idMsg,
-        subject: subject
+        subject: subject,
+        pollId: pollId || undefined
       };
     } catch (error) {
       this.logger.error('Error creating topic:', error);
@@ -1739,6 +1756,228 @@ export class ForumsService {
       };
     } catch (error) {
       this.logger.error('Error closing report:', error);
+      throw error;
+    }
+  }
+
+  // Poll methods
+  async getPollData(pollId: number, userId?: number): Promise<any> {
+    try {
+      const poll = await this.prisma.smfPoll.findUnique({
+        where: { idPoll: pollId },
+        include: {
+          choices: {
+            orderBy: { idChoice: 'asc' }
+          },
+          votes: userId ? {
+            where: { idMember: userId }
+          } : false
+        }
+      });
+
+      if (!poll) {
+        return null;
+      }
+
+      const currentTime = Math.floor(Date.now() / 1000);
+      const isExpired = poll.expireTime > 0 && currentTime > poll.expireTime;
+      const userVotes = userId ? poll.votes?.map(v => v.idChoice) || [] : [];
+      const userVoted = userVotes.length > 0;
+
+      // Calculate total votes
+      const totalVotes = poll.choices.reduce((sum, choice) => sum + choice.votes, 0);
+
+      const choices = poll.choices.map(choice => ({
+        id: choice.idChoice,
+        label: choice.label,
+        votes: choice.votes,
+        percentage: totalVotes > 0 ? Math.round((choice.votes / totalVotes) * 100) : 0,
+        isUserChoice: userVotes.includes(choice.idChoice)
+      }));
+
+      return {
+        id: poll.idPoll,
+        question: poll.question,
+        votingLocked: poll.votingLocked,
+        maxVotes: poll.maxVotes,
+        expireTime: poll.expireTime,
+        hideResults: poll.hideResults,
+        changeVote: poll.changeVote,
+        guestVote: poll.guestVote,
+        totalVotes,
+        totalVoters: await this.prisma.smfLogPoll.groupBy({
+          by: ['idMember'],
+          where: { idPoll: pollId }
+        }).then(groups => groups.length),
+        choices,
+        userVoted,
+        userChoices: userVoted ? userVotes : undefined,
+        canVote: !isExpired && !poll.votingLocked && (!userVoted || poll.changeVote === 1),
+        isExpired
+      };
+    } catch (error) {
+      this.logger.error('Error getting poll data:', error);
+      throw error;
+    }
+  }
+
+  async votePoll(pollId: number, userId: number, choices: number[]): Promise<any> {
+    try {
+      const poll = await this.prisma.smfPoll.findUnique({
+        where: { idPoll: pollId },
+        include: {
+          votes: {
+            where: { idMember: userId }
+          }
+        }
+      });
+
+      if (!poll) {
+        throw new Error('Poll not found');
+      }
+
+      const currentTime = Math.floor(Date.now() / 1000);
+      const isExpired = poll.expireTime > 0 && currentTime > poll.expireTime;
+
+      if (isExpired) {
+        throw new Error('Poll has expired');
+      }
+
+      if (poll.votingLocked) {
+        throw new Error('Poll is locked');
+      }
+
+      const userHasVoted = poll.votes.length > 0;
+
+      if (userHasVoted && !poll.changeVote) {
+        throw new Error('You have already voted and cannot change your vote');
+      }
+
+      if (choices.length > poll.maxVotes) {
+        throw new Error(`You can only select up to ${poll.maxVotes} choice(s)`);
+      }
+
+      // Execute vote in transaction
+      await this.prisma.$transaction(async (prisma) => {
+        // If user has voted before and can change vote, remove old votes
+        if (userHasVoted) {
+          const oldChoices = poll.votes.map(v => v.idChoice);
+
+          // Remove old vote log entries
+          await prisma.smfLogPoll.deleteMany({
+            where: {
+              idPoll: pollId,
+              idMember: userId
+            }
+          });
+
+          // Decrement vote counts for old choices
+          for (const oldChoice of oldChoices) {
+            await prisma.smfPollChoice.update({
+              where: {
+                idPoll_idChoice: {
+                  idPoll: pollId,
+                  idChoice: oldChoice
+                }
+              },
+              data: {
+                votes: { decrement: 1 }
+              }
+            });
+          }
+        }
+
+        // Add new votes
+        for (const choiceId of choices) {
+          // Add vote log
+          await prisma.smfLogPoll.create({
+            data: {
+              idPoll: pollId,
+              idMember: userId,
+              idChoice: choiceId
+            }
+          });
+
+          // Increment vote count
+          await prisma.smfPollChoice.update({
+            where: {
+              idPoll_idChoice: {
+                idPoll: pollId,
+                idChoice: choiceId
+              }
+            },
+            data: {
+              votes: { increment: 1 }
+            }
+          });
+        }
+      });
+
+      this.logger.log(`User ${userId} voted on poll ${pollId} with choices: ${choices.join(', ')}`);
+
+      // Return updated poll data
+      return this.getPollData(pollId, userId);
+    } catch (error) {
+      this.logger.error('Error voting on poll:', error);
+      throw error;
+    }
+  }
+
+  async createPoll(pollData: any, userId: number): Promise<number> {
+    try {
+      const user = await this.prisma.smfMember.findUnique({
+        where: { idMember: userId },
+        select: { memberName: true }
+      });
+
+      if (!user) {
+        throw new Error('User not found');
+      }
+
+      // Get next poll ID
+      const lastPoll = await this.prisma.smfPoll.findFirst({
+        orderBy: { idPoll: 'desc' },
+        select: { idPoll: true }
+      });
+      const nextPollId = (lastPoll?.idPoll || 0) + 1;
+
+      // Create poll and choices in transaction
+      await this.prisma.$transaction(async (prisma) => {
+        // Create poll
+        await prisma.smfPoll.create({
+          data: {
+            idPoll: nextPollId,
+            question: pollData.question,
+            votingLocked: 0,
+            maxVotes: pollData.maxVotes || 1,
+            expireTime: pollData.expireTime || 0,
+            hideResults: pollData.hideResults || 0,
+            changeVote: pollData.changeVote ? 1 : 0,
+            guestVote: pollData.guestVote ? 1 : 0,
+            numGuestVoters: 0,
+            resetPoll: 0,
+            idMember: userId,
+            posterName: user.memberName
+          }
+        });
+
+        // Create poll choices
+        for (let i = 0; i < pollData.choices.length; i++) {
+          await prisma.smfPollChoice.create({
+            data: {
+              idPoll: nextPollId,
+              idChoice: i,
+              label: pollData.choices[i].label,
+              votes: 0
+            }
+          });
+        }
+      });
+
+      this.logger.log(`Poll ${nextPollId} created by user ${userId}`);
+      return nextPollId;
+    } catch (error) {
+      this.logger.error('Error creating poll:', error);
       throw error;
     }
   }

@@ -685,6 +685,7 @@ model SmfTopic {
   // Relations
   board            SmfBoard @relation(fields: [idBoard], references: [idBoard], onDelete: Cascade)
   messages         SmfMessage[]
+  poll             SmfPoll? @relation(fields: [idPoll], references: [idPoll])
 
   // Computed relations for convenience
   firstMessage     SmfMessage? @relation("TopicFirstMessage", fields: [idFirstMsg], references: [idMsg])
@@ -744,5 +745,56 @@ model SmfMessageReport {
   closer      SmfMember? @relation("ReportClosedBy", fields: [closedBy], references: [idMember], onDelete: SetNull)
 
   @@map("smf_message_reports")
+}
+
+// SMF Polls
+model SmfPoll {
+  idPoll          Int       @id @map("id_poll")
+  question        String    @db.VarChar(255)
+  votingLocked    Int       @map("voting_locked") @default(0) // 0=open, 1=locked by user, 2=locked by moderator
+  maxVotes        Int       @map("max_votes") @default(1)
+  expireTime      Int       @map("expire_time") @default(0)
+  hideResults     Int       @map("hide_results") @default(0)
+  changeVote      Int       @map("change_vote") @default(0)
+  guestVote       Int       @map("guest_vote") @default(0)
+  numGuestVoters  Int       @map("num_guest_voters") @default(0)
+  resetPoll       Int       @map("reset_poll") @default(0)
+  idMember        Int       @map("id_member") @default(0)
+  posterName      String    @map("poster_name") @db.VarChar(255)
+
+  // Relations
+  choices         SmfPollChoice[]
+  votes           SmfLogPoll[]
+  topics          SmfTopic[]
+
+  @@map("smf_polls")
+}
+
+// SMF Poll Choices
+model SmfPollChoice {
+  idPoll    Int    @map("id_poll")
+  idChoice  Int    @map("id_choice")
+  label     String @db.VarChar(255)
+  votes     Int    @default(0)
+
+  // Relations
+  poll      SmfPoll @relation(fields: [idPoll], references: [idPoll], onDelete: Cascade)
+
+  @@id([idPoll, idChoice])
+  @@map("smf_poll_choices")
+}
+
+// SMF Poll Vote Log
+model SmfLogPoll {
+  idPoll    Int @map("id_poll")
+  idMember  Int @map("id_member")
+  idChoice  Int @map("id_choice")
+
+  // Relations
+  poll      SmfPoll @relation(fields: [idPoll], references: [idPoll], onDelete: Cascade)
+
+  @@id([idPoll, idMember, idChoice])
+  @@index([idPoll, idMember, idChoice])
+  @@map("smf_log_polls")
 }
 
