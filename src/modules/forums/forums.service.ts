@@ -2032,4 +2032,179 @@ export class ForumsService {
       throw error;
     }
   }
+
+  // Unread messages functionality
+  async getUnreadTopics(userId: number, boardId?: number, limit: number = 20, offset: number = 0): Promise<any> {
+    try {
+      const user = await this.prisma.smfMember.findUnique({
+        where: { idMember: userId },
+        select: { lastLogin: true }
+      });
+
+      if (!user || !user.lastLogin) {
+        return { topics: [], total: 0, limit, offset };
+      }
+
+      const whereClause: any = {
+        idLastMsg: {
+          gt: 0
+        },
+        lastMessage: {
+          posterTime: {
+            gt: user.lastLogin
+          }
+        }
+      };
+
+      if (boardId) {
+        whereClause.idBoard = boardId;
+      }
+
+      // Check board access
+      const [topics, totalTopics] = await Promise.all([
+        this.prisma.smfTopic.findMany({
+          where: whereClause,
+          skip: offset,
+          take: limit,
+          orderBy: [
+            { isSticky: 'desc' },
+            { idLastMsg: 'desc' }
+          ],
+          include: {
+            firstMessage: true,
+            lastMessage: {
+              include: {
+                member: true
+              }
+            },
+            board: {
+              include: {
+                category: true
+              }
+            },
+            starter: true
+          }
+        }),
+        this.prisma.smfTopic.count({
+          where: whereClause
+        })
+      ]);
+
+      // Filter by board access
+      const accessibleTopics = [];
+      for (const topic of topics) {
+        const hasAccess = await this.checkBoardAccess(topic.idBoard, userId);
+        if (hasAccess) {
+          accessibleTopics.push({
+            id: topic.idTopic,
+            subject: topic.firstMessage?.subject || 'Untitled',
+            isSticky: Boolean(topic.isSticky),
+            locked: Boolean(topic.locked),
+            hasPoll: topic.idPoll > 0,
+            numReplies: topic.numReplies,
+            numViews: topic.numViews,
+            board: {
+              id: topic.board.idBoard,
+              name: topic.board.name,
+              categoryName: topic.board.category.name
+            },
+            starter: {
+              id: topic.starter?.idMember || 0,
+              name: topic.starter?.memberName || topic.firstMessage?.posterName || 'Unknown'
+            },
+            lastMessage: topic.lastMessage ? {
+              id: topic.lastMessage.idMsg,
+              time: topic.lastMessage.posterTime,
+              author: topic.lastMessage.member?.memberName || topic.lastMessage.posterName,
+              isNew: topic.lastMessage.posterTime > user.lastLogin
+            } : null,
+            firstMessageTime: topic.firstMessage?.posterTime || 0
+          });
+        }
+      }
+
+      return {
+        topics: accessibleTopics,
+        total: totalTopics,
+        limit,
+        offset,
+        lastLoginTime: user.lastLogin
+      };
+    } catch (error) {
+      this.logger.error('Error fetching unread topics:', error);
+      return { topics: [], total: 0, limit, offset };
+    }
+  }
+
+  async getUnreadCount(userId: number): Promise<{ count: number }> {
+    try {
+      const user = await this.prisma.smfMember.findUnique({
+        where: { idMember: userId },
+        select: { lastLogin: true }
+      });
+
+      if (!user || !user.lastLogin) {
+        return { count: 0 };
+      }
+
+      // Get all boards user has access to
+      const categories = await this.getCategories(userId);
+      const boardIds = categories.flatMap(cat => cat.boards.map(b => b.id));
+
+      if (boardIds.length === 0) {
+        return { count: 0 };
+      }
+
+      // Count topics with new messages since last login
+      const count = await this.prisma.smfTopic.count({
+        where: {
+          idBoard: {
+            in: boardIds
+          },
+          lastMessage: {
+            posterTime: {
+              gt: user.lastLogin
+            }
+          }
+        }
+      });
+
+      return { count };
+    } catch (error) {
+      this.logger.error('Error getting unread count:', error);
+      return { count: 0 };
+    }
+  }
+
+  async markTopicAsRead(topicId: number, userId: number): Promise<{ success: boolean }> {
+    try {
+      const currentTime = Math.floor(Date.now() / 1000);
+
+      await this.prisma.smfMember.update({
+        where: { idMember: userId },
+        data: { lastLogin: currentTime }
+      });
+
+      return { success: true };
+    } catch (error) {
+      this.logger.error('Error marking topic as read:', error);
+      return { success: false };
+    }
+  }
+
+  async markAllAsRead(userId: number): Promise<{ success: boolean }> {
+    try {
+      const currentTime = Math.floor(Date.now() / 1000);
+
+      await this.prisma.smfMember.update({
+        where: { idMember: userId },
+        data: { lastLogin: currentTime }
+      });
+
+      return { success: true };
+    } catch (error) {
+      this.logger.error('Error marking all as read:', error);
+      return { success: false };
+    }
+  }
 }

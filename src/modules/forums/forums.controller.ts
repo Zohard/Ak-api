@@ -377,4 +377,61 @@ export class ForumsController {
   ) {
     return await this.forumsService.getPollVoters(pollId);
   }
+
+  @Get('unread')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get unread topics for current user' })
+  @ApiQuery({ name: 'boardId', required: false, type: Number, description: 'Filter by board ID (optional)' })
+  @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Topics per page (default: 20)' })
+  @ApiQuery({ name: 'offset', required: false, type: Number, description: 'Number to skip (default: 0)' })
+  @ApiResponse({ status: 200, description: 'Unread topics retrieved successfully' })
+  async getUnreadTopics(
+    @Request() req,
+    @Query('boardId') boardId?: string,
+    @Query('limit') limit: string = '20',
+    @Query('offset') offset: string = '0'
+  ) {
+    const userId = req.user.id;
+    return await this.forumsService.getUnreadTopics(
+      userId,
+      boardId ? parseInt(boardId) : undefined,
+      parseInt(limit),
+      parseInt(offset)
+    );
+  }
+
+  @Get('unread/count')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get count of unread topics for current user' })
+  @ApiResponse({ status: 200, description: 'Unread count retrieved successfully' })
+  async getUnreadCount(@Request() req) {
+    const userId = req.user.id;
+    return await this.forumsService.getUnreadCount(userId);
+  }
+
+  @Post('topics/:topicId/mark-read')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Mark topic as read' })
+  @ApiParam({ name: 'topicId', type: 'number', description: 'Topic ID' })
+  @ApiResponse({ status: 200, description: 'Topic marked as read successfully' })
+  async markTopicAsRead(
+    @Param('topicId', ParseIntPipe) topicId: number,
+    @Request() req
+  ) {
+    const userId = req.user.id;
+    return await this.forumsService.markTopicAsRead(topicId, userId);
+  }
+
+  @Post('mark-all-read')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Mark all topics as read for current user' })
+  @ApiResponse({ status: 200, description: 'All topics marked as read successfully' })
+  async markAllAsRead(@Request() req) {
+    const userId = req.user.id;
+    return await this.forumsService.markAllAsRead(userId);
+  }
 }
