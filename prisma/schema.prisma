@@ -76,6 +76,7 @@ model SmfMember {
   updatedTopics    SmfTopic[] @relation("TopicUpdater")
   reportsSubmitted SmfMessageReport[] @relation("ReportedBy")
   reportsClosed    SmfMessageReport[] @relation("ReportClosedBy")
+  onlineActivity   SmfLogOnline[] @relation("OnlineActivity")
 
   @@map("smf_members")
 }
@@ -796,5 +797,22 @@ model SmfLogPoll {
   @@id([idPoll, idMember, idChoice])
   @@index([idPoll, idMember, idChoice])
   @@map("smf_log_polls")
+}
+
+// SMF Online Activity Log
+model SmfLogOnline {
+  session   String  @id @db.VarChar(128)
+  logTime   Int     @map("log_time")
+  idMember  Int     @map("id_member") @default(0)
+  idSpider  Int     @map("id_spider") @default(0)
+  ip        String? @db.VarChar(45)
+  url       String  @db.VarChar(2048) @default("")
+
+  // Relations
+  member    SmfMember? @relation("OnlineActivity", fields: [idMember], references: [idMember], onDelete: Cascade)
+
+  @@index([logTime])
+  @@index([idMember])
+  @@map("smf_log_online")
 }
 

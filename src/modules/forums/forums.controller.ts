@@ -10,11 +10,15 @@ import { LockTopicDto } from './dto/lock-topic.dto';
 import { ReportMessageDto, GetReportsQueryDto } from './dto/report-message.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { OptionalJwtAuthGuard } from '../../common/guards/optional-jwt-auth.guard';
+import { ActivityTrackerService } from '../../shared/services/activity-tracker.service';
 
 @ApiTags('Forums')
 @Controller('forums')
 export class ForumsController {
-  constructor(private readonly forumsService: ForumsService) {}
+  constructor(
+    private readonly forumsService: ForumsService,
+    private readonly activityTracker: ActivityTrackerService
+  ) {}
 
   @Get('categories')
   @UseGuards(OptionalJwtAuthGuard)
@@ -433,5 +437,30 @@ export class ForumsController {
   async markAllAsRead(@Request() req) {
     const userId = req.user.id;
     return await this.forumsService.markAllAsRead(userId);
+  }
+
+  @Get('online')
+  @ApiOperation({ summary: 'Get list of online users and guests with their activities' })
+  @ApiQuery({ name: 'filter', required: false, enum: ['all', 'members', 'guests'], description: 'Filter by user type' })
+  @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Number of users to return (default: 50)' })
+  @ApiQuery({ name: 'offset', required: false, type: Number, description: 'Number of users to skip (default: 0)' })
+  @ApiResponse({ status: 200, description: 'Online users retrieved successfully' })
+  async getOnlineUsers(
+    @Query('filter') filter?: 'all' | 'members' | 'guests',
+    @Query('limit') limit?: string,
+    @Query('offset') offset?: string
+  ) {
+    return await this.activityTracker.getOnlineUsers({
+      filter: filter || 'all',
+      limit: limit ? parseInt(limit) : 50,
+      offset: offset ? parseInt(offset) : 0
+    });
+  }
+
+  @Get('online/stats')
+  @ApiOperation({ summary: 'Get online users statistics' })
+  @ApiResponse({ status: 200, description: 'Online stats retrieved successfully' })
+  async getOnlineStats() {
+    return await this.activityTracker.getOnlineStats();
   }
 }
