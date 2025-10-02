@@ -2091,7 +2091,7 @@ export class ForumsService {
       ]);
 
       // Filter by board access
-      const accessibleTopics = [];
+      const accessibleTopics: any[] = [];
       for (const topic of topics) {
         const hasAccess = await this.checkBoardAccess(topic.idBoard, userId);
         if (hasAccess) {
