@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../../shared/services/prisma.service';
 import { ForumMessageQueryDto, ForumMessage, ForumMessageResponse } from './dto/forum-message.dto';
 
@@ -1846,28 +1846,28 @@ export class ForumsService {
       });
 
       if (!poll) {
-        throw new Error('Poll not found');
+        throw new NotFoundException('Sondage introuvable');
       }
 
       const currentTime = Math.floor(Date.now() / 1000);
       const isExpired = poll.expireTime > 0 && currentTime > poll.expireTime;
 
       if (isExpired) {
-        throw new Error('Poll has expired');
+        throw new BadRequestException('Le sondage a expiré');
       }
 
       if (poll.votingLocked) {
-        throw new Error('Poll is locked');
+        throw new ForbiddenException('Le sondage est verrouillé');
       }
 
       const userHasVoted = poll.votes.length > 0;
 
       if (userHasVoted && !poll.changeVote) {
-        throw new Error('You have already voted and cannot change your vote');
+        throw new BadRequestException('Vous avez déjà voté et ne pouvez pas modifier votre vote');
       }
 
       if (choices.length > poll.maxVotes) {
-        throw new Error(`You can only select up to ${poll.maxVotes} choice(s)`);
+        throw new BadRequestException(`Vous ne pouvez sélectionner que ${poll.maxVotes} choix maximum`);
       }
 
       // Execute vote in transaction
