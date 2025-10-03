@@ -30,6 +30,11 @@ export class ActivityTrackerMiddleware implements NestMiddleware {
       // Determine action based on URL
       const action = this.determineAction(req);
 
+      // Debug logging
+      if (userId) {
+        console.log(`[Activity] Tracking user ${userId} - Action: ${action.action} - Session: ${sessionId.substring(0, 20)}...`);
+      }
+
       // Track the activity (fire and forget)
       this.activityTracker.trackActivity({
         sessionId,
