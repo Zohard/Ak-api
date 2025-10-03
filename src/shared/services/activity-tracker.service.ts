@@ -33,18 +33,23 @@ export class ActivityTrackerService {
     try {
       const currentTime = Math.floor(Date.now() / 1000);
       const urlData = JSON.stringify(params.action);
+      const idMember = params.userId || 0;
+
+      // Debug logging
+      this.logger.log(`Tracking activity - Session: ${params.sessionId.substring(0, 20)}... | Member ID: ${idMember} | Action: ${params.action.action}`);
 
       await this.prisma.smfLogOnline.upsert({
         where: { session: params.sessionId },
         update: {
           logTime: currentTime,
+          idMember: idMember,  // Update member ID in case user logged in after being a guest
           url: urlData,
           ip: params.ipAddress
         },
         create: {
           session: params.sessionId,
           logTime: currentTime,
-          idMember: params.userId || 0,
+          idMember: idMember,
           idSpider: 0,
           ip: params.ipAddress,
           url: urlData
