@@ -76,7 +76,6 @@ model SmfMember {
   updatedTopics    SmfTopic[] @relation("TopicUpdater")
   reportsSubmitted SmfMessageReport[] @relation("ReportedBy")
   reportsClosed    SmfMessageReport[] @relation("ReportClosedBy")
-  onlineActivity   SmfLogOnline[] @relation("OnlineActivity")
 
   @@map("smf_members")
 }
@@ -808,8 +807,8 @@ model SmfLogOnline {
   ip        String? @db.VarChar(45)
   url       String  @db.VarChar(2048) @default("")
 
-  // Relations
-  member    SmfMember? @relation("OnlineActivity", fields: [idMember], references: [idMember], onDelete: Cascade)
+  // Note: No foreign key to smf_members because guests have id_member = 0
+  // which doesn't exist in the members table
 
   @@index([logTime])
   @@index([idMember])
