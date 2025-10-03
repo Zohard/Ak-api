@@ -1,10 +1,14 @@
 import { Injectable, NestMiddleware } from '@nestjs/common';
 import { Request, Response, NextFunction } from 'express';
 import { ActivityTrackerService, ActivityAction } from '../../shared/services/activity-tracker.service';
+import { JwtService } from '@nestjs/jwt';
 
 @Injectable()
 export class ActivityTrackerMiddleware implements NestMiddleware {
-  constructor(private readonly activityTracker: ActivityTrackerService) {}
+  constructor(
+    private readonly activityTracker: ActivityTrackerService,
+    private readonly jwtService: JwtService
+  ) {}
 
   async use(req: Request, res: Response, next: NextFunction) {
     try {
@@ -21,8 +25,19 @@ export class ActivityTrackerMiddleware implements NestMiddleware {
         });
       }
 
-      // Get user ID if authenticated
-      const userId = (req as any).user?.id;
+      // Get user ID if authenticated (manually decode JWT)
+      let userId: number | undefined;
+      try {
+        const authHeader = req.headers.authorization;
+        if (authHeader && authHeader.startsWith('Bearer ')) {
+          const token = authHeader.substring(7);
+          const decoded = this.jwtService.verify(token) as any;
+          userId = decoded.sub; // JWT strategy uses 'sub' for user ID
+        }
+      } catch (error) {
+        // Invalid or expired token, treat as guest
+        userId = undefined;
+      }
 
       // Get IP address
       const ipAddress = this.getIpAddress(req);

@@ -1,5 +1,6 @@
 import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { JwtModule } from '@nestjs/jwt';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './modules/auth/auth.module';
@@ -39,6 +40,15 @@ import jwtConfig from './config/jwt.config';
       isGlobal: true,
       load: [databaseConfig, jwtConfig],
       envFilePath: '.env',
+    }),
+    JwtModule.registerAsync({
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService) => ({
+        secret: configService.get<string>('jwt.secret') || configService.get<string>('JWT_SECRET'),
+        signOptions: {
+          expiresIn: configService.get<string>('jwt.expiresIn') || '7d',
+        },
+      }),
     }),
     AuthModule,
     UsersModule,
