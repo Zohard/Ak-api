@@ -975,26 +975,42 @@ export class ForumsService {
       const currentTime = Math.floor(Date.now() / 1000);
       const fifteenMinutesAgo = currentTime - (15 * 60);
 
-      // Get users who logged in within the last 15 minutes
-      const onlineMembers = await this.prisma.smfMember.findMany({
+      // Get online sessions from smf_log_online table
+      const onlineSessions = await this.prisma.smfLogOnline.findMany({
         where: {
-          lastLogin: {
+          logTime: {
             gte: fifteenMinutesAgo
           }
         },
-        select: {
-          idMember: true,
-          memberName: true,
-          lastLogin: true
-        },
         orderBy: {
-          lastLogin: 'desc'
+          logTime: 'desc'
         }
       });
 
-      // For guests count, we'll need to track this separately
-      // For now, we'll return 0 guests as we don't have session tracking
-      // You can implement this later with session tracking
+      // Separate members from guests and deduplicate member IDs
+      const memberIds = [...new Set(
+        onlineSessions
+          .filter(session => session.idMember > 0)
+          .map(session => session.idMember)
+      )];
+
+      const guestCount = onlineSessions.filter(session => session.idMember === 0).length;
+
+      // Get member details
+      const onlineMembers = memberIds.length > 0
+        ? await this.prisma.smfMember.findMany({
+            where: {
+              idMember: {
+                in: memberIds
+              }
+            },
+            select: {
+              idMember: true,
+              memberName: true,
+              lastLogin: true
+            }
+          })
+        : [];
 
       return {
         members: onlineMembers.map(m => ({
@@ -1003,7 +1019,7 @@ export class ForumsService {
           lastSeen: m.lastLogin
         })),
         totalMembers: onlineMembers.length,
-        totalGuests: 0 // Placeholder - needs session tracking
+        totalGuests: guestCount
       };
     } catch (error) {
       this.logger.error('Error fetching online users:', error);
@@ -1015,13 +1031,78 @@ export class ForumsService {
     }
   }
 
-  async updateUserActivity(userId: number): Promise<void> {
+  async updateUserActivity(userId: number, actionData?: any): Promise<void> {
     try {
       const currentTime = Math.floor(Date.now() / 1000);
 
-      await this.prisma.smfMember.update({
-        where: { idMember: userId },
-        data: { lastLogin: currentTime }
+      // Generate a session ID based on user ID
+      // In a real implementation, you'd use the actual session ID from the request
+      const sessionId = `user_${userId}_${Math.floor(currentTime / 300)}`; // Changes every 5 minutes
+
+      // Build action object with additional context
+      const action: any = {
+        action: actionData?.action || 'forums',
+        ...(actionData?.topicId && { topic: actionData.topicId }),
+        ...(actionData?.boardId && { board: actionData.boardId }),
+        ...(actionData?.page && { page: actionData.page }),
+      };
+
+      // If we have a topic or board ID, fetch the title for better display
+      if (actionData?.topicId) {
+        try {
+          const topic = await this.prisma.smfTopic.findUnique({
+            where: { idTopic: actionData.topicId },
+            select: { subject: true }
+          });
+          if (topic) {
+            action.topicTitle = topic.subject;
+          }
+        } catch (err) {
+          // Ignore errors fetching topic details
+        }
+      }
+
+      if (actionData?.boardId) {
+        try {
+          const board = await this.prisma.smfBoard.findUnique({
+            where: { idBoard: actionData.boardId },
+            select: { name: true }
+          });
+          if (board) {
+            action.boardName = board.name;
+          }
+        } catch (err) {
+          // Ignore errors fetching board details
+        }
+      }
+
+      const urlData = JSON.stringify(action);
+
+      // Upsert into smf_log_online table to track activity
+      await this.prisma.smfLogOnline.upsert({
+        where: { session: sessionId },
+        update: {
+          logTime: currentTime,
+          url: urlData
+        },
+        create: {
+          session: sessionId,
+          logTime: currentTime,
+          idMember: userId,
+          idSpider: 0,
+          ip: null, // Can be passed as parameter if needed
+          url: urlData
+        }
+      });
+
+      // Clean up old sessions (older than 15 minutes)
+      const fifteenMinutesAgo = currentTime - (15 * 60);
+      await this.prisma.smfLogOnline.deleteMany({
+        where: {
+          logTime: {
+            lt: fifteenMinutesAgo
+          }
+        }
       });
     } catch (error) {
       this.logger.error('Error updating user activity:', error);
@@ -2178,13 +2259,12 @@ export class ForumsService {
 
   async markTopicAsRead(topicId: number, userId: number): Promise<{ success: boolean }> {
     try {
-      const currentTime = Math.floor(Date.now() / 1000);
+      // TODO: Implement proper read tracking using smf_log_topics table
+      // DO NOT update lastLogin here - it breaks unread message detection
+      // lastLogin should ONLY be updated during actual login (auth.service.ts)
 
-      await this.prisma.smfMember.update({
-        where: { idMember: userId },
-        data: { lastLogin: currentTime }
-      });
-
+      // For now, just return successfully
+      // Proper topic read tracking will be implemented with smf_log_topics table
       return { success: true };
     } catch (error) {
       this.logger.error('Error marking topic as read:', error);
@@ -2194,6 +2274,8 @@ export class ForumsService {
 
   async markAllAsRead(userId: number): Promise<{ success: boolean }> {
     try {
+      // Update lastLogin to current time so all previous messages appear as read
+      // This is the ONLY legitimate use case for updating lastLogin outside of actual login
       const currentTime = Math.floor(Date.now() / 1000);
 
       await this.prisma.smfMember.update({

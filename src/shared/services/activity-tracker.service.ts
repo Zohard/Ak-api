@@ -300,9 +300,15 @@ export class ActivityTrackerService {
         return 'Regarde les forums';
 
       case 'forum_board':
+        if (action.boardName) {
+          return `Regarde le forum ${action.boardName}`;
+        }
         return action.board ? `Regarde le forum #${action.board}` : 'Regarde un forum';
 
       case 'forum_topic':
+        if (action.topicTitle) {
+          return `Lit le sujet ${action.topicTitle}`;
+        }
         return action.topic ? `Lit le sujet #${action.topic}` : 'Lit un sujet';
 
       case 'who_online':
@@ -313,10 +319,28 @@ export class ActivityTrackerService {
         return action.userId ? `Regarde le profil de l'utilisateur #${action.userId}` : 'Regarde un profil';
 
       case 'anime':
+        if (action.animeTitle) {
+          return `Regarde l'anime ${action.animeTitle}`;
+        }
         return action.animeId ? `Regarde l'anime #${action.animeId}` : 'Regarde un anime';
 
       case 'manga':
+        if (action.mangaTitle) {
+          return `Regarde le manga ${action.mangaTitle}`;
+        }
         return action.mangaId ? `Regarde le manga #${action.mangaId}` : 'Regarde un manga';
+
+      case 'anime_list':
+        return 'Dans la base de données anime';
+
+      case 'manga_list':
+        return 'Dans la base de données manga';
+
+      case 'seasonal_anime':
+        if (action.season && action.year) {
+          return `Regarde les animes ${action.season} ${action.year}`;
+        }
+        return 'Regarde les animes de la saison';
 
       case 'search':
         return 'Effectue une recherche';
