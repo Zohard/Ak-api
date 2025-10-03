@@ -556,6 +556,93 @@ export class ForumsService {
     }
   }
 
+  /**
+   * Get all forum posts from a specific user with pagination
+   */
+  async getUserPosts(userId: number, page: number = 1, limit: number = 20): Promise<any> {
+    try {
+      const skip = (page - 1) * limit;
+
+      // Get total count
+      const total = await this.prisma.smfMessage.count({
+        where: { idMember: userId }
+      });
+
+      // Get user info
+      const user = await this.prisma.smfMember.findUnique({
+        where: { idMember: userId },
+        select: {
+          idMember: true,
+          memberName: true,
+          realName: true,
+          avatar: true,
+          posts: true
+        }
+      });
+
+      if (!user) {
+        throw new NotFoundException('User not found');
+      }
+
+      // Get paginated messages
+      const messages = await this.prisma.smfMessage.findMany({
+        where: { idMember: userId },
+        take: limit,
+        skip,
+        orderBy: { posterTime: 'desc' },
+        include: {
+          topic: {
+            include: {
+              board: true,
+              firstMessage: {
+                select: {
+                  subject: true
+                }
+              }
+            }
+          }
+        }
+      });
+
+      const formattedMessages = messages.map(message => ({
+        id: message.idMsg,
+        subject: message.subject || '',
+        body: message.body,
+        posterTime: message.posterTime,
+        modifiedTime: message.modifiedTime,
+        modifiedName: message.modifiedName,
+        topic: {
+          id: message.topic.idTopic,
+          subject: message.topic.firstMessage?.subject || 'Untitled',
+          board: {
+            id: message.topic.board.idBoard,
+            name: message.topic.board.name
+          }
+        }
+      }));
+
+      return {
+        user: {
+          id: user.idMember,
+          memberName: user.memberName,
+          realName: user.realName,
+          avatar: user.avatar,
+          totalPosts: user.posts
+        },
+        messages: formattedMessages,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages: Math.ceil(total / limit)
+        }
+      };
+    } catch (error) {
+      this.logger.error('Error fetching user posts:', error);
+      throw error;
+    }
+  }
+
   private stripSmfBBCode(text: string): string {
     if (!text) return '';
 

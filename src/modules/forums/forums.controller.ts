@@ -456,4 +456,18 @@ export class ForumsController {
   async getOnlineStats() {
     return await this.activityTracker.getOnlineStats();
   }
+
+  @Get('users/:userId/posts')
+  @ApiOperation({ summary: 'Get all forum posts from a specific user' })
+  @ApiParam({ name: 'userId', type: 'number', description: 'User ID' })
+  @ApiQuery({ name: 'page', required: false, type: Number, description: 'Page number (default: 1)' })
+  @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Posts per page (default: 20)' })
+  @ApiResponse({ status: 200, description: 'User posts retrieved successfully' })
+  async getUserPosts(
+    @Param('userId', ParseIntPipe) userId: number,
+    @Query('page') page: string = '1',
+    @Query('limit') limit: string = '20'
+  ) {
+    return await this.forumsService.getUserPosts(userId, parseInt(page), parseInt(limit));
+  }
 }
