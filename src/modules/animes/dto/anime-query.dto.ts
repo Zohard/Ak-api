@@ -79,7 +79,11 @@ export class AnimeQueryDto {
   })
   @IsOptional()
   @IsString()
-  @IsIn(['Série TV', 'Film', 'OAV', 'ONA', 'Clip', 'Spécial'])
+  @Transform(({ value }) => {
+    if (!value) return undefined;
+    // Decode URI component in case of encoding issues
+    return decodeURIComponent(value.toString());
+  })
   format?: string;
 
   @ApiPropertyOptional({
