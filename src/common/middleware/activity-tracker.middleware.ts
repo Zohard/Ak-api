@@ -11,6 +11,16 @@ export class ActivityTrackerMiddleware implements NestMiddleware {
       // Get or create session ID
       const sessionId = this.getSessionId(req);
 
+      // Set session cookie if it doesn't exist
+      if (!req.cookies?.['session_id']) {
+        res.cookie('session_id', sessionId, {
+          httpOnly: true,
+          maxAge: 24 * 60 * 60 * 1000, // 24 hours
+          sameSite: 'lax',
+          secure: process.env.NODE_ENV === 'production'
+        });
+      }
+
       // Get user ID if authenticated
       const userId = (req as any).user?.id;
 
