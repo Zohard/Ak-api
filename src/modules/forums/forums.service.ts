@@ -1052,10 +1052,14 @@ export class ForumsService {
         try {
           const topic = await this.prisma.smfTopic.findUnique({
             where: { idTopic: actionData.topicId },
-            select: { subject: true }
+            select: {
+              firstMessage: {
+                select: { subject: true }
+              }
+            }
           });
-          if (topic) {
-            action.topicTitle = topic.subject;
+          if (topic?.firstMessage?.subject) {
+            action.topicTitle = topic.firstMessage.subject;
           }
         } catch (err) {
           // Ignore errors fetching topic details
