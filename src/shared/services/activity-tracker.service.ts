@@ -125,8 +125,9 @@ export class ActivityTrackerService {
       // Create a map for quick lookup
       const memberMap = new Map(members.map(m => [m.idMember, m]));
 
-      // Process entries
+      // Process entries (deduplicate users by member ID)
       const users: any[] = [];
+      const seenMemberIds = new Set<number>();
       let guestCount = 0;
 
       for (const entry of onlineEntries) {
@@ -139,19 +140,14 @@ export class ActivityTrackerService {
         }
 
         if (entry.idMember === 0) {
-          // Guest
+          // Guest - count all but don't add to list (guests are anonymous)
           guestCount++;
-          users.push({
-            session: entry.session,
-            isGuest: true,
-            username: 'Invité',
-            realName: 'Invité',
-            time: entry.logTime,
-            ip: entry.ip,
-            action: this.formatAction(action),
-            actionRaw: action
-          });
         } else {
+          // Skip if we've already added this member (show only most recent activity)
+          if (seenMemberIds.has(entry.idMember)) {
+            continue;
+          }
+
           const member = memberMap.get(entry.idMember);
           if (member) {
             // Registered member
@@ -160,6 +156,7 @@ export class ActivityTrackerService {
               continue;
             }
 
+            seenMemberIds.add(entry.idMember);
             users.push({
               session: entry.session,
               isGuest: false,
@@ -182,7 +179,7 @@ export class ActivityTrackerService {
       }
 
       // Count unique members
-      const memberCount = users.filter(u => !u.isGuest).length;
+      const memberCount = seenMemberIds.size;
 
       return {
         users,
