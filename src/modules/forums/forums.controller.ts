@@ -156,9 +156,9 @@ export class ForumsController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Update user activity timestamp' })
   @ApiResponse({ status: 200, description: 'Activity updated successfully' })
-  async updateUserActivity(@Request() req) {
+  async updateUserActivity(@Request() req, @Body() body?: { action?: string; topicId?: number; boardId?: number; [key: string]: any }) {
     const userId = req.user.id;
-    await this.forumsService.updateUserActivity(userId);
+    await this.forumsService.updateUserActivity(userId, body);
     return { success: true };
   }
 
