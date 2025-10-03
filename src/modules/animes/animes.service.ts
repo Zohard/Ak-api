@@ -194,7 +194,7 @@ export class AnimesService extends BaseContentService<
     }
 
     if (format) {
-      where.format = format;
+      where.format = { equals: format, mode: 'insensitive' };
     }
 
     // Handle genre filtering via tags
@@ -906,6 +906,7 @@ export class AnimesService extends BaseContentService<
       studio = '',
       annee = '',
       statut = '',
+      format = '',
       genre = [],
       sortBy = 'dateAjout',
       sortOrder = 'desc',
@@ -914,7 +915,7 @@ export class AnimesService extends BaseContentService<
     } = query;
 
     const genreKey = Array.isArray(genre) ? genre.sort().join(',') : (genre || '');
-    return `${page}_${limit}_${search}_${studio}_${annee}_${statut}_${genreKey}_${sortBy}_${sortOrder}_${includeReviews}_${includeEpisodes}`;
+    return `${page}_${limit}_${search}_${studio}_${annee}_${statut}_${format}_${genreKey}_${sortBy}_${sortOrder}_${includeReviews}_${includeEpisodes}`;
   }
 
   // Cache invalidation methods
