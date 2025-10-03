@@ -91,13 +91,6 @@ export class ActivityTrackerService {
       const [onlineEntries, totalCount] = await Promise.all([
         this.prisma.smfLogOnline.findMany({
           where: whereClause,
-          include: {
-            member: {
-              include: {
-                membergroup: true
-              }
-            }
-          },
           orderBy: {
             logTime: 'desc'
           },
@@ -108,6 +101,24 @@ export class ActivityTrackerService {
           where: whereClause
         })
       ]);
+
+      // Get unique member IDs to fetch
+      const memberIds = [...new Set(onlineEntries.filter(e => e.idMember > 0).map(e => e.idMember))];
+
+      // Fetch member data if needed
+      const members = memberIds.length > 0 ? await this.prisma.smfMember.findMany({
+        where: {
+          idMember: {
+            in: memberIds
+          }
+        },
+        include: {
+          membergroup: true
+        }
+      }) : [];
+
+      // Create a map for quick lookup
+      const memberMap = new Map(members.map(m => [m.idMember, m]));
 
       // Process entries
       const users: any[] = [];
@@ -135,30 +146,33 @@ export class ActivityTrackerService {
             action: this.formatAction(action),
             actionRaw: action
           });
-        } else if (entry.member) {
-          // Registered member
-          // Skip hidden users if not showing them
-          if (!showHidden && !entry.member.lastLogin) {
-            continue;
-          }
+        } else {
+          const member = memberMap.get(entry.idMember);
+          if (member) {
+            // Registered member
+            // Skip hidden users if not showing them
+            if (!showHidden && !member.lastLogin) {
+              continue;
+            }
 
-          users.push({
-            session: entry.session,
-            isGuest: false,
-            id: entry.member.idMember,
-            username: entry.member.memberName,
-            realName: entry.member.realName || entry.member.memberName,
-            avatar: entry.member.avatar,
-            group: {
-              id: entry.member.idGroup,
-              name: entry.member.membergroup?.groupName || 'Member',
-              color: entry.member.membergroup?.onlineColor || null
-            },
-            time: entry.logTime,
-            ip: entry.ip,
-            action: this.formatAction(action),
-            actionRaw: action
-          });
+            users.push({
+              session: entry.session,
+              isGuest: false,
+              id: member.idMember,
+              username: member.memberName,
+              realName: member.realName || member.memberName,
+              avatar: member.avatar,
+              group: {
+                id: member.idGroup,
+                name: member.membergroup?.groupName || 'Member',
+                color: member.membergroup?.onlineColor || null
+              },
+              time: entry.logTime,
+              ip: entry.ip,
+              action: this.formatAction(action),
+              actionRaw: action
+            });
+          }
         }
       }
 
@@ -210,25 +224,26 @@ export class ActivityTrackerService {
           logTime: {
             gte: fifteenMinutesAgo
           }
-        },
-        include: {
-          member: {
-            select: {
-              idMember: true,
-              memberName: true,
-              realName: true,
-              avatar: true,
-              idGroup: true,
-              membergroup: {
-                select: {
-                  groupName: true,
-                  onlineColor: true
-                }
-              }
-            }
-          }
         }
       });
+
+      // Get unique member IDs to fetch
+      const memberIds = [...new Set(onlineEntries.filter(e => e.idMember > 0).map(e => e.idMember))];
+
+      // Fetch member data if needed
+      const membersData = memberIds.length > 0 ? await this.prisma.smfMember.findMany({
+        where: {
+          idMember: {
+            in: memberIds
+          }
+        },
+        include: {
+          membergroup: true
+        }
+      }) : [];
+
+      // Create a map for quick lookup
+      const memberMap = new Map(membersData.map(m => [m.idMember, m]));
 
       const members: any[] = [];
       let guestCount = 0;
@@ -236,17 +251,20 @@ export class ActivityTrackerService {
       for (const entry of onlineEntries) {
         if (entry.idMember === 0) {
           guestCount++;
-        } else if (entry.member) {
-          members.push({
-            id: entry.member.idMember,
-            username: entry.member.memberName,
-            realName: entry.member.realName || entry.member.memberName,
-            avatar: entry.member.avatar,
-            group: {
-              name: entry.member.membergroup?.groupName || 'Member',
-              color: entry.member.membergroup?.onlineColor || null
-            }
-          });
+        } else {
+          const member = memberMap.get(entry.idMember);
+          if (member) {
+            members.push({
+              id: member.idMember,
+              username: member.memberName,
+              realName: member.realName || member.memberName,
+              avatar: member.avatar,
+              group: {
+                name: member.membergroup?.groupName || 'Member',
+                color: member.membergroup?.onlineColor || null
+              }
+            });
+          }
         }
       }
 
