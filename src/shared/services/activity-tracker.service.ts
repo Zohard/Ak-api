@@ -92,29 +92,22 @@ export class ActivityTrackerService {
         whereClause.idMember = 0;
       }
 
-      // Get online entries
-      const [onlineEntries, totalCount] = await Promise.all([
-        this.prisma.smfLogOnline.findMany({
-          where: whereClause,
-          orderBy: {
-            logTime: 'desc'
-          },
-          take: limit,
-          skip: offset
-        }),
-        this.prisma.smfLogOnline.count({
-          where: whereClause
-        })
-      ]);
+      // Get ALL online entries (no pagination yet - we need to deduplicate first)
+      const onlineEntries = await this.prisma.smfLogOnline.findMany({
+        where: whereClause,
+        orderBy: {
+          logTime: 'desc'
+        }
+      });
 
-      // Get unique member IDs to fetch
-      const memberIds = [...new Set(onlineEntries.filter(e => e.idMember > 0).map(e => e.idMember))];
+      // Get unique member IDs
+      const uniqueMemberIds = [...new Set(onlineEntries.filter(e => e.idMember > 0).map(e => e.idMember))];
 
       // Fetch member data if needed
-      const members = memberIds.length > 0 ? await this.prisma.smfMember.findMany({
+      const members = uniqueMemberIds.length > 0 ? await this.prisma.smfMember.findMany({
         where: {
           idMember: {
-            in: memberIds
+            in: uniqueMemberIds
           }
         },
         include: {
@@ -125,8 +118,8 @@ export class ActivityTrackerService {
       // Create a map for quick lookup
       const memberMap = new Map(members.map(m => [m.idMember, m]));
 
-      // Process entries (deduplicate users by member ID)
-      const users: any[] = [];
+      // Deduplicate entries - keep only the most recent activity per user
+      const allUsers: any[] = [];
       const seenMemberIds = new Set<number>();
       let guestCount = 0;
 
@@ -140,7 +133,7 @@ export class ActivityTrackerService {
         }
 
         if (entry.idMember === 0) {
-          // Guest - count all but don't add to list (guests are anonymous)
+          // Guest - count all
           guestCount++;
         } else {
           // Skip if we've already added this member (show only most recent activity)
@@ -157,7 +150,7 @@ export class ActivityTrackerService {
             }
 
             seenMemberIds.add(entry.idMember);
-            users.push({
+            allUsers.push({
               session: entry.session,
               isGuest: false,
               id: member.idMember,
@@ -178,21 +171,22 @@ export class ActivityTrackerService {
         }
       }
 
-      // Count unique members
-      const memberCount = seenMemberIds.size;
+      // NOW apply pagination to the deduplicated list
+      const totalUniqueUsers = allUsers.length;
+      const paginatedUsers = allUsers.slice(offset, offset + limit);
 
       return {
-        users,
+        users: paginatedUsers,
         stats: {
-          totalOnline: users.length,
-          members: memberCount,
+          totalOnline: totalUniqueUsers + guestCount,
+          members: totalUniqueUsers,
           guests: guestCount,
-          totalCount
+          totalCount: totalUniqueUsers
         },
         pagination: {
           limit,
           offset,
-          totalPages: Math.ceil(totalCount / limit)
+          totalPages: Math.ceil(totalUniqueUsers / limit)
         }
       };
     } catch (error) {
