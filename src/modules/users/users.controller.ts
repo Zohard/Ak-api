@@ -209,6 +209,15 @@ export class UsersController {
   }
 
   // Public endpoints (no authentication required)
+  @Get('by-username/:username')
+  @ApiOperation({ summary: 'Récupérer un utilisateur par username (memberName ou realName)' })
+  @ApiParam({ name: 'username', description: 'Username de l\'utilisateur' })
+  @ApiResponse({ status: 200, description: 'Données de l\'utilisateur' })
+  @ApiResponse({ status: 404, description: 'Utilisateur introuvable' })
+  async getUserByUsername(@Param('username') username: string) {
+    return this.usersService.findPublicByPseudo(username);
+  }
+
   @Get('public/:pseudo')
   @ApiOperation({ summary: 'Récupérer le profil public d\'un utilisateur par pseudo' })
   @ApiParam({ name: 'pseudo', description: 'Pseudo de l\'utilisateur' })
