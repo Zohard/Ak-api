@@ -314,6 +314,11 @@ export class MediaService {
         throw new BadRequestException('Invalid URL protocol. Only HTTP(S) allowed');
       }
 
+      // Check if URL is Twitter/X and use oEmbed API
+      if (this.isTwitterUrl(url)) {
+        return await this.fetchTwitterMetadata(url);
+      }
+
       // Fetch the page with timeout
       const response = await axios.get(url, {
         timeout: 10000,
@@ -388,6 +393,57 @@ export class MediaService {
         siteName: new URL(url).hostname,
         type: 'website',
         error: 'Failed to fetch metadata',
+      };
+    }
+  }
+
+  private isTwitterUrl(url: string): boolean {
+    const urlObj = new URL(url);
+    return urlObj.hostname === 'twitter.com' ||
+           urlObj.hostname === 'www.twitter.com' ||
+           urlObj.hostname === 'x.com' ||
+           urlObj.hostname === 'www.x.com';
+  }
+
+  private async fetchTwitterMetadata(url: string) {
+    try {
+      // Use Twitter's oEmbed API
+      const oembedUrl = `https://publish.twitter.com/oembed?url=${encodeURIComponent(url)}`;
+      const response = await axios.get(oembedUrl, {
+        timeout: 10000,
+      });
+
+      const data = response.data;
+
+      // Extract author name from the HTML
+      const authorMatch = data.author_name || '';
+
+      // Parse the HTML to extract text content for description
+      const $ = cheerio.load(data.html || '');
+      const tweetText = $('blockquote').text().trim() || '';
+
+      // Extract first line as potential title/preview
+      const firstLine = tweetText.split('\n')[0] || tweetText.substring(0, 100);
+
+      return {
+        url,
+        title: authorMatch ? `Tweet by ${authorMatch}` : 'Tweet',
+        description: firstLine,
+        image: null, // Twitter oEmbed doesn't provide images directly
+        favicon: 'https://abs.twimg.com/favicons/twitter.3.ico',
+        siteName: 'X (formerly Twitter)',
+        type: 'article',
+      };
+    } catch (error) {
+      // Fallback if oEmbed fails
+      return {
+        url,
+        title: 'Tweet',
+        description: '',
+        image: null,
+        favicon: 'https://abs.twimg.com/favicons/twitter.3.ico',
+        siteName: 'X (formerly Twitter)',
+        type: 'article',
       };
     }
   }
