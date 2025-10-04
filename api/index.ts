@@ -43,6 +43,8 @@ const initializeApp = async () => {
         'X-Requested-With',
         'Accept',
         'Origin',
+        'X-Current-Page',
+        'X-Page-Path',
       ],
     });
 
