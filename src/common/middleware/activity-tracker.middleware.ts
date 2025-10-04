@@ -12,6 +12,18 @@ export class ActivityTrackerMiddleware implements NestMiddleware {
 
   async use(req: Request, res: Response, next: NextFunction) {
     try {
+      // Skip activity tracking for auth verification endpoints
+      // These are called periodically and should not update navigation state
+      const skipPaths = [
+        '/api/auth/verify',
+        '/api/auth/refresh',
+        '/api/auth/profile'
+      ];
+
+      if (skipPaths.some(path => req.path === path)) {
+        return next();
+      }
+
       // Get or create session ID
       const sessionId = this.getSessionId(req);
 
