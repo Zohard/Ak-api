@@ -18,6 +18,25 @@ export class EmailService {
     });
   }
 
+  async sendEmailVerification(email: string, username: string, verificationToken: string): Promise<void> {
+    const verificationUrl = `${this.configService.get('FRONTEND_URL')}/verify-email?token=${verificationToken}`;
+
+    const mailOptions = {
+      from: this.configService.get<string>('MAILTRAP_FROM'),
+      to: email,
+      subject: 'Confirmez votre adresse email - Anime-Kun',
+      html: this.getEmailVerificationTemplate(username, verificationUrl),
+    };
+
+    try {
+      await this.transporter.sendMail(mailOptions);
+      console.log(`Verification email sent to ${email}`);
+    } catch (error) {
+      console.error('Error sending verification email:', error);
+      throw error;
+    }
+  }
+
   async sendForgotPasswordEmail(email: string, resetToken: string): Promise<void> {
     const resetUrl = `${this.configService.get('FRONTEND_URL')}/reset-password?token=${resetToken}`;
 
@@ -35,6 +54,105 @@ export class EmailService {
       console.error('Error sending email:', error);
       throw error;
     }
+  }
+
+  private getEmailVerificationTemplate(username: string, verificationUrl: string): string {
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <title>Confirmez votre adresse email</title>
+        <style>
+          body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+          }
+          .header {
+            background-color: #2563eb;
+            color: white;
+            padding: 20px;
+            text-align: center;
+            border-radius: 8px 8px 0 0;
+          }
+          .content {
+            background-color: #f8fafc;
+            padding: 30px;
+            border-radius: 0 0 8px 8px;
+          }
+          .button {
+            display: inline-block;
+            background-color: #2563eb;
+            color: white;
+            padding: 12px 24px;
+            text-decoration: none;
+            border-radius: 6px;
+            margin: 20px 0;
+          }
+          .info {
+            background-color: #dbeafe;
+            border: 1px solid #3b82f6;
+            padding: 15px;
+            border-radius: 6px;
+            margin: 20px 0;
+          }
+          .footer {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #e5e7eb;
+            font-size: 14px;
+            color: #6b7280;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1>🎌 Anime-Kun</h1>
+          <h2>Bienvenue sur Anime-Kun !</h2>
+        </div>
+        <div class="content">
+          <p>Bonjour <strong>${username}</strong>,</p>
+
+          <p>Merci de vous être inscrit sur Anime-Kun ! Pour compléter votre inscription et accéder à toutes les fonctionnalités de la plateforme, veuillez confirmer votre adresse email en cliquant sur le bouton ci-dessous :</p>
+
+          <div style="text-align: center;">
+            <a href="${verificationUrl}" class="button">Confirmer mon adresse email</a>
+          </div>
+
+          <p>Ou copiez et collez ce lien dans votre navigateur :</p>
+          <p style="word-break: break-all; background-color: #e5e7eb; padding: 10px; border-radius: 4px;">
+            ${verificationUrl}
+          </p>
+
+          <div class="info">
+            <strong>📌 À savoir :</strong>
+            <ul>
+              <li>Ce lien expire dans 24 heures</li>
+              <li>Votre compte ne sera pleinement actif qu'après validation</li>
+              <li>Si vous n'avez pas créé de compte, ignorez cet email</li>
+            </ul>
+          </div>
+
+          <p>Une fois votre email confirmé, vous pourrez :</p>
+          <ul>
+            <li>✍️ Rédiger des critiques d'animes et mangas</li>
+            <li>💬 Participer aux forums de discussion</li>
+            <li>📚 Gérer votre collection personnelle</li>
+            <li>⭐ Noter et suivre vos œuvres préférées</li>
+          </ul>
+
+          <div class="footer">
+            <p>Cet email a été envoyé automatiquement, merci de ne pas y répondre.</p>
+            <p><strong>L'équipe Anime-Kun</strong></p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
   }
 
   private getForgotPasswordTemplate(resetUrl: string): string {

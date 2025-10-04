@@ -9,6 +9,7 @@ import * as bcrypt from 'bcryptjs';
 import * as crypto from 'crypto';
 import { PrismaService } from '../../shared/services/prisma.service';
 import { EmailService } from '../../shared/services/email.service';
+import { CaptchaService } from '../../shared/services/captcha.service';
 import { MetricsService } from '../../shared/services/metrics.service';
 import { ADMIN_GROUP_IDS } from '../../shared/constants/admin.constants';
 import { SmfMember } from '@prisma/client';
@@ -24,6 +25,7 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly emailService: EmailService,
+    private readonly captchaService: CaptchaService,
     private readonly metricsService: MetricsService,
   ) {}
 
@@ -143,6 +145,9 @@ export class AuthService {
     ipAddress?: string,
     userAgent?: string,
   ) {
+    // Verify captcha first
+    await this.captchaService.verifyCaptcha(registerDto.captchaToken, ipAddress);
+
     // Check if user exists
     const existingUser = await this.prisma.smfMember.findFirst({
       where: {
@@ -173,30 +178,162 @@ export class AuthService {
         passwd: hashedPassword,
         dateRegistered: Math.floor(Date.now() / 1000),
         idGroup: 0,
+        emailVerified: false, // Email not verified yet
       } as any, // Temporary fix for Prisma type issue
     });
+
+    // Generate email verification token
+    const verificationToken = crypto.randomBytes(32).toString('hex');
+    const expiresAt = new Date();
+    expiresAt.setHours(expiresAt.getHours() + 24); // Token expires in 24 hours
+
+    // Save verification token
+    await this.prisma.akEmailVerificationToken.create({
+      data: {
+        token: verificationToken,
+        userId: user.idMember,
+        email: user.emailAddress,
+        expiresAt,
+        ipAddress,
+        userAgent,
+      },
+    });
+
+    // Send verification email
+    try {
+      await this.emailService.sendEmailVerification(
+        user.emailAddress,
+        user.memberName,
+        verificationToken,
+      );
+    } catch (error) {
+      console.error('Failed to send verification email:', error);
+      // Don't fail registration if email fails - user can request another verification email
+    }
 
     // Track successful registration attempt
     this.metricsService.trackAuthAttempt('register', 'success', 'local');
 
+    return {
+      message: 'Registration successful. Please check your email to verify your account.',
+      emailSent: true,
+      user: this.sanitizeUser(user),
+    };
+  }
+
+  async verifyEmail(token: string, ipAddress?: string) {
+    // Find the verification token
+    const verificationRecord = await this.prisma.akEmailVerificationToken.findUnique({
+      where: { token },
+      include: { user: true },
+    });
+
+    if (!verificationRecord) {
+      throw new BadRequestException('Invalid verification token');
+    }
+
+    // Check if already verified
+    if (verificationRecord.isVerified) {
+      throw new BadRequestException('Email already verified');
+    }
+
+    // Check if token is expired
+    if (verificationRecord.expiresAt < new Date()) {
+      throw new BadRequestException('Verification token has expired');
+    }
+
+    // Mark token as verified
+    await this.prisma.akEmailVerificationToken.update({
+      where: { id: verificationRecord.id },
+      data: {
+        isVerified: true,
+        verifiedAt: new Date(),
+      },
+    });
+
+    // Mark user email as verified
+    await this.prisma.smfMember.update({
+      where: { idMember: verificationRecord.userId },
+      data: {
+        emailVerified: true,
+        emailVerifiedAt: new Date(),
+      },
+    });
+
+    // Generate tokens for auto-login after verification
     const payload = {
-      sub: user.idMember,
-      username: user.memberName,
-      email: user.emailAddress,
-      isAdmin: false,
+      sub: verificationRecord.user.idMember,
+      username: verificationRecord.user.memberName,
+      email: verificationRecord.user.emailAddress,
+      isAdmin:
+        ADMIN_GROUP_IDS.has(verificationRecord.user.idGroup) ||
+        verificationRecord.user.idMember === 1,
     };
 
     const accessToken = this.jwtService.sign(payload);
     const refreshToken = await this.generateRefreshToken(
-      user,
+      verificationRecord.user,
       ipAddress,
-      userAgent,
+      null,
     );
 
     return {
+      message: 'Email verified successfully',
       accessToken,
       refreshToken,
-      user: this.sanitizeUser(user),
+      user: this.sanitizeUser(verificationRecord.user),
+    };
+  }
+
+  async resendVerificationEmail(email: string, ipAddress?: string, userAgent?: string) {
+    // Find user by email
+    const user = await this.prisma.smfMember.findFirst({
+      where: { emailAddress: email },
+    });
+
+    if (!user) {
+      throw new BadRequestException('User not found');
+    }
+
+    // Check if already verified
+    if (user.emailVerified) {
+      throw new BadRequestException('Email already verified');
+    }
+
+    // Delete any existing unused verification tokens
+    await this.prisma.akEmailVerificationToken.deleteMany({
+      where: {
+        userId: user.idMember,
+        isVerified: false,
+      },
+    });
+
+    // Generate new verification token
+    const verificationToken = crypto.randomBytes(32).toString('hex');
+    const expiresAt = new Date();
+    expiresAt.setHours(expiresAt.getHours() + 24);
+
+    // Save new verification token
+    await this.prisma.akEmailVerificationToken.create({
+      data: {
+        token: verificationToken,
+        userId: user.idMember,
+        email: user.emailAddress,
+        expiresAt,
+        ipAddress,
+        userAgent,
+      },
+    });
+
+    // Send verification email
+    await this.emailService.sendEmailVerification(
+      user.emailAddress,
+      user.memberName,
+      verificationToken,
+    );
+
+    return {
+      message: 'Verification email sent. Please check your inbox.',
     };
   }
 
