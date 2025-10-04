@@ -146,6 +146,19 @@ export class MangasController {
     return this.mangasService.searchAniList(query, parsedLimit);
   }
 
+  @Get('isbn/lookup')
+  @ApiOperation({ summary: 'Lookup manga by ISBN barcode' })
+  @ApiQuery({ name: 'isbn', required: true, description: 'ISBN barcode number', example: '9784088820750' })
+  @ApiResponse({ status: 200, description: 'Manga information from ISBN lookup' })
+  @ApiResponse({ status: 400, description: 'Invalid ISBN or book not found' })
+  @ApiResponse({ status: 404, description: 'No matching manga found on AniList' })
+  async lookupByIsbn(@Query('isbn') isbn: string) {
+    if (!isbn) {
+      throw new BadRequestException('ISBN parameter is required');
+    }
+    return this.mangasService.lookupByIsbn(isbn);
+  }
+
   @Get(':id/tags')
   @ApiOperation({ summary: 'Tags pour un manga spécifique' })
   @ApiParam({ name: 'id', description: 'ID du manga', type: 'number' })

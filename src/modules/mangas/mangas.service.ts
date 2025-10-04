@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   ForbiddenException,
+  BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '../../shared/services/prisma.service';
 import { CacheService } from '../../shared/services/cache.service';
@@ -13,6 +14,7 @@ import { RelatedContentItem, RelationsResponse } from '../shared/types/relations
 import { ImageKitService } from '../media/imagekit.service';
 import { AniListService } from '../anilist/anilist.service';
 import { Prisma } from '@prisma/client';
+import axios from 'axios';
 
 @Injectable()
 export class MangasService extends BaseContentService<
@@ -463,6 +465,67 @@ export class MangasService extends BaseContentService<
     } catch (error: any) {
       console.error('Error searching AniList (manga):', error.message);
       throw new Error('Failed to search AniList for manga');
+    }
+  }
+
+  async lookupByIsbn(isbn: string) {
+    try {
+      // Validate ISBN format (ISBN-10 or ISBN-13)
+      const cleanIsbn = isbn.replace(/[-\s]/g, '');
+      if (!/^\d{10}(\d{3})?$/.test(cleanIsbn)) {
+        throw new BadRequestException('Invalid ISBN format. Must be ISBN-10 or ISBN-13');
+      }
+
+      // Try Google Books API first
+      const googleBooksUrl = `https://www.googleapis.com/books/v1/volumes?q=isbn:${cleanIsbn}`;
+      const googleResponse = await axios.get(googleBooksUrl, { timeout: 10000 });
+
+      if (!googleResponse.data.items || googleResponse.data.items.length === 0) {
+        throw new NotFoundException('No book found with this ISBN');
+      }
+
+      const bookInfo = googleResponse.data.items[0].volumeInfo;
+      const title = bookInfo.title || '';
+      const authors = bookInfo.authors ? bookInfo.authors.join(', ') : '';
+      const description = bookInfo.description || '';
+      const thumbnail = bookInfo.imageLinks?.thumbnail || bookInfo.imageLinks?.smallThumbnail || null;
+
+      // Search AniList with the book title
+      const anilistResults = await this.aniListService.searchManga(title, 5);
+
+      return {
+        isbn: cleanIsbn,
+        bookInfo: {
+          title,
+          authors,
+          description,
+          thumbnail,
+          publishedDate: bookInfo.publishedDate,
+          pageCount: bookInfo.pageCount,
+        },
+        anilistResults: anilistResults.map(manga => ({
+          id: manga.id,
+          title: manga.title,
+          coverImage: manga.coverImage,
+          description: manga.description,
+          format: manga.format,
+          status: manga.status,
+          chapters: manga.chapters,
+          volumes: manga.volumes,
+          startDate: manga.startDate,
+          genres: manga.genres,
+          staff: manga.staff,
+        })),
+        message: anilistResults.length > 0
+          ? 'Book found. Please select the matching manga from AniList results.'
+          : 'Book found but no matching manga on AniList. You may need to search manually.',
+      };
+    } catch (error: any) {
+      if (error instanceof BadRequestException || error instanceof NotFoundException) {
+        throw error;
+      }
+      console.error('Error in ISBN lookup:', error.message);
+      throw new BadRequestException('Failed to lookup ISBN. Please try again.');
     }
   }
 
