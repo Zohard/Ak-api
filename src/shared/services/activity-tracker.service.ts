@@ -340,6 +340,9 @@ export class ActivityTrackerService {
       case 'profile':
         return action.userId ? `Regarde le profil de l'utilisateur #${action.userId}` : 'Regarde un profil';
 
+      case 'user_reviews':
+        return action.username ? `Regarde les critiques de ${action.username}` : 'Regarde des critiques';
+
       case 'anime':
         if (action.animeTitle) {
           return `Regarde l'anime ${action.animeTitle}`;
