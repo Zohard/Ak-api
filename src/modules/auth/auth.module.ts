@@ -8,6 +8,7 @@ import { JwtStrategy } from './strategies/jwt.strategy';
 import { LocalStrategy } from './strategies/local.strategy';
 import { PrismaService } from '../../shared/services/prisma.service';
 import { EmailService } from '../../shared/services/email.service';
+import { CaptchaService } from '../../shared/services/captcha.service';
 import { MetricsModule } from '../metrics/metrics.module';
 
 @Module({
@@ -26,7 +27,7 @@ import { MetricsModule } from '../metrics/metrics.module';
     MetricsModule,
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy, LocalStrategy, PrismaService, EmailService],
+  providers: [AuthService, JwtStrategy, LocalStrategy, PrismaService, EmailService, CaptchaService],
   exports: [AuthService, JwtModule],
 })
 export class AuthModule {}

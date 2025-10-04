@@ -57,10 +57,15 @@ model SmfMember {
   unreadMessages   Int      @default(0) @map("unread_messages")
   newPm            Int      @default(0) @map("new_pm")
 
+  // Email verification
+  emailVerified    Boolean  @default(false) @map("email_verified")
+  emailVerifiedAt  DateTime? @map("email_verified_at") @db.Timestamptz
+
   // Relations
   membergroup      SmfMembergroup? @relation(fields: [idGroup], references: [idGroup])
   refreshTokens    AkRefreshToken[]
   passwordResetTokens AkPasswordResetToken[]
+  emailVerificationTokens AkEmailVerificationToken[]
   reviews          AkCritique[]
   adminAuditLogs   AdminAuditLog[]
   animeCollections CollectionAnime[] @relation("UserAnimeCollection")
@@ -116,6 +121,25 @@ model AkPasswordResetToken {
   user        SmfMember @relation(fields: [userId], references: [idMember], onDelete: Cascade)
 
   @@map("ak_password_reset_tokens")
+}
+
+// Email Verification Tokens
+model AkEmailVerificationToken {
+  id          Int       @id @default(autoincrement())
+  token       String    @unique @db.VarChar(255)
+  userId      Int       @map("user_id")
+  email       String    @db.VarChar(255)
+  expiresAt   DateTime  @map("expires_at") @db.Timestamptz
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  verifiedAt  DateTime? @map("verified_at") @db.Timestamptz
+  isVerified  Boolean   @default(false) @map("is_verified")
+  ipAddress   String?   @map("ip_address") @db.Inet
+  userAgent   String?   @map("user_agent") @db.Text
+
+  // Relations
+  user        SmfMember @relation(fields: [userId], references: [idMember], onDelete: Cascade)
+
+  @@map("ak_email_verification_tokens")
 }
 
 // Animes

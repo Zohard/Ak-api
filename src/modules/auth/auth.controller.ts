@@ -158,6 +158,51 @@ export class AuthController {
     return this.authService.resetPassword(resetPasswordDto);
   }
 
+  @Post('verify-email')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Vérification de l\'adresse email' })
+  @ApiResponse({
+    status: 200,
+    description: 'Email vérifié avec succès',
+  })
+  @ApiResponse({ status: 400, description: 'Token invalide ou expiré' })
+  async verifyEmail(
+    @Body('token') token: string,
+    @Ip() ip: string,
+  ) {
+    return this.authService.verifyEmail(token, ip);
+  }
+
+  @Post('resend-verification')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Renvoyer l\'email de vérification' })
+  @ApiHeader({
+    name: 'user-agent',
+    description: 'User agent string',
+    required: false,
+    schema: {
+      default:
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36 Edg/134.0.0.0',
+    },
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Email de vérification envoyé',
+  })
+  @ApiResponse({ status: 400, description: 'Email déjà vérifié ou utilisateur introuvable' })
+  async resendVerification(
+    @Body('email') email: string,
+    @Ip() ip: string,
+    @Headers('user-agent') userAgent?: string,
+  ) {
+    return this.authService.resendVerificationEmail(
+      email,
+      ip,
+      userAgent ||
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36 Edg/134.0.0.0',
+    );
+  }
+
   @Get('profile')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
