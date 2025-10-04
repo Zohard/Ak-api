@@ -8,6 +8,8 @@ import { ImageKitService } from './imagekit.service';
 import sharp from 'sharp';
 import * as path from 'path';
 import * as fs from 'fs/promises';
+import axios from 'axios';
+import * as cheerio from 'cheerio';
 
 @Injectable()
 export class MediaService {
@@ -302,5 +304,91 @@ export class MediaService {
       redirect: true,
       url: imageUrl,
     };
+  }
+
+  async fetchUrlMetadata(url: string) {
+    try {
+      // Validate URL
+      const urlObj = new URL(url);
+      if (!['http:', 'https:'].includes(urlObj.protocol)) {
+        throw new BadRequestException('Invalid URL protocol. Only HTTP(S) allowed');
+      }
+
+      // Fetch the page with timeout
+      const response = await axios.get(url, {
+        timeout: 10000,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (compatible; AnimeKun/1.0; +https://anime-kun.fr)',
+        },
+        maxRedirects: 5,
+      });
+
+      const html = response.data;
+      const $ = cheerio.load(html);
+
+      // Extract Open Graph tags
+      const og = {
+        title: $('meta[property="og:title"]').attr('content'),
+        description: $('meta[property="og:description"]').attr('content'),
+        image: $('meta[property="og:image"]').attr('content'),
+        url: $('meta[property="og:url"]').attr('content'),
+        type: $('meta[property="og:type"]').attr('content'),
+        siteName: $('meta[property="og:site_name"]').attr('content'),
+      };
+
+      // Extract Twitter Card tags as fallback
+      const twitter = {
+        card: $('meta[name="twitter:card"]').attr('content'),
+        title: $('meta[name="twitter:title"]').attr('content'),
+        description: $('meta[name="twitter:description"]').attr('content'),
+        image: $('meta[name="twitter:image"]').attr('content'),
+      };
+
+      // Extract standard meta tags as final fallback
+      const fallback = {
+        title: $('title').text(),
+        description: $('meta[name="description"]').attr('content'),
+        favicon: $('link[rel="icon"]').attr('href') || $('link[rel="shortcut icon"]').attr('href'),
+      };
+
+      // Build metadata object with priority: OG > Twitter > Fallback
+      const metadata = {
+        url: og.url || url,
+        title: og.title || twitter.title || fallback.title || 'No title',
+        description: og.description || twitter.description || fallback.description || '',
+        image: og.image || twitter.image || null,
+        favicon: fallback.favicon || null,
+        siteName: og.siteName || urlObj.hostname,
+        type: og.type || 'website',
+      };
+
+      // Make image URLs absolute if they're relative
+      if (metadata.image && !metadata.image.startsWith('http')) {
+        metadata.image = new URL(metadata.image, url).href;
+      }
+      if (metadata.favicon && !metadata.favicon.startsWith('http')) {
+        metadata.favicon = new URL(metadata.favicon, url).href;
+      }
+
+      return metadata;
+    } catch (error) {
+      if (error.code === 'ENOTFOUND' || error.code === 'ETIMEDOUT') {
+        throw new BadRequestException('Unable to fetch URL. The site may be down or unreachable');
+      }
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      // Return minimal metadata on error
+      return {
+        url,
+        title: url,
+        description: '',
+        image: null,
+        favicon: null,
+        siteName: new URL(url).hostname,
+        type: 'website',
+        error: 'Failed to fetch metadata',
+      };
+    }
   }
 }
