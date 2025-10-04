@@ -58,8 +58,8 @@ export class SourcesExternesService {
     // Use regex to extract anime titles - simpler approach without JSDOM
     // Look for elements with class "elt" and extract h2 > a text content
     const eltMatches = htmlContent.match(/<div[^>]*class="[^"]*elt[^"]*"[^>]*>[\s\S]*?<\/div>/gi) || [];
-    
-    eltMatches.forEach((eltHtml) => {
+
+    eltMatches.forEach((eltHtml: string) => {
       // Extract title from h2 > a within title div
       const titleMatch = eltHtml.match(/<div[^>]*class="[^"]*title[^"]*"[^>]*>[\s\S]*?<h2[^>]*>[\s\S]*?<a[^>]*>([^<]+)<\/a>/i);
       if (titleMatch && titleMatch[1]) {
@@ -75,7 +75,7 @@ export class SourcesExternesService {
     // If no .elt elements found, try alternative approach with h2 a tags
     if (titles.length === 0) {
       const h2Matches = htmlContent.match(/<h2[^>]*>[\s\S]*?<a[^>]*>([^<]+)<\/a>[\s\S]*?<\/h2>/gi) || [];
-      h2Matches.forEach((h2Html) => {
+      h2Matches.forEach((h2Html: string) => {
         const titleMatch = h2Html.match(/<a[^>]*>([^<]+)<\/a>/i);
         if (titleMatch && titleMatch[1]) {
           let title = titleMatch[1].trim();
