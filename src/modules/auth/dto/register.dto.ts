@@ -39,11 +39,4 @@ export class RegisterDto {
   @IsOptional()
   @IsString()
   realName?: string;
-
-  @ApiProperty({
-    description: 'Token de validation reCAPTCHA',
-    example: '03AGdBq25...',
-  })
-  @IsString()
-  captchaToken: string;
 }
