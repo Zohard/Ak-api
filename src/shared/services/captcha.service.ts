@@ -11,6 +11,12 @@ export class CaptchaService {
   }
 
   async verifyCaptcha(token: string, remoteIp?: string): Promise<boolean> {
+    // Allow dev bypass in development
+    if (token === 'dev-bypass' && process.env.NODE_ENV === 'development') {
+      console.warn('Using dev-bypass for reCAPTCHA in development mode');
+      return true;
+    }
+
     if (!this.recaptchaSecretKey) {
       console.warn('reCAPTCHA secret key not configured, skipping verification');
       return true; // Skip verification if not configured (dev mode)
