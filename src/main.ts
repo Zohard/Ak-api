@@ -46,6 +46,8 @@ async function bootstrap() {
       'X-Requested-With',
       'Accept',
       'Origin',
+      'X-Current-Page',
+      'X-Page-Path',
     ],
   });
 
