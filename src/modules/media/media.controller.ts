@@ -186,5 +186,15 @@ export class MediaController {
     }
   }
 
-  // TODO: Add external image proxy endpoint later
+  @Get('url-metadata')
+  @ApiOperation({ summary: 'Fetch URL metadata (Open Graph, Twitter Cards)' })
+  @ApiResponse({ status: 200, description: 'URL metadata retrieved' })
+  @ApiResponse({ status: 400, description: 'Invalid URL' })
+  async getUrlMetadata(@Query('url') url: string) {
+    if (!url) {
+      throw new BadRequestException('URL parameter is required');
+    }
+
+    return this.mediaService.fetchUrlMetadata(url);
+  }
 }
