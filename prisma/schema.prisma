@@ -30,7 +30,7 @@ model SmfMembergroup {
 
 // SMF Members (Users)
 model SmfMember {
-  idMember         Int      @id @map("id_member")
+  idMember         Int      @id @default(autoincrement()) @map("id_member")
   memberName       String   @map("member_name") @db.VarChar(80)
   realName         String?  @map("real_name") @db.VarChar(255)
   emailAddress     String   @map("email_address") @db.VarChar(255)
