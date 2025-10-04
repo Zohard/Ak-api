@@ -274,7 +274,7 @@ export class AuthService {
     const refreshToken = await this.generateRefreshToken(
       verificationRecord.user,
       ipAddress,
-      null,
+      undefined,
     );
 
     return {

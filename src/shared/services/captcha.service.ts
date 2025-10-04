@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class CaptchaService {
-  private readonly recaptchaSecretKey: string;
+  private readonly recaptchaSecretKey: string | undefined;
   private readonly recaptchaVerifyUrl = 'https://www.google.com/recaptcha/api/siteverify';
 
   constructor(private readonly configService: ConfigService) {
