@@ -74,39 +74,16 @@ export class MediaController {
     return this.mediaService.uploadImage(file, type, parsedRelatedId);
   }
 
-  @Get(':id')
-  @ApiOperation({ summary: 'Get media by ID' })
-  @ApiResponse({ status: 200, description: 'Media found' })
-  @ApiResponse({ status: 404, description: 'Media not found' })
-  async getMediaById(@Param('id', ParseIntPipe) id: number) {
-    return this.mediaService.getMediaById(id);
-  }
-
-  @Get('content/:relatedId')
-  @ApiOperation({ summary: 'Get media by related content ID' })
-  @ApiResponse({ status: 200, description: 'Media list retrieved' })
-  async getMediaByContentId(
-    @Param('relatedId', ParseIntPipe) relatedId: number,
-    @Query('type') type: 'anime' | 'manga' = 'anime',
-  ) {
-    if (!['anime', 'manga'].includes(type)) {
-      throw new BadRequestException('Type must be either anime or manga');
+  @Get('url-metadata')
+  @ApiOperation({ summary: 'Fetch URL metadata (Open Graph, Twitter Cards)' })
+  @ApiResponse({ status: 200, description: 'URL metadata retrieved' })
+  @ApiResponse({ status: 400, description: 'Invalid URL' })
+  async getUrlMetadata(@Query('url') url: string) {
+    if (!url) {
+      throw new BadRequestException('URL parameter is required');
     }
 
-    return this.mediaService.getMediaByRelatedId(relatedId, type);
-  }
-
-  @Delete(':id')
-  @UseGuards(JwtAuthGuard)
-  @ApiOperation({ summary: 'Delete media file' })
-  @ApiResponse({ status: 200, description: 'Media deleted successfully' })
-  @ApiResponse({ status: 404, description: 'Media not found' })
-  @ApiBearerAuth()
-  async deleteMedia(
-    @Param('id', ParseIntPipe) id: number,
-    @CurrentUser() user: any,
-  ) {
-    return this.mediaService.deleteMedia(id, user.id);
+    return this.mediaService.fetchUrlMetadata(url);
   }
 
   @Get('admin/stats')
@@ -186,15 +163,38 @@ export class MediaController {
     }
   }
 
-  @Get('url-metadata')
-  @ApiOperation({ summary: 'Fetch URL metadata (Open Graph, Twitter Cards)' })
-  @ApiResponse({ status: 200, description: 'URL metadata retrieved' })
-  @ApiResponse({ status: 400, description: 'Invalid URL' })
-  async getUrlMetadata(@Query('url') url: string) {
-    if (!url) {
-      throw new BadRequestException('URL parameter is required');
+  @Get('content/:relatedId')
+  @ApiOperation({ summary: 'Get media by related content ID' })
+  @ApiResponse({ status: 200, description: 'Media list retrieved' })
+  async getMediaByContentId(
+    @Param('relatedId', ParseIntPipe) relatedId: number,
+    @Query('type') type: 'anime' | 'manga' = 'anime',
+  ) {
+    if (!['anime', 'manga'].includes(type)) {
+      throw new BadRequestException('Type must be either anime or manga');
     }
 
-    return this.mediaService.fetchUrlMetadata(url);
+    return this.mediaService.getMediaByRelatedId(relatedId, type);
+  }
+
+  @Get(':id')
+  @ApiOperation({ summary: 'Get media by ID' })
+  @ApiResponse({ status: 200, description: 'Media found' })
+  @ApiResponse({ status: 404, description: 'Media not found' })
+  async getMediaById(@Param('id', ParseIntPipe) id: number) {
+    return this.mediaService.getMediaById(id);
+  }
+
+  @Delete(':id')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Delete media file' })
+  @ApiResponse({ status: 200, description: 'Media deleted successfully' })
+  @ApiResponse({ status: 404, description: 'Media not found' })
+  @ApiBearerAuth()
+  async deleteMedia(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: any,
+  ) {
+    return this.mediaService.deleteMedia(id, user.id);
   }
 }
