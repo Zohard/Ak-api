@@ -121,7 +121,7 @@ export class ActivityTrackerService {
       // Deduplicate entries - keep only the most recent activity per user
       const allUsers: any[] = [];
       const seenMemberIds = new Set<number>();
-      let guestCount = 0;
+      const seenGuestSessions = new Set<string>();
 
       for (const entry of onlineEntries) {
         // Parse activity action
@@ -133,8 +133,27 @@ export class ActivityTrackerService {
         }
 
         if (entry.idMember === 0) {
-          // Guest - count all
-          guestCount++;
+          // Guest - deduplicate by session
+          if (!seenGuestSessions.has(entry.session)) {
+            seenGuestSessions.add(entry.session);
+            allUsers.push({
+              session: entry.session,
+              isGuest: true,
+              id: null,
+              username: 'Invité',
+              realName: 'Invité',
+              avatar: null,
+              group: {
+                id: 0,
+                name: 'Guest',
+                color: null
+              },
+              time: entry.logTime,
+              ip: entry.ip,
+              action: this.formatAction(action),
+              actionRaw: action
+            });
+          }
         } else {
           // Skip if we've already added this member (show only most recent activity)
           if (seenMemberIds.has(entry.idMember)) {
@@ -172,15 +191,17 @@ export class ActivityTrackerService {
       }
 
       // NOW apply pagination to the deduplicated list
+      const totalMembers = allUsers.filter(u => !u.isGuest).length;
+      const totalGuests = allUsers.filter(u => u.isGuest).length;
       const totalUniqueUsers = allUsers.length;
       const paginatedUsers = allUsers.slice(offset, offset + limit);
 
       return {
         users: paginatedUsers,
         stats: {
-          totalOnline: totalUniqueUsers + guestCount,
-          members: totalUniqueUsers,
-          guests: guestCount,
+          totalOnline: totalUniqueUsers,
+          members: totalMembers,
+          guests: totalGuests,
           totalCount: totalUniqueUsers
         },
         pagination: {
