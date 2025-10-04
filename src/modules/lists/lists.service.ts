@@ -208,7 +208,23 @@ export class ListsService {
   }
 
   async getById(id: number) {
-    const list = await this.prisma.akListesTop.findUnique({ where: { idListe: id }, include: { membre: { select: { idMember: true, memberName: true } } } });
+    const list = await this.prisma.akListesTop.findUnique({
+      where: { idListe: id },
+      include: {
+        membre: {
+          select: {
+            idMember: true,
+            memberName: true,
+            realName: true,
+            avatar: true,
+            dateRegistered: true,
+            lastLogin: true,
+            location: true,
+            personalText: true
+          }
+        }
+      }
+    });
     if (!list) throw new NotFoundException('List not found');
     return this.formatList(list);
   }
@@ -329,7 +345,17 @@ export class ListsService {
       popularite: row.popularite,
       statut: row.statut,
       date_creation: row.dateCreation,
-      membre: row.membre ? { id: row.membre.idMember, pseudo: row.membre.memberName } : undefined,
+      membre: row.membre ? {
+        id: row.membre.idMember,
+        pseudo: row.membre.memberName,
+        username: row.membre.memberName,
+        realName: row.membre.realName,
+        avatar: row.membre.avatar,
+        dateInscription: row.membre.dateRegistered,
+        lastLogin: row.membre.lastLogin,
+        location: row.membre.location,
+        personalText: row.membre.personalText
+      } : undefined,
     };
   }
 }
