@@ -334,6 +334,7 @@ export class ActivityTrackerService {
 
       case 'who_online':
       case 'online':
+      case 'forums_online':
         return 'Regarde Qui est en ligne';
 
       case 'profile':
