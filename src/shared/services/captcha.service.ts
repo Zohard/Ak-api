@@ -11,15 +11,25 @@ export class CaptchaService {
   }
 
   async verifyCaptcha(token: string, remoteIp?: string): Promise<boolean> {
-    // Allow dev bypass in development
-    if (token === 'dev-bypass' && process.env.NODE_ENV === 'development') {
-      console.warn('Using dev-bypass for reCAPTCHA in development mode');
-      return true;
+    // Allow bypass tokens if reCAPTCHA is not configured
+    const bypassTokens = ['dev-bypass', 'bypass-no-recaptcha'];
+
+    if (bypassTokens.includes(token)) {
+      if (!this.recaptchaSecretKey) {
+        console.warn(`Using bypass token '${token}' - reCAPTCHA not configured`);
+        return true;
+      } else if (process.env.NODE_ENV === 'development') {
+        console.warn(`Using bypass token '${token}' in development mode`);
+        return true;
+      } else {
+        console.warn(`Bypass token '${token}' used but reCAPTCHA is configured - will validate anyway`);
+        throw new BadRequestException('Invalid captcha token');
+      }
     }
 
     if (!this.recaptchaSecretKey) {
       console.warn('reCAPTCHA secret key not configured, skipping verification');
-      return true; // Skip verification if not configured (dev mode)
+      return true;
     }
 
     if (!token) {
