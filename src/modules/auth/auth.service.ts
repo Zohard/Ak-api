@@ -9,7 +9,6 @@ import * as bcrypt from 'bcryptjs';
 import * as crypto from 'crypto';
 import { PrismaService } from '../../shared/services/prisma.service';
 import { EmailService } from '../../shared/services/email.service';
-import { CaptchaService } from '../../shared/services/captcha.service';
 import { MetricsService } from '../../shared/services/metrics.service';
 import { ADMIN_GROUP_IDS } from '../../shared/constants/admin.constants';
 import { SmfMember } from '@prisma/client';
@@ -25,7 +24,6 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly emailService: EmailService,
-    private readonly captchaService: CaptchaService,
     private readonly metricsService: MetricsService,
   ) {}
 
@@ -145,9 +143,6 @@ export class AuthService {
     ipAddress?: string,
     userAgent?: string,
   ) {
-    // Verify captcha first
-    await this.captchaService.verifyCaptcha(registerDto.captchaToken, ipAddress);
-
     // Check if user exists
     const existingUser = await this.prisma.smfMember.findFirst({
       where: {
