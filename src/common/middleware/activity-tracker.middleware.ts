@@ -12,15 +12,30 @@ export class ActivityTrackerMiddleware implements NestMiddleware {
 
   async use(req: Request, res: Response, next: NextFunction) {
     try {
-      // Skip activity tracking for auth verification endpoints
-      // These are called periodically and should not update navigation state
+      // Skip activity tracking for certain endpoints
+      // These are data-fetching endpoints that should not update user's current page/activity
       const skipPaths = [
         '/api/auth/verify',
         '/api/auth/refresh',
-        '/api/auth/profile'
+        '/api/auth/profile',
+        '/api/forums/messages/latest',  // Homepage forum panel
+        '/api/forums/boards',            // Forum boards list (used in panels)
+        '/api/reviews/latest',           // Latest reviews
+        '/api/reviews/stats',            // Review statistics
+        '/api/online/stats'              // Online users stats widget
       ];
 
-      if (skipPaths.some(path => req.path === path)) {
+      // Also skip if path contains certain patterns (data fetching)
+      const skipPatterns = [
+        '/api/anime/latest',
+        '/api/manga/latest',
+        '/api/articles/latest',
+        '/stats',
+        '/count'
+      ];
+
+      if (skipPaths.some(path => req.path === path) ||
+          skipPatterns.some(pattern => req.path.includes(pattern))) {
         return next();
       }
 
@@ -54,8 +69,8 @@ export class ActivityTrackerMiddleware implements NestMiddleware {
       // Get IP address
       const ipAddress = this.getIpAddress(req);
 
-      // Determine action based on URL
-      const action = this.determineAction(req);
+      // Determine action - prioritize custom header from frontend
+      const action = this.determineActionFromHeader(req) || this.determineAction(req);
 
       // Debug logging
       if (userId) {
@@ -106,6 +121,24 @@ export class ActivityTrackerMiddleware implements NestMiddleware {
     }
 
     return req.ip || req.socket.remoteAddress || '0.0.0.0';
+  }
+
+  private determineActionFromHeader(req: Request): ActivityAction | null {
+    const currentPage = req.headers['x-current-page'] as string;
+    const pagePath = req.headers['x-page-path'] as string;
+
+    if (!currentPage) {
+      return null;
+    }
+
+    // The frontend provides a simple action name, we can enhance it with path info
+    const action: ActivityAction = { action: currentPage };
+
+    if (pagePath) {
+      action.path = pagePath;
+    }
+
+    return action;
   }
 
   private determineAction(req: Request): ActivityAction {
