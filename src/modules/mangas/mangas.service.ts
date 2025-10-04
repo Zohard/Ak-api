@@ -508,8 +508,6 @@ export class MangasService extends BaseContentService<
           title: manga.title,
           coverImage: manga.coverImage,
           description: manga.description,
-          format: manga.format,
-          status: manga.status,
           chapters: manga.chapters,
           volumes: manga.volumes,
           startDate: manga.startDate,
