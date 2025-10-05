@@ -67,27 +67,27 @@ export class ListsService {
 
     if (animeIds.length > 0) {
       const animes = await this.prisma.akAnime.findMany({
-        where: { id: { in: animeIds } },
-        select: { id: true, image: true }
+        where: { idAnime: { in: animeIds } },
+        select: { idAnime: true, image: true }
       });
       for (const anime of animes) {
-        if (anime.image) animeImages.set(anime.id, anime.image);
+        if (anime.image) animeImages.set(anime.idAnime, anime.image);
       }
     }
 
     if (mangaIds.length > 0) {
       const mangas = await this.prisma.akManga.findMany({
-        where: { id: { in: mangaIds } },
-        select: { id: true, image: true }
+        where: { idManga: { in: mangaIds } },
+        select: { idManga: true, image: true }
       });
       for (const manga of mangas) {
-        if (manga.image) mangaImages.set(manga.id, manga.image);
+        if (manga.image) mangaImages.set(manga.idManga, manga.image);
       }
     }
 
     // Map images back to lists
     return rows.map((r) => {
-      const formatted = this.formatList(r);
+      const formatted = this.formatList(r) as any;
       const firstItem = listFirstItemMap.get(r.idListe);
       if (firstItem) {
         const imageMap = firstItem.type === 'anime' ? animeImages : mangaImages;
