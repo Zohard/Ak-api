@@ -1092,6 +1092,17 @@ export class UsersService {
     };
   }
 
+  private decodeHtmlEntities(text: string): string {
+    if (!text) return '';
+    return text
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&#039;/g, "'")
+      .replace(/&nbsp;/g, ' ');
+  }
+
   private sanitizeUser(user: any) {
     // Remove sensitive fields and format response
     const {
@@ -1114,6 +1125,14 @@ export class UsersService {
       ...otherFields,
     };
 
+    // Decode HTML entities in text fields
+    if (sanitized.personalText) {
+      sanitized.personalText = this.decodeHtmlEntities(sanitized.personalText);
+    }
+    if (sanitized.location) {
+      sanitized.location = this.decodeHtmlEntities(sanitized.location);
+    }
+
     if (emailAddress !== undefined) {
       sanitized.email = emailAddress;
     }
@@ -1133,7 +1152,7 @@ export class UsersService {
       ...otherFields
     } = user;
 
-    return {
+    const publicUser = {
       id: idMember,
       pseudo: realName || memberName,
       username: memberName,
@@ -1143,5 +1162,15 @@ export class UsersService {
       reputation: otherFields.experience || 0,
       ...otherFields,
     };
+
+    // Decode HTML entities in text fields
+    if (publicUser.personalText) {
+      publicUser.personalText = this.decodeHtmlEntities(publicUser.personalText);
+    }
+    if (publicUser.location) {
+      publicUser.location = this.decodeHtmlEntities(publicUser.location);
+    }
+
+    return publicUser;
   }
 }
