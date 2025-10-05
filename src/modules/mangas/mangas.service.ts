@@ -485,18 +485,58 @@ export class MangasService extends BaseContentService<
       }
 
       const bookInfo = googleResponse.data.items[0].volumeInfo;
-      const title = bookInfo.title || '';
+      const rawTitle = bookInfo.title || '';
       const authors = bookInfo.authors ? bookInfo.authors.join(', ') : '';
       const description = bookInfo.description || '';
       const thumbnail = bookInfo.imageLinks?.thumbnail || bookInfo.imageLinks?.smallThumbnail || null;
 
-      // Search AniList with the book title
-      const anilistResults = await this.aniListService.searchManga(title, 5);
+      // Clean the title for better AniList matching
+      // Remove volume/tome indicators and numbers
+      let cleanedTitle = rawTitle
+        // Remove common volume patterns (French)
+        .replace(/[,\s]*tome\s+\d+/gi, '')
+        .replace(/[,\s]*volume\s+\d+/gi, '')
+        .replace(/[,\s]*vol\.?\s*\d+/gi, '')
+        .replace(/[,\s]*t\.?\s*\d+/gi, '')
+        // Remove common volume patterns (English)
+        .replace(/[,\s]*vol(ume)?\.?\s*\d+/gi, '')
+        // Remove edition info
+        .replace(/[,\s]*\d+(st|nd|rd|th)\s+edition/gi, '')
+        .replace(/[,\s]*édition\s+\d+/gi, '')
+        // Remove trailing numbers and punctuation
+        .replace(/[,\s]*\d+\s*$/, '')
+        .replace(/[,\-:\s]+$/, '')
+        .trim();
+
+      console.log('ISBN lookup - Raw title:', rawTitle);
+      console.log('ISBN lookup - Cleaned title:', cleanedTitle);
+
+      // Try multiple search strategies
+      let anilistResults = [];
+
+      // Strategy 1: Search with cleaned title
+      if (cleanedTitle) {
+        anilistResults = await this.aniListService.searchManga(cleanedTitle, 5);
+        console.log('ISBN lookup - Results from cleaned title:', anilistResults.length);
+      }
+
+      // Strategy 2: If no results, try with raw title
+      if (anilistResults.length === 0 && rawTitle !== cleanedTitle) {
+        anilistResults = await this.aniListService.searchManga(rawTitle, 5);
+        console.log('ISBN lookup - Results from raw title:', anilistResults.length);
+      }
+
+      // Strategy 3: If still no results and we have an author, try searching by author
+      if (anilistResults.length === 0 && authors) {
+        const firstAuthor = authors.split(',')[0].trim();
+        anilistResults = await this.aniListService.searchManga(firstAuthor, 5);
+        console.log('ISBN lookup - Results from author search:', anilistResults.length);
+      }
 
       return {
         isbn: cleanIsbn,
         bookInfo: {
-          title,
+          title: rawTitle,
           authors,
           description,
           thumbnail,
