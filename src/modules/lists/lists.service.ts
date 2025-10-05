@@ -36,7 +36,67 @@ export class ListsService {
       orderBy: { idListe: 'desc' },
       include: { membre: { select: { idMember: true, memberName: true } } },
     });
-    return rows.map((r) => this.formatList(r));
+
+    // Extract first item IDs and batch fetch their images
+    const animeIds: number[] = [];
+    const mangaIds: number[] = [];
+    const listFirstItemMap = new Map<number, { id: number; type: 'anime' | 'manga' }>();
+
+    for (const row of rows) {
+      try {
+        const jsonData = JSON.parse(row.jsonData || '[]');
+        if (Array.isArray(jsonData) && jsonData.length > 0) {
+          const firstId = parseInt(String(jsonData[0]), 10);
+          if (!isNaN(firstId)) {
+            listFirstItemMap.set(row.idListe, { id: firstId, type: row.animeOrManga as 'anime' | 'manga' });
+            if (row.animeOrManga === 'anime') {
+              animeIds.push(firstId);
+            } else {
+              mangaIds.push(firstId);
+            }
+          }
+        }
+      } catch {
+        // Skip invalid JSON
+      }
+    }
+
+    // Batch fetch anime and manga images
+    const animeImages = new Map<number, string>();
+    const mangaImages = new Map<number, string>();
+
+    if (animeIds.length > 0) {
+      const animes = await this.prisma.akAnime.findMany({
+        where: { id: { in: animeIds } },
+        select: { id: true, image: true }
+      });
+      for (const anime of animes) {
+        if (anime.image) animeImages.set(anime.id, anime.image);
+      }
+    }
+
+    if (mangaIds.length > 0) {
+      const mangas = await this.prisma.akManga.findMany({
+        where: { id: { in: mangaIds } },
+        select: { id: true, image: true }
+      });
+      for (const manga of mangas) {
+        if (manga.image) mangaImages.set(manga.id, manga.image);
+      }
+    }
+
+    // Map images back to lists
+    return rows.map((r) => {
+      const formatted = this.formatList(r);
+      const firstItem = listFirstItemMap.get(r.idListe);
+      if (firstItem) {
+        const imageMap = firstItem.type === 'anime' ? animeImages : mangaImages;
+        formatted.firstItemImage = imageMap.get(firstItem.id) || null;
+      } else {
+        formatted.firstItemImage = null;
+      }
+      return formatted;
+    });
   }
 
   async createList(userId: number, dto: CreateListDto) {
