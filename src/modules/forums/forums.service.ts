@@ -71,6 +71,7 @@ export class ForumsService {
                 topicSubject: string;
                 author: string;
                 time: number;
+                numReplies?: number;
               } | null = null;
               if (board.idLastMsg) {
                 const lastMsg = await this.prisma.smfMessage.findUnique({
@@ -91,7 +92,8 @@ export class ForumsService {
                     topicId: lastMsg.idTopic,
                     topicSubject: lastMsg.topic?.firstMessage?.subject || lastMsg.subject,
                     author: lastMsg.posterName,
-                    time: lastMsg.posterTime
+                    time: lastMsg.posterTime,
+                    numReplies: lastMsg.topic?.numReplies
                   };
                 }
               }
