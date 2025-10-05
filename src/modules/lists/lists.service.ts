@@ -26,17 +26,7 @@ export class ListsService {
     return Number(((ratio * 0.7) + (viewsWeight * 0.3)).toFixed(4));
   }
 
-  async getUserLists(userId: number, type?: 'liste' | 'top' | 'top1', mediaType?: 'anime' | 'manga') {
-    const rows = await this.prisma.akListesTop.findMany({
-      where: {
-        idMembre: userId,
-        ...(type ? { type } : {}),
-        ...(mediaType ? { animeOrManga: mediaType } : {}),
-      },
-      orderBy: { idListe: 'desc' },
-      include: { membre: { select: { idMember: true, memberName: true } } },
-    });
-
+  private async batchFetchFirstItemImages(rows: any[]): Promise<Map<number, string>> {
     // Extract first item IDs and batch fetch their images
     const animeIds: number[] = [];
     const mangaIds: number[] = [];
@@ -86,15 +76,36 @@ export class ListsService {
     }
 
     // Map images back to lists
+    const resultMap = new Map<number, string>();
+    for (const [listId, firstItem] of listFirstItemMap.entries()) {
+      const imageMap = firstItem.type === 'anime' ? animeImages : mangaImages;
+      const image = imageMap.get(firstItem.id);
+      if (image) {
+        resultMap.set(listId, image);
+      }
+    }
+
+    return resultMap;
+  }
+
+  async getUserLists(userId: number, type?: 'liste' | 'top' | 'top1', mediaType?: 'anime' | 'manga') {
+    const rows = await this.prisma.akListesTop.findMany({
+      where: {
+        idMembre: userId,
+        ...(type ? { type } : {}),
+        ...(mediaType ? { animeOrManga: mediaType } : {}),
+      },
+      orderBy: { idListe: 'desc' },
+      include: { membre: { select: { idMember: true, memberName: true } } },
+    });
+
+    // Batch fetch first item images
+    const imageMap = await this.batchFetchFirstItemImages(rows);
+
+    // Map images to lists
     return rows.map((r) => {
       const formatted = this.formatList(r) as any;
-      const firstItem = listFirstItemMap.get(r.idListe);
-      if (firstItem) {
-        const imageMap = firstItem.type === 'anime' ? animeImages : mangaImages;
-        formatted.firstItemImage = imageMap.get(firstItem.id) || null;
-      } else {
-        formatted.firstItemImage = null;
-      }
+      formatted.firstItemImage = imageMap.get(r.idListe) || null;
       return formatted;
     });
   }
@@ -257,7 +268,17 @@ export class ListsService {
         }
       }),
     ]);
-    const items = rows.map((r) => this.formatList(r));
+
+    // Batch fetch first item images
+    const imageMap = await this.batchFetchFirstItemImages(rows);
+
+    // Map images to lists
+    const items = rows.map((r) => {
+      const formatted = this.formatList(r) as any;
+      formatted.firstItemImage = imageMap.get(r.idListe) || null;
+      return formatted;
+    });
+
     const totalPages = Math.max(Math.ceil(total / limit), 1);
     const result = { items, page, limit, total, totalPages };
 
