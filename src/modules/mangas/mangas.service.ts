@@ -12,7 +12,7 @@ import { UpdateMangaDto } from './dto/update-manga.dto';
 import { MangaQueryDto } from './dto/manga-query.dto';
 import { RelatedContentItem, RelationsResponse } from '../shared/types/relations.types';
 import { ImageKitService } from '../media/imagekit.service';
-import { AniListService } from '../anilist/anilist.service';
+import { AniListService, AniListManga } from '../anilist/anilist.service';
 import { Prisma } from '@prisma/client';
 import axios from 'axios';
 
@@ -512,7 +512,7 @@ export class MangasService extends BaseContentService<
       console.log('ISBN lookup - Cleaned title:', cleanedTitle);
 
       // Try multiple search strategies
-      let anilistResults = [];
+      let anilistResults: AniListManga[] = [];
 
       // Strategy 1: Search with cleaned title
       if (cleanedTitle) {
