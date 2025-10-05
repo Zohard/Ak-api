@@ -720,11 +720,84 @@ export class CollectionsService {
     });
   }
 
+  // Get collection summary (counts per type) for a user
+  async getCollectionSummary(userId: number, currentUserId?: number) {
+    // Only show collections if it's the current user or collections are public
+    const isOwnCollection = currentUserId === userId;
+
+    const collectionTypes = [
+      { type: 1, name: 'Terminé' },
+      { type: 2, name: 'En cours' },
+      { type: 3, name: 'Planifié' },
+      { type: 4, name: 'Abandonné' }
+    ];
+
+    // Get counts for each collection type
+    const animeCounts = await this.prisma.collectionAnime.groupBy({
+      by: ['type'],
+      where: {
+        idMembre: userId,
+        ...(isOwnCollection ? {} : { isPublic: true })
+      },
+      _count: {
+        type: true
+      }
+    });
+
+    const mangaCounts = await this.prisma.collectionManga.groupBy({
+      by: ['type'],
+      where: {
+        idMembre: userId,
+        ...(isOwnCollection ? {} : { isPublic: true })
+      },
+      _count: {
+        type: true
+      }
+    });
+
+    // Format the response
+    const data = collectionTypes.map(ct => {
+      const animeCount = animeCounts.find(ac => ac.type === ct.type)?._count?.type || 0;
+      const mangaCount = mangaCounts.find(mc => mc.type === ct.type)?._count?.type || 0;
+
+      return {
+        type: ct.type,
+        name: ct.name,
+        anime: {
+          count: animeCount,
+          mediaType: 'anime' as const
+        },
+        manga: {
+          count: mangaCount,
+          mediaType: 'manga' as const
+        },
+        totalCount: animeCount + mangaCount
+      };
+    });
+
+    // Also provide flattened structure for easier consumption
+    const summary = [
+      {
+        mediaType: 'anime' as const,
+        totalCount: animeCounts.reduce((sum, ac) => sum + (ac._count?.type || 0), 0)
+      },
+      {
+        mediaType: 'manga' as const,
+        totalCount: mangaCounts.reduce((sum, mc) => sum + (mc._count?.type || 0), 0)
+      }
+    ];
+
+    return {
+      data: summary,  // Return the flattened summary as 'data' for the frontend
+      details: data    // Keep detailed breakdown as 'details'
+    };
+  }
+
   // Get all collections for a user (virtual collections based on type)
   async findUserCollections(userId: number, currentUserId?: number) {
     // Only show collections if it's the current user or collections are public
     const isOwnCollection = currentUserId === userId;
-    
+
     // Create cache key - different keys for own vs public view, with version for separate anime/manga sample images
     const cacheKey = `find_user_collections:v3:${userId}:${isOwnCollection ? 'own' : 'public'}`;
 
