@@ -329,6 +329,17 @@ export class ListsService {
     return { updated: lists.length };
   }
 
+  private decodeHtmlEntities(text: string): string {
+    if (!text) return '';
+    return text
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&#039;/g, "'")
+      .replace(/&nbsp;/g, ' ');
+  }
+
   private formatList(row: any) {
     return {
       id_liste: row.idListe,
@@ -353,8 +364,8 @@ export class ListsService {
         avatar: row.membre.avatar,
         dateInscription: row.membre.dateRegistered,
         lastLogin: row.membre.lastLogin,
-        location: row.membre.location,
-        personalText: row.membre.personalText
+        location: this.decodeHtmlEntities(row.membre.location),
+        personalText: this.decodeHtmlEntities(row.membre.personalText)
       } : undefined,
     };
   }
