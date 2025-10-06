@@ -189,17 +189,27 @@ export class UsersController {
     @Query('limit', ParseIntPipe) limit?: number,
     @Query('offset', ParseIntPipe) offset?: number,
   ) {
-    const effectiveLimit = limit || 12;
+    const requestedLimit = limit || 12;
     const effectiveOffset = offset || 0;
-    const page = Math.floor(effectiveOffset / effectiveLimit) + 1;
+    const page = Math.floor(effectiveOffset / requestedLimit) + 1;
+
+    // Fetch more items to ensure we have enough after filtering
+    const fetchLimit = requestedLimit * 3;
     const result = await this.usersService.getUserRecommendations(
       id,
-      effectiveLimit,
+      fetchLimit,
       page,
     );
+
+    // Filter by media type and take only the requested limit
+    const filtered = result.items.filter((item: any) => item.type === media);
+    const limitedItems = filtered.slice(0, requestedLimit);
+
     return {
       ...result,
-      items: result.items.filter((item: any) => item.type === media),
+      items: limitedItems,
+      total: filtered.length,
+      hasMore: filtered.length > requestedLimit
     };
   }
 
