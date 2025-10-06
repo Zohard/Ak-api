@@ -220,14 +220,18 @@ export class UsersController {
   @ApiParam({ name: 'id', description: "ID de l'utilisateur", type: 'number' })
   @ApiQuery({ name: 'limit', required: false, description: 'Nombre de recommandations', example: 12 })
   @ApiQuery({ name: 'page', required: false, description: 'Numéro de page', example: 1 })
+  @ApiQuery({ name: 'genre', required: false, description: 'Filtrer par genre' })
+  @ApiQuery({ name: 'sortBy', required: false, description: 'Trier par (rating, popularity, date, title)' })
   @ApiResponse({ status: 200, description: "Recommandations personnalisées" })
   @ApiResponse({ status: 404, description: 'Utilisateur introuvable' })
   async getUserRecommendations(
     @Param('id', ParseIntPipe) id: number,
     @Query('limit') limit?: number,
     @Query('page') page?: number,
+    @Query('genre') genre?: string,
+    @Query('sortBy') sortBy?: string,
   ) {
-    return this.usersService.getUserRecommendations(id, limit || 12, page || 1);
+    return this.usersService.getUserRecommendations(id, limit || 12, page || 1, genre, sortBy);
   }
 
   // Public endpoints (no authentication required)
