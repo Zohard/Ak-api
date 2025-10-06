@@ -580,11 +580,14 @@ export class UsersService {
     // Build ORDER BY clause based on sortBy parameter
     const buildOrderBy = (mediaType: 'anime' | 'manga') => {
       const prefix = mediaType === 'anime' ? 'a' : 'm';
+      // Anime uses nb_reviews for popularity, Manga uses nb_clics
+      const popularityColumn = mediaType === 'anime' ? 'nb_reviews' : 'nb_clics';
+
       switch (sortBy) {
         case 'rating':
           return `${prefix}.moyennenotes DESC, ${prefix}.id_${mediaType} DESC`;
         case 'popularity':
-          return `${prefix}.hits DESC, ${prefix}.id_${mediaType} DESC`;
+          return `${prefix}.${popularityColumn} DESC, ${prefix}.id_${mediaType} DESC`;
         case 'date':
           return `${prefix}.annee DESC, ${prefix}.id_${mediaType} DESC`;
         case 'title':
@@ -611,7 +614,7 @@ export class UsersService {
           'anime' as type,
           a.nice_url as niceUrl,
           a.moyennenotes,
-          a.hits,
+          a.nb_reviews,
           a.annee
         FROM ak_animes a
         JOIN ak_tag2fiche tf ON a.id_anime = tf.id_fiche AND tf.type = 'anime'
@@ -639,7 +642,7 @@ export class UsersService {
           'manga' as type,
           m.nice_url as niceUrl,
           m.moyennenotes,
-          m.hits,
+          m.nb_clics,
           m.annee
         FROM ak_mangas m
         JOIN ak_tag2fiche tf ON m.id_manga = tf.id_fiche AND tf.type = 'manga'
@@ -691,7 +694,7 @@ export class UsersService {
           'anime' as type,
           a.nice_url as niceUrl,
           a.moyennenotes,
-          a.hits,
+          a.nb_reviews,
           a.annee
         FROM ak_animes a
         ${animeGenreFilter}
@@ -720,7 +723,7 @@ export class UsersService {
           'manga' as type,
           m.nice_url as niceUrl,
           m.moyennenotes,
-          m.hits,
+          m.nb_clics,
           m.annee
         FROM ak_mangas m
         ${mangaGenreFilter}
