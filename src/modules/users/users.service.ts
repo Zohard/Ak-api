@@ -1094,13 +1094,13 @@ export class UsersService {
 
   async checkUserActivity(userId: number) {
     // Check if user has any anime in collection
-    const animeCount = await this.prisma.akAnimeCollection.count({
-      where: { userId }
+    const animeCount = await this.prisma.collectionAnime.count({
+      where: { idMembre: userId }
     });
 
     // Check if user has any manga in collection
-    const mangaCount = await this.prisma.akMangaCollection.count({
-      where: { userId }
+    const mangaCount = await this.prisma.collectionManga.count({
+      where: { idMembre: userId }
     });
 
     // Check if user has any forum posts
