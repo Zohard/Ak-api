@@ -101,6 +101,16 @@ export class ReviewsService {
       },
     });
 
+    // Update user's review count
+    await this.prisma.smfMember.update({
+      where: { idMember: userId },
+      data: {
+        nbCritiques: {
+          increment: 1,
+        },
+      },
+    });
+
     // Invalidate user review cache after creation
     await this.invalidateReviewCache(review.idCritique, idAnime, idManga, userId);
 
@@ -480,6 +490,16 @@ export class ReviewsService {
 
     await this.prisma.akCritique.delete({
       where: { idCritique: id },
+    });
+
+    // Update user's review count (decrement)
+    await this.prisma.smfMember.update({
+      where: { idMember: review.idMembre },
+      data: {
+        nbCritiques: {
+          decrement: 1,
+        },
+      },
     });
 
     // Invalidate caches after removal
