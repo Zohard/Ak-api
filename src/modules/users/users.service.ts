@@ -544,7 +544,13 @@ export class UsersService {
     };
   }
 
-  async getUserRecommendations(id: number, limit: number = 12, page: number = 1) {
+  async getUserRecommendations(
+    id: number,
+    limit: number = 12,
+    page: number = 1,
+    genre?: string,
+    sortBy?: string
+  ) {
     const user = await this.prisma.smfMember.findUnique({
       where: { idMember: id },
       select: { idMember: true },
@@ -571,13 +577,33 @@ export class UsersService {
 
     const offset = (page - 1) * limit;
 
+    // Build ORDER BY clause based on sortBy parameter
+    const buildOrderBy = (mediaType: 'anime' | 'manga') => {
+      const prefix = mediaType === 'anime' ? 'a' : 'm';
+      switch (sortBy) {
+        case 'rating':
+          return `${prefix}.moyennenotes DESC, ${prefix}.id_${mediaType} DESC`;
+        case 'popularity':
+          return `${prefix}.hits DESC, ${prefix}.id_${mediaType} DESC`;
+        case 'date':
+          return `${prefix}.annee DESC, ${prefix}.id_${mediaType} DESC`;
+        case 'title':
+          return `${prefix}.titre ASC`;
+        default:
+          return `${prefix}.moyennenotes DESC, ${prefix}.id_${mediaType} DESC`;
+      }
+    };
+
     let recommendations: any[] = [];
 
     if ((userGenres as any[]).length > 0) {
       const topGenres = (userGenres as any[]).map(g => g.genre);
 
-      // Get anime recommendations based on favorite genres (using tags system)
-      const animeRecs = await this.prisma.$queryRaw`
+      // Get anime recommendations based on favorite genres or specific genre filter
+      const genresToUse = genre ? [genre] : topGenres;
+      const animeOrderBy = buildOrderBy('anime');
+
+      const animeRecs = await this.prisma.$queryRawUnsafe(`
         SELECT DISTINCT
           a.id_anime as id,
           a.titre,
@@ -587,7 +613,7 @@ export class UsersService {
         FROM ak_animes a
         JOIN ak_tag2fiche tf ON a.id_anime = tf.id_fiche AND tf.type = 'anime'
         JOIN ak_tags t ON tf.id_tag = t.id_tag
-        WHERE t.tag_name = ANY(${topGenres})
+        WHERE LOWER(t.tag_name) = ANY(ARRAY[${genresToUse.map(g => `'${g.toLowerCase()}'`).join(',')}])
           AND a.statut = 1
           AND a.id_anime NOT IN (
             SELECT id_anime FROM ak_critique WHERE id_membre = ${id} AND id_anime IS NOT NULL
@@ -595,12 +621,14 @@ export class UsersService {
           AND a.id_anime NOT IN (
             SELECT id_anime FROM collection_animes WHERE id_membre = ${id} AND id_anime IS NOT NULL
           )
-        ORDER BY a.moyennenotes DESC, a.id_anime DESC
+        ORDER BY ${animeOrderBy}
         LIMIT ${Math.ceil(limit / 2)} OFFSET ${offset}
-      `;
+      `);
 
-      // Get manga recommendations based on favorite genres (using tags system)
-      const mangaRecs = await this.prisma.$queryRaw`
+      // Get manga recommendations based on favorite genres or specific genre filter
+      const mangaOrderBy = buildOrderBy('manga');
+
+      const mangaRecs = await this.prisma.$queryRawUnsafe(`
         SELECT DISTINCT
           m.id_manga as id,
           m.titre,
@@ -610,7 +638,7 @@ export class UsersService {
         FROM ak_mangas m
         JOIN ak_tag2fiche tf ON m.id_manga = tf.id_fiche AND tf.type = 'manga'
         JOIN ak_tags t ON tf.id_tag = t.id_tag
-        WHERE t.tag_name = ANY(${topGenres})
+        WHERE LOWER(t.tag_name) = ANY(ARRAY[${genresToUse.map(g => `'${g.toLowerCase()}'`).join(',')}])
           AND m.statut = 1
           AND m.id_manga NOT IN (
             SELECT id_manga FROM ak_critique WHERE id_membre = ${id} AND id_manga IS NOT NULL
@@ -618,9 +646,9 @@ export class UsersService {
           AND m.id_manga NOT IN (
             SELECT id_manga FROM collection_mangas WHERE id_membre = ${id} AND id_manga IS NOT NULL
           )
-        ORDER BY m.moyennenotes DESC, m.id_manga DESC
+        ORDER BY ${mangaOrderBy}
         LIMIT ${Math.floor(limit / 2)} OFFSET ${offset}
-      `;
+      `);
 
       recommendations = [
         ...(animeRecs as any[]),
@@ -631,46 +659,69 @@ export class UsersService {
     // If not enough recommendations, add popular items
     if (recommendations.length < limit) {
       const remaining = limit - recommendations.length;
+      const animeOrderBy = buildOrderBy('anime');
+      const mangaOrderBy = buildOrderBy('manga');
+
+      // Build genre filter clause if genre is specified
+      const genreJoinAndWhere = genre
+        ? `
+          JOIN ak_tag2fiche tf ON %TABLE%.%ID% = tf.id_fiche AND tf.type = '%TYPE%'
+          JOIN ak_tags t ON tf.id_tag = t.id_tag
+          AND LOWER(t.tag_name) = '${genre.toLowerCase()}'
+        `
+        : '';
 
       // Get popular anime items
-      const popularAnimes = await this.prisma.$queryRaw`
-        SELECT
-          id_anime as id,
-          titre,
-          image,
+      const animeGenreFilter = genreJoinAndWhere
+        .replace('%TABLE%', 'a')
+        .replace('%ID%', 'id_anime')
+        .replace('%TYPE%', 'anime');
+
+      const popularAnimes = await this.prisma.$queryRawUnsafe(`
+        SELECT ${genre ? 'DISTINCT' : ''}
+          a.id_anime as id,
+          a.titre,
+          a.image,
           'anime' as type,
-          nice_url as niceUrl
-        FROM ak_animes
-        WHERE statut = 1
-          AND id_anime NOT IN (
+          a.nice_url as niceUrl
+        FROM ak_animes a
+        ${animeGenreFilter}
+        WHERE a.statut = 1
+          AND a.id_anime NOT IN (
             SELECT id_anime FROM ak_critique WHERE id_membre = ${id} AND id_anime IS NOT NULL
           )
-          AND id_anime NOT IN (
+          AND a.id_anime NOT IN (
             SELECT id_anime FROM collection_animes WHERE id_membre = ${id} AND id_anime IS NOT NULL
           )
-        ORDER BY moyennenotes DESC, id_anime DESC
+        ORDER BY ${animeOrderBy}
         LIMIT ${Math.ceil(remaining / 2)} OFFSET ${offset}
-      `;
+      `);
 
       // Get popular manga items
-      const popularMangas = await this.prisma.$queryRaw`
-        SELECT
-          id_manga as id,
-          titre,
-          image,
+      const mangaGenreFilter = genreJoinAndWhere
+        .replace('%TABLE%', 'm')
+        .replace('%ID%', 'id_manga')
+        .replace('%TYPE%', 'manga');
+
+      const popularMangas = await this.prisma.$queryRawUnsafe(`
+        SELECT ${genre ? 'DISTINCT' : ''}
+          m.id_manga as id,
+          m.titre,
+          m.image,
           'manga' as type,
-          nice_url as niceUrl
-        FROM ak_mangas
-        WHERE statut = 1
-          AND id_manga NOT IN (
+          m.nice_url as niceUrl
+        FROM ak_mangas m
+        ${mangaGenreFilter}
+        WHERE m.statut = 1
+          AND m.id_manga NOT IN (
             SELECT id_manga FROM ak_critique WHERE id_membre = ${id} AND id_manga IS NOT NULL
           )
-          AND id_manga NOT IN (
+          AND m.id_manga NOT IN (
             SELECT id_manga FROM collection_mangas WHERE id_membre = ${id} AND id_manga IS NOT NULL
           )
-        ORDER BY moyennenotes DESC, id_manga DESC
+        ORDER BY ${mangaOrderBy}
         LIMIT ${Math.ceil(remaining / 2)} OFFSET ${offset}
-      `;
+      `);
 
       const popularItems = [...(popularAnimes as any[]), ...(popularMangas as any[])]
         .slice(0, remaining);
