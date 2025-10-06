@@ -104,7 +104,7 @@ export class AuthService {
     if (!user) {
       // Track failed login attempt
       this.metricsService.trackAuthAttempt('login', 'failure', 'local');
-      throw new UnauthorizedException('Invalid credentials');
+      throw new UnauthorizedException('Votre mot de passe ou Email/Nom d\'utilisateur est incorrect');
     }
 
     // Track successful login attempt
