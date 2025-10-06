@@ -1092,6 +1092,34 @@ export class UsersService {
     };
   }
 
+  async checkUserActivity(userId: number) {
+    // Check if user has any anime in collection
+    const animeCount = await this.prisma.akAnimeCollection.count({
+      where: { userId }
+    });
+
+    // Check if user has any manga in collection
+    const mangaCount = await this.prisma.akMangaCollection.count({
+      where: { userId }
+    });
+
+    // Check if user has any forum posts
+    const user = await this.prisma.smfMember.findUnique({
+      where: { idMember: userId },
+      select: { posts: true }
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    return {
+      hasAnimeInCollection: animeCount > 0,
+      hasMangaInCollection: mangaCount > 0,
+      hasForumPosts: user.posts > 0
+    };
+  }
+
   private decodeHtmlEntities(text: string): string {
     if (!text) return '';
     return text

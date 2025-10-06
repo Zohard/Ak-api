@@ -66,6 +66,18 @@ export class UsersController {
     return this.usersService.findOne(req.user.id);
   }
 
+  @Get('activity-check')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: "Vérifier l'activité de l'utilisateur connecté" })
+  @ApiResponse({
+    status: 200,
+    description: "État de l'activité de l'utilisateur (collections, messages forum)"
+  })
+  async checkUserActivity(@Request() req) {
+    return this.usersService.checkUserActivity(req.user.id);
+  }
+
   @Patch('me')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
