@@ -609,7 +609,10 @@ export class UsersService {
           a.titre,
           a.image,
           'anime' as type,
-          a.nice_url as niceUrl
+          a.nice_url as niceUrl,
+          a.moyennenotes,
+          a.hits,
+          a.annee
         FROM ak_animes a
         JOIN ak_tag2fiche tf ON a.id_anime = tf.id_fiche AND tf.type = 'anime'
         JOIN ak_tags t ON tf.id_tag = t.id_tag
@@ -634,7 +637,10 @@ export class UsersService {
           m.titre,
           m.image,
           'manga' as type,
-          m.nice_url as niceUrl
+          m.nice_url as niceUrl,
+          m.moyennenotes,
+          m.hits,
+          m.annee
         FROM ak_mangas m
         JOIN ak_tag2fiche tf ON m.id_manga = tf.id_fiche AND tf.type = 'manga'
         JOIN ak_tags t ON tf.id_tag = t.id_tag
@@ -683,7 +689,10 @@ export class UsersService {
           a.titre,
           a.image,
           'anime' as type,
-          a.nice_url as niceUrl
+          a.nice_url as niceUrl,
+          a.moyennenotes,
+          a.hits,
+          a.annee
         FROM ak_animes a
         ${animeGenreFilter}
         WHERE a.statut = 1
@@ -709,7 +718,10 @@ export class UsersService {
           m.titre,
           m.image,
           'manga' as type,
-          m.nice_url as niceUrl
+          m.nice_url as niceUrl,
+          m.moyennenotes,
+          m.hits,
+          m.annee
         FROM ak_mangas m
         ${mangaGenreFilter}
         WHERE m.statut = 1
