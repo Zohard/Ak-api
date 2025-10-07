@@ -550,37 +550,34 @@ export class AdminContentService {
   }
 
   async getContentTags(id: number, type: string) {
-    // id_fiche is stored as 'anime123' or 'manga456' format
-    const ficheId = `${type}${id}`;
     const tags = await this.prisma.$queryRaw`
       SELECT
         t.id_tag as id,
         t.tag_name as nom,
-        t.description,
-        tf.id
+        t.description
       FROM ak_tag2fiche tf
       JOIN ak_tags t ON tf.id_tag = t.id_tag
-      WHERE tf.id_fiche = ${ficheId}
+      WHERE tf.id_fiche = ${id} AND tf.type = ${type}
     `;
 
     return tags;
   }
 
   async addContentTag(id: number, type: string, tagId: number) {
-    // id_fiche is stored as 'anime123' or 'manga456' format
-    const ficheId = `${type}${id}`;
-
     // Prevent duplicates
-    const exists = await this.prisma.$queryRaw`
-      SELECT 1 FROM ak_tag2fiche WHERE id_fiche = ${ficheId} AND id_tag = ${tagId} LIMIT 1
-    `;
+    const exists = await this.prisma.$queryRawUnsafe(
+      `SELECT 1 FROM ak_tag2fiche WHERE id_fiche = $1 AND type = $2 AND id_tag = $3 LIMIT 1`,
+      id,
+      type,
+      tagId,
+    );
     if ((exists as any[]).length > 0) {
       return { message: 'Tag already attached' };
     }
 
     await this.prisma.$queryRaw`
-      INSERT INTO ak_tag2fiche (id_fiche, id_tag)
-      VALUES (${ficheId}, ${tagId})
+      INSERT INTO ak_tag2fiche (id_fiche, type, id_tag)
+      VALUES (${id}, ${type}, ${tagId})
     `;
 
     return { message: 'Tag added successfully' };
@@ -601,12 +598,9 @@ export class AdminContentService {
 
 
   async removeContentTag(id: number, type: string, tagId: number) {
-    // id_fiche is stored as 'anime123' or 'manga456' format
-    const ficheId = `${type}${id}`;
-
     await this.prisma.$queryRaw`
       DELETE FROM ak_tag2fiche
-      WHERE id_fiche = ${ficheId} AND id_tag = ${tagId}
+      WHERE id_fiche = ${id} AND type = ${type} AND id_tag = ${tagId}
     `;
 
     return { message: 'Tag removed successfully' };
