@@ -10,10 +10,14 @@ import {
   CreateContentRelationshipDto,
   UpdateContentRelationshipDto,
 } from './dto/content-relationship.dto';
+import { AdminLoggingService } from '../logging/admin-logging.service';
 
 @Injectable()
 export class AdminContentService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private adminLogging: AdminLoggingService,
+  ) {}
 
   async getAllContent(query: ContentAdminQueryDto) {
     const {
@@ -489,6 +493,7 @@ export class AdminContentService {
     type: string,
     businessId: number,
     role?: string,
+    username?: string,
   ) {
     const staffTable =
       type === 'anime' ? 'ak_business_to_animes' : 'ak_business_to_mangas';
@@ -515,10 +520,18 @@ export class AdminContentService {
       role || null,
     );
 
+    // Log the action
+    if (username) {
+      const logMessage = role
+        ? `Ajout staff B#${businessId} (${role}) `
+        : `Ajout staff B#${businessId}`;
+      await this.adminLogging.addLog(id, type as 'anime' | 'manga', username, logMessage);
+    }
+
     return { message: 'Staff member added successfully' };
   }
 
-  async removeContentStaff(id: number, type: string, businessId: number, role?: string) {
+  async removeContentStaff(id: number, type: string, businessId: number, role?: string, username?: string) {
     const staffTable =
       type === 'anime' ? 'ak_business_to_animes' : 'ak_business_to_mangas';
     const idColumn = type === 'anime' ? 'id_anime' : 'id_manga';
@@ -546,6 +559,11 @@ export class AdminContentService {
       );
     }
 
+    // Log the action
+    if (username) {
+      await this.adminLogging.addLog(id, type as 'anime' | 'manga', username, 'Suppression staff (?)');
+    }
+
     return { message: 'Staff member removed successfully' };
   }
 
@@ -563,7 +581,7 @@ export class AdminContentService {
     return tags;
   }
 
-  async addContentTag(id: number, type: string, tagId: number) {
+  async addContentTag(id: number, type: string, tagId: number, username: string) {
     // Prevent duplicates
     const exists = await this.prisma.$queryRawUnsafe(
       `SELECT 1 FROM ak_tag2fiche WHERE id_fiche = $1 AND type = $2 AND id_tag = $3 LIMIT 1`,
@@ -579,6 +597,9 @@ export class AdminContentService {
       INSERT INTO ak_tag2fiche (id_fiche, type, id_tag)
       VALUES (${id}, ${type}, ${tagId})
     `;
+
+    // Log the action
+    await this.adminLogging.addLog(id, type as 'anime' | 'manga', username, 'Modification des tags');
 
     return { message: 'Tag added successfully' };
   }
@@ -597,11 +618,14 @@ export class AdminContentService {
   }
 
 
-  async removeContentTag(id: number, type: string, tagId: number) {
+  async removeContentTag(id: number, type: string, tagId: number, username: string) {
     await this.prisma.$queryRaw`
       DELETE FROM ak_tag2fiche
       WHERE id_fiche = ${id} AND type = ${type} AND id_tag = ${tagId}
     `;
+
+    // Log the action
+    await this.adminLogging.addLog(id, type as 'anime' | 'manga', username, 'Modification des tags');
 
     return { message: 'Tag removed successfully' };
   }
