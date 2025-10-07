@@ -278,12 +278,14 @@ export class AdminContentController {
   })
   @ApiParam({ name: 'id', description: 'Content ID' })
   async addStaff(
+    @Request() req,
     @Param('type') type: string,
     @Param('id', ParseIntPipe) id: number,
     @Body('businessId', ParseIntPipe) businessId: number,
     @Body('role') role?: string,
   ) {
-    return this.adminContentService.addContentStaff(id, type, businessId, role);
+    const username = req.user?.pseudo || req.user?.member_name || 'admin';
+    return this.adminContentService.addContentStaff(id, type, businessId, role, username);
   }
 
   @Delete(':type/:id/staff/:businessId')
@@ -297,12 +299,14 @@ export class AdminContentController {
   @ApiParam({ name: 'businessId', description: 'Business ID' })
   @ApiQuery({ name: 'role', required: false, description: 'Specific role to remove' })
   async removeStaff(
+    @Request() req,
     @Param('type') type: string,
     @Param('id', ParseIntPipe) id: number,
     @Param('businessId', ParseIntPipe) businessId: number,
     @Query('role') role?: string,
   ) {
-    return this.adminContentService.removeContentStaff(id, type, businessId, role);
+    const username = req.user?.pseudo || req.user?.member_name || 'admin';
+    return this.adminContentService.removeContentStaff(id, type, businessId, role, username);
   }
 
   // Tag management
@@ -330,11 +334,13 @@ export class AdminContentController {
   })
   @ApiParam({ name: 'id', description: 'Content ID' })
   async addTag(
+    @Request() req,
     @Param('type') type: string,
     @Param('id', ParseIntPipe) id: number,
     @Body('tagId', ParseIntPipe) tagId: number,
   ) {
-    return this.adminContentService.addContentTag(id, type, tagId);
+    const username = req.user?.pseudo || req.user?.member_name || 'admin';
+    return this.adminContentService.addContentTag(id, type, tagId, username);
   }
 
   @Delete(':type/:id/tags/:tagId')
@@ -347,11 +353,13 @@ export class AdminContentController {
   @ApiParam({ name: 'id', description: 'Content ID' })
   @ApiParam({ name: 'tagId', description: 'Tag ID' })
   async removeTag(
+    @Request() req,
     @Param('type') type: string,
     @Param('id', ParseIntPipe) id: number,
     @Param('tagId', ParseIntPipe) tagId: number,
   ) {
-    return this.adminContentService.removeContentTag(id, type, tagId);
+    const username = req.user?.pseudo || req.user?.member_name || 'admin';
+    return this.adminContentService.removeContentTag(id, type, tagId, username);
   }
 
   @Get('tags/search')

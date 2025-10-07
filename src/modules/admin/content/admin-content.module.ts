@@ -11,9 +11,10 @@ import { SourcesExternesController } from './sources-externes.controller';
 import { SourcesExternesService } from './sources-externes.service';
 import { PrismaService } from '../../../shared/services/prisma.service';
 import { MediaModule } from '../../media/media.module';
+import { AdminLoggingModule } from '../logging/admin-logging.module';
 
 @Module({
-  imports: [MediaModule],
+  imports: [MediaModule, AdminLoggingModule],
   controllers: [AdminContentController, AdminAnimesController, AdminMangasController, AdminBusinessController, SourcesExternesController],
   providers: [AdminContentService, AdminAnimesService, AdminMangasService, AdminBusinessService, SourcesExternesService, PrismaService],
   exports: [AdminContentService],
