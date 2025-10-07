@@ -9,7 +9,7 @@ export class SeasonsController {
 
   @Get()
   async getAllSeasons() {
-    const seasons = await this.seasonsService.findAll();
+    const seasons = await this.seasonsService.findAll() as any[];
 
     // Map season number to French season name
     const saisonMap: Record<number, string> = {
