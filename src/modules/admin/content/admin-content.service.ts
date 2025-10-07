@@ -373,19 +373,19 @@ export class AdminContentService {
   async getContentRelationships(id: number, type: string) {
     // Relationships are stored with the source in id_fiche_depart as 'anime<ID>' or 'manga<ID>'
     const sourceKey = `${type}${id}`;
-    const relationships = await this.prisma.$queryRaw`
-      SELECT 
+    const relationships = await this.prisma.$queryRaw<any[]>`
+      SELECT
         r.id_relation,
         r.id_fiche_depart,
         r.id_anime,
         r.id_manga,
-        CASE 
+        CASE
           WHEN r.id_anime > 0 THEN r.id_anime
           WHEN r.id_manga > 0 THEN r.id_manga
           ELSE NULL
         END as related_id,
         'related'::text as type_relation,
-        CASE 
+        CASE
           WHEN r.id_anime > 0 THEN 'anime'::text
           WHEN r.id_manga > 0 THEN 'manga'::text
           ELSE 'unknown'::text
@@ -397,7 +397,18 @@ export class AdminContentService {
       WHERE r.id_fiche_depart = ${sourceKey}
     `;
 
-    return relationships;
+    // Fetch tags for each related item
+    const relationshipsWithTags = await Promise.all(
+      relationships.map(async (rel: any) => {
+        if (rel.related_id && rel.related_type) {
+          const tags = await this.getContentTags(rel.related_id, rel.related_type);
+          return { ...rel, tags };
+        }
+        return { ...rel, tags: [] };
+      })
+    );
+
+    return relationshipsWithTags;
   }
 
   async createContentRelationship(
