@@ -9,12 +9,42 @@ export class SeasonsController {
 
   @Get()
   async getAllSeasons() {
-    return this.seasonsService.findAll();
+    const seasons = await this.seasonsService.findAll();
+
+    // Map season number to French season name
+    const saisonMap: Record<number, string> = {
+      1: 'hiver',
+      2: 'printemps',
+      3: 'été',
+      4: 'automne'
+    };
+
+    // Add nom_saison to each season
+    return seasons.map((season: any) => ({
+      ...season,
+      nom_saison: saisonMap[season.saison] || 'été'
+    }));
   }
 
   @Get('current')
   async getCurrentSeason() {
-    return this.seasonsService.findCurrent();
+    const season = await this.seasonsService.findCurrent();
+    if (!season) {
+      return null;
+    }
+
+    // Map season number to French season name
+    const saisonMap: Record<number, string> = {
+      1: 'hiver',
+      2: 'printemps',
+      3: 'été',
+      4: 'automne'
+    };
+
+    return {
+      ...season,
+      nom_saison: saisonMap[season.saison] || 'été'
+    };
   }
 
   @Get(':id')
@@ -23,7 +53,19 @@ export class SeasonsController {
     if (!season) {
       throw new NotFoundException(`Season with ID ${id} not found`);
     }
-    return season;
+
+    // Map season number to French season name
+    const saisonMap: Record<number, string> = {
+      1: 'hiver',
+      2: 'printemps',
+      3: 'été',
+      4: 'automne'
+    };
+
+    return {
+      ...season,
+      nom_saison: saisonMap[season.saison] || 'été'
+    };
   }
 
   @Get(':id/animes')
