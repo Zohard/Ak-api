@@ -1053,7 +1053,8 @@ export class ForumsService {
           posterName: latestMessage.posterName,
           posterTime: latestMessage.posterTime,
           topicId: latestMessage.idTopic,
-          boardName: latestMessage.topic?.board?.name || 'Unknown'  // Use topic's board, not message's board
+          boardName: latestMessage.topic?.board?.name || 'Unknown',  // Use topic's board, not message's board
+          topicReplies: latestMessage.topic?.numReplies || 0  // Add reply count for page calculation
         } : null
       };
     } catch (error) {
