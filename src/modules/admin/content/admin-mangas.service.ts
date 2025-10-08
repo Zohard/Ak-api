@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../../shared/services/prisma.service';
 import { ImageKitService } from '../../media/imagekit.service';
+import { AdminLoggingService } from '../logging/admin-logging.service';
 import {
   AdminMangaListQueryDto,
   CreateAdminMangaDto,
@@ -12,6 +13,7 @@ export class AdminMangasService {
   constructor(
     private prisma: PrismaService,
     private imageKitService: ImageKitService,
+    private adminLogging: AdminLoggingService,
   ) {}
 
   async list(query: AdminMangaListQueryDto) {
@@ -36,10 +38,17 @@ export class AdminMangasService {
     return item;
   }
 
-  async create(dto: CreateAdminMangaDto) {
+  async create(dto: CreateAdminMangaDto, username?: string) {
     const data: any = { ...dto };
     if (!data.niceUrl && data.titre) data.niceUrl = this.slugify(data.titre);
-    return this.prisma.akManga.create({ data });
+    const created = await this.prisma.akManga.create({ data });
+
+    // Log the creation
+    if (username) {
+      await this.adminLogging.addLog(created.idManga, 'manga', username, 'Création fiche');
+    }
+
+    return created;
   }
 
   async update(id: number, dto: UpdateAdminMangaDto, user?: any) {
@@ -56,19 +65,35 @@ export class AdminMangasService {
         let cleanSynopsis = dto.synopsis;
         const attributionRegex = /<br><br>"Synopsis soumis par .+"/g;
         cleanSynopsis = cleanSynopsis.replace(attributionRegex, '');
-        
+
         // Append the new attribution
         data.synopsis = `${cleanSynopsis}<br><br>"Synopsis soumis par ${user.username}"`;
       }
     }
 
-    return this.prisma.akManga.update({ where: { idManga: id }, data });
+    const updated = await this.prisma.akManga.update({ where: { idManga: id }, data });
+
+    // Log the update
+    if (user) {
+      const username = user.pseudo || user.member_name || user.username || 'admin';
+      await this.adminLogging.addLog(id, 'manga', username, 'Modification infos principales');
+    }
+
+    return updated;
   }
 
-  async updateStatus(id: number, statut: number) {
+  async updateStatus(id: number, statut: number, username?: string) {
     const existing = await this.prisma.akManga.findUnique({ where: { idManga: id } });
     if (!existing) throw new NotFoundException('Manga introuvable');
-    return this.prisma.akManga.update({ where: { idManga: id }, data: { statut } });
+
+    const updated = await this.prisma.akManga.update({ where: { idManga: id }, data: { statut } });
+
+    // Log the status change
+    if (username) {
+      await this.adminLogging.addLog(id, 'manga', username, `Modification statut (${statut})`);
+    }
+
+    return updated;
   }
 
   async remove(id: number) {

@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../../shared/services/prisma.service';
+import { AdminLoggingService } from '../logging/admin-logging.service';
 import {
   AdminAnimeListQueryDto,
   CreateAdminAnimeDto,
@@ -8,7 +9,10 @@ import {
 
 @Injectable()
 export class AdminAnimesService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private adminLogging: AdminLoggingService,
+  ) {}
 
   async getOne(id: number) {
     const anime = await this.prisma.akAnime.findUnique({ where: { idAnime: id } });
@@ -62,7 +66,7 @@ export class AdminAnimesService {
     };
   }
 
-  async create(dto: CreateAdminAnimeDto) {
+  async create(dto: CreateAdminAnimeDto, username?: string) {
     // Normalize legacy fields
     const titreOrig = dto.titreOrig ?? dto.titre_orig ?? null;
     const normalizeFormat = (val?: string | null) => {
@@ -112,6 +116,12 @@ export class AdminAnimesService {
     // Note: legacy `topic` is not supported; use `commentaire` instead
 
     const created = await this.prisma.akAnime.create({ data });
+
+    // Log the creation
+    if (username) {
+      await this.adminLogging.addLog(created.idAnime, 'anime', username, 'Création fiche');
+    }
+
     return created;
   }
 
@@ -147,13 +157,28 @@ export class AdminAnimesService {
     }
 
     const updated = await this.prisma.akAnime.update({ where: { idAnime: id }, data });
+
+    // Log the update
+    if (user) {
+      const username = user.pseudo || user.member_name || user.username || 'admin';
+      await this.adminLogging.addLog(id, 'anime', username, 'Modification infos principales');
+    }
+
     return updated;
   }
 
-  async updateStatus(id: number, statut: number) {
+  async updateStatus(id: number, statut: number, username?: string) {
     const existing = await this.prisma.akAnime.findUnique({ where: { idAnime: id } });
     if (!existing) throw new NotFoundException('Anime introuvable');
-    return this.prisma.akAnime.update({ where: { idAnime: id }, data: { statut } });
+
+    const updated = await this.prisma.akAnime.update({ where: { idAnime: id }, data: { statut } });
+
+    // Log the status change
+    if (username) {
+      await this.adminLogging.addLog(id, 'anime', username, `Modification statut (${statut})`);
+    }
+
+    return updated;
   }
 
   async remove(id: number) {

@@ -9,6 +9,7 @@ import {
   Query,
   UseGuards,
   Delete,
+  Request,
 } from '@nestjs/common';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
@@ -38,8 +39,9 @@ export class AdminAnimesController {
   @Post()
   @ApiOperation({ summary: 'Créer un anime (admin)' })
   @ApiResponse({ status: 201, description: 'Anime créé' })
-  create(@Body() dto: CreateAdminAnimeDto) {
-    return this.service.create(dto);
+  create(@Request() req, @Body() dto: CreateAdminAnimeDto) {
+    const username = req.user?.pseudo || req.user?.member_name || 'admin';
+    return this.service.create(dto, username);
   }
 
   @Get(':id')
@@ -64,10 +66,12 @@ export class AdminAnimesController {
   @ApiOperation({ summary: 'Mettre à jour le statut (admin)' })
   @ApiResponse({ status: 200, description: 'Statut mis à jour' })
   updateStatus(
+    @Request() req,
     @Param('id', ParseIntPipe) id: number,
     @Body('statut', ParseIntPipe) statut: number,
   ) {
-    return this.service.updateStatus(id, statut);
+    const username = req.user?.pseudo || req.user?.member_name || 'admin';
+    return this.service.updateStatus(id, statut, username);
   }
 
   @Post(':id/staff')
