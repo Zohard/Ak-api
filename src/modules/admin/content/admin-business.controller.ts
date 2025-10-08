@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, ParseIntPipe, Post, Put, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, ParseIntPipe, Post, Put, Query, Request, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { AdminGuard } from '../../../common/guards/admin.guard';
@@ -22,15 +22,24 @@ export class AdminBusinessController {
 
   @Post()
   @ApiOperation({ summary: 'Créer une fiche business (admin)' })
-  create(@Body() dto: CreateAdminBusinessDto) { return this.service.create(dto); }
+  create(@Request() req, @Body() dto: CreateAdminBusinessDto) {
+    const username = req.user?.pseudo || req.user?.member_name || 'admin';
+    return this.service.create(dto, username);
+  }
 
   @Put(':id')
   @ApiOperation({ summary: 'Mettre à jour une fiche business (admin)' })
-  update(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateAdminBusinessDto) { return this.service.update(id, dto); }
+  update(@Request() req, @Param('id', ParseIntPipe) id: number, @Body() dto: UpdateAdminBusinessDto) {
+    const username = req.user?.pseudo || req.user?.member_name || 'admin';
+    return this.service.update(id, dto, username);
+  }
 
   @Put(':id/status')
   @ApiOperation({ summary: 'Mettre à jour le statut (admin)' })
-  updateStatus(@Param('id', ParseIntPipe) id: number, @Body('statut', ParseIntPipe) statut: number) { return this.service.updateStatus(id, statut); }
+  updateStatus(@Request() req, @Param('id', ParseIntPipe) id: number, @Body('statut', ParseIntPipe) statut: number) {
+    const username = req.user?.pseudo || req.user?.member_name || 'admin';
+    return this.service.updateStatus(id, statut, username);
+  }
 
   @Delete(':id')
   @ApiOperation({ summary: 'Supprimer une fiche business (admin)' })

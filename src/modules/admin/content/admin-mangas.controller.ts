@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, ParseIntPipe, Post, Put, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, ParseIntPipe, Post, Put, Query, Request, UseGuards } from '@nestjs/common';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import { ApiBearerAuth, ApiBody, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
@@ -23,7 +23,10 @@ export class AdminMangasController {
 
   @Post()
   @ApiOperation({ summary: 'Créer un manga (admin)' })
-  create(@Body() dto: CreateAdminMangaDto) { return this.service.create(dto); }
+  create(@Request() req, @Body() dto: CreateAdminMangaDto) {
+    const username = req.user?.pseudo || req.user?.member_name || 'admin';
+    return this.service.create(dto, username);
+  }
 
   @Put(':id')
   @ApiOperation({ summary: 'Mettre à jour un manga (admin)' })
@@ -31,7 +34,10 @@ export class AdminMangasController {
 
   @Put(':id/status')
   @ApiOperation({ summary: 'Mettre à jour le statut (admin)' })
-  updateStatus(@Param('id', ParseIntPipe) id: number, @Body('statut', ParseIntPipe) statut: number) { return this.service.updateStatus(id, statut); }
+  updateStatus(@Request() req, @Param('id', ParseIntPipe) id: number, @Body('statut', ParseIntPipe) statut: number) {
+    const username = req.user?.pseudo || req.user?.member_name || 'admin';
+    return this.service.updateStatus(id, statut, username);
+  }
 
   @Delete(':id')
   @ApiOperation({ summary: 'Supprimer un manga (admin)' })

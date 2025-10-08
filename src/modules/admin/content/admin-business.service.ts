@@ -1,10 +1,14 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../../shared/services/prisma.service';
+import { AdminLoggingService } from '../logging/admin-logging.service';
 import { AdminBusinessListQueryDto, CreateAdminBusinessDto, UpdateAdminBusinessDto } from './dto/admin-business.dto';
 
 @Injectable()
 export class AdminBusinessService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private adminLogging: AdminLoggingService,
+  ) {}
 
   async list(query: AdminBusinessListQueryDto) {
     const { page = 1, statut, search, type } = query;
@@ -27,7 +31,7 @@ export class AdminBusinessService {
     return item;
   }
 
-  async create(dto: CreateAdminBusinessDto) {
+  async create(dto: CreateAdminBusinessDto, username?: string) {
     // Check if denomination already exists
     if (dto.denomination) {
       const existingBusiness = await this.prisma.akBusiness.findUnique({
@@ -41,10 +45,17 @@ export class AdminBusinessService {
 
     const data: any = { ...dto };
     if (!data.niceUrl && data.denomination) data.niceUrl = this.slugify(data.denomination);
-    return this.prisma.akBusiness.create({ data });
+    const created = await this.prisma.akBusiness.create({ data });
+
+    // Log the creation
+    if (username) {
+      await this.adminLogging.addLog(created.idBusiness, 'business', username, 'Création fiche');
+    }
+
+    return created;
   }
 
-  async update(id: number, dto: UpdateAdminBusinessDto) {
+  async update(id: number, dto: UpdateAdminBusinessDto, username?: string) {
     const existing = await this.prisma.akBusiness.findUnique({ where: { idBusiness: id } });
     if (!existing) throw new NotFoundException('Fiche business introuvable');
 
@@ -61,13 +72,28 @@ export class AdminBusinessService {
 
     const data: any = { ...dto };
     if (dto.denomination && !dto.niceUrl) data.niceUrl = this.slugify(dto.denomination);
-    return this.prisma.akBusiness.update({ where: { idBusiness: id }, data });
+    const updated = await this.prisma.akBusiness.update({ where: { idBusiness: id }, data });
+
+    // Log the update
+    if (username) {
+      await this.adminLogging.addLog(id, 'business', username, 'Modification infos principales');
+    }
+
+    return updated;
   }
 
-  async updateStatus(id: number, statut: number) {
+  async updateStatus(id: number, statut: number, username?: string) {
     const existing = await this.prisma.akBusiness.findUnique({ where: { idBusiness: id } });
     if (!existing) throw new NotFoundException('Fiche business introuvable');
-    return this.prisma.akBusiness.update({ where: { idBusiness: id }, data: { statut } });
+
+    const updated = await this.prisma.akBusiness.update({ where: { idBusiness: id }, data: { statut } });
+
+    // Log the status change
+    if (username) {
+      await this.adminLogging.addLog(id, 'business', username, `Modification statut (${statut})`);
+    }
+
+    return updated;
   }
 
   async remove(id: number) {

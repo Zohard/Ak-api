@@ -118,4 +118,114 @@ export class AdminLoggingService {
       return [];
     }
   }
+
+  /**
+   * Get formatted activities grouped by content
+   */
+  async getFormattedActivities(limit = 50): Promise<any[]> {
+    try {
+      // Get recent logs
+      const logs = await this.prisma.$queryRaw<any[]>`
+        SELECT id_log, anime, manga, business, json_data, last_mod
+        FROM ak_logs_admin
+        ORDER BY last_mod DESC
+        LIMIT ${limit}
+      `;
+
+      // Format each log entry
+      const formattedLogs = await Promise.all(
+        logs.map(async (log) => {
+          const jsonData = JSON.parse(log.json_data || '{}');
+
+          // Determine content type and ID
+          let contentType: 'anime' | 'manga' | 'business' = 'anime';
+          let contentId = 0;
+          let title = '';
+          let status = '';
+
+          if (log.anime > 0) {
+            contentType = 'anime';
+            contentId = log.anime;
+            // Fetch anime title and status
+            const anime = await this.prisma.$queryRaw<any[]>`
+              SELECT titre, statut FROM ak_animes WHERE id_anime = ${contentId} LIMIT 1
+            `;
+            if (anime && anime.length > 0) {
+              title = anime[0].titre;
+              status = anime[0].statut === 1 ? '' : 'en attente';
+            }
+          } else if (log.manga > 0) {
+            contentType = 'manga';
+            contentId = log.manga;
+            // Fetch manga title and status
+            const manga = await this.prisma.$queryRaw<any[]>`
+              SELECT titre, statut FROM ak_mangas WHERE id_manga = ${contentId} LIMIT 1
+            `;
+            if (manga && manga.length > 0) {
+              title = manga[0].titre;
+              status = manga[0].statut === 1 ? '' : 'en attente';
+            }
+          } else if (log.business > 0) {
+            contentType = 'business';
+            contentId = log.business;
+            // Fetch business name
+            const business = await this.prisma.$queryRaw<any[]>`
+              SELECT denomination FROM ak_business WHERE id_business = ${contentId} LIMIT 1
+            `;
+            if (business && business.length > 0) {
+              title = business[0].denomination;
+            }
+          }
+
+          // Parse activities from JSON and sort by timestamp descending
+          const activities = Object.entries(jsonData)
+            .map(([timestamp, data]: [string, any]) => {
+              const username = Object.keys(data)[0];
+              const action = data[username];
+              return {
+                timestamp: parseInt(timestamp),
+                date: this.formatDate(parseInt(timestamp)),
+                username,
+                action,
+              };
+            })
+            .sort((a, b) => b.timestamp - a.timestamp);
+
+          return {
+            id_log: log.id_log,
+            contentType,
+            contentId,
+            title,
+            status,
+            link:
+              contentType === 'anime'
+                ? `/admin/animes/${contentId}`
+                : contentType === 'manga'
+                  ? `/admin/mangas/${contentId}`
+                  : `/admin/business/${contentId}`,
+            activities,
+          };
+        }),
+      );
+
+      return formattedLogs;
+    } catch (error) {
+      console.error('Failed to get formatted activities:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Format Unix timestamp to DD-MM-YYYY à HH:MM
+   */
+  private formatDate(timestamp: number): string {
+    const date = new Date(timestamp * 1000);
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = date.getFullYear();
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+
+    return `${day}-${month}-${year} à ${hours}:${minutes}`;
+  }
 }
