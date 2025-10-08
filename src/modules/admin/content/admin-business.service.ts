@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../../shared/services/prisma.service';
 import { AdminLoggingService } from '../logging/admin-logging.service';
+import { ImageKitService } from '../../media/imagekit.service';
 import { AdminBusinessListQueryDto, CreateAdminBusinessDto, UpdateAdminBusinessDto } from './dto/admin-business.dto';
 
 @Injectable()
@@ -8,6 +9,7 @@ export class AdminBusinessService {
   constructor(
     private prisma: PrismaService,
     private adminLogging: AdminLoggingService,
+    private imageKitService: ImageKitService,
   ) {}
 
   async list(query: AdminBusinessListQueryDto) {
@@ -101,6 +103,48 @@ export class AdminBusinessService {
     if (!existing) throw new NotFoundException('Fiche business introuvable');
     await this.prisma.akBusiness.delete({ where: { idBusiness: id } });
     return { message: 'Business supprimé' };
+  }
+
+  async importBusinessImage(
+    imageUrl: string,
+    businessName: string
+  ): Promise<{ success: boolean; imageKitUrl?: string; filename?: string; error?: string }> {
+    try {
+      if (!imageUrl || !imageUrl.trim()) {
+        return { success: false, error: 'No image URL provided' };
+      }
+
+      // Generate a clean filename from the business name
+      const cleanName = businessName
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/(^-|-$)+/g, '')
+        .substring(0, 50);
+
+      const timestamp = Date.now();
+      const filename = `${cleanName}-${timestamp}`;
+
+      // Use ImageKit service to upload from URL
+      const result = await this.imageKitService.uploadImageFromUrl(
+        imageUrl,
+        filename,
+        'images/business' // Store in business folder
+      );
+
+      return {
+        success: true,
+        imageKitUrl: result.url,
+        filename: result.filename, // Store the filename for database
+      };
+    } catch (error) {
+      console.warn('Failed to import business image:', error.message);
+      return {
+        success: false,
+        error: error.message,
+      };
+    }
   }
 
   private slugify(text: string) {

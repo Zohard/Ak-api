@@ -1,5 +1,5 @@
 import { Body, Controller, Delete, Get, Param, ParseIntPipe, Post, Put, Query, Request, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiBody, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { AdminGuard } from '../../../common/guards/admin.guard';
 import { AdminBusinessService } from './admin-business.service';
@@ -44,5 +44,30 @@ export class AdminBusinessController {
   @Delete(':id')
   @ApiOperation({ summary: 'Supprimer une fiche business (admin)' })
   remove(@Param('id', ParseIntPipe) id: number) { return this.service.remove(id); }
+
+  @Post('import-image')
+  @ApiOperation({
+    summary: 'Import business image to ImageKit',
+    description: 'Download and upload a business image from external sources to ImageKit'
+  })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        imageUrl: { type: 'string', description: 'URL of the image to import' },
+        businessName: { type: 'string', description: 'Name of the business for filename generation' }
+      },
+      required: ['imageUrl', 'businessName']
+    }
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Image import result'
+  })
+  async importImage(
+    @Body() importData: { imageUrl: string; businessName: string },
+  ): Promise<any> {
+    return this.service.importBusinessImage(importData.imageUrl, importData.businessName);
+  }
 }
 
