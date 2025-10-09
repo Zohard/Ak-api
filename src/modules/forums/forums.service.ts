@@ -2444,8 +2444,8 @@ export class ForumsService {
         ? offset + accessibleMessages.length + 1 // Suggest there may be more
         : offset + accessibleMessages.length; // No more results
 
-      // Format results
-      const results = accessibleMessages.map(msg => {
+      // Format results with message position calculation
+      const results = await Promise.all(accessibleMessages.map(async (msg) => {
         // Create excerpt from body (remove BBCode tags and limit length)
         let cleanBody = msg.body
           .replace(/\[quote[^\]]*\][\s\S]*?\[\/quote\]/gi, '') // Remove quotes first
@@ -2467,6 +2467,19 @@ export class ForumsService {
           ? cleanBody.substring(0, 200) + '...'
           : cleanBody;
 
+        // Calculate message position in topic (for pagination)
+        const messagePosition = await this.prisma.smfMessage.count({
+          where: {
+            idTopic: msg.idTopic,
+            posterTime: {
+              lte: msg.posterTime
+            },
+            idMsg: {
+              lte: msg.idMsg // Include messages at same time but with lower ID
+            }
+          }
+        });
+
         return {
           id: msg.idMsg,
           subject: msg.subject,
@@ -2474,6 +2487,7 @@ export class ForumsService {
           posterName: msg.posterName,
           posterTime: msg.posterTime,
           topicId: msg.idTopic,
+          messagePosition: messagePosition, // Position in topic (1-indexed)
           numReplies: msg.topic?.numReplies || 0,
           numViews: msg.topic?.numViews || 0,
           isSticky: msg.topic?.isSticky === 1,
@@ -2484,7 +2498,7 @@ export class ForumsService {
             categoryName: msg.topic?.board?.category?.name
           }
         };
-      });
+      }));
 
       return {
         results,
