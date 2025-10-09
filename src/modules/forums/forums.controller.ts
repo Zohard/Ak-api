@@ -472,6 +472,7 @@ export class ForumsController {
   }
 
   @Get('search')
+  @UseGuards(OptionalJwtAuthGuard)
   @ApiOperation({ summary: 'Search forum posts and topics by title or content' })
   @ApiQuery({ name: 'q', required: true, type: String, description: 'Search query' })
   @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Results per page (default: 20)' })
@@ -480,15 +481,18 @@ export class ForumsController {
   async searchForums(
     @Query('q') searchQuery: string,
     @Query('limit') limit: string = '20',
-    @Query('offset') offset: string = '0'
+    @Query('offset') offset: string = '0',
+    @Request() req?
   ) {
     if (!searchQuery || searchQuery.trim().length === 0) {
       return { results: [], total: 0 };
     }
+    const userId = req?.user?.id || null;
     return await this.forumsService.searchForums(
       searchQuery,
       parseInt(limit),
-      parseInt(offset)
+      parseInt(offset),
+      userId
     );
   }
 }
