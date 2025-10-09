@@ -209,6 +209,18 @@ export class CollectionsController {
     );
   }
 
+  @Get('user/:userId/info')
+  @ApiOperation({ summary: 'Get user info with collection summary (optimized single-user endpoint)' })
+  @ApiParam({ name: 'userId', type: 'number', description: 'User ID' })
+  @ApiResponse({ status: 200, description: 'User info with collections retrieved successfully' })
+  getUserInfo(
+    @Param('userId', ParseIntPipe) userId: number,
+    @Request() req
+  ) {
+    const currentUserId = req.user?.id;
+    return this.collectionsService.getUserInfo(userId, currentUserId);
+  }
+
   @Get('user/:userId/summary')
   @ApiOperation({ summary: 'Get collection summary (counts per type) for a user' })
   @ApiParam({ name: 'userId', type: 'number', description: 'User ID' })
