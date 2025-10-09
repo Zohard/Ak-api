@@ -2393,11 +2393,12 @@ export class ForumsService {
     }
   }
 
-  async searchForums(searchQuery: string, limit: number, offset: number) {
+  async searchForums(searchQuery: string, limit: number, offset: number, userId?: number) {
     try {
       const searchTerm = `%${searchQuery}%`;
 
       // Search in both topics (first message) and regular messages
+      // Fetch more than needed to account for filtering
       const messages = await this.prisma.smfMessage.findMany({
         where: {
           OR: [
@@ -2419,23 +2420,32 @@ export class ForumsService {
           }
         },
         orderBy: { posterTime: 'desc' },
-        take: limit,
+        take: limit * 3, // Fetch 3x to account for filtered results
         skip: offset
       });
 
-      // Get total count for pagination
-      const totalCount = await this.prisma.smfMessage.count({
-        where: {
-          OR: [
-            { subject: { contains: searchQuery, mode: 'insensitive' } },
-            { body: { contains: searchQuery, mode: 'insensitive' } }
-          ],
-          approved: 1
+      // Filter by board access
+      const accessibleMessages: any[] = [];
+      for (const msg of messages) {
+        if (msg.topic?.board?.idBoard) {
+          const hasAccess = await this.checkBoardAccess(msg.topic.board.idBoard, userId);
+          if (hasAccess) {
+            accessibleMessages.push(msg);
+            if (accessibleMessages.length >= limit) {
+              break; // Stop once we have enough results
+            }
+          }
         }
-      });
+      }
+
+      // Get total count of all matching messages (for pagination estimate)
+      // Note: This is an approximation since we can't efficiently count accessible boards
+      const totalCount = accessibleMessages.length >= limit
+        ? offset + accessibleMessages.length + 1 // Suggest there may be more
+        : offset + accessibleMessages.length; // No more results
 
       // Format results
-      const results = messages.map(msg => {
+      const results = accessibleMessages.map(msg => {
         // Create excerpt from body (remove BBCode tags and limit length)
         let cleanBody = msg.body
           .replace(/\[quote[^\]]*\][\s\S]*?\[\/quote\]/gi, '') // Remove quotes first
