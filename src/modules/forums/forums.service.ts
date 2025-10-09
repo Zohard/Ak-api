@@ -2392,4 +2392,85 @@ export class ForumsService {
       return { success: false };
     }
   }
+
+  async searchForums(searchQuery: string, limit: number, offset: number) {
+    try {
+      const searchTerm = `%${searchQuery}%`;
+
+      // Search in both topics (first message) and regular messages
+      const messages = await this.prisma.smfMessage.findMany({
+        where: {
+          OR: [
+            { subject: { contains: searchQuery, mode: 'insensitive' } },
+            { body: { contains: searchQuery, mode: 'insensitive' } }
+          ],
+          // Exclude deleted messages
+          approved: 1
+        },
+        include: {
+          topic: {
+            include: {
+              board: {
+                include: {
+                  category: true
+                }
+              }
+            }
+          }
+        },
+        orderBy: { posterTime: 'desc' },
+        take: limit,
+        skip: offset
+      });
+
+      // Get total count for pagination
+      const totalCount = await this.prisma.smfMessage.count({
+        where: {
+          OR: [
+            { subject: { contains: searchQuery, mode: 'insensitive' } },
+            { body: { contains: searchQuery, mode: 'insensitive' } }
+          ],
+          approved: 1
+        }
+      });
+
+      // Format results
+      const results = messages.map(msg => {
+        // Create excerpt from body (remove BBCode tags and limit length)
+        const cleanBody = msg.body
+          .replace(/\[.*?\]/g, '') // Remove BBCode tags
+          .replace(/\s+/g, ' ')    // Normalize whitespace
+          .trim();
+        const excerpt = cleanBody.length > 200
+          ? cleanBody.substring(0, 200) + '...'
+          : cleanBody;
+
+        return {
+          id: msg.idMsg,
+          subject: msg.subject,
+          excerpt: excerpt,
+          posterName: msg.posterName,
+          posterTime: msg.posterTime,
+          topicId: msg.idTopic,
+          numReplies: msg.topic?.numReplies || 0,
+          numViews: msg.topic?.numViews || 0,
+          isSticky: msg.topic?.isSticky === 1,
+          locked: msg.topic?.locked === 1,
+          board: {
+            id: msg.topic?.board?.idBoard,
+            name: msg.topic?.board?.name,
+            categoryName: msg.topic?.board?.category?.name
+          }
+        };
+      });
+
+      return {
+        results,
+        total: totalCount
+      };
+    } catch (error) {
+      this.logger.error('Error searching forums:', error);
+      return { results: [], total: 0 };
+    }
+  }
 }

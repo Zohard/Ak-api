@@ -470,4 +470,25 @@ export class ForumsController {
   ) {
     return await this.forumsService.getUserPosts(userId, parseInt(page), parseInt(limit));
   }
+
+  @Get('search')
+  @ApiOperation({ summary: 'Search forum posts and topics by title or content' })
+  @ApiQuery({ name: 'q', required: true, type: String, description: 'Search query' })
+  @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Results per page (default: 20)' })
+  @ApiQuery({ name: 'offset', required: false, type: Number, description: 'Number of results to skip (default: 0)' })
+  @ApiResponse({ status: 200, description: 'Search results retrieved successfully' })
+  async searchForums(
+    @Query('q') searchQuery: string,
+    @Query('limit') limit: string = '20',
+    @Query('offset') offset: string = '0'
+  ) {
+    if (!searchQuery || searchQuery.trim().length === 0) {
+      return { results: [], total: 0 };
+    }
+    return await this.forumsService.searchForums(
+      searchQuery,
+      parseInt(limit),
+      parseInt(offset)
+    );
+  }
 }
