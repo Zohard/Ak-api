@@ -371,7 +371,7 @@ export class ForumsService {
       // Query to get latest messages with topic and board information
       // We get the latest message from each topic to show recent activity
       const messagesQuery = `
-        SELECT DISTINCT ON (t.id_topic)
+        SELECT
           m.id_msg as id,
           t.id_topic as topic_id,
           t.id_board as board_id,
@@ -393,7 +393,7 @@ export class ForumsService {
         INNER JOIN smf_boards b ON t.id_board = b.id_board
         WHERE b.redirect = '' OR b.redirect IS NULL
         ${whereClause}
-        ORDER BY t.id_topic, m.poster_time DESC
+        ORDER BY m.poster_time DESC
         LIMIT $1 OFFSET $2
       `;
 
