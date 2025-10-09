@@ -720,6 +720,82 @@ export class CollectionsService {
     });
   }
 
+  // Get user info with collection summary (optimized for single user)
+  async getUserInfo(userId: number, currentUserId?: number) {
+    const isOwnCollection = currentUserId === userId;
+
+    // Fetch user info and collection counts in parallel
+    const [user, animeCounts, mangaCounts] = await Promise.all([
+      this.prisma.smfMember.findUnique({
+        where: { idMember: userId },
+        select: {
+          idMember: true,
+          memberName: true,
+          emailAddress: true,
+          avatar: true,
+          dateRegistered: true,
+        }
+      }),
+      this.prisma.collectionAnime.groupBy({
+        by: ['type'],
+        where: {
+          idMembre: userId,
+          ...(isOwnCollection ? {} : { isPublic: true })
+        },
+        _count: { type: true }
+      }),
+      this.prisma.collectionManga.groupBy({
+        by: ['type'],
+        where: {
+          idMembre: userId,
+          ...(isOwnCollection ? {} : { isPublic: true })
+        },
+        _count: { type: true }
+      })
+    ]);
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    const collectionTypes = [
+      { type: 1, name: 'Terminé' },
+      { type: 2, name: 'En cours' },
+      { type: 3, name: 'Planifié' },
+      { type: 4, name: 'Abandonné' }
+    ];
+
+    // Calculate collection counts by type
+    const collections = collectionTypes.map(ct => {
+      const animeCount = animeCounts.find(ac => ac.type === ct.type)?._count?.type || 0;
+      const mangaCount = mangaCounts.find(mc => mc.type === ct.type)?._count?.type || 0;
+
+      return {
+        type: ct.type,
+        name: ct.name,
+        animeCount,
+        mangaCount,
+        totalCount: animeCount + mangaCount,
+        hasItems: (animeCount + mangaCount) > 0
+      };
+    }).filter(c => c.hasItems);
+
+    const totalPublicAnimes = animeCounts.reduce((sum, ac) => sum + (ac._count?.type || 0), 0);
+    const totalPublicMangas = mangaCounts.reduce((sum, mc) => sum + (mc._count?.type || 0), 0);
+
+    return {
+      id: user.idMember,
+      username: user.memberName,
+      email: user.emailAddress,
+      avatarUrl: user.avatar,
+      joinedAt: user.dateRegistered,
+      collections,
+      totalPublicAnimes,
+      totalPublicMangas,
+      totalPublicItems: totalPublicAnimes + totalPublicMangas
+    };
+  }
+
   // Get collection summary (counts per type) for a user
   async getCollectionSummary(userId: number, currentUserId?: number) {
     // Only show collections if it's the current user or collections are public
