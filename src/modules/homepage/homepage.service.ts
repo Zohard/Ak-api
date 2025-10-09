@@ -20,7 +20,7 @@ export class HomePageService {
   ) {}
 
   async getHomePageData() {
-    const cacheKey = 'v1';
+    const cacheKey = 'v2';
     
     // Try cache first
     const cached = await this.cache.getHomepageData(cacheKey);
@@ -46,7 +46,7 @@ export class HomePageService {
         this.reviewsService.findAll({ limit: 6, sortBy: 'dateCritique', sortOrder: 'desc' } as any),
         this.articlesService.findAll({ limit: 6, sort: 'date', order: 'DESC', status: 'published' } as any),
         this.seasonsService.findCurrent(),
-        this.forumsService.getLatestMessages({ limit: 3 } as any),
+        this.forumsService.getLatestMessages({ limit: 2 } as any),
         this.prisma.akAnime.count(),
         this.prisma.akManga.count(),
         this.reviewsService.getReviewsCount(),
@@ -101,7 +101,7 @@ export class HomePageService {
           current: seasonData || null,
           animes: seasonAnimes,
         },
-        forum: forumData || { messages: [], total: 0, limit: 3, offset: 0 },
+        forum: forumData || { messages: [], total: 0, limit: 2, offset: 0 },
         stats: {
           animes: Number(animeCountData || 0),
           mangas: Number(mangaCountData || 0),
@@ -127,7 +127,7 @@ export class HomePageService {
       return {
         hero: { reviews: [], articles: [] },
         season: { current: null, animes: [] },
-        forum: { messages: [], total: 0, limit: 3, offset: 0 },
+        forum: { messages: [], total: 0, limit: 2, offset: 0 },
         stats: { animes: 0, mangas: 0, reviews: 0 },
         generatedAt: new Date().toISOString(),
       };
