@@ -2437,10 +2437,22 @@ export class ForumsService {
       // Format results
       const results = messages.map(msg => {
         // Create excerpt from body (remove BBCode tags and limit length)
-        const cleanBody = msg.body
-          .replace(/\[.*?\]/g, '') // Remove BBCode tags
+        let cleanBody = msg.body
+          .replace(/\[quote[^\]]*\][\s\S]*?\[\/quote\]/gi, '') // Remove quotes first
+          .replace(/\[spoiler[^\]]*\][\s\S]*?\[\/spoiler\]/gi, '[Spoiler]') // Replace spoilers with marker
+          .replace(/\[code\][\s\S]*?\[\/code\]/gi, '[Code]') // Replace code blocks with marker
+          .replace(/\[img[^\]]*\][^\[]*\[\/img\]/gi, '[Image]') // Replace images with marker
+          .replace(/\[url[^\]]*\][^\[]*\[\/url\]/gi, '') // Remove URL tags but keep text
+          .replace(/\[.*?\]/g, '') // Remove all other BBCode tags
+          .replace(/&nbsp;/g, ' ') // Replace HTML entities
+          .replace(/&amp;/g, '&')
+          .replace(/&lt;/g, '<')
+          .replace(/&gt;/g, '>')
+          .replace(/&quot;/g, '"')
+          .replace(/&#039;/g, "'")
           .replace(/\s+/g, ' ')    // Normalize whitespace
           .trim();
+
         const excerpt = cleanBody.length > 200
           ? cleanBody.substring(0, 200) + '...'
           : cleanBody;
