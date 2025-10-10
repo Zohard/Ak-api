@@ -56,6 +56,31 @@ export class EmailService {
     }
   }
 
+  async sendPrivateMessageNotification(
+    recipientEmail: string,
+    recipientUsername: string,
+    senderName: string,
+    subject: string,
+    messagePreview: string,
+  ): Promise<void> {
+    const messagesUrl = `${this.configService.get('FRONTEND_URL')}/messages`;
+
+    const mailOptions = {
+      from: this.configService.get<string>('MAILTRAP_FROM'),
+      to: recipientEmail,
+      subject: `Nouveau message privé de ${senderName} - Anime-Kun`,
+      html: this.getPrivateMessageTemplate(recipientUsername, senderName, subject, messagePreview, messagesUrl),
+    };
+
+    try {
+      await this.transporter.sendMail(mailOptions);
+      console.log(`PM notification email sent to ${recipientEmail}`);
+    } catch (error) {
+      console.error('Error sending PM notification email:', error);
+      // Don't throw - we don't want to fail the PM send if email fails
+    }
+  }
+
   private getEmailVerificationTemplate(username: string, verificationUrl: string): string {
     return `
       <!DOCTYPE html>
@@ -235,6 +260,117 @@ export class EmailService {
               <li>Ne partagez jamais ce lien avec personne</li>
             </ul>
           </div>
+
+          <div class="footer">
+            <p>Cet email a été envoyé automatiquement, merci de ne pas y répondre.</p>
+            <p><strong>L'équipe Anime-Kun</strong></p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+  }
+
+  private getPrivateMessageTemplate(
+    recipientUsername: string,
+    senderName: string,
+    subject: string,
+    messagePreview: string,
+    messagesUrl: string,
+  ): string {
+    // Truncate message preview to 200 characters
+    const truncatedMessage = messagePreview.length > 200
+      ? messagePreview.substring(0, 200) + '...'
+      : messagePreview;
+
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <title>Nouveau message privé</title>
+        <style>
+          body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+          }
+          .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+            border-radius: 8px 8px 0 0;
+          }
+          .content {
+            background-color: #f8fafc;
+            padding: 30px;
+            border-radius: 0 0 8px 8px;
+          }
+          .button {
+            display: inline-block;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 12px 24px;
+            text-decoration: none;
+            border-radius: 6px;
+            margin: 20px 0;
+          }
+          .message-preview {
+            background-color: white;
+            border-left: 4px solid #667eea;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+          }
+          .sender-info {
+            background-color: #ede9fe;
+            border: 1px solid #c4b5fd;
+            padding: 15px;
+            border-radius: 6px;
+            margin: 20px 0;
+          }
+          .footer {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #e5e7eb;
+            font-size: 14px;
+            color: #6b7280;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1>💌 Anime-Kun</h1>
+          <h2>Nouveau message privé</h2>
+        </div>
+        <div class="content">
+          <p>Bonjour <strong>${recipientUsername}</strong>,</p>
+
+          <p>Vous avez reçu un nouveau message privé de <strong>${senderName}</strong> !</p>
+
+          <div class="sender-info">
+            <strong>📧 De :</strong> ${senderName}<br>
+            <strong>📝 Sujet :</strong> ${subject}
+          </div>
+
+          <div class="message-preview">
+            <strong>Aperçu du message :</strong>
+            <p style="margin: 10px 0 0 0; color: #4b5563;">${truncatedMessage}</p>
+          </div>
+
+          <p>Pour lire et répondre à ce message, cliquez sur le bouton ci-dessous :</p>
+
+          <div style="text-align: center;">
+            <a href="${messagesUrl}" class="button">📨 Lire mon message</a>
+          </div>
+
+          <p style="text-align: center; color: #6b7280; font-size: 14px;">
+            Ou copiez ce lien : <a href="${messagesUrl}">${messagesUrl}</a>
+          </p>
 
           <div class="footer">
             <p>Cet email a été envoyé automatiquement, merci de ne pas y répondre.</p>
