@@ -1,5 +1,6 @@
 import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../shared/services/prisma.service';
+import { EmailService } from '../../shared/services/email.service';
 import { CreateMessageDto } from './dto/create-message.dto';
 import { GetMessagesDto, SearchMessagesDto, MarkReadDto } from './dto/get-messages.dto';
 import { SmfMessage, MessageUser, MessageResponse, ConversationMessage } from './interfaces/message.interface';
@@ -8,13 +9,16 @@ import { SmfMessage, MessageUser, MessageResponse, ConversationMessage } from '.
 export class MessagesService {
   private readonly logger = new Logger(MessagesService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly emailService: EmailService,
+  ) {}
 
   async sendMessage(createMessageDto: CreateMessageDto): Promise<MessageResponse> {
     const { senderId, recipientId, subject, message, threadId } = createMessageDto;
 
     try {
-      return await this.prisma.$transaction(async (prisma) => {
+      const result = await this.prisma.$transaction(async (prisma) => {
         // Get sender info
         const sender = await prisma.smfMember.findUnique({
           where: { idMember: senderId },
@@ -23,6 +27,20 @@ export class MessagesService {
 
         if (!sender) {
           throw new NotFoundException('Sender not found');
+        }
+
+        // Get recipient info for email notification
+        const recipient = await prisma.smfMember.findUnique({
+          where: { idMember: recipientId },
+          select: {
+            memberName: true,
+            realName: true,
+            emailAddress: true
+          }
+        });
+
+        if (!recipient) {
+          throw new NotFoundException('Recipient not found');
         }
 
         const senderName = sender.realName || sender.memberName;
@@ -76,9 +94,31 @@ export class MessagesService {
         return {
           success: true,
           messageId,
-          threadId: threadId || messageId
+          threadId: threadId || messageId,
+          recipientEmail: recipient.emailAddress,
+          recipientUsername: recipient.realName || recipient.memberName,
+          senderName
         };
       });
+
+      // Send email notification asynchronously (don't wait for it)
+      if (result.recipientEmail) {
+        this.emailService.sendPrivateMessageNotification(
+          result.recipientEmail,
+          result.recipientUsername,
+          result.senderName,
+          subject,
+          message,
+        ).catch(err => {
+          this.logger.error('Failed to send PM email notification:', err);
+        });
+      }
+
+      return {
+        success: result.success,
+        messageId: result.messageId,
+        threadId: result.threadId
+      };
     } catch (error) {
       this.logger.error('Failed to send message:', error);
       throw new BadRequestException('Failed to send message');
