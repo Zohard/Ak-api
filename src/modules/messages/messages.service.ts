@@ -258,26 +258,46 @@ export class MessagesService {
 
     try {
       await this.prisma.$transaction(async (prisma) => {
-        await prisma.smfPmRecipient.update({
+        // Check if message is already read
+        const recipient = await prisma.smfPmRecipient.findUnique({
           where: {
             idPm_idMember: {
               idPm: messageId,
               idMember: userId
             }
-          },
-          data: {
-            isRead: 1,
-            isNew: 0
           }
         });
 
-        // Update user's unread count
-        await prisma.smfMember.update({
-          where: { idMember: userId },
-          data: {
-            unreadMessages: { decrement: 1 }
+        // Only update if message is unread
+        if (recipient && recipient.isRead === 0) {
+          await prisma.smfPmRecipient.update({
+            where: {
+              idPm_idMember: {
+                idPm: messageId,
+                idMember: userId
+              }
+            },
+            data: {
+              isRead: 1,
+              isNew: 0
+            }
+          });
+
+          // Update user's unread count (only if currently > 0)
+          const user = await prisma.smfMember.findUnique({
+            where: { idMember: userId },
+            select: { unreadMessages: true }
+          });
+
+          if (user && user.unreadMessages > 0) {
+            await prisma.smfMember.update({
+              where: { idMember: userId },
+              data: {
+                unreadMessages: { decrement: 1 }
+              }
+            });
           }
-        });
+        }
       });
     } catch (error) {
       this.logger.error('Failed to mark message as read:', error);
