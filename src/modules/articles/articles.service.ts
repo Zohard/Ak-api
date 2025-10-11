@@ -251,9 +251,9 @@ export class ArticlesService {
       const imgMeta = post.postMeta.find(meta => meta.metaKey === 'img');
       const akImgMeta = post.postMeta.find(meta => meta.metaKey === 'ak_img');
 
-      // Extract categories (filter for category taxonomy only)
+      // Extract categories (filter for category taxonomy only) with better safety checks
       const categories = post.termRelationships
-        .filter(rel => rel.termTaxonomy && rel.termTaxonomy.taxonomy === 'category')
+        .filter(rel => rel.termTaxonomy && rel.termTaxonomy.term && rel.termTaxonomy.taxonomy === 'category')
         .map(rel => ({
           id: rel.termTaxonomy.term.termId,
           idCat: rel.termTaxonomy.term.termId,
@@ -1022,15 +1022,25 @@ export class ArticlesService {
     const imgunebigMeta = post.postMeta?.find(meta => meta.metaKey === 'imgunebig');
     const tagsMeta = post.postMeta?.find(meta => meta.metaKey === 'tags');
 
-    // Extract categories
-    const categories = post.termRelationships?.filter(rel => rel.termTaxonomy).map(rel => ({
-      id: rel.termTaxonomy.term.termId,
-      idCat: rel.termTaxonomy.term.termId,
-      name: rel.termTaxonomy.term.name,
-      nom: rel.termTaxonomy.term.name,
-      slug: rel.termTaxonomy.term.slug,
-      niceUrl: rel.termTaxonomy.term.slug,
-    })) || [];
+    // Extract categories with better safety checks
+    const categories = post.termRelationships
+      ?.filter(rel => rel.termTaxonomy && rel.termTaxonomy.term)
+      .map(rel => ({
+        id: rel.termTaxonomy.term.termId,
+        idCat: rel.termTaxonomy.term.termId,
+        name: rel.termTaxonomy.term.name,
+        nom: rel.termTaxonomy.term.name,
+        slug: rel.termTaxonomy.term.slug,
+        niceUrl: rel.termTaxonomy.term.slug,
+      })) || [];
+
+    // Log if categories are empty for debugging
+    if (categories.length === 0 && post.termRelationships?.length > 0) {
+      console.warn(`Article ${post.ID}: termRelationships exist but no valid categories found`, {
+        relationshipsCount: post.termRelationships.length,
+        firstRel: post.termRelationships[0]
+      });
+    }
 
     // Transform comments
     const comments = post.comments?.map(comment => ({
