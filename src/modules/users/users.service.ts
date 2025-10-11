@@ -63,7 +63,7 @@ export class UsersService {
     ]);
 
     return {
-      users: users.map(this.sanitizeUser),
+      users: users.map(user => this.sanitizeUser(user)),
       pagination: {
         page,
         limit,
