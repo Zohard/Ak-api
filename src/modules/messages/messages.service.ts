@@ -45,29 +45,48 @@ export class MessagesService {
 
         const senderName = sender.realName || sender.memberName;
         const msgTime = Math.floor(Date.now() / 1000);
-        const pmHead = threadId || 0;
 
-        // Insert message
-        const newMessage = await prisma.smfPersonalMessage.create({
-          data: {
-            idPmHead: pmHead,
-            idMemberFrom: senderId,
-            fromName: senderName,
-            msgtime: msgTime,
-            subject,
-            body: message
-          }
-        });
+        // FIXED: Create message with proper idPmHead handling
+        let newMessage;
 
-        const messageId = newMessage.idPm;
+        if (threadId) {
+          // If replying to existing thread, use the threadId
+          newMessage = await prisma.smfPersonalMessage.create({
+            data: {
+              idPmHead: threadId,
+              idMemberFrom: senderId,
+              fromName: senderName,
+              msgtime: msgTime,
+              subject,
+              body: message,
+              deletedBySender: 0
+            }
+          });
+        } else {
+          // For new conversation, we need to create the message first
+          // Then update idPmHead to match its own idPm
+          // This avoids the constraint issue by only creating once
+          newMessage = await prisma.smfPersonalMessage.create({
+            data: {
+              idPmHead: 0, // Temporary value
+              idMemberFrom: senderId,
+              fromName: senderName,
+              msgtime: msgTime,
+              subject,
+              body: message,
+              deletedBySender: 0
+            }
+          });
 
-        // If this is the first message in a thread, update the pm_head
-        if (!threadId) {
-          await prisma.smfPersonalMessage.update({
-            where: { idPm: messageId },
-            data: { idPmHead: messageId }
+          // Update idPmHead to match the newly created idPm
+          newMessage = await prisma.smfPersonalMessage.update({
+            where: { idPm: newMessage.idPm },
+            data: { idPmHead: newMessage.idPm }
           });
         }
+
+        const messageId = newMessage.idPm;
+        const finalThreadId = threadId || messageId;
 
         // Add recipient
         await prisma.smfPmRecipient.create({
@@ -94,7 +113,7 @@ export class MessagesService {
         return {
           success: true,
           messageId,
-          threadId: threadId || messageId,
+          threadId: finalThreadId,
           recipientEmail: recipient.emailAddress,
           recipientUsername: recipient.realName || recipient.memberName,
           senderName
@@ -121,7 +140,43 @@ export class MessagesService {
       };
     } catch (error) {
       this.logger.error('Failed to send message:', error);
+
+      // Provide more specific error information
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+
+      if (error.code === 'P2002') {
+        this.logger.error('Unique constraint violation - possible sequence issue', error);
+        throw new BadRequestException('Message creation failed due to a database constraint. Please try again.');
+      }
+
       throw new BadRequestException('Failed to send message');
+    }
+  }
+
+  /**
+   * Utility method to fix the idPm sequence if it gets out of sync
+   * Call this method via an admin endpoint if you encounter sequence issues
+   */
+  async fixMessageSequence(): Promise<{ success: boolean; message: string }> {
+    try {
+      await this.prisma.$executeRawUnsafe(`
+        SELECT setval(
+          pg_get_serial_sequence('smf_personal_messages', 'id_pm'),
+          COALESCE((SELECT MAX(id_pm) FROM smf_personal_messages), 1),
+          true
+        );
+      `);
+
+      this.logger.log('Message sequence successfully reset');
+      return {
+        success: true,
+        message: 'Message ID sequence has been synchronized with the database'
+      };
+    } catch (error) {
+      this.logger.error('Failed to fix message sequence:', error);
+      throw new BadRequestException('Failed to fix message sequence');
     }
   }
 
