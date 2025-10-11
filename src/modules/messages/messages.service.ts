@@ -15,7 +15,7 @@ export class MessagesService {
   ) {}
 
   async sendMessage(createMessageDto: CreateMessageDto): Promise<MessageResponse> {
-    const { senderId, recipientId, subject, message, threadId } = createMessageDto;
+    const { senderId, recipientId, subject, message, threadId, bccRecipientIds } = createMessageDto;
 
     try {
       const result = await this.prisma.$transaction(async (prisma) => {
@@ -88,7 +88,7 @@ export class MessagesService {
         const messageId = newMessage.idPm;
         const finalThreadId = threadId || messageId;
 
-        // Add recipient
+        // Add main recipient (not BCC)
         await prisma.smfPmRecipient.create({
           data: {
             idPm: messageId,
@@ -100,7 +100,7 @@ export class MessagesService {
           }
         });
 
-        // Update recipient's message counts
+        // Update main recipient's message counts
         await prisma.smfMember.update({
           where: { idMember: recipientId },
           data: {
@@ -110,17 +110,74 @@ export class MessagesService {
           }
         });
 
+        // Add BCC recipients if any
+        const bccRecipientEmails: Array<{ email: string; username: string }> = [];
+        if (bccRecipientIds && bccRecipientIds.length > 0) {
+          for (const bccRecipientId of bccRecipientIds) {
+            // Skip if BCC recipient is same as main recipient or sender
+            if (bccRecipientId === recipientId || bccRecipientId === senderId) {
+              continue;
+            }
+
+            // Get BCC recipient info
+            const bccRecipient = await prisma.smfMember.findUnique({
+              where: { idMember: bccRecipientId },
+              select: {
+                memberName: true,
+                realName: true,
+                emailAddress: true
+              }
+            });
+
+            if (!bccRecipient) {
+              this.logger.warn(`BCC recipient ${bccRecipientId} not found, skipping`);
+              continue;
+            }
+
+            // Create recipient record with BCC flag
+            await prisma.smfPmRecipient.create({
+              data: {
+                idPm: messageId,
+                idMember: bccRecipientId,
+                bcc: 1, // Mark as BCC
+                isRead: 0,
+                isNew: 1,
+                deleted: 0
+              }
+            });
+
+            // Update BCC recipient's message counts
+            await prisma.smfMember.update({
+              where: { idMember: bccRecipientId },
+              data: {
+                instantMessages: { increment: 1 },
+                unreadMessages: { increment: 1 },
+                newPm: 1
+              }
+            });
+
+            // Collect BCC recipient email info for notifications
+            if (bccRecipient.emailAddress) {
+              bccRecipientEmails.push({
+                email: bccRecipient.emailAddress,
+                username: bccRecipient.realName || bccRecipient.memberName
+              });
+            }
+          }
+        }
+
         return {
           success: true,
           messageId,
           threadId: finalThreadId,
           recipientEmail: recipient.emailAddress,
           recipientUsername: recipient.realName || recipient.memberName,
-          senderName
+          senderName,
+          bccRecipientEmails
         };
       });
 
-      // Send email notification asynchronously (don't wait for it)
+      // Send email notification to main recipient asynchronously (don't wait for it)
       if (result.recipientEmail) {
         this.emailService.sendPrivateMessageNotification(
           result.recipientEmail,
@@ -131,6 +188,21 @@ export class MessagesService {
         ).catch(err => {
           this.logger.error('Failed to send PM email notification:', err);
         });
+      }
+
+      // Send email notifications to BCC recipients asynchronously
+      if (result.bccRecipientEmails && result.bccRecipientEmails.length > 0) {
+        for (const bccRecipient of result.bccRecipientEmails) {
+          this.emailService.sendPrivateMessageNotification(
+            bccRecipient.email,
+            bccRecipient.username,
+            result.senderName,
+            subject,
+            message,
+          ).catch(err => {
+            this.logger.error(`Failed to send BCC PM email notification to ${bccRecipient.username}:`, err);
+          });
+        }
       }
 
       return {
