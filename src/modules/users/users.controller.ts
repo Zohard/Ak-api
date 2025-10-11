@@ -291,4 +291,17 @@ export class UsersController {
   ) {
     return this.usersService.getPublicUserActivity(pseudo, limit || 10);
   }
+
+  @Get('birthdays')
+  @ApiOperation({ summary: 'Récupérer les anniversaires des utilisateurs par mois' })
+  @ApiQuery({ name: 'month', required: true, description: 'Mois (1-12)', example: 1 })
+  @ApiQuery({ name: 'year', required: true, description: 'Année', example: 2025 })
+  @ApiResponse({ status: 200, description: 'Liste des anniversaires du mois' })
+  @ApiResponse({ status: 400, description: 'Paramètres invalides' })
+  async getUserBirthdays(
+    @Query('month', ParseIntPipe) month: number,
+    @Query('year', ParseIntPipe) year: number,
+  ) {
+    return this.usersService.getUserBirthdays(month, year);
+  }
 }

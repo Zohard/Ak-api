@@ -1186,6 +1186,64 @@ export class UsersService {
     };
   }
 
+  async getUserBirthdays(month: number, year: number) {
+    // Validate month
+    if (month < 1 || month > 12) {
+      throw new BadRequestException('Le mois doit être entre 1 et 12');
+    }
+
+    // Get all users with birthdays in the specified month
+    const users = await this.prisma.$queryRaw`
+      SELECT
+        id_member as "idMember",
+        member_name as "memberName",
+        real_name as "realName",
+        avatar,
+        birthdate,
+        EXTRACT(DAY FROM birthdate) as day
+      FROM smf_members
+      WHERE birthdate IS NOT NULL
+        AND EXTRACT(MONTH FROM birthdate) = ${month}
+      ORDER BY EXTRACT(DAY FROM birthdate), member_name
+    `;
+
+    // Calculate age and format response
+    const birthdays = (users as any[]).map(user => {
+      const birthDate = new Date(user.birthdate);
+      const currentYear = year;
+      const birthYear = birthDate.getFullYear();
+
+      // Calculate age (will be their age on this birthday in the given year)
+      let age = currentYear - birthYear;
+
+      return {
+        id: user.idMember,
+        pseudo: user.realName || user.memberName,
+        memberName: user.memberName,
+        avatar: user.avatar,
+        birthdate: user.birthdate,
+        day: Number(user.day),
+        age: age
+      };
+    });
+
+    // Group by day
+    const birthdaysByDay: { [key: number]: any[] } = {};
+    birthdays.forEach(birthday => {
+      if (!birthdaysByDay[birthday.day]) {
+        birthdaysByDay[birthday.day] = [];
+      }
+      birthdaysByDay[birthday.day].push(birthday);
+    });
+
+    return {
+      month,
+      year,
+      birthdays: birthdaysByDay,
+      total: birthdays.length
+    };
+  }
+
   private decodeHtmlEntities(text: string): string {
     if (!text) return '';
     return text
