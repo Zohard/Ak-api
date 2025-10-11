@@ -43,7 +43,7 @@ export class HomePageService {
         mangaCount,
         reviewsCount,
       ] = await Promise.allSettled([
-        this.reviewsService.findAll({ limit: 6, sortBy: 'dateCritique', sortOrder: 'desc' } as any),
+        this.reviewsService.findAll({ limit: 6, sortBy: 'dateCritique', sortOrder: 'desc', statut: 0 } as any), // Only public reviews
         this.articlesService.findAll({ limit: 6, sort: 'date', order: 'DESC', status: 'published' } as any),
         this.seasonsService.findCurrent(),
         this.forumsService.getLatestMessages({ limit: 2 } as any),
@@ -145,10 +145,10 @@ export class HomePageService {
     // Test each data source individually
     try {
       this.logger.log('🧪 Testing reviews service...');
-      const reviewsResult = await this.reviewsService.findAll({ limit: 3, sortBy: 'dateCritique', sortOrder: 'desc' } as any);
+      const reviewsResult = await this.reviewsService.findAll({ limit: 3, sortBy: 'dateCritique', sortOrder: 'desc', statut: 0 } as any); // Only public reviews
       debug.sources.reviews = {
         status: 'success',
-        count: Array.isArray((reviewsResult as any)?.reviews) ? (reviewsResult as any).reviews.length : 
+        count: Array.isArray((reviewsResult as any)?.reviews) ? (reviewsResult as any).reviews.length :
                Array.isArray((reviewsResult as any)?.data) ? (reviewsResult as any).data.length : 0,
         sampleData: reviewsResult
       };
