@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsString, IsInt, IsOptional, MaxLength } from 'class-validator';
+import { IsNotEmpty, IsString, IsInt, IsOptional, MaxLength, IsArray } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class CreateMessageDto {
@@ -25,4 +25,10 @@ export class CreateMessageDto {
   @IsInt()
   @Type(() => Number)
   threadId?: number;
+
+  @IsOptional()
+  @IsArray()
+  @IsInt({ each: true })
+  @Type(() => Number)
+  bccRecipientIds?: number[];
 }
