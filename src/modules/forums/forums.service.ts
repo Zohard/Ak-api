@@ -596,17 +596,13 @@ export class ForumsService {
 
   /**
    * Get all forum posts from a specific user with pagination
+   * Only shows approved messages in non-redirect boards
    */
   async getUserPosts(userId: number, page: number = 1, limit: number = 20): Promise<any> {
     try {
       const skip = (page - 1) * limit;
 
-      // Get total count
-      const total = await this.prisma.smfMessage.count({
-        where: { idMember: userId }
-      });
-
-      // Get user info
+      // Get user info first
       const user = await this.prisma.smfMember.findUnique({
         where: { idMember: userId },
         select: {
@@ -622,11 +618,12 @@ export class ForumsService {
         throw new NotFoundException('User not found');
       }
 
-      // Get paginated messages
-      const messages = await this.prisma.smfMessage.findMany({
-        where: { idMember: userId },
-        take: limit,
-        skip,
+      // Get all messages with their topics and boards
+      const allMessages = await this.prisma.smfMessage.findMany({
+        where: {
+          idMember: userId,
+          approved: 1 // Only approved messages
+        },
         orderBy: { posterTime: 'desc' },
         include: {
           topic: {
@@ -642,7 +639,28 @@ export class ForumsService {
         }
       });
 
-      const formattedMessages = messages.map(message => ({
+      // Filter messages by board access and exclude redirect boards
+      const accessibleMessages: any[] = [];
+      for (const message of allMessages) {
+        // Skip if board is a redirect
+        if (message.topic?.board?.redirect && message.topic.board.redirect.trim() !== '') {
+          continue;
+        }
+
+        // Check board access (this will handle permissions)
+        const hasAccess = await this.checkBoardAccess(message.topic.board.idBoard, userId);
+        if (hasAccess) {
+          accessibleMessages.push(message);
+        }
+      }
+
+      // Get total count of accessible messages
+      const total = accessibleMessages.length;
+
+      // Apply pagination to accessible messages
+      const paginatedMessages = accessibleMessages.slice(skip, skip + limit);
+
+      const formattedMessages = paginatedMessages.map(message => ({
         id: message.idMsg,
         subject: message.subject || '',
         body: message.body,
