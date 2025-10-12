@@ -403,7 +403,7 @@ export class ForumsService {
           t.id_topic as topic_id,
           t.id_board as board_id,
           COALESCE(first_msg.subject, m.subject) as subject,
-          SUBSTRING(m.body FROM 1 FOR 200) as body_excerpt,
+          m.body as body_excerpt,
           m.poster_time,
           m.poster_name,
           m.id_member as member_id,
@@ -450,7 +450,7 @@ export class ForumsService {
         topicId: Number(row.topic_id),
         boardId: Number(row.board_id),
         subject: row.subject || 'Untitled Topic',
-        body: this.stripSmfBBCode(row.body_excerpt || ''),
+        body: row.body_excerpt || '', // Return raw BBCode for frontend parsing
         posterTime: Number(row.poster_time),
         posterName: row.poster_name || 'Unknown',
         memberId: Number(row.member_id) || 0,
