@@ -615,10 +615,10 @@ export class ReviewsService {
     const cacheKey = `user_review:${userId}:${type}:${contentId}`;
     
     // Try to get from cache first
-    const cached = await this.cacheService.get(cacheKey);
-    if (cached !== null) {
-      return cached;
-    }
+    //const cached = await this.cacheService.get(cacheKey);
+    //if (cached !== null) {
+      //return cached;
+    //}
 
     const whereCondition = {
       idMembre: userId,
