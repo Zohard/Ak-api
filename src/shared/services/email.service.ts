@@ -359,7 +359,7 @@ export class EmailService {
 
           <div class="message-preview">
             <strong>Aperçu du message :</strong>
-            <p style="margin: 10px 0 0 0; color: #4b5563;">${truncatedMessage}</p>
+            <p style="margin: 10px 0 0 0; color: #1f2937;">${truncatedMessage}</p>
           </div>
 
           <p>Pour lire et répondre à ce message, cliquez sur le bouton ci-dessous :</p>
