@@ -25,7 +25,15 @@ export class ForumsService {
               ]
             },
             orderBy: { boardOrder: 'asc' },
-            include: {
+            select: {
+              idBoard: true,
+              name: true,
+              description: true,
+              numTopics: true,
+              numPosts: true,
+              redirect: true,
+              idLastMsg: true,
+              idParent: true, // Include idParent to identify child boards
               _count: {
                 select: { topics: true, messages: true }
               }
@@ -51,15 +59,11 @@ export class ForumsService {
         categories.map(async category => {
           this.logger.log(`Processing category: ${category.name} with ${category.boards.length} boards`);
 
-          const accessibleBoards = await Promise.all(
+          // Build all board objects with their data
+          const allBoardsWithData = await Promise.all(
             category.boards.map(async board => {
               const hasAccess = await this.checkBoardAccess(board.idBoard, userId);
-              this.logger.log(`Board ${board.idBoard} (${board.name}) access for user ${userId}: ${hasAccess}`);
-
-              // Special logging for Team AK boards
-              if (category.name === 'Team AK') {
-                this.logger.warn(`🔍 TEAM AK BOARD DETECTED: ${board.idBoard} (${board.name}) - access: ${hasAccess} - member_groups: "${board.memberGroups}"`);
-              }
+              this.logger.log(`Board ${board.idBoard} (${board.name}) access for user ${userId}: ${hasAccess}, idParent: ${board.idParent}`);
 
               if (!hasAccess) return null;
 
@@ -105,20 +109,43 @@ export class ForumsService {
                 numTopics: board.numTopics,
                 numPosts: board.numPosts,
                 redirect: board.redirect,
-                lastMessage: lastMessage
+                lastMessage: lastMessage,
+                idParent: board.idParent
               };
             })
           );
 
-          const filteredBoards = accessibleBoards.filter(board => board !== null);
-          this.logger.log(`Category ${category.name}: ${filteredBoards.length}/${category.boards.length} accessible boards`);
+          // Filter out null values (boards without access)
+          const accessibleBoards = allBoardsWithData.filter(board => board !== null);
+
+          // Separate parent boards (idParent === 0) from child boards (idParent > 0)
+          const parentBoards = accessibleBoards.filter(board => board.idParent === 0);
+          const childBoards = accessibleBoards.filter(board => board.idParent > 0);
+
+          // Nest child boards under their parent boards
+          const boardsWithChildren = parentBoards.map(parentBoard => {
+            const children = childBoards.filter(child => child.idParent === parentBoard.id);
+
+            // Remove idParent from the response (we don't need it in the frontend)
+            const { idParent: _, ...boardWithoutIdParent } = parentBoard;
+
+            return {
+              ...boardWithoutIdParent,
+              children: children.length > 0 ? children.map(child => {
+                const { idParent: __, ...childWithoutIdParent } = child;
+                return childWithoutIdParent;
+              }) : undefined
+            };
+          });
+
+          this.logger.log(`Category ${category.name}: ${parentBoards.length} parent boards, ${childBoards.length} child boards`);
 
           return {
             id: category.idCat,
             name: category.name,
             catOrder: category.catOrder,
             canCollapse: Boolean(category.canCollapse),
-            boards: filteredBoards
+            boards: boardsWithChildren
           };
         })
       );
