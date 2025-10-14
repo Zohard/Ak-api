@@ -69,9 +69,9 @@ export class MangasController {
   @ApiQuery({
     name: 'type',
     required: false,
-    description: 'Type de classement',
+    description: 'Type de classement (reviews-based only)',
     example: 'reviews-bayes',
-    enum: ['reviews-bayes', 'reviews-avg', 'collection-bayes', 'collection-avg'],
+    enum: ['reviews-bayes', 'reviews-avg'],
   })
   @ApiResponse({ status: 200, description: 'Liste des meilleurs mangas' })
   async getTopMangas(
@@ -94,9 +94,9 @@ export class MangasController {
   @ApiQuery({
     name: 'type',
     required: false,
-    description: 'Type de classement',
+    description: 'Type de classement (reviews-based only)',
     example: 'reviews-bayes',
-    enum: ['reviews-bayes', 'reviews-avg', 'collection-bayes', 'collection-avg'],
+    enum: ['reviews-bayes', 'reviews-avg'],
   })
   @ApiResponse({ status: 200, description: 'Liste des pires mangas' })
   async getFlopMangas(
