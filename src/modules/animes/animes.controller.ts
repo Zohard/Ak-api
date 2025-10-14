@@ -58,10 +58,46 @@ export class AnimesController {
     description: "Nombre d'animes à retourner",
     example: 10,
   })
+  @ApiQuery({
+    name: 'type',
+    required: false,
+    description: 'Type de classement',
+    example: 'reviews-bayes',
+    enum: ['reviews-bayes', 'reviews-avg', 'collection-bayes', 'collection-avg'],
+  })
   @ApiResponse({ status: 200, description: 'Liste des meilleurs animes' })
-  async getTopAnimes(@Query('limit') limit?: string) {
+  async getTopAnimes(
+    @Query('limit') limit?: string,
+    @Query('type') type?: string,
+  ) {
     const parsedLimit = limit ? parseInt(limit) : 10;
-    return this.animesService.getTopAnimes(parsedLimit);
+    const rankingType = type || 'reviews-bayes';
+    return this.animesService.getTopAnimes(parsedLimit, rankingType);
+  }
+
+  @Get('flop')
+  @ApiOperation({ summary: 'Flop animes les moins bien notés' })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    description: "Nombre d'animes à retourner",
+    example: 20,
+  })
+  @ApiQuery({
+    name: 'type',
+    required: false,
+    description: 'Type de classement',
+    example: 'reviews-bayes',
+    enum: ['reviews-bayes', 'reviews-avg', 'collection-bayes', 'collection-avg'],
+  })
+  @ApiResponse({ status: 200, description: 'Liste des pires animes' })
+  async getFlopAnimes(
+    @Query('limit') limit?: string,
+    @Query('type') type?: string,
+  ) {
+    const parsedLimit = limit ? parseInt(limit) : 20;
+    const rankingType = type || 'reviews-bayes';
+    return this.animesService.getFlopAnimes(parsedLimit, rankingType);
   }
 
   @Get('random')

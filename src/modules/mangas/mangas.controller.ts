@@ -60,10 +60,52 @@ export class MangasController {
 
   @Get('top')
   @ApiOperation({ summary: 'Top mangas les mieux notés' })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    description: "Nombre de mangas à retourner",
+    example: 10,
+  })
+  @ApiQuery({
+    name: 'type',
+    required: false,
+    description: 'Type de classement',
+    example: 'reviews-bayes',
+    enum: ['reviews-bayes', 'reviews-avg', 'collection-bayes', 'collection-avg'],
+  })
   @ApiResponse({ status: 200, description: 'Liste des meilleurs mangas' })
-  async getTopMangas(@Query('limit') limit?: string) {
+  async getTopMangas(
+    @Query('limit') limit?: string,
+    @Query('type') type?: string,
+  ) {
     const parsedLimit = limit ? parseInt(limit) : 10;
-    return this.mangasService.getTopMangas(parsedLimit);
+    const rankingType = type || 'reviews-bayes';
+    return this.mangasService.getTopMangas(parsedLimit, rankingType);
+  }
+
+  @Get('flop')
+  @ApiOperation({ summary: 'Flop mangas les moins bien notés' })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    description: "Nombre de mangas à retourner",
+    example: 20,
+  })
+  @ApiQuery({
+    name: 'type',
+    required: false,
+    description: 'Type de classement',
+    example: 'reviews-bayes',
+    enum: ['reviews-bayes', 'reviews-avg', 'collection-bayes', 'collection-avg'],
+  })
+  @ApiResponse({ status: 200, description: 'Liste des pires mangas' })
+  async getFlopMangas(
+    @Query('limit') limit?: string,
+    @Query('type') type?: string,
+  ) {
+    const parsedLimit = limit ? parseInt(limit) : 20;
+    const rankingType = type || 'reviews-bayes';
+    return this.mangasService.getFlopMangas(parsedLimit, rankingType);
   }
 
   @Get('random')
