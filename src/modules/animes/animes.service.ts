@@ -482,12 +482,16 @@ export class AnimesService extends BaseContentService<
       return cached;
     }
 
-    // Simplified: only use review-based rankings since collection fields don't exist
+    // Determine minimum review count based on ranking type
+    // Bayesian: requires more reviews to reduce impact of outliers
+    // Average: allows fewer reviews for a wider range
+    const minReviews = type === 'reviews-bayes' ? 10 : 3;
+
     const animes = await this.prisma.executeWithRetry(() =>
       this.prisma.akAnime.findMany({
         where: {
           statut: 1,
-          nbReviews: { gte: 3 }, // Minimum 3 reviews
+          nbReviews: { gte: minReviews },
         },
         orderBy: [{ moyenneNotes: 'desc' }, { nbReviews: 'desc' }],
         take: limit,
@@ -528,12 +532,16 @@ export class AnimesService extends BaseContentService<
       return cached;
     }
 
-    // Simplified: only use review-based rankings since collection fields don't exist
+    // Determine minimum review count based on ranking type
+    // Bayesian: requires more reviews to reduce impact of outliers
+    // Average: allows fewer reviews for a wider range
+    const minReviews = type === 'reviews-bayes' ? 10 : 3;
+
     const animes = await this.prisma.executeWithRetry(() =>
       this.prisma.akAnime.findMany({
         where: {
           statut: 1,
-          nbReviews: { gte: 3 }, // Minimum 3 reviews
+          nbReviews: { gte: minReviews },
         },
         orderBy: [{ moyenneNotes: 'asc' }, { nbReviews: 'desc' }],
         take: limit,
