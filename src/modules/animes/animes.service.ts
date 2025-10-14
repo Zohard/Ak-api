@@ -482,35 +482,85 @@ export class AnimesService extends BaseContentService<
       return cached;
     }
 
-    // Determine minimum review count based on ranking type
-    // Bayesian: requires more reviews to reduce impact of outliers
-    // Average: allows fewer reviews for a wider range
-    const minReviews = type === 'reviews-bayes' ? 10 : 3;
+    let animes: any[];
 
-    const animes = await this.prisma.executeWithRetry(() =>
-      this.prisma.akAnime.findMany({
-        where: {
-          statut: 1,
-          nbReviews: { gte: minReviews },
-        },
-        orderBy: [{ moyenneNotes: 'desc' }, { nbReviews: 'desc' }],
-        take: limit,
+    // Collection-based rankings (ratings are out of 5)
+    if (type === 'collection-bayes' || type === 'collection-avg') {
+      const minRatings = type === 'collection-bayes' ? 10 : 3;
+
+      // Use raw SQL to calculate average from collection ratings
+      // Collection ratings are /5, so we multiply by 2 to get /10 for consistency
+      const results = await this.prisma.$queryRaw<Array<{
+        id_anime: number;
+        avg_rating: number;
+        num_ratings: number
+      }>>`
+        SELECT
+          a.id_anime,
+          (AVG(c.evaluation) * 2)::float as avg_rating,
+          COUNT(c.evaluation)::int as num_ratings
+        FROM ak_animes a
+        INNER JOIN collection_animes c ON a.id_anime = c.id_anime
+        WHERE a.statut = 1 AND c.evaluation > 0
+        GROUP BY a.id_anime
+        HAVING COUNT(c.evaluation) >= ${minRatings}
+        ORDER BY AVG(c.evaluation) DESC, COUNT(c.evaluation) DESC
+        LIMIT ${limit}
+      `;
+
+      // Fetch full anime details for each result
+      const animeIds = results.map(r => r.id_anime);
+      animes = await this.prisma.akAnime.findMany({
+        where: { idAnime: { in: animeIds }, statut: 1 },
         include: {
           reviews: {
             take: 2,
             orderBy: { dateCritique: 'desc' },
             include: {
               membre: {
-                select: {
-                  idMember: true,
-                  memberName: true,
-                },
+                select: { idMember: true, memberName: true },
               },
             },
           },
         },
-      })
-    );
+      });
+
+      // Sort animes in the same order as results and add collection stats
+      const animeMap = new Map(animes.map(a => [a.idAnime, a]));
+      animes = results.map(r => {
+        const anime = animeMap.get(r.id_anime);
+        return anime ? {
+          ...anime,
+          moyenneNotes: r.avg_rating, // Use collection average (converted to /10)
+          nbReviews: r.num_ratings, // Show number of collection ratings
+        } : null;
+      }).filter(Boolean);
+
+    } else {
+      // Reviews-based rankings (existing logic)
+      const minReviews = type === 'reviews-bayes' ? 10 : 3;
+      animes = await this.prisma.executeWithRetry(() =>
+        this.prisma.akAnime.findMany({
+          where: {
+            statut: 1,
+            nbReviews: { gte: minReviews },
+          },
+          orderBy: [{ moyenneNotes: 'desc' }, { nbReviews: 'desc' }],
+          take: limit,
+          include: {
+            reviews: {
+              take: 2,
+              orderBy: { dateCritique: 'desc' },
+              include: {
+                membre: {
+                  select: { idMember: true, memberName: true },
+                },
+              },
+            },
+          },
+        })
+      );
+    }
 
     const result = {
       topAnimes: animes.map(this.formatAnime.bind(this)),
@@ -532,35 +582,85 @@ export class AnimesService extends BaseContentService<
       return cached;
     }
 
-    // Determine minimum review count based on ranking type
-    // Bayesian: requires more reviews to reduce impact of outliers
-    // Average: allows fewer reviews for a wider range
-    const minReviews = type === 'reviews-bayes' ? 10 : 3;
+    let animes: any[];
 
-    const animes = await this.prisma.executeWithRetry(() =>
-      this.prisma.akAnime.findMany({
-        where: {
-          statut: 1,
-          nbReviews: { gte: minReviews },
-        },
-        orderBy: [{ moyenneNotes: 'asc' }, { nbReviews: 'desc' }],
-        take: limit,
+    // Collection-based rankings (ratings are out of 5)
+    if (type === 'collection-bayes' || type === 'collection-avg') {
+      const minRatings = type === 'collection-bayes' ? 10 : 3;
+
+      // Use raw SQL to calculate average from collection ratings
+      // Collection ratings are /5, so we multiply by 2 to get /10 for consistency
+      const results = await this.prisma.$queryRaw<Array<{
+        id_anime: number;
+        avg_rating: number;
+        num_ratings: number
+      }>>`
+        SELECT
+          a.id_anime,
+          (AVG(c.evaluation) * 2)::float as avg_rating,
+          COUNT(c.evaluation)::int as num_ratings
+        FROM ak_animes a
+        INNER JOIN collection_animes c ON a.id_anime = c.id_anime
+        WHERE a.statut = 1 AND c.evaluation > 0
+        GROUP BY a.id_anime
+        HAVING COUNT(c.evaluation) >= ${minRatings}
+        ORDER BY AVG(c.evaluation) ASC, COUNT(c.evaluation) DESC
+        LIMIT ${limit}
+      `;
+
+      // Fetch full anime details for each result
+      const animeIds = results.map(r => r.id_anime);
+      animes = await this.prisma.akAnime.findMany({
+        where: { idAnime: { in: animeIds }, statut: 1 },
         include: {
           reviews: {
             take: 2,
             orderBy: { dateCritique: 'desc' },
             include: {
               membre: {
-                select: {
-                  idMember: true,
-                  memberName: true,
-                },
+                select: { idMember: true, memberName: true },
               },
             },
           },
         },
-      })
-    );
+      });
+
+      // Sort animes in the same order as results and add collection stats
+      const animeMap = new Map(animes.map(a => [a.idAnime, a]));
+      animes = results.map(r => {
+        const anime = animeMap.get(r.id_anime);
+        return anime ? {
+          ...anime,
+          moyenneNotes: r.avg_rating, // Use collection average (converted to /10)
+          nbReviews: r.num_ratings, // Show number of collection ratings
+        } : null;
+      }).filter(Boolean);
+
+    } else {
+      // Reviews-based rankings (existing logic)
+      const minReviews = type === 'reviews-bayes' ? 10 : 3;
+      animes = await this.prisma.executeWithRetry(() =>
+        this.prisma.akAnime.findMany({
+          where: {
+            statut: 1,
+            nbReviews: { gte: minReviews },
+          },
+          orderBy: [{ moyenneNotes: 'asc' }, { nbReviews: 'desc' }],
+          take: limit,
+          include: {
+            reviews: {
+              take: 2,
+              orderBy: { dateCritique: 'desc' },
+              include: {
+                membre: {
+                  select: { idMember: true, memberName: true },
+                },
+              },
+            },
+          },
+        })
+      );
+    }
 
     const result = {
       flopAnimes: animes.map(this.formatAnime.bind(this)),
