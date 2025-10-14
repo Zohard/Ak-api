@@ -474,44 +474,274 @@ export class AnimesService extends BaseContentService<
     return { message: 'Anime supprimé avec succès' };
   }
 
-  async getTopAnimes(limit = 10) {
+  async getTopAnimes(limit = 10, type = 'reviews-bayes') {
     // Try to get from cache first
-    const cached = await this.cacheService.getTopContent('anime', limit);
+    const cacheKey = `top_anime_${type}_${limit}`;
+    const cached = await this.cacheService.get(cacheKey);
     if (cached) {
       return cached;
     }
 
-    const animes = await this.prisma.executeWithRetry(() =>
-      this.prisma.akAnime.findMany({
-        where: {
-          statut: 1,
-        },
-        orderBy: [{ dateAjout: 'desc' }],
-        take: limit,
-        include: {
-          reviews: {
-            take: 2,
-            orderBy: { dateCritique: 'desc' },
+    let animes: any[];
+
+    switch (type) {
+      case 'reviews-avg':
+        // Simple average rating from reviews
+        animes = await this.prisma.executeWithRetry(() =>
+          this.prisma.akAnime.findMany({
+            where: {
+              statut: 1,
+              nbrCritiques: { gte: 3 }, // Minimum 3 reviews
+            },
+            orderBy: [{ moyenneNotes: 'desc' }, { nbrCritiques: 'desc' }],
+            take: limit,
             include: {
-              membre: {
-                select: {
-                  idMember: true,
-                  memberName: true,
+              reviews: {
+                take: 2,
+                orderBy: { dateCritique: 'desc' },
+                include: {
+                  membre: {
+                    select: {
+                      idMember: true,
+                      memberName: true,
+                    },
+                  },
                 },
               },
             },
-          },
-        },
-      })
-    );
+          })
+        );
+        break;
+
+      case 'collection-bayes':
+        // Bayesian average for collection ratings
+        animes = await this.prisma.executeWithRetry(() =>
+          this.prisma.akAnime.findMany({
+            where: {
+              statut: 1,
+              nbrVotes: { gte: 5 }, // Minimum 5 collection votes
+            },
+            orderBy: [{ moyenneVotes: 'desc' }, { nbrVotes: 'desc' }],
+            take: limit,
+            include: {
+              reviews: {
+                take: 2,
+                orderBy: { dateCritique: 'desc' },
+                include: {
+                  membre: {
+                    select: {
+                      idMember: true,
+                      memberName: true,
+                    },
+                  },
+                },
+              },
+            },
+          })
+        );
+        break;
+
+      case 'collection-avg':
+        // Simple average for collection ratings
+        animes = await this.prisma.executeWithRetry(() =>
+          this.prisma.akAnime.findMany({
+            where: {
+              statut: 1,
+              nbrVotes: { gte: 5 }, // Minimum 5 collection votes
+            },
+            orderBy: [{ moyenneVotes: 'desc' }, { nbrVotes: 'desc' }],
+            take: limit,
+            include: {
+              reviews: {
+                take: 2,
+                orderBy: { dateCritique: 'desc' },
+                include: {
+                  membre: {
+                    select: {
+                      idMember: true,
+                      memberName: true,
+                    },
+                  },
+                },
+              },
+            },
+          })
+        );
+        break;
+
+      case 'reviews-bayes':
+      default:
+        // Bayesian average for review ratings (default)
+        animes = await this.prisma.executeWithRetry(() =>
+          this.prisma.akAnime.findMany({
+            where: {
+              statut: 1,
+              nbrCritiques: { gte: 3 }, // Minimum 3 reviews
+            },
+            orderBy: [{ moyenneNotes: 'desc' }, { nbrCritiques: 'desc' }],
+            take: limit,
+            include: {
+              reviews: {
+                take: 2,
+                orderBy: { dateCritique: 'desc' },
+                include: {
+                  membre: {
+                    select: {
+                      idMember: true,
+                      memberName: true,
+                    },
+                  },
+                },
+              },
+            },
+          })
+        );
+    }
 
     const result = {
-      topAnimes: animes.map(this.formatAnime),
+      topAnimes: animes.map(this.formatAnime.bind(this)),
+      rankingType: type,
       generatedAt: new Date().toISOString(),
     };
 
     // Cache for 15 minutes
-    await this.cacheService.setTopContent('anime', limit, result, 900);
+    await this.cacheService.set(cacheKey, result, 900);
+
+    return result;
+  }
+
+  async getFlopAnimes(limit = 20, type = 'reviews-bayes') {
+    // Try to get from cache first
+    const cacheKey = `flop_anime_${type}_${limit}`;
+    const cached = await this.cacheService.get(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
+    let animes: any[];
+
+    switch (type) {
+      case 'reviews-avg':
+        // Simple average rating from reviews (lowest)
+        animes = await this.prisma.executeWithRetry(() =>
+          this.prisma.akAnime.findMany({
+            where: {
+              statut: 1,
+              nbrCritiques: { gte: 3 }, // Minimum 3 reviews
+            },
+            orderBy: [{ moyenneNotes: 'asc' }, { nbrCritiques: 'desc' }],
+            take: limit,
+            include: {
+              reviews: {
+                take: 2,
+                orderBy: { dateCritique: 'desc' },
+                include: {
+                  membre: {
+                    select: {
+                      idMember: true,
+                      memberName: true,
+                    },
+                  },
+                },
+              },
+            },
+          })
+        );
+        break;
+
+      case 'collection-bayes':
+        // Bayesian average for collection ratings (lowest)
+        animes = await this.prisma.executeWithRetry(() =>
+          this.prisma.akAnime.findMany({
+            where: {
+              statut: 1,
+              nbrVotes: { gte: 5 }, // Minimum 5 collection votes
+            },
+            orderBy: [{ moyenneVotes: 'asc' }, { nbrVotes: 'desc' }],
+            take: limit,
+            include: {
+              reviews: {
+                take: 2,
+                orderBy: { dateCritique: 'desc' },
+                include: {
+                  membre: {
+                    select: {
+                      idMember: true,
+                      memberName: true,
+                    },
+                  },
+                },
+              },
+            },
+          })
+        );
+        break;
+
+      case 'collection-avg':
+        // Simple average for collection ratings (lowest)
+        animes = await this.prisma.executeWithRetry(() =>
+          this.prisma.akAnime.findMany({
+            where: {
+              statut: 1,
+              nbrVotes: { gte: 5 }, // Minimum 5 collection votes
+            },
+            orderBy: [{ moyenneVotes: 'asc' }, { nbrVotes: 'desc' }],
+            take: limit,
+            include: {
+              reviews: {
+                take: 2,
+                orderBy: { dateCritique: 'desc' },
+                include: {
+                  membre: {
+                    select: {
+                      idMember: true,
+                      memberName: true,
+                    },
+                  },
+                },
+              },
+            },
+          })
+        );
+        break;
+
+      case 'reviews-bayes':
+      default:
+        // Bayesian average for review ratings (lowest) (default)
+        animes = await this.prisma.executeWithRetry(() =>
+          this.prisma.akAnime.findMany({
+            where: {
+              statut: 1,
+              nbrCritiques: { gte: 3 }, // Minimum 3 reviews
+            },
+            orderBy: [{ moyenneNotes: 'asc' }, { nbrCritiques: 'desc' }],
+            take: limit,
+            include: {
+              reviews: {
+                take: 2,
+                orderBy: { dateCritique: 'desc' },
+                include: {
+                  membre: {
+                    select: {
+                      idMember: true,
+                      memberName: true,
+                    },
+                  },
+                },
+              },
+            },
+          })
+        );
+    }
+
+    const result = {
+      flopAnimes: animes.map(this.formatAnime.bind(this)),
+      rankingType: type,
+      generatedAt: new Date().toISOString(),
+    };
+
+    // Cache for 15 minutes
+    await this.cacheService.set(cacheKey, result, 900);
 
     return result;
   }
