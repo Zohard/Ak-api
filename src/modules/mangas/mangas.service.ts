@@ -412,6 +412,75 @@ export class MangasService extends BaseContentService<
       return cached;
     }
 
+    // Handle collection-based rankings
+    if (type === 'collection-bayes' || type === 'collection-avg') {
+      const minRatings = type === 'collection-bayes' ? 10 : 3;
+
+      // Query collection_mangas for user ratings
+      // Collection ratings are /5, multiply by 2 to convert to /10
+      const results = await this.prisma.$queryRaw<Array<{
+        id_manga: number;
+        avg_rating: number;
+        num_ratings: number;
+      }>>`
+        SELECT
+          a.id_manga,
+          (AVG(c.evaluation) * 2)::float as avg_rating,
+          COUNT(c.evaluation)::int as num_ratings
+        FROM ak_mangas a
+        INNER JOIN collection_mangas c ON a.id_manga = c.id_manga
+        WHERE a.statut = 1 AND c.evaluation > 0
+        GROUP BY a.id_manga
+        HAVING COUNT(c.evaluation) >= ${minRatings}
+        ORDER BY AVG(c.evaluation) DESC, COUNT(c.evaluation) DESC
+        LIMIT ${limit}
+      `;
+
+      // Fetch full manga details
+      const mangaIds = results.map(r => r.id_manga);
+      const mangas = await this.prisma.akManga.findMany({
+        where: { idManga: { in: mangaIds }, statut: 1 },
+        include: {
+          reviews: {
+            take: 2,
+            orderBy: { dateCritique: 'desc' },
+            include: {
+              membre: {
+                select: {
+                  idMember: true,
+                  memberName: true,
+                },
+              },
+            },
+          },
+        },
+      });
+
+      // Sort to maintain the order from the query
+      const sortedMangas = mangaIds.map(id =>
+        mangas.find(a => a.idManga === id)
+      ).filter(Boolean);
+
+      // Add collection stats to formatted output
+      const mangasWithStats = sortedMangas.map(manga => {
+        const stats = results.find(r => r.id_manga === manga!.idManga);
+        return {
+          ...this.formatManga(manga),
+          collectionRating: stats?.avg_rating || 0,
+          collectionCount: stats?.num_ratings || 0,
+        };
+      });
+
+      const result = {
+        topMangas: mangasWithStats,
+        rankingType: type,
+        generatedAt: new Date().toISOString(),
+      };
+
+      await this.cacheService.set(cacheKey, result, 900);
+      return result;
+    }
+
     // Determine minimum review count based on ranking type
     // Bayesian: requires more reviews to reduce impact of outliers
     // Average: allows fewer reviews for a wider range
@@ -460,6 +529,76 @@ export class MangasService extends BaseContentService<
     const cached = await this.cacheService.get(cacheKey);
     if (cached) {
       return cached;
+    }
+
+    // Handle collection-based rankings
+    if (type === 'collection-bayes' || type === 'collection-avg') {
+      const minRatings = type === 'collection-bayes' ? 10 : 3;
+
+      // Query collection_mangas for user ratings
+      // Collection ratings are /5, multiply by 2 to convert to /10
+      // Use ASC order to get lowest rated mangas
+      const results = await this.prisma.$queryRaw<Array<{
+        id_manga: number;
+        avg_rating: number;
+        num_ratings: number;
+      }>>`
+        SELECT
+          a.id_manga,
+          (AVG(c.evaluation) * 2)::float as avg_rating,
+          COUNT(c.evaluation)::int as num_ratings
+        FROM ak_mangas a
+        INNER JOIN collection_mangas c ON a.id_manga = c.id_manga
+        WHERE a.statut = 1 AND c.evaluation > 0
+        GROUP BY a.id_manga
+        HAVING COUNT(c.evaluation) >= ${minRatings}
+        ORDER BY AVG(c.evaluation) ASC, COUNT(c.evaluation) DESC
+        LIMIT ${limit}
+      `;
+
+      // Fetch full manga details
+      const mangaIds = results.map(r => r.id_manga);
+      const mangas = await this.prisma.akManga.findMany({
+        where: { idManga: { in: mangaIds }, statut: 1 },
+        include: {
+          reviews: {
+            take: 2,
+            orderBy: { dateCritique: 'desc' },
+            include: {
+              membre: {
+                select: {
+                  idMember: true,
+                  memberName: true,
+                },
+              },
+            },
+          },
+        },
+      });
+
+      // Sort to maintain the order from the query
+      const sortedMangas = mangaIds.map(id =>
+        mangas.find(a => a.idManga === id)
+      ).filter(Boolean);
+
+      // Add collection stats to formatted output
+      const mangasWithStats = sortedMangas.map(manga => {
+        const stats = results.find(r => r.id_manga === manga!.idManga);
+        return {
+          ...this.formatManga(manga),
+          collectionRating: stats?.avg_rating || 0,
+          collectionCount: stats?.num_ratings || 0,
+        };
+      });
+
+      const result = {
+        flopMangas: mangasWithStats,
+        rankingType: type,
+        generatedAt: new Date().toISOString(),
+      };
+
+      await this.cacheService.set(cacheKey, result, 900);
+      return result;
     }
 
     // Determine minimum review count based on ranking type
