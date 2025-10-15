@@ -192,6 +192,24 @@ export class AnimesController {
     return this.animesService.autocomplete(query, exclude, parsedLimit);
   }
 
+  @Get('bulk')
+  @ApiOperation({ summary: 'Récupérer plusieurs animes par IDs (bulk fetch)' })
+  @ApiQuery({
+    name: 'ids',
+    required: true,
+    description: 'IDs des animes (séparés par virgules)',
+    example: '1,2,3,4,5',
+  })
+  @ApiResponse({ status: 200, description: 'Liste des animes' })
+  @ApiResponse({ status: 400, description: 'IDs invalides' })
+  async findByIds(@Query('ids') ids: string) {
+    const idArray = ids.split(',').map(id => parseInt(id.trim())).filter(id => !isNaN(id));
+    if (idArray.length === 0) {
+      throw new Error('No valid IDs provided');
+    }
+    return this.animesService.findByIds(idArray);
+  }
+
   @Get('anilist/search')
   @ApiOperation({ summary: 'Recherche animes sur AniList' })
   @ApiQuery({
