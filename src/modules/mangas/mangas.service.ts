@@ -282,7 +282,7 @@ export class MangasService extends BaseContentService<
     }
 
     const formattedManga = this.formatManga(manga);
-    
+
     // Cache the result
     const cacheData = {
       data: formattedManga,
@@ -291,6 +291,29 @@ export class MangasService extends BaseContentService<
     await this.cacheService.setManga(id, cacheData, 600); // 10 minutes
 
     return formattedManga;
+  }
+
+  async findByIds(ids: number[]) {
+    if (!ids || ids.length === 0) {
+      return [];
+    }
+
+    // Fetch all mangas in a single query
+    const mangas = await this.prisma.akManga.findMany({
+      where: {
+        idManga: { in: ids },
+        statut: 1, // Only return published mangas
+      },
+    });
+
+    // Create a map for quick lookup
+    const mangaMap = new Map(mangas.map(manga => [manga.idManga, manga]));
+
+    // Return mangas in the same order as the input IDs
+    return ids
+      .map(id => mangaMap.get(id))
+      .filter(Boolean)
+      .map(manga => this.formatManga(manga));
   }
 
   async update(

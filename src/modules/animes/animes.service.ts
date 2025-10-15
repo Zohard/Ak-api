@@ -341,7 +341,7 @@ export class AnimesService extends BaseContentService<
     }
 
     const formattedAnime = this.formatAnime(anime);
-    
+
     // Cache the result
     const cacheData = {
       data: formattedAnime,
@@ -351,6 +351,29 @@ export class AnimesService extends BaseContentService<
     await this.cacheService.setAnime(id, cacheData, 600); // 10 minutes
 
     return formattedAnime;
+  }
+
+  async findByIds(ids: number[]) {
+    if (!ids || ids.length === 0) {
+      return [];
+    }
+
+    // Fetch all animes in a single query
+    const animes = await this.prisma.akAnime.findMany({
+      where: {
+        idAnime: { in: ids },
+        statut: 1, // Only return published animes
+      },
+    });
+
+    // Create a map for quick lookup
+    const animeMap = new Map(animes.map(anime => [anime.idAnime, anime]));
+
+    // Return animes in the same order as the input IDs
+    return ids
+      .map(id => animeMap.get(id))
+      .filter(Boolean)
+      .map(anime => this.formatAnime(anime));
   }
 
   async update(
