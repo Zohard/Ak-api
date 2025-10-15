@@ -475,9 +475,8 @@ export class AnimesService extends BaseContentService<
   }
 
   async getTopAnimes(limit = 10, type = 'reviews-bayes') {
-    // Try to get from cache first
-    const cacheKey = `top_anime_${type}_${limit}`;
-    const cached = await this.cacheService.get(cacheKey);
+    // Try to get from cache first (1 hour TTL)
+    const cached = await this.cacheService.getRankings('anime', 'top', type, limit);
     if (cached) {
       return cached;
     }
@@ -568,16 +567,15 @@ export class AnimesService extends BaseContentService<
       generatedAt: new Date().toISOString(),
     };
 
-    // Cache for 15 minutes
-    await this.cacheService.set(cacheKey, result, 900);
+    // Cache for 1 hour (3600 seconds)
+    await this.cacheService.setRankings('anime', 'top', type, limit, result);
 
     return result;
   }
 
   async getFlopAnimes(limit = 20, type = 'reviews-bayes') {
-    // Try to get from cache first
-    const cacheKey = `flop_anime_${type}_${limit}`;
-    const cached = await this.cacheService.get(cacheKey);
+    // Try to get from cache first (1 hour TTL)
+    const cached = await this.cacheService.getRankings('anime', 'flop', type, limit);
     if (cached) {
       return cached;
     }
@@ -668,8 +666,8 @@ export class AnimesService extends BaseContentService<
       generatedAt: new Date().toISOString(),
     };
 
-    // Cache for 15 minutes
-    await this.cacheService.set(cacheKey, result, 900);
+    // Cache for 1 hour (3600 seconds)
+    await this.cacheService.setRankings('anime', 'flop', type, limit, result);
 
     return result;
   }
