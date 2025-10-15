@@ -156,6 +156,20 @@ export class CacheService implements OnModuleInit {
     await this.set(`top:${type}:${limit}`, content, ttl); // 15 minutes
   }
 
+  // Rankings cache methods (1 hour TTL)
+  async getRankings(mediaType: 'anime' | 'manga', rankingType: 'top' | 'flop', type: string, limit: number): Promise<any> {
+    return this.get(`rankings:${mediaType}:${rankingType}:${type}:${limit}`);
+  }
+
+  async setRankings(mediaType: 'anime' | 'manga', rankingType: 'top' | 'flop', type: string, limit: number, content: any, ttl = 3600): Promise<void> {
+    await this.set(`rankings:${mediaType}:${rankingType}:${type}:${limit}`, content, ttl); // 1 hour
+  }
+
+  async invalidateRankings(mediaType: 'anime' | 'manga'): Promise<void> {
+    await this.delByPattern(`rankings:${mediaType}:*`);
+    this.logger.debug(`Invalidated rankings cache for ${mediaType}`);
+  }
+
   // Lists cache methods
   async getPublicLists(mediaType: string, sort: string, limit: number): Promise<any> {
     return this.get(`lists:${mediaType}:${sort}:${limit}`);

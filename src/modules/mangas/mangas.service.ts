@@ -405,9 +405,8 @@ export class MangasService extends BaseContentService<
   }
 
   async getTopMangas(limit = 10, type = 'reviews-bayes') {
-    // Try to get from cache first
-    const cacheKey = `top_manga_${type}_${limit}`;
-    const cached = await this.cacheService.get(cacheKey);
+    // Try to get from cache first (1 hour TTL)
+    const cached = await this.cacheService.getRankings('manga', 'top', type, limit);
     if (cached) {
       return cached;
     }
@@ -477,7 +476,8 @@ export class MangasService extends BaseContentService<
         generatedAt: new Date().toISOString(),
       };
 
-      await this.cacheService.set(cacheKey, result, 900);
+      // Cache for 1 hour (3600 seconds)
+      await this.cacheService.setRankings('manga', 'top', type, limit, result);
       return result;
     }
 
@@ -517,16 +517,15 @@ export class MangasService extends BaseContentService<
       generatedAt: new Date().toISOString(),
     };
 
-    // Cache for 15 minutes
-    await this.cacheService.set(cacheKey, result, 900);
+    // Cache for 1 hour (3600 seconds)
+    await this.cacheService.setRankings('manga', 'top', type, limit, result);
 
     return result;
   }
 
   async getFlopMangas(limit = 20, type = 'reviews-bayes') {
-    // Try to get from cache first
-    const cacheKey = `flop_manga_${type}_${limit}`;
-    const cached = await this.cacheService.get(cacheKey);
+    // Try to get from cache first (1 hour TTL)
+    const cached = await this.cacheService.getRankings('manga', 'flop', type, limit);
     if (cached) {
       return cached;
     }
@@ -597,7 +596,8 @@ export class MangasService extends BaseContentService<
         generatedAt: new Date().toISOString(),
       };
 
-      await this.cacheService.set(cacheKey, result, 900);
+      // Cache for 1 hour (3600 seconds)
+      await this.cacheService.setRankings('manga', 'flop', type, limit, result);
       return result;
     }
 
@@ -637,8 +637,8 @@ export class MangasService extends BaseContentService<
       generatedAt: new Date().toISOString(),
     };
 
-    // Cache for 15 minutes
-    await this.cacheService.set(cacheKey, result, 900);
+    // Cache for 1 hour (3600 seconds)
+    await this.cacheService.setRankings('manga', 'flop', type, limit, result);
 
     return result;
   }
