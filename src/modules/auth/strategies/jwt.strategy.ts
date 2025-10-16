@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { PrismaService } from '../../../shared/services/prisma.service';
-import { ADMIN_GROUP_IDS } from '../../../shared/constants/admin.constants';
+import { hasAdminAccess, getRoleName } from '../../../shared/constants/rbac.constants';
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
@@ -31,8 +31,10 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       id: user.idMember,
       username: user.memberName,
       email: user.emailAddress,
+      groupId: user.idGroup,
+      role: getRoleName(user.idGroup),
       isAdmin:
-        ADMIN_GROUP_IDS.has(user.idGroup) ||
+        hasAdminAccess(user.idGroup) ||
         user.idMember === 1 ||
         user.idMember === 17667,
     };
