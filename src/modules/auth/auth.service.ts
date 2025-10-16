@@ -10,7 +10,7 @@ import * as crypto from 'crypto';
 import { PrismaService } from '../../shared/services/prisma.service';
 import { EmailService } from '../../shared/services/email.service';
 import { MetricsService } from '../../shared/services/metrics.service';
-import { ADMIN_GROUP_IDS } from '../../shared/constants/admin.constants';
+import { hasAdminAccess, getRoleName } from '../../shared/constants/rbac.constants';
 import { SmfMember } from '@prisma/client';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
@@ -120,8 +120,10 @@ export class AuthService {
       sub: user.idMember,
       username: user.memberName,
       email: user.emailAddress,
+      groupId: user.idGroup,
+      role: getRoleName(user.idGroup),
       isAdmin:
-        ADMIN_GROUP_IDS.has(user.idGroup) || user.idMember === 1,
+        hasAdminAccess(user.idGroup) || user.idMember === 1,
     };
 
     const accessToken = this.jwtService.sign(payload);
@@ -260,8 +262,10 @@ export class AuthService {
       sub: verificationRecord.user.idMember,
       username: verificationRecord.user.memberName,
       email: verificationRecord.user.emailAddress,
+      groupId: verificationRecord.user.idGroup,
+      role: getRoleName(verificationRecord.user.idGroup),
       isAdmin:
-        ADMIN_GROUP_IDS.has(verificationRecord.user.idGroup) ||
+        hasAdminAccess(verificationRecord.user.idGroup) ||
         verificationRecord.user.idMember === 1,
     };
 
@@ -365,8 +369,10 @@ export class AuthService {
       sub: tokenRecord.user.idMember,
       username: tokenRecord.user.memberName,
       email: tokenRecord.user.emailAddress,
+      groupId: tokenRecord.user.idGroup,
+      role: getRoleName(tokenRecord.user.idGroup),
       isAdmin:
-        ADMIN_GROUP_IDS.has(tokenRecord.user.idGroup) ||
+        hasAdminAccess(tokenRecord.user.idGroup) ||
         tokenRecord.user.idMember === 1 ||
         tokenRecord.user.idMember === 17667,
     };
@@ -525,8 +531,10 @@ export class AuthService {
       lastLogin: user.lastLogin,
       posts: user.posts,
       avatar: user.avatar,
+      groupId: user.idGroup,
+      role: getRoleName(user.idGroup),
       isAdmin:
-        ADMIN_GROUP_IDS.has(user.idGroup) || user.idMember === 1,
+        hasAdminAccess(user.idGroup) || user.idMember === 1,
     };
   }
 }

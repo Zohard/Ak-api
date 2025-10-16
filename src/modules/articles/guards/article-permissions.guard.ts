@@ -1,6 +1,17 @@
-import { Injectable, CanActivate, ExecutionContext } from '@nestjs/common';
+import {
+  Injectable,
+  CanActivate,
+  ExecutionContext,
+  ForbiddenException,
+} from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { ARTICLE_PERMISSIONS_KEY } from '../decorators/article-permissions.decorator';
+import {
+  hasPermission,
+  Resource,
+  Action,
+  SMFGroup,
+} from '../../../shared/constants/rbac.constants';
 
 @Injectable()
 export class ArticlePermissionsGuard implements CanActivate {
@@ -18,46 +29,61 @@ export class ArticlePermissionsGuard implements CanActivate {
 
     const { user } = context.switchToHttp().getRequest();
 
-    if (!user) {
-      return false;
+    if (!user || !user.groupId) {
+      throw new ForbiddenException('Accès refusé - Authentification requise');
     }
 
-    // Check user roles for article permissions
-    // These should be based on your user role system
-    const isWriter = this.hasWriterRole(user);
-    const isEditor = this.hasEditorRole(user);
-    const isAdmin = user.isAdmin || false;
-
+    // Map old permission strings to RBAC actions
+    let action: Action;
     switch (requiredPermission) {
       case 'write':
-        return isWriter || isEditor || isAdmin;
+        action = Action.CREATE;
+        break;
       case 'edit':
-        return isEditor || isAdmin;
+        action = Action.UPDATE;
+        break;
       case 'publish':
-        return isEditor || isAdmin;
+        action = Action.PUBLISH;
+        break;
       case 'moderate':
-        return isEditor || isAdmin;
+        action = Action.MODERATE;
+        break;
       case 'manage':
-        return isAdmin;
+        action = Action.MODERATE;
+        break;
       case 'delete':
-        return isAdmin;
+        action = Action.DELETE;
+        break;
       default:
         return false;
     }
-  }
 
-  private hasWriterRole(user: any): boolean {
-    // Implement your writer role check logic
-    // This could be based on user groups, permissions, or a separate roles table
+    // For Rédacteur invité (group 14), check ownership for UPDATE actions
+    if (user.groupId === SMFGroup.REDACTEUR_INVITE && action === Action.UPDATE) {
+      // The ownership check will be done in the service layer
+      // Here we just check if they have UPDATE_OWN permission
+      return hasPermission(
+        user.groupId,
+        Resource.ARTICLES,
+        Action.UPDATE_OWN,
+        user.id,
+      );
+    }
 
-    // For now, check if user has admin privileges or is in a writer group
-    return user.isAdmin || user.idGroup === 2 || user.isWriter === true;
-  }
+    // Check permission using RBAC
+    const hasRequiredPermission = hasPermission(
+      user.groupId,
+      Resource.ARTICLES,
+      action,
+      user.id,
+    );
 
-  private hasEditorRole(user: any): boolean {
-    // Implement your editor role check logic
-    // Editors typically have more permissions than writers
+    if (!hasRequiredPermission) {
+      throw new ForbiddenException(
+        `Accès refusé - Permission requise: ${action} articles`,
+      );
+    }
 
-    return user.isAdmin || user.idGroup === 3 || user.isEditor === true;
+    return true;
   }
 }

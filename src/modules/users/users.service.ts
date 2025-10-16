@@ -5,7 +5,7 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { PrismaService } from '../../shared/services/prisma.service';
-import { ADMIN_GROUP_IDS } from '../../shared/constants/admin.constants';
+import { hasAdminAccess, getRoleName } from '../../shared/constants/rbac.constants';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { UserQueryDto } from './dto/user-query.dto';
 import { CreateUserDto } from './dto/create-user.dto';
@@ -327,7 +327,7 @@ export class UsersService {
     }
 
     // Don't allow deleting admin users unless requested by another admin
-    if (ADMIN_GROUP_IDS.has(user.idGroup) && !isAdmin) {
+    if (hasAdminAccess(user.idGroup) && !isAdmin) {
       throw new ForbiddenException('Impossible de supprimer un administrateur');
     }
 
@@ -1273,7 +1273,9 @@ export class UsersService {
       realName,
       registrationDate: dateRegistered,
       lastLogin,
-      isAdmin: ADMIN_GROUP_IDS.has(user.idGroup) || idMember === 1,
+      groupId: user.idGroup,
+      role: getRoleName(user.idGroup),
+      isAdmin: hasAdminAccess(user.idGroup) || idMember === 1,
       ...otherFields,
     };
 

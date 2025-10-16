@@ -11,6 +11,7 @@ import { CreateArticleDto } from './dto/create-article.dto';
 import { UpdateArticleDto } from './dto/update-article.dto';
 import { ArticleQueryDto } from './dto/article-query.dto';
 import { PublishArticleDto } from './dto/publish-article.dto';
+import { SMFGroup } from '../../shared/constants/rbac.constants';
 
 @Injectable()
 export class ArticlesService {
