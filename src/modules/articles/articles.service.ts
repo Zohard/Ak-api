@@ -58,11 +58,13 @@ export class ArticlesService {
   async findAll(query: ArticleQueryDto) {
     // Create cache key from query parameters
     const cacheKey = this.createCacheKey(query);
-    
-    // Try to get from cache first
-    const cached = await this.cacheService.getArticlesList(cacheKey);
-    if (cached) {
-      return cached;
+
+    // Try to get from cache first (skip cache for admin status filters)
+    if (query.status !== 'draft' && query.status !== 'archived') {
+      const cached = await this.cacheService.getArticlesList(cacheKey);
+      if (cached) {
+        return cached;
+      }
     }
 
     const {
