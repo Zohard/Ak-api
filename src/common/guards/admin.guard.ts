@@ -4,7 +4,12 @@ import {
   ExecutionContext,
   ForbiddenException,
 } from '@nestjs/common';
+import { hasAdminAccess } from '../../shared/constants/rbac.constants';
 
+/**
+ * AdminGuard checks if user has any admin panel access
+ * For specific resource permissions, use PermissionsGuard instead
+ */
 @Injectable()
 export class AdminGuard implements CanActivate {
   canActivate(context: ExecutionContext): boolean {
@@ -15,7 +20,10 @@ export class AdminGuard implements CanActivate {
       throw new ForbiddenException('Authentification requise');
     }
 
-    if (!user.isAdmin) {
+    // Check if user has admin access using RBAC system
+    const hasAccess = hasAdminAccess(user.groupId) || user.isAdmin;
+
+    if (!hasAccess) {
       throw new ForbiddenException("Droits d'administrateur requis");
     }
 
