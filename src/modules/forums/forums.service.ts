@@ -597,82 +597,124 @@ export class ForumsService {
   /**
    * Get all forum posts from a specific user with pagination
    * Only shows approved messages in non-redirect boards
+   * ULTRA-OPTIMIZED: Uses raw SQL for maximum performance
    */
   async getUserPosts(userId: number, page: number = 1, limit: number = 20): Promise<any> {
     try {
-      const skip = (page - 1) * limit;
-
-      // Get user info first
-      const user = await this.prisma.smfMember.findUnique({
-        where: { idMember: userId },
-        select: {
-          idMember: true,
-          memberName: true,
-          realName: true,
-          avatar: true,
-          posts: true
-        }
-      });
+      // Get user info and groups in parallel
+      const [user, userGroups] = await Promise.all([
+        this.prisma.smfMember.findUnique({
+          where: { idMember: userId },
+          select: {
+            idMember: true,
+            memberName: true,
+            realName: true,
+            avatar: true,
+            posts: true
+          }
+        }),
+        this.getUserGroups(userId)
+      ]);
 
       if (!user) {
         throw new NotFoundException('User not found');
       }
 
-      // Get all messages with their topics and boards
-      const allMessages = await this.prisma.smfMessage.findMany({
-        where: {
-          idMember: userId,
-          approved: 1 // Only approved messages
-        },
-        orderBy: { posterTime: 'desc' },
-        include: {
-          topic: {
-            include: {
-              board: true,
-              firstMessage: {
-                select: {
-                  subject: true
-                }
-              }
+      const skip = (page - 1) * limit;
+      const fetchLimit = limit * 2; // Fetch 2x to account for filtering
+
+      // Use raw SQL for better performance
+      const messages: any[] = await this.prisma.$queryRaw`
+        SELECT
+          m.id_msg as "idMsg",
+          m.id_topic as "idTopic",
+          m.subject,
+          m.body,
+          m.poster_time as "posterTime",
+          m.modified_time as "modifiedTime",
+          m.modified_name as "modifiedName",
+          b.id_board as "boardId",
+          b.name as "boardName",
+          b.member_groups as "memberGroups",
+          fm.subject as "topicSubject"
+        FROM smf_messages m
+        INNER JOIN smf_topics t ON m.id_topic = t.id_topic
+        INNER JOIN smf_boards b ON t.id_board = b.id_board
+        LEFT JOIN smf_messages fm ON t.id_first_msg = fm.id_msg
+        WHERE m.id_member = ${userId}
+          AND m.approved = 1
+          AND (b.redirect IS NULL OR b.redirect = '')
+        ORDER BY m.poster_time DESC
+        LIMIT ${fetchLimit}
+        OFFSET ${skip}
+      `;
+
+      // Build a map of board permissions
+      const boardAccessMap = new Map<number, boolean>();
+
+      // Filter messages by board access
+      const accessibleMessages: any[] = [];
+      for (const message of messages) {
+        const boardId = Number(message.boardId);
+
+        // Check if we've already determined access for this board
+        if (!boardAccessMap.has(boardId)) {
+          const memberGroups = message.memberGroups || '';
+          let hasAccess = true;
+
+          // Parse allowed member groups
+          let allowedGroups: number[];
+          if (!memberGroups || memberGroups.trim() === '' || memberGroups.trim() === '0') {
+            allowedGroups = [-1, 0, 1, 2, 3, 4];
+          } else {
+            allowedGroups = memberGroups.split(',').map((g: string) => parseInt(g.trim())).filter((g: number) => !isNaN(g));
+            if (allowedGroups.length === 0) {
+              allowedGroups = [-1, 0, 1, 2, 3, 4];
             }
           }
-        }
-      });
 
-      // Filter messages by board access and exclude redirect boards
-      const accessibleMessages: any[] = [];
-      for (const message of allMessages) {
-        // Skip if board is a redirect
-        if (message.topic?.board?.redirect && message.topic.board.redirect.trim() !== '') {
-          continue;
+          // Check access
+          if (!allowedGroups.includes(-1)) {
+            hasAccess = userGroups.some(group => allowedGroups.includes(group));
+          }
+
+          boardAccessMap.set(boardId, hasAccess);
         }
 
-        // Check board access (this will handle permissions)
-        const hasAccess = await this.checkBoardAccess(message.topic.board.idBoard, userId);
-        if (hasAccess) {
+        if (boardAccessMap.get(boardId)) {
           accessibleMessages.push(message);
+          if (accessibleMessages.length >= limit) {
+            break;
+          }
         }
       }
 
-      // Get total count of accessible messages
-      const total = accessibleMessages.length;
+      // Get total count using simpler query
+      const countResult: any[] = await this.prisma.$queryRaw`
+        SELECT COUNT(*) as count
+        FROM smf_messages m
+        INNER JOIN smf_topics t ON m.id_topic = t.id_topic
+        INNER JOIN smf_boards b ON t.id_board = b.id_board
+        WHERE m.id_member = ${userId}
+          AND m.approved = 1
+          AND (b.redirect IS NULL OR b.redirect = '')
+      `;
 
-      // Apply pagination to accessible messages
-      const paginatedMessages = accessibleMessages.slice(skip, skip + limit);
+      const totalApprox = Number(countResult[0]?.count || 0);
 
-      const formattedMessages = paginatedMessages.map(message => ({
-        id: message.idMsg,
-        subject: message.subject || '',
-        body: message.body,
-        posterTime: message.posterTime,
-        modifiedTime: message.modifiedTime,
-        modifiedName: message.modifiedName,
+      const formattedMessages = accessibleMessages.map(msg => ({
+        id: Number(msg.idMsg),
+        subject: msg.subject || '',
+        body: msg.body || '',
+        posterTime: Number(msg.posterTime),
+        modifiedTime: msg.modifiedTime ? Number(msg.modifiedTime) : null,
+        modifiedName: msg.modifiedName,
         topic: {
-          id: message.topic.idTopic,
-          subject: message.topic.firstMessage?.subject || 'Untitled',
+          id: Number(msg.idTopic),
+          subject: msg.topicSubject || 'Untitled',
           board: {
-            id: message.topic.board.idBoard,
-            name: message.topic.board.name
+            id: Number(msg.boardId),
+            name: msg.boardName
           }
         }
       }));
@@ -689,8 +731,9 @@ export class ForumsService {
         pagination: {
           page,
           limit,
-          total,
-          totalPages: Math.ceil(total / limit)
+          total: totalApprox,
+          totalPages: Math.ceil(totalApprox / limit),
+          hasMore: accessibleMessages.length >= limit
         }
       };
     } catch (error) {
