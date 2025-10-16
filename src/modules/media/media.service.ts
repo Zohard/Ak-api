@@ -402,40 +402,70 @@ export class MediaService {
     return urlObj.hostname === 'twitter.com' ||
            urlObj.hostname === 'www.twitter.com' ||
            urlObj.hostname === 'x.com' ||
-           urlObj.hostname === 'www.x.com';
+           urlObj.hostname === 'www.x.com' ||
+           urlObj.hostname === 'fxtwitter.com' ||
+           urlObj.hostname === 'vxtwitter.com' ||
+           urlObj.hostname === 'fixupx.com';
   }
 
   private async fetchTwitterMetadata(url: string) {
     try {
-      // Use Twitter's oEmbed API
-      const oembedUrl = `https://publish.twitter.com/oembed?url=${encodeURIComponent(url)}`;
-      const response = await axios.get(oembedUrl, {
+      const urlObj = new URL(url);
+
+      // If it's already a fxtwitter/vxtwitter URL, use it directly
+      // Otherwise convert regular twitter.com/x.com URLs to fxtwitter for better metadata
+      let fetchUrl = url;
+      if (urlObj.hostname === 'twitter.com' || urlObj.hostname === 'x.com' ||
+          urlObj.hostname === 'www.twitter.com' || urlObj.hostname === 'www.x.com') {
+        fetchUrl = url.replace(/(twitter\.com|x\.com)/, 'fxtwitter.com');
+      }
+
+      // Fetch the page with Open Graph metadata
+      const response = await axios.get(fetchUrl, {
         timeout: 10000,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (compatible; AnimeKun/1.0; +https://anime-kun.fr)',
+        },
+        maxRedirects: 5,
       });
 
-      const data = response.data;
+      const html = response.data;
+      const $ = cheerio.load(html);
 
-      // Extract author name from the HTML
-      const authorMatch = data.author_name || '';
+      // Extract Open Graph tags (fxtwitter provides rich OG metadata)
+      const og = {
+        title: $('meta[property="og:title"]').attr('content'),
+        description: $('meta[property="og:description"]').attr('content'),
+        image: $('meta[property="og:image"]').attr('content'),
+        video: $('meta[property="og:video"]').attr('content'),
+        type: $('meta[property="og:type"]').attr('content'),
+        siteName: $('meta[property="og:site_name"]').attr('content'),
+      };
 
-      // Parse the HTML to extract text content for description
-      const $ = cheerio.load(data.html || '');
-      const tweetText = $('blockquote').text().trim() || '';
+      // Extract Twitter Card tags
+      const twitter = {
+        card: $('meta[name="twitter:card"]').attr('content'),
+        image: $('meta[name="twitter:image"]').attr('content'),
+        player: $('meta[name="twitter:player"]').attr('content'),
+      };
 
-      // Extract first line as potential title/preview
-      const firstLine = tweetText.split('\n')[0] || tweetText.substring(0, 100);
+      // Determine if there's video/gif content
+      const hasVideo = og.video || twitter.player;
+      const mediaImage = og.image || twitter.image;
 
       return {
-        url,
-        title: authorMatch ? `Tweet by ${authorMatch}` : 'Tweet',
-        description: firstLine,
-        image: null, // Twitter oEmbed doesn't provide images directly
+        url: url, // Return original URL
+        title: og.title || 'Tweet',
+        description: og.description || '',
+        image: mediaImage || null,
+        video: hasVideo ? (og.video || twitter.player) : null,
         favicon: 'https://abs.twimg.com/favicons/twitter.3.ico',
-        siteName: 'X (formerly Twitter)',
-        type: 'article',
+        siteName: og.siteName || 'X (formerly Twitter)',
+        type: og.type || 'article',
       };
     } catch (error) {
-      // Fallback if oEmbed fails
+      console.error('Error fetching Twitter metadata:', error);
+      // Fallback
       return {
         url,
         title: 'Tweet',
