@@ -592,6 +592,8 @@ export class ArticlesService {
       pingStatus: 'open',
       postPassword: '',
       postContentFiltered: '',
+      toPing: '',
+      pinged: '',
       guid: `http://localhost:3003/?p=${Date.now()}`,
       menuOrder: 0,
       commentCount: 0,
