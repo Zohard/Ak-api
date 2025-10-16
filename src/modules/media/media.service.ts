@@ -459,12 +459,12 @@ export class MediaService {
 
           return {
             url: url,
-            title: `${tweet.author?.name || username} on X`,
+            title: `${tweet.author?.name || username}`,
             description: tweet.text || '',
             image: image || null,
             video: video || null,
             favicon: 'https://abs.twimg.com/favicons/twitter.3.ico',
-            siteName: 'X (formerly Twitter)',
+            siteName: 'X',
             type: 'article',
           };
         }
@@ -519,7 +519,7 @@ export class MediaService {
         image: mediaImage || null,
         video: hasVideo ? (og.video || twitter.player) : null,
         favicon: 'https://abs.twimg.com/favicons/twitter.3.ico',
-        siteName: og.siteName || 'X (formerly Twitter)',
+        siteName: og.siteName || 'X',
         type: og.type || 'article',
       };
     } catch (error) {
@@ -531,7 +531,7 @@ export class MediaService {
         description: '',
         image: null,
         favicon: 'https://abs.twimg.com/favicons/twitter.3.ico',
-        siteName: 'X (formerly Twitter)',
+        siteName: 'X',
         type: 'article',
       };
     }
