@@ -412,19 +412,79 @@ export class MediaService {
     try {
       const urlObj = new URL(url);
 
-      // If it's already a fxtwitter/vxtwitter URL, use it directly
-      // Otherwise convert regular twitter.com/x.com URLs to fxtwitter for better metadata
+      // Extract username and tweet ID for API call
+      const tweetMatch = url.match(/(?:twitter\.com|x\.com|fxtwitter\.com|vxtwitter\.com|fixupx\.com)\/([^\/]+)\/status\/(\d+)/);
+
+      if (!tweetMatch) {
+        throw new Error('Invalid Twitter URL format');
+      }
+
+      const [, username, tweetId] = tweetMatch;
+
+      // Try fxtwitter API first
+      try {
+        const apiUrl = `https://api.fxtwitter.com/${username}/status/${tweetId}`;
+        const apiResponse = await axios.get(apiUrl, {
+          timeout: 10000,
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (compatible; AnimeKun/1.0; +https://anime-kun.fr)',
+            'Accept': 'application/json',
+          },
+        });
+
+        const tweet = apiResponse.data?.tweet;
+        if (tweet) {
+          // Extract media (photos, videos, gifs)
+          const media = tweet.media;
+          let image = null;
+          let video = null;
+
+          if (media) {
+            if (media.photos && media.photos.length > 0) {
+              image = media.photos[0].url;
+            }
+            if (media.videos && media.videos.length > 0) {
+              video = media.videos[0].url;
+            }
+            if (media.all && media.all.length > 0) {
+              // Try to get the first video/gif or image
+              const firstMedia = media.all[0];
+              if (firstMedia.type === 'video' || firstMedia.type === 'gif') {
+                video = firstMedia.url;
+              } else if (firstMedia.type === 'photo') {
+                image = firstMedia.url;
+              }
+            }
+          }
+
+          return {
+            url: url,
+            title: `${tweet.author?.name || username} on X`,
+            description: tweet.text || '',
+            image: image || null,
+            video: video || null,
+            favicon: 'https://abs.twimg.com/favicons/twitter.3.ico',
+            siteName: 'X (formerly Twitter)',
+            type: 'article',
+          };
+        }
+      } catch (apiError) {
+        console.warn('FxTwitter API failed, falling back to HTML scraping:', apiError.message);
+      }
+
+      // Fallback to HTML scraping
       let fetchUrl = url;
       if (urlObj.hostname === 'twitter.com' || urlObj.hostname === 'x.com' ||
           urlObj.hostname === 'www.twitter.com' || urlObj.hostname === 'www.x.com') {
         fetchUrl = url.replace(/(twitter\.com|x\.com)/, 'fxtwitter.com');
       }
 
-      // Fetch the page with Open Graph metadata
       const response = await axios.get(fetchUrl, {
         timeout: 10000,
         headers: {
-          'User-Agent': 'Mozilla/5.0 (compatible; AnimeKun/1.0; +https://anime-kun.fr)',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.5',
         },
         maxRedirects: 5,
       });
@@ -432,7 +492,7 @@ export class MediaService {
       const html = response.data;
       const $ = cheerio.load(html);
 
-      // Extract Open Graph tags (fxtwitter provides rich OG metadata)
+      // Extract Open Graph tags
       const og = {
         title: $('meta[property="og:title"]').attr('content'),
         description: $('meta[property="og:description"]').attr('content'),
@@ -449,12 +509,11 @@ export class MediaService {
         player: $('meta[name="twitter:player"]').attr('content'),
       };
 
-      // Determine if there's video/gif content
       const hasVideo = og.video || twitter.player;
       const mediaImage = og.image || twitter.image;
 
       return {
-        url: url, // Return original URL
+        url: url,
         title: og.title || 'Tweet',
         description: og.description || '',
         image: mediaImage || null,
@@ -464,7 +523,7 @@ export class MediaService {
         type: og.type || 'article',
       };
     } catch (error) {
-      console.error('Error fetching Twitter metadata:', error);
+      console.error('Error fetching Twitter metadata:', error.message || error);
       // Fallback
       return {
         url,
