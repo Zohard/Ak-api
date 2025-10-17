@@ -2597,4 +2597,67 @@ export class ForumsService {
       return { results: [], total: 0 };
     }
   }
+
+  /**
+   * Get the page number where a specific message appears in its topic
+   * Used for navigating directly to a message from reports/links
+   */
+  async getMessagePage(messageId: number, userId?: number): Promise<{ page: number; topicId: number; messagePosition: number }> {
+    try {
+      // Get the message with topic info
+      const message = await this.prisma.smfMessage.findUnique({
+        where: { idMsg: messageId },
+        select: {
+          idMsg: true,
+          idTopic: true,
+          idBoard: true,
+          posterTime: true
+        }
+      });
+
+      if (!message) {
+        throw new NotFoundException('Message not found');
+      }
+
+      // Check board access if user is provided
+      if (userId) {
+        const hasAccess = await this.checkBoardAccess(message.idBoard, userId);
+        if (!hasAccess) {
+          throw new ForbiddenException('Access denied to this board');
+        }
+      }
+
+      // Calculate the message's position in the topic (1-indexed)
+      // Count all messages in the topic that come before or at the same time as this message
+      const messagePosition = await this.prisma.smfMessage.count({
+        where: {
+          idTopic: message.idTopic,
+          OR: [
+            { posterTime: { lt: message.posterTime } },
+            {
+              AND: [
+                { posterTime: message.posterTime },
+                { idMsg: { lte: message.idMsg } }
+              ]
+            }
+          ]
+        }
+      });
+
+      // Calculate page number (15 messages per page, matching the frontend)
+      const messagesPerPage = 15;
+      const page = Math.ceil(messagePosition / messagesPerPage);
+
+      this.logger.log(`Message ${messageId} is at position ${messagePosition} in topic ${message.idTopic}, page ${page}`);
+
+      return {
+        page,
+        topicId: message.idTopic,
+        messagePosition
+      };
+    } catch (error) {
+      this.logger.error('Error getting message page:', error);
+      throw error;
+    }
+  }
 }
