@@ -83,6 +83,20 @@ export class ForumsController {
     return await this.forumsService.getLatestMessages(query);
   }
 
+  @Get('messages/:messageId/page')
+  @UseGuards(OptionalJwtAuthGuard)
+  @ApiOperation({ summary: 'Get the page number where a specific message appears in its topic' })
+  @ApiParam({ name: 'messageId', type: 'number', description: 'Message ID' })
+  @ApiResponse({ status: 200, description: 'Page number retrieved successfully' })
+  @ApiResponse({ status: 404, description: 'Message not found' })
+  async getMessagePage(
+    @Param('messageId', ParseIntPipe) messageId: number,
+    @Request() req?
+  ) {
+    const userId = req?.user?.id || null;
+    return await this.forumsService.getMessagePage(messageId, userId);
+  }
+
   @Get('boards')
   @ApiOperation({ summary: 'Get list of forum boards' })
   @ApiResponse({ status: 200, description: 'Forum boards retrieved successfully' })
