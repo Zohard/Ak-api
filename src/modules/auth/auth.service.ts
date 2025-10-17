@@ -110,10 +110,19 @@ export class AuthService {
     // Track successful login attempt
     this.metricsService.trackAuthAttempt('login', 'success', 'local');
 
-    // Update last login
+    // Get the full user record to access lastLogin
+    const fullUser = await this.prisma.smfMember.findUnique({
+      where: { idMember: user.idMember },
+      select: { lastLogin: true }
+    });
+
+    // Update last login and store previous login
     await this.prisma.smfMember.update({
       where: { idMember: user.idMember },
-      data: { lastLogin: Math.floor(Date.now() / 1000) },
+      data: {
+        previousLogin: fullUser?.lastLogin,
+        lastLogin: Math.floor(Date.now() / 1000)
+      },
     });
 
     const payload = {

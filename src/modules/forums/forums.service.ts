@@ -2310,10 +2310,17 @@ export class ForumsService {
     try {
       const user = await this.prisma.smfMember.findUnique({
         where: { idMember: userId },
-        select: { lastLogin: true }
+        select: { lastLogin: true, previousLogin: true }
       });
 
-      if (!user || !user.lastLogin) {
+      if (!user) {
+        return { topics: [], total: 0, limit, offset };
+      }
+
+      // Use previousLogin if available, otherwise fall back to lastLogin
+      const referenceTime = user.previousLogin || user.lastLogin;
+
+      if (!referenceTime) {
         return { topics: [], total: 0, limit, offset };
       }
 
@@ -2323,7 +2330,7 @@ export class ForumsService {
         },
         lastMessage: {
           posterTime: {
-            gt: user.lastLogin
+            gt: referenceTime
           }
         }
       };
@@ -2388,7 +2395,7 @@ export class ForumsService {
               id: topic.lastMessage.idMsg,
               time: topic.lastMessage.posterTime,
               author: topic.lastMessage.member?.memberName || topic.lastMessage.posterName,
-              isNew: topic.lastMessage.posterTime > user.lastLogin
+              isNew: topic.lastMessage.posterTime > referenceTime
             } : null,
             firstMessageTime: topic.firstMessage?.posterTime || 0
           });

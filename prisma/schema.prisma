@@ -39,6 +39,7 @@ model SmfMember {
   posts            Int      @default(0)
   dateRegistered   Int      @map("date_registered")
   lastLogin        Int?     @map("last_login")
+  previousLogin    Int?     @map("previous_login")
   idGroup          Int      @map("id_group") @default(0)
   idPostGroup      Int?     @map("id_post_group")
   additionalGroups String?  @map("additional_groups") @db.VarChar(255)
