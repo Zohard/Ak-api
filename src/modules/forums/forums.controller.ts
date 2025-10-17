@@ -339,6 +339,22 @@ export class ForumsController {
   @ApiResponse({ status: 200, description: 'Report closed successfully' })
   @ApiResponse({ status: 403, description: 'Access denied - insufficient permissions' })
   @ApiResponse({ status: 404, description: 'Report not found' })
+  async closeReportPut(
+    @Param('reportId', ParseIntPipe) reportId: number,
+    @Request() req
+  ) {
+    const userId = req.user.id;
+    return await this.forumsService.closeReport(reportId, userId);
+  }
+
+  @Post('reports/:reportId/close')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Close a report (Admin, Global Moderator, Moderator only)' })
+  @ApiParam({ name: 'reportId', type: 'number', description: 'Report ID to close' })
+  @ApiResponse({ status: 200, description: 'Report closed successfully' })
+  @ApiResponse({ status: 403, description: 'Access denied - insufficient permissions' })
+  @ApiResponse({ status: 404, description: 'Report not found' })
   async closeReport(
     @Param('reportId', ParseIntPipe) reportId: number,
     @Request() req
