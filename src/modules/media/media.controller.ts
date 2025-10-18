@@ -49,6 +49,7 @@ export class MediaController {
     @UploadedFile() file: Express.Multer.File,
     @Body('type') type: 'anime' | 'manga' | 'avatar' | 'cover',
     @Body('relatedId') relatedId?: string,
+    @Body('isScreenshot') isScreenshot?: string,
     @CurrentUser() user?: any,
   ) {
     if (!file) {
@@ -71,7 +72,9 @@ export class MediaController {
       throw new BadRequestException('Invalid relatedId. Must be a number');
     }
 
-    return this.mediaService.uploadImage(file, type, parsedRelatedId);
+    const isScreenshotBool = isScreenshot === 'true' || isScreenshot === '1';
+
+    return this.mediaService.uploadImage(file, type, parsedRelatedId, isScreenshotBool);
   }
 
   @Get('url-metadata')
