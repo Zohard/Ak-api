@@ -149,9 +149,11 @@ export class MediaService {
           url = item.filename;
         } else {
           // Generate ImageKit URL from filename
-          // Keep the filename as-is (with screenshots/ prefix if it exists)
-          const folderPath = `images/${type}s`;
-          url = this.imagekitService.getImageUrl(`${folderPath}/${item.filename}`);
+          // If filename starts with screenshots/, the full path is images/{type}s/{filename}
+          // Otherwise, it's images/{type}s/{filename}
+          const basePath = `images/${type}s`;
+          const fullPath = `${basePath}/${item.filename}`;
+          url = this.imagekitService.getImageUrl(fullPath);
         }
 
         processedMedia.push({
