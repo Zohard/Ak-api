@@ -42,9 +42,16 @@ export class MediaService {
       );
     }
 
+    // Validate relatedId for screenshots to prevent orphaned images
+    if (isScreenshot && !relatedId) {
+      throw new BadRequestException('Related ID is required for screenshots');
+    }
+
     // Generate unique filename
     const fileExtension = path.extname(file.originalname);
     const filename = `${type}_${Date.now()}_${Math.random().toString(36).substring(7)}${fileExtension}`;
+
+    let uploadResult: any = null;
 
     try {
       // Process image with Sharp
@@ -56,7 +63,7 @@ export class MediaService {
         ? `images/${type}s/screenshots`
         : `images/${type}s`;
 
-      const uploadResult = await this.imagekitService.uploadImage(
+      uploadResult = await this.imagekitService.uploadImage(
         processedImage,
         filename,
         folderPath
@@ -65,24 +72,54 @@ export class MediaService {
       // Save to database with screenshots/ prefix if it's a screenshot
       const dbFilename = isScreenshot ? `screenshots/${uploadResult.name}` : uploadResult.name;
 
-      const result = await this.prisma.$queryRaw`
-        INSERT INTO ak_screenshots (url_screen, id_titre, type, upload_date)
-        VALUES (${dbFilename}, ${relatedId || 0}, ${this.getTypeId(type)}, NOW())
-        RETURNING id_screen
-      `;
+      try {
+        const result = await this.prisma.$queryRaw`
+          INSERT INTO ak_screenshots (url_screen, id_titre, type, upload_date)
+          VALUES (${dbFilename}, ${relatedId || 0}, ${this.getTypeId(type)}, NOW())
+          RETURNING id_screen
+        `;
 
-      return {
-        id: (result as any[])[0]?.id_screen,
-        filename: dbFilename,
-        originalName: file.originalname,
-        size: processedImage.length,
-        type,
-        url: uploadResult.url,
-        relatedId,
-        imagekitFileId: uploadResult.fileId,
-      };
+        return {
+          id: (result as any[])[0]?.id_screen,
+          filename: dbFilename,
+          originalName: file.originalname,
+          size: processedImage.length,
+          type,
+          url: uploadResult.url,
+          relatedId,
+          imagekitFileId: uploadResult.fileId,
+        };
+      } catch (dbError) {
+        // Database save failed - delete the uploaded file from ImageKit to prevent orphaned files
+        console.error('[MediaService] Database save failed, deleting ImageKit file:', uploadResult.fileId);
+
+        try {
+          await this.imagekitService.deleteImage(uploadResult.fileId);
+          console.log('[MediaService] Successfully deleted orphaned ImageKit file:', uploadResult.fileId);
+        } catch (deleteError) {
+          console.error('[MediaService] Failed to delete ImageKit file after database error:', deleteError);
+          // Log this for manual cleanup but don't fail the operation
+        }
+
+        throw new BadRequestException(`Failed to save image metadata: ${dbError.message}`);
+      }
     } catch (error) {
-      throw error;
+      // If it's already a BadRequestException, re-throw it
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+
+      // If we have an uploadResult but something else failed, try to clean up
+      if (uploadResult && uploadResult.fileId) {
+        try {
+          await this.imagekitService.deleteImage(uploadResult.fileId);
+          console.log('[MediaService] Cleaned up ImageKit file after upload error:', uploadResult.fileId);
+        } catch (deleteError) {
+          console.error('[MediaService] Failed to cleanup ImageKit file:', deleteError);
+        }
+      }
+
+      throw new BadRequestException(`Image upload failed: ${error.message}`);
     }
   }
 
@@ -128,9 +165,7 @@ export class MediaService {
   }
 
   async getMediaByRelatedId(relatedId: number, type: 'anime' | 'manga') {
-    console.log('[getMediaByRelatedId] Called with:', { relatedId, type, typeOfType: typeof type });
     const typeId = this.getTypeId(type);
-    console.log('[getMediaByRelatedId] TypeId:', typeId);
 
     const media = await this.prisma.$queryRaw`
       SELECT
@@ -141,8 +176,6 @@ export class MediaService {
       WHERE id_titre = ${relatedId} AND type = ${typeId}
       ORDER BY upload_date DESC
     `;
-
-    console.log('[getMediaByRelatedId] Found media items:', (media as any[]).length);
 
     // Convert database results to use ImageKit URLs
     const processedMedia: any[] = [];
@@ -160,9 +193,7 @@ export class MediaService {
           // ImageKit path should be: "/images/animes/screenshots/filename.jpg" or "/images/animes/filename.jpg"
           // Note: ImageKit's url() function expects path starting with /
           const fullPath = `/images/${type}s/${item.filename}`;
-          console.log('[getMediaByRelatedId] Generated fullPath:', fullPath, 'for type:', type);
           url = this.imagekitService.getImageUrl(fullPath);
-          console.log('[getMediaByRelatedId] ImageKit URL:', url);
         }
 
         processedMedia.push({
