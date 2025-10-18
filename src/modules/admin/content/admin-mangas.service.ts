@@ -29,7 +29,45 @@ export class AdminMangasService {
       this.prisma.akManga.findMany({ where, skip, take: limit, orderBy: { dateAjout: 'desc' } }),
       this.prisma.akManga.count({ where }),
     ]);
-    return { items, pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } };
+
+    // Resolve publisher names from ak_business table
+    const businessIds: number[] = [];
+    items.forEach((manga) => {
+      if (manga.editeur && manga.editeur.startsWith('business')) {
+        const idMatch = manga.editeur.match(/business(\d+)/);
+        if (idMatch && idMatch[1]) {
+          businessIds.push(parseInt(idMatch[1], 10));
+        }
+      }
+    });
+
+    // Fetch all business names at once
+    let businessMap: Map<number, string> = new Map();
+    if (businessIds.length > 0) {
+      const businesses = await this.prisma.akBusiness.findMany({
+        where: { idBusiness: { in: businessIds } },
+        select: { idBusiness: true, denomination: true },
+      });
+      businessMap = new Map(businesses.map((b) => [b.idBusiness, b.denomination]));
+    }
+
+    // Map business names back to manga items
+    const enrichedItems = items.map((manga) => {
+      if (manga.editeur && manga.editeur.startsWith('business')) {
+        const idMatch = manga.editeur.match(/business(\d+)/);
+        if (idMatch && idMatch[1]) {
+          const businessId = parseInt(idMatch[1], 10);
+          const businessName = businessMap.get(businessId);
+          return {
+            ...manga,
+            editeur: businessName || manga.editeur, // Use resolved name or fallback to original
+          };
+        }
+      }
+      return manga;
+    });
+
+    return { items: enrichedItems, pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } };
   }
 
   async getOne(id: number) {
