@@ -111,8 +111,10 @@ export class MediaService {
       url = result.filename;
     } else {
       // Generate ImageKit URL from filename
-      const folderPath = `images/${typeName}s`;
-      url = this.imagekitService.getImageUrl(`${folderPath}/${result.filename}`);
+      // Database stores: "screenshots/filename.jpg" or just "filename.jpg"
+      // ImageKit path should be: "/images/animes/screenshots/filename.jpg"
+      const fullPath = `/images/${typeName}s/${result.filename}`;
+      url = this.imagekitService.getImageUrl(fullPath);
     }
 
     return {
@@ -149,10 +151,10 @@ export class MediaService {
           url = item.filename;
         } else {
           // Generate ImageKit URL from filename
-          // If filename starts with screenshots/, the full path is images/{type}s/{filename}
-          // Otherwise, it's images/{type}s/{filename}
-          const basePath = `images/${type}s`;
-          const fullPath = `${basePath}/${item.filename}`;
+          // Database stores: "screenshots/filename.jpg" or just "filename.jpg"
+          // ImageKit path should be: "/images/animes/screenshots/filename.jpg" or "/images/animes/filename.jpg"
+          // Note: ImageKit's url() function expects path starting with /
+          const fullPath = `/images/${type}s/${item.filename}`;
           url = this.imagekitService.getImageUrl(fullPath);
         }
 
