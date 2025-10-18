@@ -30,6 +30,7 @@ export class MediaService {
     file: Express.Multer.File,
     type: 'anime' | 'manga' | 'avatar' | 'cover',
     relatedId?: number,
+    isScreenshot?: boolean,
   ) {
     if (!file) {
       throw new BadRequestException('No file provided');
@@ -50,23 +51,29 @@ export class MediaService {
       const processedImage = await this.processImage(file.buffer, type);
 
       // Upload to ImageKit
-      const folderPath = `images/${type}s`; // images/animes, images/mangas, etc.
+      // For screenshots, upload to screenshots/ subfolder
+      const folderPath = isScreenshot
+        ? `images/${type}s/screenshots`
+        : `images/${type}s`;
+
       const uploadResult = await this.imagekitService.uploadImage(
         processedImage,
         filename,
         folderPath
       );
 
-      // Save to database
+      // Save to database with screenshots/ prefix if it's a screenshot
+      const dbFilename = isScreenshot ? `screenshots/${uploadResult.name}` : uploadResult.name;
+
       const result = await this.prisma.$queryRaw`
         INSERT INTO ak_screenshots (url_screen, id_titre, type, upload_date)
-        VALUES (${uploadResult.name}, ${relatedId || 0}, ${this.getTypeId(type)}, NOW())
+        VALUES (${dbFilename}, ${relatedId || 0}, ${this.getTypeId(type)}, NOW())
         RETURNING id_screen
       `;
 
       return {
         id: (result as any[])[0]?.id_screen,
-        filename: uploadResult.name,
+        filename: dbFilename,
         originalName: file.originalname,
         size: processedImage.length,
         type,
@@ -136,27 +143,20 @@ export class MediaService {
     for (const item of media as any[]) {
       try {
         let url: string;
-        let cleanFilename: string;
-
-        // Handle different filename formats
-        if (item.filename.startsWith('screenshots/')) {
-          cleanFilename = item.filename.replace(/^screenshots\//, '');
-        } else {
-          cleanFilename = item.filename;
-        }
 
         // Check if it's already an ImageKit URL
         if (item.filename.startsWith('https://ik.imagekit.io/')) {
           url = item.filename;
         } else {
           // Generate ImageKit URL from filename
+          // Keep the filename as-is (with screenshots/ prefix if it exists)
           const folderPath = `images/${type}s`;
-          url = this.imagekitService.getImageUrl(`${folderPath}/${cleanFilename}`);
+          url = this.imagekitService.getImageUrl(`${folderPath}/${item.filename}`);
         }
 
         processedMedia.push({
           id: Number(item.id),
-          filename: cleanFilename,
+          filename: item.filename,
           uploadDate: item.upload_date,
           url: url,
         });
