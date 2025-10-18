@@ -128,7 +128,10 @@ export class MediaService {
   }
 
   async getMediaByRelatedId(relatedId: number, type: 'anime' | 'manga') {
+    console.log('[getMediaByRelatedId] Called with:', { relatedId, type, typeOfType: typeof type });
     const typeId = this.getTypeId(type);
+    console.log('[getMediaByRelatedId] TypeId:', typeId);
+
     const media = await this.prisma.$queryRaw`
       SELECT
         id_screen as id,
@@ -138,6 +141,8 @@ export class MediaService {
       WHERE id_titre = ${relatedId} AND type = ${typeId}
       ORDER BY upload_date DESC
     `;
+
+    console.log('[getMediaByRelatedId] Found media items:', (media as any[]).length);
 
     // Convert database results to use ImageKit URLs
     const processedMedia: any[] = [];
@@ -155,7 +160,9 @@ export class MediaService {
           // ImageKit path should be: "/images/animes/screenshots/filename.jpg" or "/images/animes/filename.jpg"
           // Note: ImageKit's url() function expects path starting with /
           const fullPath = `/images/${type}s/${item.filename}`;
+          console.log('[getMediaByRelatedId] Generated fullPath:', fullPath, 'for type:', type);
           url = this.imagekitService.getImageUrl(fullPath);
+          console.log('[getMediaByRelatedId] ImageKit URL:', url);
         }
 
         processedMedia.push({
