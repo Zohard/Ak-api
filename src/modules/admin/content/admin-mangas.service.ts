@@ -30,41 +30,38 @@ export class AdminMangasService {
       this.prisma.akManga.count({ where }),
     ]);
 
-    // Resolve publisher names from ak_business table
-    const businessIds: number[] = [];
-    items.forEach((manga) => {
-      if (manga.editeur && manga.editeur.startsWith('business')) {
-        const idMatch = manga.editeur.match(/business(\d+)/);
-        if (idMatch && idMatch[1]) {
-          businessIds.push(parseInt(idMatch[1], 10));
-        }
+    // Get manga IDs to fetch publishers from ak_business_to_mangas
+    const mangaIds = items.map((manga) => manga.idManga);
+
+    // Fetch publisher relationships (type = 'Editeur') for all mangas at once
+    const publisherRelations = await this.prisma.akBusinessToManga.findMany({
+      where: {
+        idManga: { in: mangaIds },
+        type: 'Editeur',
+      },
+      include: {
+        business: {
+          select: { idBusiness: true, denomination: true },
+        },
+      },
+      orderBy: { idRelation: 'asc' }, // Get the first one if multiple exist
+    });
+
+    // Create a map of manga ID to publisher name (only the first publisher)
+    const publisherMap: Map<number, string | null> = new Map();
+    publisherRelations.forEach((relation) => {
+      if (relation.idManga && !publisherMap.has(relation.idManga)) {
+        publisherMap.set(relation.idManga, relation.business?.denomination || null);
       }
     });
 
-    // Fetch all business names at once
-    let businessMap: Map<number, string | null> = new Map();
-    if (businessIds.length > 0) {
-      const businesses = await this.prisma.akBusiness.findMany({
-        where: { idBusiness: { in: businessIds } },
-        select: { idBusiness: true, denomination: true },
-      });
-      businessMap = new Map(businesses.map((b) => [b.idBusiness, b.denomination]));
-    }
-
-    // Map business names back to manga items
+    // Map publisher names back to manga items
     const enrichedItems = items.map((manga) => {
-      if (manga.editeur && manga.editeur.startsWith('business')) {
-        const idMatch = manga.editeur.match(/business(\d+)/);
-        if (idMatch && idMatch[1]) {
-          const businessId = parseInt(idMatch[1], 10);
-          const businessName = businessMap.get(businessId);
-          return {
-            ...manga,
-            editeur: businessName || manga.editeur, // Use resolved name or fallback to original
-          };
-        }
-      }
-      return manga;
+      const publisherName = publisherMap.get(manga.idManga);
+      return {
+        ...manga,
+        editeur: publisherName || manga.editeur, // Use publisher name from relations or fallback to original
+      };
     });
 
     return { items: enrichedItems, pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } };
