@@ -128,6 +128,11 @@ export class CreateAdminAnimeDto {
   @IsOptional()
   @IsString()
   commentaire?: string;
+
+  @ApiPropertyOptional({ description: 'ID du topic forum associé' })
+  @IsOptional()
+  @IsInt()
+  lienforum?: number;
 }
 
 export class UpdateAdminAnimeDto {
@@ -231,6 +236,11 @@ export class UpdateAdminAnimeDto {
   @IsOptional()
   @IsString()
   commentaire?: string;
+
+  @ApiPropertyOptional({ description: 'ID du topic forum associé' })
+  @IsOptional()
+  @IsInt()
+  lienforum?: number;
 }
 
 export class AdminAnimeListQueryDto {
