@@ -380,6 +380,54 @@ export class ForumsService {
     }
   }
 
+  async getTopicPreview(topicId: number, userId?: number) {
+    try {
+      const topic = await this.prisma.smfTopic.findUnique({
+        where: { idTopic: topicId },
+        include: {
+          board: true,
+          firstMessage: true,
+          lastMessage: {
+            include: {
+              member: {
+                select: {
+                  idMember: true,
+                  memberName: true
+                }
+              }
+            }
+          }
+        }
+      });
+
+      if (!topic) {
+        throw new Error('Topic not found');
+      }
+
+      // Check board access permissions
+      const hasAccess = await this.checkBoardAccess(topic.board.idBoard, userId);
+      if (!hasAccess) {
+        throw new Error('Access denied to this topic');
+      }
+
+      return {
+        id: topic.idTopic,
+        subject: topic.firstMessage?.subject || 'Untitled',
+        author: topic.firstMessage?.posterName || 'Unknown',
+        createdAt: topic.firstMessage?.posterTime ? new Date(Number(topic.firstMessage.posterTime) * 1000).toISOString() : new Date().toISOString(),
+        numReplies: topic.numReplies,
+        numViews: topic.numViews,
+        lastPost: topic.lastMessage ? {
+          author: topic.lastMessage.posterName,
+          date: new Date(Number(topic.lastMessage.posterTime) * 1000).toISOString()
+        } : null
+      };
+    } catch (error) {
+      this.logger.error('Error fetching topic preview:', error);
+      throw error;
+    }
+  }
+
   async getLatestMessages(query: ForumMessageQueryDto): Promise<ForumMessageResponse> {
     const { limit = 10, offset = 0, boardId } = query;
 
