@@ -376,8 +376,17 @@ export class AdminContentService {
 
   async getContentRelationships(id: number, type: string) {
     // Relationships are stored with the source in id_fiche_depart as 'anime<ID>' or 'manga<ID>'
+    // We query BIDIRECTIONALLY: both where this content is the source AND where it's the target
     const sourceKey = `${type}${id}`;
-    const relationships = await this.prisma.$queryRaw<any[]>`
+    const idColumn = type === 'anime' ? 'id_anime' : 'id_manga';
+
+    // Build the WHERE clause dynamically based on type
+    const whereClause = type === 'anime'
+      ? `WHERE r.id_fiche_depart = $1 OR r.id_anime = $2`
+      : `WHERE r.id_fiche_depart = $1 OR r.id_manga = $2`;
+
+    const relationships = await this.prisma.$queryRawUnsafe<any[]>(
+      `
       SELECT
         r.id_relation,
         r.id_fiche_depart,
@@ -398,8 +407,11 @@ export class AdminContentService {
       FROM ak_fiche_to_fiche r
       LEFT JOIN ak_animes a ON r.id_anime = a.id_anime
       LEFT JOIN ak_mangas m ON r.id_manga = m.id_manga
-      WHERE r.id_fiche_depart = ${sourceKey}
-    `;
+      ${whereClause}
+    `,
+      sourceKey,
+      id,
+    );
 
     // Fetch tags for each related item
     const relationshipsWithTags = await Promise.all(
