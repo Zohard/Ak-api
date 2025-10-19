@@ -732,6 +732,7 @@ export class ReviewsService {
       idAnime,
       idManga,
       critique,
+      acceptImages,
       membre,
       ...otherFields
     } = review;
@@ -767,6 +768,7 @@ export class ReviewsService {
       mangaId: idManga,
       reviewDate,
       critique,
+      acceptImages,
       membre: mappedMembre,
       ...otherFields,
     };
