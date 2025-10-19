@@ -73,6 +73,19 @@ export class ForumsController {
     return { success: true };
   }
 
+  @Get('topics/:topicId/preview')
+  @UseGuards(OptionalJwtAuthGuard)
+  @ApiOperation({ summary: 'Get topic preview for media pages' })
+  @ApiParam({ name: 'topicId', type: 'number', description: 'Topic ID' })
+  @ApiResponse({ status: 200, description: 'Topic preview retrieved successfully' })
+  async getTopicPreview(
+    @Param('topicId', ParseIntPipe) topicId: number,
+    @Request() req?
+  ) {
+    const userId = req?.user?.id || null;
+    return this.forumsService.getTopicPreview(topicId, userId);
+  }
+
   @Get('messages/latest')
   @ApiOperation({ summary: 'Get latest forum messages' })
   @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Number of messages to return (default: 10)' })
