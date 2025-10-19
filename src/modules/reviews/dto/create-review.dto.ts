@@ -60,4 +60,17 @@ export class CreateReviewDto {
   @Type(() => Number)
   @ValidateIf((o) => !o.idAnime)
   idManga?: number;
+
+  @ApiPropertyOptional({
+    description: 'Afficher avec des illustrations/screenshots (0 ou 1)',
+    example: 1,
+    minimum: 0,
+    maximum: 1,
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(1)
+  @Type(() => Number)
+  acceptImages?: number;
 }
