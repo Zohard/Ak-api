@@ -107,6 +107,11 @@ export class CreateAdminMangaDto {
   @IsInt()
   @IsIn([0, 1, 2])
   statut?: number;
+
+  @ApiPropertyOptional({ description: 'Commentaire sur la fiche' })
+  @IsOptional()
+  @IsString()
+  commentaire?: string;
 }
 
 export class UpdateAdminMangaDto extends CreateAdminMangaDto {}
