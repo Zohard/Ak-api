@@ -42,7 +42,7 @@ export class AdminMangasService {
     });
 
     // Fetch all business names at once
-    let businessMap: Map<number, string> = new Map();
+    let businessMap: Map<number, string | null> = new Map();
     if (businessIds.length > 0) {
       const businesses = await this.prisma.akBusiness.findMany({
         where: { idBusiness: { in: businessIds } },
