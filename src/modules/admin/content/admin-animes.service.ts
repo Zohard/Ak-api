@@ -113,6 +113,7 @@ export class AdminAnimesService {
     if (dto.lien_adn) data.lienAdn = dto.lien_adn;
     if (dto.doublage) data.doublage = dto.doublage;
     if (dto.commentaire) data.commentaire = dto.commentaire;
+    if (typeof dto.lienforum === 'number') data.lienForum = dto.lienforum;
     // Note: legacy `topic` is not supported; use `commentaire` instead
 
     const created = await this.prisma.akAnime.create({ data });
@@ -129,11 +130,16 @@ export class AdminAnimesService {
     const existing = await this.prisma.akAnime.findUnique({ where: { idAnime: id } });
     if (!existing) throw new NotFoundException('Anime introuvable');
 
-    const { topic, ...rest } = dto as any;
+    const { topic, lienforum, ...rest } = dto as any;
     const data: any = { ...rest };
     if (dto.titre) {
       data.titre = dto.titre;
       if (!dto.niceUrl) data.niceUrl = this.slugify(dto.titre);
+    }
+
+    // Map lienforum from DTO to lienForum for Prisma
+    if (typeof lienforum === 'number') {
+      data.lienForum = lienforum;
     }
 
     // Handle synopsis validation - append user attribution if synopsis is being updated

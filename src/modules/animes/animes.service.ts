@@ -1130,13 +1130,13 @@ export class AnimesService extends BaseContentService<
   }
 
   private formatAnime(anime: any) {
-    const { idAnime, dateAjout, image, lienforum, ...otherFields } = anime;
+    const { idAnime, dateAjout, image, lienForum, ...otherFields } = anime;
 
     return {
       id: idAnime,
       addedDate: dateAjout?.toISOString(),
       image: image ? (typeof image === 'string' && /^https?:\/\//.test(image) ? image : `/api/media/serve/anime/${image}`) : null,
-      lienforum: lienforum || null,
+      lienforum: lienForum || null,
       ...otherFields,
     };
   }
