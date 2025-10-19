@@ -70,7 +70,26 @@ export class AdminMangasService {
   async getOne(id: number) {
     const item = await this.prisma.akManga.findUnique({ where: { idManga: id } });
     if (!item) throw new NotFoundException('Manga introuvable');
-    return item;
+
+    // Fetch publisher from ak_business_to_mangas (same as in list method)
+    const publisherRelation = await this.prisma.akBusinessToManga.findFirst({
+      where: {
+        idManga: id,
+        type: 'Editeur',
+      },
+      include: {
+        business: {
+          select: { idBusiness: true, denomination: true },
+        },
+      },
+      orderBy: { idRelation: 'asc' }, // Get the first one if multiple exist
+    });
+
+    // Return manga with publisher name from relation or fallback to original editeur field
+    return {
+      ...item,
+      editeur: publisherRelation?.business?.denomination || item.editeur,
+    };
   }
 
   async create(dto: CreateAdminMangaDto, username?: string) {
