@@ -385,67 +385,54 @@ export class AdminContentService {
       ? `WHERE r.id_fiche_depart = $1 OR r.id_anime = $2`
       : `WHERE r.id_fiche_depart = $1 OR r.id_manga = $2`;
 
+    // Filter to only anime/manga relationships (exclude jeu, ost, business, etc.)
     const relationships = await this.prisma.$queryRawUnsafe<any[]>(
       `
       SELECT
-        r.id_relation,
-        r.id_fiche_depart,
-        r.id_anime,
-        r.id_manga,
-        CASE
-          -- If this row matches because we're the source (id_fiche_depart matches),
-          -- then the related content is in id_anime/id_manga
-          WHEN r.id_fiche_depart = $1 THEN
-            CASE
-              WHEN r.id_anime > 0 THEN r.id_anime
-              WHEN r.id_manga > 0 THEN r.id_manga
-              ELSE NULL
-            END
-          -- If this row matches because we're the target (id_anime/id_manga matches),
-          -- then the related content is in id_fiche_depart
-          ELSE
-            CASE
-              WHEN r.id_fiche_depart LIKE 'anime%' THEN CAST(SUBSTRING(r.id_fiche_depart FROM 6) AS INTEGER)
-              WHEN r.id_fiche_depart LIKE 'manga%' THEN CAST(SUBSTRING(r.id_fiche_depart FROM 6) AS INTEGER)
-              ELSE NULL
-            END
-        END as related_id,
-        'related'::text as type_relation,
-        CASE
-          -- If this row matches because we're the source, extract type from id_anime/id_manga
-          WHEN r.id_fiche_depart = $1 THEN
-            CASE
-              WHEN r.id_anime > 0 THEN 'anime'::text
-              WHEN r.id_manga > 0 THEN 'manga'::text
-              ELSE 'unknown'::text
-            END
-          -- If this row matches because we're the target, extract type from id_fiche_depart
-          ELSE
-            CASE
-              WHEN r.id_fiche_depart LIKE 'anime%' THEN 'anime'::text
-              WHEN r.id_fiche_depart LIKE 'manga%' THEN 'manga'::text
-              ELSE 'unknown'::text
-            END
-        END as related_type,
-        CASE
-          -- If this row matches because we're the source, get title from target tables
-          WHEN r.id_fiche_depart = $1 THEN COALESCE(a.titre, m.titre)
-          -- If this row matches because we're the target, get title from source tables via joins
-          ELSE
-            CASE
-              WHEN r.id_fiche_depart LIKE 'anime%' THEN a2.titre
-              WHEN r.id_fiche_depart LIKE 'manga%' THEN m2.titre
-              ELSE NULL
-            END
-        END as related_title
-      FROM ak_fiche_to_fiche r
-      LEFT JOIN ak_animes a ON r.id_anime = a.id_anime
-      LEFT JOIN ak_mangas m ON r.id_manga = m.id_manga
-      LEFT JOIN ak_animes a2 ON r.id_fiche_depart LIKE 'anime%'
-        AND CAST(SUBSTRING(r.id_fiche_depart FROM 6) AS INTEGER) = a2.id_anime
-      LEFT JOIN ak_mangas m2 ON r.id_fiche_depart LIKE 'manga%'
-        AND CAST(SUBSTRING(r.id_fiche_depart FROM 6) AS INTEGER) = m2.id_manga
-      ${whereClause}
+        base.id_relation,
+        base.id_fiche_depart,
+        base.id_anime,
+        base.id_manga,
+        base.related_id,
+        base.related_type,
+        base.type_relation,
+        COALESCE(a.titre, m.titre) as related_title
+      FROM (
+        SELECT
+          r.id_relation,
+          r.id_fiche_depart,
+          r.id_anime,
+          r.id_manga,
+          CASE
+            WHEN r.id_fiche_depart = $1 THEN
+              CASE
+                WHEN r.id_anime > 0 THEN r.id_anime
+                WHEN r.id_manga > 0 THEN r.id_manga
+                ELSE NULL
+              END
+            WHEN r.id_fiche_depart ~ '^anime[0-9]+\$' THEN CAST(SUBSTRING(r.id_fiche_depart, 6) AS INTEGER)
+            WHEN r.id_fiche_depart ~ '^manga[0-9]+\$' THEN CAST(SUBSTRING(r.id_fiche_depart, 6) AS INTEGER)
+            ELSE NULL
+          END as related_id,
+          'related'::text as type_relation,
+          CASE
+            WHEN r.id_fiche_depart = $1 THEN
+              CASE
+                WHEN r.id_anime > 0 THEN 'anime'::text
+                WHEN r.id_manga > 0 THEN 'manga'::text
+                ELSE 'unknown'::text
+              END
+            WHEN r.id_fiche_depart ~ '^anime[0-9]+\$' THEN 'anime'::text
+            WHEN r.id_fiche_depart ~ '^manga[0-9]+\$' THEN 'manga'::text
+            ELSE 'unknown'::text
+          END as related_type
+        FROM ak_fiche_to_fiche r
+        ${whereClause}
+        AND (r.id_anime > 0 OR r.id_manga > 0 OR r.id_fiche_depart ~ '^anime[0-9]+\$' OR r.id_fiche_depart ~ '^manga[0-9]+\$')
+      ) base
+      LEFT JOIN ak_animes a ON base.related_type = 'anime' AND base.related_id = a.id_anime
+      LEFT JOIN ak_mangas m ON base.related_type = 'manga' AND base.related_id = m.id_manga
+      WHERE base.related_id IS NOT NULL
     `,
       sourceKey,
       id,
