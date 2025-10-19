@@ -1335,12 +1335,13 @@ export class MangasService extends BaseContentService<
   }
 
   private formatManga(manga: any) {
-    const { idManga, dateAjout, image, ...otherFields } = manga;
+    const { idManga, dateAjout, image, lienForum, ...otherFields } = manga;
 
     return {
       id: idManga,
       addedDate: dateAjout?.toISOString(),
       image: image ? (typeof image === 'string' && /^https?:\/\//.test(image) ? image : `/api/media/serve/manga/${image}`) : null,
+      lienforum: lienForum || null,
       ...otherFields,
     };
   }
