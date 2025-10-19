@@ -230,8 +230,42 @@ export class MangasService extends BaseContentService<
       this.prisma.akManga.count({ where }),
     ]);
 
+    // Get manga IDs to fetch publishers from ak_business_to_mangas
+    const mangaIds = mangas.map((manga) => manga.idManga);
+
+    // Fetch publisher relationships (type = 'Editeur') for all mangas at once
+    const publisherRelations = await this.prisma.akBusinessToManga.findMany({
+      where: {
+        idManga: { in: mangaIds },
+        type: 'Editeur',
+      },
+      include: {
+        business: {
+          select: { idBusiness: true, denomination: true },
+        },
+      },
+      orderBy: { idRelation: 'asc' }, // Get the first one if multiple exist
+    });
+
+    // Create a map of manga ID to publisher name (only the first publisher)
+    const publisherMap: Map<number, string | null> = new Map();
+    publisherRelations.forEach((relation) => {
+      if (relation.idManga && !publisherMap.has(relation.idManga)) {
+        publisherMap.set(relation.idManga, relation.business?.denomination || null);
+      }
+    });
+
+    // Map publisher names back to manga items
+    const enrichedMangas = mangas.map((manga) => {
+      const publisherName = publisherMap.get(manga.idManga);
+      return {
+        ...manga,
+        editeur: publisherName || manga.editeur, // Use publisher name from relations or fallback to original
+      };
+    });
+
     const result = {
-      mangas: mangas.map(this.formatManga),
+      mangas: enrichedMangas.map(this.formatManga),
       pagination: {
         page,
         limit,
@@ -281,7 +315,27 @@ export class MangasService extends BaseContentService<
       throw new NotFoundException('Manga introuvable');
     }
 
-    const formattedManga = this.formatManga(manga);
+    // Fetch publisher from ak_business_to_mangas
+    const publisherRelation = await this.prisma.akBusinessToManga.findFirst({
+      where: {
+        idManga: id,
+        type: 'Editeur',
+      },
+      include: {
+        business: {
+          select: { idBusiness: true, denomination: true },
+        },
+      },
+      orderBy: { idRelation: 'asc' }, // Get the first one if multiple exist
+    });
+
+    // Enrich manga with publisher name
+    const enrichedManga = {
+      ...manga,
+      editeur: publisherRelation?.business?.denomination || manga.editeur,
+    };
+
+    const formattedManga = this.formatManga(enrichedManga);
 
     // Cache the result
     const cacheData = {
@@ -306,8 +360,39 @@ export class MangasService extends BaseContentService<
       },
     });
 
+    // Fetch publisher relationships (type = 'Editeur') for all mangas at once
+    const publisherRelations = await this.prisma.akBusinessToManga.findMany({
+      where: {
+        idManga: { in: ids },
+        type: 'Editeur',
+      },
+      include: {
+        business: {
+          select: { idBusiness: true, denomination: true },
+        },
+      },
+      orderBy: { idRelation: 'asc' }, // Get the first one if multiple exist
+    });
+
+    // Create a map of manga ID to publisher name (only the first publisher)
+    const publisherMap: Map<number, string | null> = new Map();
+    publisherRelations.forEach((relation) => {
+      if (relation.idManga && !publisherMap.has(relation.idManga)) {
+        publisherMap.set(relation.idManga, relation.business?.denomination || null);
+      }
+    });
+
+    // Enrich mangas with publisher names
+    const enrichedMangas = mangas.map((manga) => {
+      const publisherName = publisherMap.get(manga.idManga);
+      return {
+        ...manga,
+        editeur: publisherName || manga.editeur, // Use publisher name from relations or fallback to original
+      };
+    });
+
     // Create a map for quick lookup
-    const mangaMap = new Map(mangas.map(manga => [manga.idManga, manga]));
+    const mangaMap = new Map(enrichedMangas.map(manga => [manga.idManga, manga]));
 
     // Return mangas in the same order as the input IDs
     return ids
@@ -478,9 +563,40 @@ export class MangasService extends BaseContentService<
         },
       });
 
+      // Fetch publisher relationships (type = 'Editeur') for all mangas at once
+      const publisherRelations = await this.prisma.akBusinessToManga.findMany({
+        where: {
+          idManga: { in: mangaIds },
+          type: 'Editeur',
+        },
+        include: {
+          business: {
+            select: { idBusiness: true, denomination: true },
+          },
+        },
+        orderBy: { idRelation: 'asc' },
+      });
+
+      // Create a map of manga ID to publisher name
+      const publisherMap: Map<number, string | null> = new Map();
+      publisherRelations.forEach((relation) => {
+        if (relation.idManga && !publisherMap.has(relation.idManga)) {
+          publisherMap.set(relation.idManga, relation.business?.denomination || null);
+        }
+      });
+
+      // Enrich mangas with publisher names
+      const enrichedMangas = mangas.map((manga) => {
+        const publisherName = publisherMap.get(manga.idManga);
+        return {
+          ...manga,
+          editeur: publisherName || manga.editeur,
+        };
+      });
+
       // Sort to maintain the order from the query
       const sortedMangas = mangaIds.map(id =>
-        mangas.find(a => a.idManga === id)
+        enrichedMangas.find(a => a.idManga === id)
       ).filter(Boolean);
 
       // Add collection stats to formatted output
@@ -534,8 +650,40 @@ export class MangasService extends BaseContentService<
       })
     );
 
+    // Fetch publisher relationships (type = 'Editeur') for all mangas at once
+    const mangaIds = mangas.map((manga) => manga.idManga);
+    const publisherRelations = await this.prisma.akBusinessToManga.findMany({
+      where: {
+        idManga: { in: mangaIds },
+        type: 'Editeur',
+      },
+      include: {
+        business: {
+          select: { idBusiness: true, denomination: true },
+        },
+      },
+      orderBy: { idRelation: 'asc' },
+    });
+
+    // Create a map of manga ID to publisher name
+    const publisherMap: Map<number, string | null> = new Map();
+    publisherRelations.forEach((relation) => {
+      if (relation.idManga && !publisherMap.has(relation.idManga)) {
+        publisherMap.set(relation.idManga, relation.business?.denomination || null);
+      }
+    });
+
+    // Enrich mangas with publisher names
+    const enrichedMangas = mangas.map((manga) => {
+      const publisherName = publisherMap.get(manga.idManga);
+      return {
+        ...manga,
+        editeur: publisherName || manga.editeur,
+      };
+    });
+
     const result = {
-      topMangas: mangas.map(this.formatManga.bind(this)),
+      topMangas: enrichedMangas.map(this.formatManga.bind(this)),
       rankingType: type,
       generatedAt: new Date().toISOString(),
     };
@@ -598,9 +746,40 @@ export class MangasService extends BaseContentService<
         },
       });
 
+      // Fetch publisher relationships (type = 'Editeur') for all mangas at once
+      const publisherRelations = await this.prisma.akBusinessToManga.findMany({
+        where: {
+          idManga: { in: mangaIds },
+          type: 'Editeur',
+        },
+        include: {
+          business: {
+            select: { idBusiness: true, denomination: true },
+          },
+        },
+        orderBy: { idRelation: 'asc' },
+      });
+
+      // Create a map of manga ID to publisher name
+      const publisherMap: Map<number, string | null> = new Map();
+      publisherRelations.forEach((relation) => {
+        if (relation.idManga && !publisherMap.has(relation.idManga)) {
+          publisherMap.set(relation.idManga, relation.business?.denomination || null);
+        }
+      });
+
+      // Enrich mangas with publisher names
+      const enrichedMangas = mangas.map((manga) => {
+        const publisherName = publisherMap.get(manga.idManga);
+        return {
+          ...manga,
+          editeur: publisherName || manga.editeur,
+        };
+      });
+
       // Sort to maintain the order from the query
       const sortedMangas = mangaIds.map(id =>
-        mangas.find(a => a.idManga === id)
+        enrichedMangas.find(a => a.idManga === id)
       ).filter(Boolean);
 
       // Add collection stats to formatted output
@@ -654,8 +833,40 @@ export class MangasService extends BaseContentService<
       })
     );
 
+    // Fetch publisher relationships (type = 'Editeur') for all mangas at once
+    const mangaIds = mangas.map((manga) => manga.idManga);
+    const publisherRelations = await this.prisma.akBusinessToManga.findMany({
+      where: {
+        idManga: { in: mangaIds },
+        type: 'Editeur',
+      },
+      include: {
+        business: {
+          select: { idBusiness: true, denomination: true },
+        },
+      },
+      orderBy: { idRelation: 'asc' },
+    });
+
+    // Create a map of manga ID to publisher name
+    const publisherMap: Map<number, string | null> = new Map();
+    publisherRelations.forEach((relation) => {
+      if (relation.idManga && !publisherMap.has(relation.idManga)) {
+        publisherMap.set(relation.idManga, relation.business?.denomination || null);
+      }
+    });
+
+    // Enrich mangas with publisher names
+    const enrichedMangas = mangas.map((manga) => {
+      const publisherName = publisherMap.get(manga.idManga);
+      return {
+        ...manga,
+        editeur: publisherName || manga.editeur,
+      };
+    });
+
     const result = {
-      flopMangas: mangas.map(this.formatManga.bind(this)),
+      flopMangas: enrichedMangas.map(this.formatManga.bind(this)),
       rankingType: type,
       generatedAt: new Date().toISOString(),
     };
@@ -1033,10 +1244,41 @@ export class MangasService extends BaseContentService<
       orderBy: { moyenneNotes: 'desc' },
     });
 
+    // Fetch publisher relationships (type = 'Editeur') for all mangas at once
+    const publisherRelations = await this.prisma.akBusinessToManga.findMany({
+      where: {
+        idManga: { in: mangaIds },
+        type: 'Editeur',
+      },
+      include: {
+        business: {
+          select: { idBusiness: true, denomination: true },
+        },
+      },
+      orderBy: { idRelation: 'asc' },
+    });
+
+    // Create a map of manga ID to publisher name
+    const publisherMap: Map<number, string | null> = new Map();
+    publisherRelations.forEach((relation) => {
+      if (relation.idManga && !publisherMap.has(relation.idManga)) {
+        publisherMap.set(relation.idManga, relation.business?.denomination || null);
+      }
+    });
+
+    // Enrich mangas with publisher names
+    const enrichedMangas = mangas.map((manga) => {
+      const publisherName = publisherMap.get(manga.idManga);
+      return {
+        ...manga,
+        editeur: publisherName || manga.editeur,
+      };
+    });
+
     return {
       genre: decodedGenre,
-      ak_mangas: mangas.map(this.formatManga.bind(this)),
-      count: mangas.length,
+      ak_mangas: enrichedMangas.map(this.formatManga.bind(this)),
+      count: enrichedMangas.length,
     };
   }
 
