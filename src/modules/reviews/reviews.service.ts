@@ -308,7 +308,11 @@ export class ReviewsService {
               memberName: true,
               avatar: true,
               realName: true,
-              _count: { select: { reviews: { where: { statut: 0 } } } },
+              _count: {
+                select: {
+                  reviews: true
+                }
+              },
             },
           },
         anime: {
@@ -337,17 +341,26 @@ export class ReviewsService {
 
     let formattedReview = this.formatReview(review);
 
-    // Compute author's visible reviews average rating
+    // Compute author's visible reviews count and average rating
     try {
-      const avg = await this.prisma.akCritique.aggregate({
-        where: { idMembre: review.idMembre, statut: 0, NOT: { notation: null } },
-        _avg: { notation: true },
-      })
+      const [avg, count] = await Promise.all([
+        this.prisma.akCritique.aggregate({
+          where: { idMembre: review.idMembre, statut: 0, NOT: { notation: null } },
+          _avg: { notation: true },
+        }),
+        this.prisma.akCritique.count({
+          where: { idMembre: review.idMembre, statut: 0 }
+        })
+      ])
       const average = avg._avg?.notation ?? 0
       if (formattedReview.membre) {
         formattedReview = {
           ...formattedReview,
-          membre: { ...formattedReview.membre, averageRating: Number(average) }
+          membre: {
+            ...formattedReview.membre,
+            reviewsCount: count,
+            averageRating: Number(average)
+          }
         }
       }
     } catch {}
