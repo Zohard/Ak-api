@@ -14,6 +14,10 @@ export class ForumsService {
     try {
       this.logger.log('About to query database for categories...');
 
+      // Fetch user groups ONCE at the start (HUGE performance improvement!)
+      const userGroups = userId ? await this.getUserGroups(userId) : [0];
+      this.logger.log(`User groups for user ${userId || 'guest'}: [${userGroups.join(',')}]`);
+
       const categories = await this.prisma.smfCategory.findMany({
         orderBy: { catOrder: 'asc' },
         include: {
@@ -34,6 +38,7 @@ export class ForumsService {
               redirect: true,
               idLastMsg: true,
               idParent: true, // Include idParent to identify child boards
+              memberGroups: true, // Include for permission checking (no extra query needed!)
               _count: {
                 select: { topics: true, messages: true }
               }
@@ -88,68 +93,77 @@ export class ForumsService {
       );
 
       // Filter boards based on access permissions
-      const filteredCategories = await Promise.all(
-        categories.map(async category => {
-          this.logger.log(`Processing category: ${category.name} with ${category.boards.length} boards`);
+      const filteredCategories = categories.map(category => {
+        this.logger.log(`Processing category: ${category.name} with ${category.boards.length} boards`);
 
-          // Build all board objects with their data
-          const allBoardsWithData = await Promise.all(
-            category.boards.map(async board => {
-              const hasAccess = await this.checkBoardAccess(board.idBoard, userId);
-              this.logger.log(`Board ${board.idBoard} (${board.name}) access for user ${userId}: ${hasAccess}, idParent: ${board.idParent}`);
+        // Build all board objects with their data (NO async needed - all data already fetched!)
+        const allBoardsWithData = category.boards.map(board => {
+          // Check permissions inline (no database query!)
+          let allowedGroups: number[];
+          if (!board.memberGroups || board.memberGroups.trim() === '' || board.memberGroups.trim() === '0') {
+            // Default to public access
+            allowedGroups = [-1, 0, 1, 2, 3, 4];
+          } else {
+            allowedGroups = board.memberGroups.split(',').map(g => parseInt(g.trim())).filter(g => !isNaN(g));
+            if (allowedGroups.length === 0) {
+              allowedGroups = [-1, 0, 1, 2, 3, 4];
+            }
+          }
 
-              if (!hasAccess) return null;
+          // Check if user has access (group -1 means public, or user group matches)
+          const hasAccess = allowedGroups.includes(-1) || userGroups.some(group => allowedGroups.includes(group));
+          this.logger.log(`Board ${board.idBoard} (${board.name}) access for user ${userId}: ${hasAccess}, idParent: ${board.idParent}`);
 
-              // Get last message from pre-fetched map (no extra query!)
-              const lastMessage = board.idLastMsg ? lastMessagesMap.get(board.idLastMsg) || null : null;
+          if (!hasAccess) return null;
 
-              return {
-                id: board.idBoard,
-                name: board.name,
-                description: board.description,
-                numTopics: board.numTopics,
-                numPosts: board.numPosts,
-                redirect: board.redirect,
-                lastMessage: lastMessage,
-                idParent: board.idParent
-              };
-            })
-          );
-
-          // Filter out null values (boards without access)
-          const accessibleBoards = allBoardsWithData.filter(board => board !== null);
-
-          // Separate parent boards (idParent === 0) from child boards (idParent > 0)
-          const parentBoards = accessibleBoards.filter(board => board.idParent === 0);
-          const childBoards = accessibleBoards.filter(board => board.idParent > 0);
-
-          // Nest child boards under their parent boards
-          const boardsWithChildren = parentBoards.map(parentBoard => {
-            const children = childBoards.filter(child => child.idParent === parentBoard.id);
-
-            // Remove idParent from the response (we don't need it in the frontend)
-            const { idParent: _, ...boardWithoutIdParent } = parentBoard;
-
-            return {
-              ...boardWithoutIdParent,
-              children: children.length > 0 ? children.map(child => {
-                const { idParent: __, ...childWithoutIdParent } = child;
-                return childWithoutIdParent;
-              }) : undefined
-            };
-          });
-
-          this.logger.log(`Category ${category.name}: ${parentBoards.length} parent boards, ${childBoards.length} child boards`);
+          // Get last message from pre-fetched map (no extra query!)
+          const lastMessage = board.idLastMsg ? lastMessagesMap.get(board.idLastMsg) || null : null;
 
           return {
-            id: category.idCat,
-            name: category.name,
-            catOrder: category.catOrder,
-            canCollapse: Boolean(category.canCollapse),
-            boards: boardsWithChildren
+            id: board.idBoard,
+            name: board.name,
+            description: board.description,
+            numTopics: board.numTopics,
+            numPosts: board.numPosts,
+            redirect: board.redirect,
+            lastMessage: lastMessage,
+            idParent: board.idParent
           };
-        })
-      );
+        });
+
+        // Filter out null values (boards without access)
+        const accessibleBoards = allBoardsWithData.filter(board => board !== null);
+
+        // Separate parent boards (idParent === 0) from child boards (idParent > 0)
+        const parentBoards = accessibleBoards.filter(board => board.idParent === 0);
+        const childBoards = accessibleBoards.filter(board => board.idParent > 0);
+
+        // Nest child boards under their parent boards
+        const boardsWithChildren = parentBoards.map(parentBoard => {
+          const children = childBoards.filter(child => child.idParent === parentBoard.id);
+
+          // Remove idParent from the response (we don't need it in the frontend)
+          const { idParent: _, ...boardWithoutIdParent } = parentBoard;
+
+          return {
+            ...boardWithoutIdParent,
+            children: children.length > 0 ? children.map(child => {
+              const { idParent: __, ...childWithoutIdParent } = child;
+              return childWithoutIdParent;
+            }) : undefined
+          };
+        });
+
+        this.logger.log(`Category ${category.name}: ${parentBoards.length} parent boards, ${childBoards.length} child boards`);
+
+        return {
+          id: category.idCat,
+          name: category.name,
+          catOrder: category.catOrder,
+          canCollapse: Boolean(category.canCollapse),
+          boards: boardsWithChildren
+        };
+      });
 
       // Filter out categories with no accessible boards
       const categoriesWithBoards = filteredCategories.filter(category => category.boards.length > 0);
