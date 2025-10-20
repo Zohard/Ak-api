@@ -3,7 +3,6 @@
   "buildCommand": "npm run build",
   "functions": {
     "api/index.ts": {
-      "runtime": "@vercel/node@3",
       "maxDuration": 30,
       "memory": 1024
     }
