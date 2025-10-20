@@ -501,7 +501,11 @@ export class UsersService {
         COALESCE(a.titre, m.titre) as title,
         c.id_critique as id,
         c.nice_url as "reviewSlug",
-        COALESCE(a.nice_url, m.nice_url) as "niceUrl",
+        CASE
+          WHEN c.id_anime IS NOT NULL THEN CONCAT(a.nice_url, '-', a.id_anime)
+          WHEN c.id_manga IS NOT NULL THEN CONCAT(m.nice_url, '-', m.id_manga)
+          ELSE NULL
+        END as "niceUrl",
         CASE
           WHEN c.id_anime IS NOT NULL THEN 'anime'
           WHEN c.id_manga IS NOT NULL THEN 'manga'
@@ -523,7 +527,7 @@ export class UsersService {
         a.titre as title,
         ca.id_anime as id,
         NULL as "reviewSlug",
-        a.nice_url as "niceUrl",
+        CONCAT(a.nice_url, '-', a.id_anime) as "niceUrl",
         'anime' as "mediaType"
       FROM collection_animes ca
       LEFT JOIN ak_animes a ON ca.id_anime = a.id_anime
@@ -537,7 +541,7 @@ export class UsersService {
         m.titre as title,
         cm.id_manga as id,
         NULL as "reviewSlug",
-        m.nice_url as "niceUrl",
+        CONCAT(m.nice_url, '-', m.id_manga) as "niceUrl",
         'manga' as "mediaType"
       FROM collection_mangas cm
       LEFT JOIN ak_mangas m ON cm.id_manga = m.id_manga
@@ -1126,7 +1130,11 @@ export class UsersService {
         COALESCE(a.titre, m.titre) as title,
         c.id_critique as id,
         c.nice_url as "reviewSlug",
-        COALESCE(a.nice_url, m.nice_url) as "niceUrl",
+        CASE
+          WHEN c.id_anime IS NOT NULL THEN CONCAT(a.nice_url, '-', a.id_anime)
+          WHEN c.id_manga IS NOT NULL THEN CONCAT(m.nice_url, '-', m.id_manga)
+          ELSE NULL
+        END as "niceUrl",
         CASE
           WHEN c.id_anime IS NOT NULL THEN 'anime'
           WHEN c.id_manga IS NOT NULL THEN 'manga'
@@ -1148,7 +1156,7 @@ export class UsersService {
         a.titre as title,
         ca.id_anime as id,
         NULL as "reviewSlug",
-        a.nice_url as "niceUrl",
+        CONCAT(a.nice_url, '-', a.id_anime) as "niceUrl",
         'anime' as "mediaType"
       FROM collection_animes ca
       LEFT JOIN ak_animes a ON ca.id_anime = a.id_anime
@@ -1162,7 +1170,7 @@ export class UsersService {
         m.titre as title,
         cm.id_manga as id,
         NULL as "reviewSlug",
-        m.nice_url as "niceUrl",
+        CONCAT(m.nice_url, '-', m.id_manga) as "niceUrl",
         'manga' as "mediaType"
       FROM collection_mangas cm
       LEFT JOIN ak_mangas m ON cm.id_manga = m.id_manga
