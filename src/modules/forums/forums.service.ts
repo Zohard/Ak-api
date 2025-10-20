@@ -460,6 +460,7 @@ export class ForumsService {
 
       // Query to get latest messages with topic and board information
       // We get the latest message from each topic to show recent activity
+      // Filter out deleted/unapproved messages (approved = 0)
       const messagesQuery = `
         SELECT
           m.id_msg as id,
@@ -481,7 +482,9 @@ export class ForumsService {
         LEFT JOIN smf_messages first_msg ON t.id_first_msg = first_msg.id_msg
         LEFT JOIN smf_messages last_msg ON t.id_last_msg = last_msg.id_msg
         INNER JOIN smf_boards b ON t.id_board = b.id_board
-        WHERE b.redirect = '' OR b.redirect IS NULL
+        WHERE (b.redirect = '' OR b.redirect IS NULL)
+        AND m.approved = 1
+        AND t.approved = 1
         ${whereClause}
         ORDER BY m.poster_time DESC
         LIMIT $1 OFFSET $2
@@ -492,19 +495,21 @@ export class ForumsService {
         SELECT COUNT(DISTINCT t.id_topic) as total
         FROM smf_topics t
         INNER JOIN smf_boards b ON t.id_board = b.id_board
-        WHERE b.redirect = '' OR b.redirect IS NULL
+        WHERE (b.redirect = '' OR b.redirect IS NULL)
+        AND t.approved = 1
         ${whereClause.replace('$' + (paramIndex - 1), '$3')}
       `;
 
       const [messagesResult, countResult] = await Promise.all([
         this.prisma.$queryRawUnsafe(messagesQuery, ...queryParams),
-        boardId 
+        boardId
           ? this.prisma.$queryRawUnsafe(countQuery, boardId)
           : this.prisma.$queryRawUnsafe(`
               SELECT COUNT(DISTINCT t.id_topic) as total
               FROM smf_topics t
               INNER JOIN smf_boards b ON t.id_board = b.id_board
-              WHERE b.redirect = '' OR b.redirect IS NULL
+              WHERE (b.redirect = '' OR b.redirect IS NULL)
+              AND t.approved = 1
             `)
       ]);
 
