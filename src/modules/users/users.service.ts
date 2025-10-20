@@ -499,7 +499,14 @@ export class UsersService {
         'review' as type,
         EXTRACT(EPOCH FROM c.date_critique) as date,
         COALESCE(a.titre, m.titre) as title,
-        c.id_critique as id
+        c.id_critique as id,
+        c.nice_url as "reviewSlug",
+        COALESCE(a.nice_url, m.nice_url) as "niceUrl",
+        CASE
+          WHEN c.id_anime IS NOT NULL THEN 'anime'
+          WHEN c.id_manga IS NOT NULL THEN 'manga'
+          ELSE NULL
+        END as "mediaType"
       FROM ak_critique c
       LEFT JOIN ak_animes a ON c.id_anime = a.id_anime
       LEFT JOIN ak_mangas m ON c.id_manga = m.id_manga
@@ -514,7 +521,10 @@ export class UsersService {
         'anime_added' as type,
         EXTRACT(EPOCH FROM ca.created_at) as date,
         a.titre as title,
-        ca.id_anime as id
+        ca.id_anime as id,
+        NULL as "reviewSlug",
+        a.nice_url as "niceUrl",
+        'anime' as "mediaType"
       FROM collection_animes ca
       LEFT JOIN ak_animes a ON ca.id_anime = a.id_anime
       WHERE ca.id_membre = ${id}
@@ -525,7 +535,10 @@ export class UsersService {
         'manga_added' as type,
         EXTRACT(EPOCH FROM cm.created_at) as date,
         m.titre as title,
-        cm.id_manga as id
+        cm.id_manga as id,
+        NULL as "reviewSlug",
+        m.nice_url as "niceUrl",
+        'manga' as "mediaType"
       FROM collection_mangas cm
       LEFT JOIN ak_mangas m ON cm.id_manga = m.id_manga
       WHERE cm.id_membre = ${id}
@@ -1111,7 +1124,14 @@ export class UsersService {
         'review' as type,
         c.date_critique as date,
         COALESCE(a.titre, m.titre) as title,
-        c.id_critique as id
+        c.id_critique as id,
+        c.nice_url as "reviewSlug",
+        COALESCE(a.nice_url, m.nice_url) as "niceUrl",
+        CASE
+          WHEN c.id_anime IS NOT NULL THEN 'anime'
+          WHEN c.id_manga IS NOT NULL THEN 'manga'
+          ELSE NULL
+        END as "mediaType"
       FROM ak_critique c
       LEFT JOIN ak_animes a ON c.id_anime = a.id_anime
       LEFT JOIN ak_mangas m ON c.id_manga = m.id_manga
@@ -1126,7 +1146,10 @@ export class UsersService {
         'anime_added' as type,
         EXTRACT(EPOCH FROM ca.created_at) as date,
         a.titre as title,
-        ca.id_anime as id
+        ca.id_anime as id,
+        NULL as "reviewSlug",
+        a.nice_url as "niceUrl",
+        'anime' as "mediaType"
       FROM collection_animes ca
       LEFT JOIN ak_animes a ON ca.id_anime = a.id_anime
       WHERE ca.id_membre = ${user.idMember} AND ca.is_public = true
@@ -1137,7 +1160,10 @@ export class UsersService {
         'manga_added' as type,
         EXTRACT(EPOCH FROM cm.created_at) as date,
         m.titre as title,
-        cm.id_manga as id
+        cm.id_manga as id,
+        NULL as "reviewSlug",
+        m.nice_url as "niceUrl",
+        'manga' as "mediaType"
       FROM collection_mangas cm
       LEFT JOIN ak_mangas m ON cm.id_manga = m.id_manga
       WHERE cm.id_membre = ${user.idMember} AND cm.is_public = true
