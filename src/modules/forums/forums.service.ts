@@ -278,11 +278,11 @@ export class ForumsService {
             member: {
               include: {
                 membergroup: true,
-                animeCollections: {
-                  select: { idCollection: true }
-                },
-                mangaCollections: {
-                  select: { idCollection: true }
+                _count: {
+                  select: {
+                    animeCollections: true,
+                    mangaCollections: true
+                  }
                 }
               }
             }
@@ -343,8 +343,8 @@ export class ForumsService {
             posts: post.member?.posts || 0,
             dateRegistered: post.member?.dateRegistered || 0,
             nbCritiques: post.member?.nbCritiques || 0,
-            animeCount: post.member?.animeCollections?.length || 0,
-            mangaCount: post.member?.mangaCollections?.length || 0,
+            animeCount: post.member?._count?.animeCollections || 0,
+            mangaCount: post.member?._count?.mangaCollections || 0,
             group: {
               name: post.member?.membergroup?.groupName || 'Member',
               color: post.member?.membergroup?.onlineColor || null
