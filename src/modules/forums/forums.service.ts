@@ -54,6 +54,39 @@ export class ForumsService {
 
       this.logger.log(`Total boards across all categories: ${categories.reduce((total, cat) => total + cat.boards.length, 0)}`);
 
+      // Collect all last message IDs across all boards
+      const allLastMsgIds = categories.flatMap(cat =>
+        cat.boards.map(board => board.idLastMsg).filter(id => id !== null && id > 0)
+      );
+
+      // Fetch all last messages in a single query (HUGE performance improvement!)
+      const lastMessages = allLastMsgIds.length > 0 ? await this.prisma.smfMessage.findMany({
+        where: { idMsg: { in: allLastMsgIds } },
+        include: {
+          topic: {
+            include: {
+              firstMessage: true
+            }
+          }
+        }
+      }) : [];
+
+      // Create a map for quick lookup
+      const lastMessagesMap = new Map(
+        lastMessages.map(msg => [
+          msg.idMsg,
+          {
+            id: msg.idMsg,
+            subject: msg.subject,
+            topicId: msg.idTopic,
+            topicSubject: msg.topic?.firstMessage?.subject || msg.subject,
+            author: msg.posterName,
+            time: msg.posterTime,
+            numReplies: msg.topic?.numReplies
+          }
+        ])
+      );
+
       // Filter boards based on access permissions
       const filteredCategories = await Promise.all(
         categories.map(async category => {
@@ -67,40 +100,8 @@ export class ForumsService {
 
               if (!hasAccess) return null;
 
-              // Fetch last message details if available
-              let lastMessage: {
-                id: number;
-                subject: string;
-                topicId: number;
-                topicSubject: string;
-                author: string;
-                time: number;
-                numReplies?: number;
-              } | null = null;
-              if (board.idLastMsg) {
-                const lastMsg = await this.prisma.smfMessage.findUnique({
-                  where: { idMsg: board.idLastMsg },
-                  include: {
-                    topic: {
-                      include: {
-                        firstMessage: true
-                      }
-                    }
-                  }
-                });
-
-                if (lastMsg) {
-                  lastMessage = {
-                    id: lastMsg.idMsg,
-                    subject: lastMsg.subject,
-                    topicId: lastMsg.idTopic,
-                    topicSubject: lastMsg.topic?.firstMessage?.subject || lastMsg.subject,
-                    author: lastMsg.posterName,
-                    time: lastMsg.posterTime,
-                    numReplies: lastMsg.topic?.numReplies
-                  };
-                }
-              }
+              // Get last message from pre-fetched map (no extra query!)
+              const lastMessage = board.idLastMsg ? lastMessagesMap.get(board.idLastMsg) || null : null;
 
               return {
                 id: board.idBoard,
