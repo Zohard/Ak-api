@@ -9,14 +9,9 @@ export class ForumsService {
   constructor(private readonly prisma: PrismaService) {}
 
   async getCategories(userId?: number) {
-    this.logger.log(`=== STARTING getCategories for user: ${userId || 'guest'} ===`);
-
     try {
-      this.logger.log('About to query database for categories...');
-
       // Fetch user groups ONCE at the start (HUGE performance improvement!)
       const userGroups = userId ? await this.getUserGroups(userId) : [0];
-      this.logger.log(`User groups for user ${userId || 'guest'}: [${userGroups.join(',')}]`);
 
       const categories = await this.prisma.smfCategory.findMany({
         orderBy: { catOrder: 'asc' },
@@ -47,17 +42,9 @@ export class ForumsService {
         }
       });
 
-      this.logger.log(`=== DATABASE QUERY RESULT: Found ${categories.length} categories ===`);
-      categories.forEach((cat, index) => {
-        this.logger.log(`Category ${index + 1}: ID=${cat.idCat}, Name="${cat.name}", Boards=${cat.boards.length}`);
-      });
-
       if (categories.length === 0) {
-        this.logger.error('NO CATEGORIES FOUND IN DATABASE!');
         return [];
       }
-
-      this.logger.log(`Total boards across all categories: ${categories.reduce((total, cat) => total + cat.boards.length, 0)}`);
 
       // Collect all last message IDs across all boards
       const allLastMsgIds = categories.flatMap(cat =>
@@ -94,8 +81,6 @@ export class ForumsService {
 
       // Filter boards based on access permissions
       const filteredCategories = categories.map(category => {
-        this.logger.log(`Processing category: ${category.name} with ${category.boards.length} boards`);
-
         // Build all board objects with their data (NO async needed - all data already fetched!)
         const allBoardsWithData = category.boards.map(board => {
           // Check permissions inline (no database query!)
@@ -112,7 +97,6 @@ export class ForumsService {
 
           // Check if user has access (group -1 means public, or user group matches)
           const hasAccess = allowedGroups.includes(-1) || userGroups.some(group => allowedGroups.includes(group));
-          this.logger.log(`Board ${board.idBoard} (${board.name}) access for user ${userId}: ${hasAccess}, idParent: ${board.idParent}`);
 
           if (!hasAccess) return null;
 
@@ -154,8 +138,6 @@ export class ForumsService {
           };
         });
 
-        this.logger.log(`Category ${category.name}: ${parentBoards.length} parent boards, ${childBoards.length} child boards`);
-
         return {
           id: category.idCat,
           name: category.name,
@@ -167,9 +149,6 @@ export class ForumsService {
 
       // Filter out categories with no accessible boards
       const categoriesWithBoards = filteredCategories.filter(category => category.boards.length > 0);
-
-      const totalAccessibleBoards = categoriesWithBoards.reduce((total, cat) => total + cat.boards.length, 0);
-      this.logger.log(`=== FINAL RESULT: Returning ${categoriesWithBoards.length} categories (filtered from ${filteredCategories.length}) with ${totalAccessibleBoards} accessible boards ===`);
 
       return categoriesWithBoards;
     } catch (error) {
@@ -896,8 +875,6 @@ export class ForumsService {
         }
       });
 
-      this.logger.debug(`getUserGroups for user ${userId}: SMF data = ${JSON.stringify(smfUser)}`);
-
       if (smfUser) {
         // User found in SMF table, use SMF groups
         const groups = [smfUser.idGroup];
@@ -905,7 +882,6 @@ export class ForumsService {
         // Add post group if different from main group
         if (smfUser.idPostGroup && smfUser.idPostGroup !== smfUser.idGroup) {
           groups.push(smfUser.idPostGroup);
-          this.logger.debug(`getUserGroups: added post group ${smfUser.idPostGroup} for user ${userId}`);
         }
 
         // Add additional groups
@@ -915,22 +891,12 @@ export class ForumsService {
             .map(g => parseInt(g.trim()))
             .filter(g => !isNaN(g) && g > 0);
           groups.push(...additionalGroups);
-          this.logger.debug(`getUserGroups: added additional groups [${additionalGroups.join(',')}] for user ${userId}`);
         }
 
-        const finalGroups = [...new Set(groups)]; // Remove duplicates
-        this.logger.debug(`getUserGroups: final SMF groups for user ${userId} = [${finalGroups.join(',')}]`);
-
-        return finalGroups;
+        return [...new Set(groups)]; // Remove duplicates
       }
 
-      // User not found in SMF table - this could be a legitimate admin user who doesn't have SMF account yet
-      // For admin users (from JWT isAdmin=true), grant administrator group access
-      this.logger.warn(`getUserGroups: user ${userId} not found in SMF table - considering as potential admin`);
-
-      // Since user 17667 has isAdmin=true in JWT but doesn't exist in SMF table,
-      // we'll grant administrator group (1) access as a fallback for authenticated admins
-      this.logger.debug(`getUserGroups: granting administrator group [1] for missing user ${userId} (admin fallback)`);
+      // User not found in SMF table - grant administrator group as fallback for authenticated admins
       return [1]; // Administrator group for admin users not in SMF table
 
     } catch (error) {
