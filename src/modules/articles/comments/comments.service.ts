@@ -18,6 +18,18 @@ export class CommentsService {
     private cacheService: CacheService,
   ) {}
 
+  /**
+   * Convert WordPress comment_approved values to moderation status
+   * '1' = Approved (1)
+   * '0' = Pending (0)
+   * 'spam' = Rejected/Spam (2)
+   */
+  private getModerationStatus(commentApproved: string): number {
+    if (commentApproved === '1') return 1;
+    if (commentApproved === 'spam') return 2;
+    return 0; // Default: pending
+  }
+
   async create(
     createCommentDto: CreateCommentDto,
     userId?: number,
@@ -88,7 +100,7 @@ export class CommentsService {
       website: comment.commentAuthorUrl,
       commentaire: comment.commentContent,
       date: comment.commentDate.toISOString(),
-      moderation: comment.commentApproved === '1' ? 1 : 0,
+      moderation: this.getModerationStatus(comment.commentApproved),
     };
   }
 
@@ -168,7 +180,7 @@ export class CommentsService {
         return {
           ...baseComment,
           email: comment.commentAuthorEmail,
-          moderation: comment.commentApproved === '1' ? 1 : 0,
+          moderation: this.getModerationStatus(comment.commentApproved),
           ip: comment.commentAuthorIP,
         };
       }
@@ -229,7 +241,7 @@ export class CommentsService {
       return {
         ...baseComment,
         email: comment.commentAuthorEmail,
-        moderation: comment.commentApproved === '1' ? 1 : 0,
+        moderation: this.getModerationStatus(comment.commentApproved),
         ip: comment.commentAuthorIP,
       };
     }
@@ -278,7 +290,7 @@ export class CommentsService {
       website: updatedComment.commentAuthorUrl,
       commentaire: updatedComment.commentContent,
       date: updatedComment.commentDate.toISOString(),
-      moderation: updatedComment.commentApproved === '1' ? 1 : 0,
+      moderation: this.getModerationStatus(updatedComment.commentApproved),
     };
   }
 
