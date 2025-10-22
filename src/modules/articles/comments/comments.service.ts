@@ -92,7 +92,11 @@ export class CommentsService {
     };
   }
 
-  async findAll(query: CommentQueryDto, includePrivateFields: boolean = false) {
+  async findAll(
+    query: CommentQueryDto,
+    includePrivateFields: boolean = false,
+    requestingUserId?: number,
+  ) {
     const {
       page = 1,
       limit = 20,
@@ -166,6 +170,15 @@ export class CommentsService {
           email: comment.commentAuthorEmail,
           moderation: comment.commentApproved === '1' ? 1 : 0,
           ip: comment.commentAuthorIP,
+        };
+      }
+
+      // Include email for comment owner (even if not admin) so they can edit/delete their old comments
+      // This is needed for comments created before the JWT fix (userId: 0)
+      if (requestingUserId && comment.userId === requestingUserId) {
+        return {
+          ...baseComment,
+          email: comment.commentAuthorEmail,
         };
       }
 
