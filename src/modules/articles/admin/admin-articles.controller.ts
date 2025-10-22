@@ -54,7 +54,7 @@ export class AdminArticlesController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Insufficient permissions' })
   create(@Body() createArticleDto: CreateArticleDto, @Request() req) {
-    return this.articlesService.create(createArticleDto, req.user.sub);
+    return this.articlesService.create(createArticleDto, req.user.id);
   }
 
   @Get()
@@ -64,7 +64,7 @@ export class AdminArticlesController {
     // Allow admins to see all articles regardless of status
     if (!req.user.isAdmin && query.status === 'all') {
       // Non-admin users can only see their own articles or published ones
-      query.authorId = req.user.sub;
+      query.authorId = req.user.id;
     }
     return this.articlesService.findAll(query);
   }
@@ -88,7 +88,7 @@ export class AdminArticlesController {
   getDrafts(@Query() query: ArticleQueryDto, @Request() req) {
     query.status = 'draft';
     if (!req.user.isAdmin) {
-      query.authorId = req.user.sub; // Non-admins can only see their own drafts
+      query.authorId = req.user.id; // Non-admins can only see their own drafts
     }
     return this.articlesService.findAll(query);
   }
@@ -113,7 +113,7 @@ export class AdminArticlesController {
     description: 'User articles retrieved successfully',
   })
   getMyArticles(@Query() query: ArticleQueryDto, @Request() req) {
-    query.authorId = req.user.sub;
+    query.authorId = req.user.id;
     return this.articlesService.findAll(query);
   }
 
@@ -141,7 +141,7 @@ export class AdminArticlesController {
     return this.articlesService.update(
       id,
       updateArticleDto,
-      req.user.sub,
+      req.user.id,
       req.user.isAdmin,
     );
   }
@@ -165,7 +165,7 @@ export class AdminArticlesController {
     return this.articlesService.publish(
       id,
       publishDto,
-      req.user.sub,
+      req.user.id,
       req.user.isAdmin,
     );
   }
@@ -234,7 +234,7 @@ export class AdminArticlesController {
   @ApiResponse({ status: 403, description: 'Insufficient permissions' })
   @ApiResponse({ status: 404, description: 'Article not found' })
   remove(@Param('id', ParseIntPipe) id: number, @Request() req) {
-    return this.articlesService.remove(id, req.user.sub, req.user.isAdmin);
+    return this.articlesService.remove(id, req.user.id, req.user.isAdmin);
   }
 
   @Post('bulk-publish')
@@ -259,7 +259,7 @@ export class AdminArticlesController {
         const result = await this.articlesService.publish(
           articleId,
           { publish },
-          req.user.sub,
+          req.user.id,
           req.user.isAdmin,
         );
         results.push({ id: articleId, status: 'success', data: result });
@@ -291,7 +291,7 @@ export class AdminArticlesController {
       try {
         await this.articlesService.remove(
           articleId,
-          req.user.sub,
+          req.user.id,
           req.user.isAdmin,
         );
         results.push({ id: articleId, status: 'success', message: 'Deleted' });

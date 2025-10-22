@@ -91,7 +91,7 @@ export class AdminCommentsController {
     return this.commentsService.update(
       id,
       updateCommentDto,
-      req.user.sub,
+      req.user.id,
       true,
     );
   }
@@ -105,7 +105,7 @@ export class AdminCommentsController {
     @Body() moderateDto: ModerateCommentDto,
     @Request() req,
   ) {
-    return this.commentsService.moderate(id, moderateDto, req.user.sub, true);
+    return this.commentsService.moderate(id, moderateDto, req.user.id, true);
   }
 
   @Delete(':id')
@@ -113,7 +113,7 @@ export class AdminCommentsController {
   @ApiResponse({ status: 200, description: 'Comment deleted successfully' })
   @ApiResponse({ status: 404, description: 'Comment not found' })
   remove(@Param('id', ParseIntPipe) id: number, @Request() req) {
-    return this.commentsService.remove(id, req.user.sub, true);
+    return this.commentsService.remove(id, req.user.id, true);
   }
 
   @Post('bulk-moderate')
@@ -135,7 +135,7 @@ export class AdminCommentsController {
 
     for (const commentId of commentIds) {
       try {
-        await this.commentsService.remove(commentId, req.user.sub, true);
+        await this.commentsService.remove(commentId, req.user.id, true);
         results.push({ id: commentId, status: 'success', message: 'Deleted' });
       } catch (error) {
         results.push({

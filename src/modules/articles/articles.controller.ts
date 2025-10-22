@@ -53,7 +53,7 @@ export class ArticlesController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Insufficient permissions' })
   create(@Body() createArticleDto: CreateArticleDto, @Request() req) {
-    return this.articlesService.create(createArticleDto, req.user.sub);
+    return this.articlesService.create(createArticleDto, req.user.id);
   }
 
   @Get()
@@ -143,7 +143,7 @@ export class ArticlesController {
     return this.articlesService.update(
       id,
       updateArticleDto,
-      req.user.sub,
+      req.user.id,
       req.user.isAdmin,
     );
   }
@@ -168,7 +168,7 @@ export class ArticlesController {
     return this.articlesService.publish(
       id,
       publishDto,
-      req.user.sub,
+      req.user.id,
       req.user.isAdmin,
     );
   }
@@ -183,7 +183,7 @@ export class ArticlesController {
   @ApiResponse({ status: 403, description: 'Insufficient permissions' })
   @ApiResponse({ status: 404, description: 'Article not found' })
   remove(@Param('id', ParseIntPipe) id: number, @Request() req) {
-    return this.articlesService.remove(id, req.user.sub, req.user.isAdmin);
+    return this.articlesService.remove(id, req.user.id, req.user.isAdmin);
   }
 
   @Post(':id/view')
@@ -230,7 +230,7 @@ export class ArticlesController {
     createCommentDto.articleId = articleId;
     return this.commentsService.create(
       createCommentDto,
-      req.user?.sub,
+      req.user?.id,
       req.ip,
       req.headers['user-agent'],
     );

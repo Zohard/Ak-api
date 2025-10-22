@@ -49,7 +49,7 @@ export class CommentsController {
   ) {
     return this.commentsService.create(
       createCommentDto,
-      req.user?.sub,
+      req.user?.id,
       ip,
       userAgent,
     );
@@ -126,7 +126,7 @@ export class CommentsController {
     return this.commentsService.update(
       id,
       updateCommentDto,
-      req.user.sub,
+      req.user.id,
       req.user.isAdmin,
     );
   }
@@ -141,6 +141,6 @@ export class CommentsController {
   @ApiResponse({ status: 403, description: 'Forbidden - not your comment' })
   @ApiResponse({ status: 404, description: 'Comment not found' })
   remove(@Param('id', ParseIntPipe) id: number, @Request() req) {
-    return this.commentsService.remove(id, req.user.sub, req.user.isAdmin);
+    return this.commentsService.remove(id, req.user.id, req.user.isAdmin);
   }
 }
