@@ -207,10 +207,13 @@ export class ArticlesController {
   getArticleComments(
     @Param('id', ParseIntPipe) articleId: number,
     @Query() query: CommentQueryDto,
+    @Request() req,
   ) {
     query.status = 'approved';
     query.articleId = articleId;
-    return this.commentsService.findAll(query);
+    // Pass user ID if authenticated (optional - no guard required)
+    const userId = req.user?.id;
+    return this.commentsService.findAll(query, false, userId);
   }
 
   @Post(':id/comments')
