@@ -697,13 +697,14 @@ export class ReviewsService {
     }
 
     // Increment all view counters
+    // Handle NULL values by setting to 1 if null, otherwise increment
     const updatedReview = await this.prisma.akCritique.update({
       where: { idCritique: reviewId },
       data: {
-        nbClics: { increment: 1 },
-        nbClicsDay: { increment: 1 },
-        nbClicsWeek: { increment: 1 },
-        nbClicsMonth: { increment: 1 },
+        nbClics: review.nbClics === null ? 1 : { increment: 1 },
+        nbClicsDay: review.nbClicsDay === null ? 1 : { increment: 1 },
+        nbClicsWeek: review.nbClicsWeek === null ? 1 : { increment: 1 },
+        nbClicsMonth: review.nbClicsMonth === null ? 1 : { increment: 1 },
       },
       select: {
         idCritique: true,

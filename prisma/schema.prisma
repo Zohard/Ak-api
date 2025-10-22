@@ -343,10 +343,10 @@ model AkCritique {
   idOst        Int       @default(0) @map("id_ost")
   idJeu        Int       @default(0) @map("id_jeu")
   causeSuppr   String?   @map("cause_suppr") @db.Text
-  nbClics      Int?      @map("nb_clics")
+  nbClics      Int?      @default(0) @map("nb_clics")
   nbClicsDay   Int?      @default(0) @map("nb_clics_day")
-  nbClicsWeek  Int?      @map("nb_clics_week")
-  nbClicsMonth Int?      @map("nb_clics_month")
+  nbClicsWeek  Int?      @default(0) @map("nb_clics_week")
+  nbClicsMonth Int?      @default(0) @map("nb_clics_month")
   nbCarac      Int?      @map("nb_carac")
   popularite   Float?    @db.Real
   classementPopularite Int? @map("classement_popularite")
