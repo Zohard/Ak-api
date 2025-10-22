@@ -185,12 +185,13 @@ export class CommentsService {
         };
       }
 
-      // Include email for comment owner (even if not admin) so they can edit/delete their old comments
-      // This is needed for comments created before the JWT fix (userId: 0)
+      // Include email and moderation for comment owner (even if not admin)
+      // This allows them to edit/delete their own comments and see moderation status
       if (requestingUserId && comment.userId === requestingUserId) {
         return {
           ...baseComment,
           email: comment.commentAuthorEmail,
+          moderation: this.getModerationStatus(comment.commentApproved),
         };
       }
 
