@@ -70,8 +70,11 @@ export class ReviewsController {
   async getUserReviews(
     @Param('userId', ParseIntPipe) userId: number,
     @Query('limit', ParseIntPipe) limit = 20,
+    @Request() req?,
   ) {
-    return this.reviewsService.getUserReviews(userId, limit);
+    // Pass requesting user ID if authenticated (to show unpublished reviews for own profile)
+    const requestingUserId = req?.user?.id;
+    return this.reviewsService.getUserReviews(userId, limit, requestingUserId);
   }
 
   @Get('my-reviews')
@@ -80,7 +83,8 @@ export class ReviewsController {
   @ApiOperation({ summary: 'Mes critiques' })
   @ApiResponse({ status: 200, description: 'Liste de mes critiques' })
   async getMyReviews(@Request() req, @Query('limit', ParseIntPipe) limit = 20) {
-    return this.reviewsService.getUserReviews(req.user.id, limit);
+    // Pass user ID as requesting user to show all reviews including unpublished
+    return this.reviewsService.getUserReviews(req.user.id, limit, req.user.id);
   }
 
   @Get('check/:type/:id')

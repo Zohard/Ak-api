@@ -584,9 +584,16 @@ export class ReviewsService {
     return result;
   }
 
-  async getUserReviews(userId: number, limit = 20) {
+  async getUserReviews(userId: number, limit = 20, requestingUserId?: number) {
+    // Only show published reviews (statut: 1) unless the user is viewing their own reviews
+    const isOwnReviews = requestingUserId && requestingUserId === userId;
+
     const reviews = await this.prisma.akCritique.findMany({
-      where: { idMembre: userId },
+      where: {
+        idMembre: userId,
+        // Only filter by published status if viewing someone else's reviews
+        ...(isOwnReviews ? {} : { statut: 1 }),
+      },
       orderBy: { dateCritique: 'desc' },
       take: limit,
       include: {
