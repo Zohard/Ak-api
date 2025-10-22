@@ -211,9 +211,11 @@ export class ArticlesController {
   ) {
     query.status = 'approved';
     query.articleId = articleId;
+    // Include private fields (email, moderation, ip) if user is admin
+    const includePrivateFields = req.user?.isAdmin || false;
     // Pass user ID if authenticated (optional - no guard required)
     const userId = req.user?.id;
-    return this.commentsService.findAll(query, false, userId);
+    return this.commentsService.findAll(query, includePrivateFields, userId);
   }
 
   @Post(':id/comments')
