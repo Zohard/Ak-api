@@ -440,6 +440,7 @@ export class ForumsService {
       // Query to get latest messages with topic and board information
       // We get the latest message from each topic to show recent activity
       // Filter out deleted/unapproved messages (approved = 0)
+      // Filter out messages in recycle bin (board_id = 10 is Corbeille/trash)
       const messagesQuery = `
         SELECT
           m.id_msg as id,
@@ -464,6 +465,7 @@ export class ForumsService {
         WHERE (b.redirect = '' OR b.redirect IS NULL)
         AND m.approved = 1
         AND t.approved = 1
+        AND t.id_board != 10
         ${whereClause}
         ORDER BY m.poster_time DESC
         LIMIT $1 OFFSET $2
@@ -476,6 +478,7 @@ export class ForumsService {
         INNER JOIN smf_boards b ON t.id_board = b.id_board
         WHERE (b.redirect = '' OR b.redirect IS NULL)
         AND t.approved = 1
+        AND t.id_board != 10
         ${whereClause.replace('$' + (paramIndex - 1), '$3')}
       `;
 
@@ -489,6 +492,7 @@ export class ForumsService {
               INNER JOIN smf_boards b ON t.id_board = b.id_board
               WHERE (b.redirect = '' OR b.redirect IS NULL)
               AND t.approved = 1
+              AND t.id_board != 10
             `)
       ]);
 
@@ -691,6 +695,7 @@ export class ForumsService {
         WHERE m.id_member = ${userId}
           AND m.approved = 1
           AND (b.redirect IS NULL OR b.redirect = '')
+          AND t.id_board != 10
         ORDER BY m.poster_time DESC
         LIMIT ${fetchLimit}
         OFFSET ${skip}
