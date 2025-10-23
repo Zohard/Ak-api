@@ -1309,6 +1309,7 @@ export class CollectionsService {
       id: item.idCollection,
       animeId: item.idAnime,
       addedAt: item.createdAt?.toISOString() || new Date().toISOString(),
+      type: item.type,
       notes: item.notes,
       rating: item.evaluation > 0 ? item.evaluation : null,
       anime: {
@@ -1515,6 +1516,7 @@ export class CollectionsService {
       id: item.idCollection,
       mangaId: item.idManga,
       addedAt: item.createdAt?.toISOString() || new Date().toISOString(),
+      type: item.type,
       notes: item.notes,
       rating: item.evaluation > 0 ? item.evaluation : null,
       manga: {
