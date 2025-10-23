@@ -116,6 +116,13 @@ export class ListsController {
     return this.listsService.stats(id);
   }
 
+  // GET /lists/:id/votes - Get real-time vote counts (uncached)
+  @Get(':id/votes')
+  @ApiOperation({ summary: 'Obtenir les votes en temps réel (non mis en cache)' })
+  getVotes(@Param('id', ParseIntPipe) id: number) {
+    return this.listsService.getVotes(id);
+  }
+
   // GET /lists/id/:id - fetch by ID (avoid conflict with /lists/:userId)
   @Get('id/:id')
   @ApiOperation({ summary: 'Obtenir une liste par ID' })

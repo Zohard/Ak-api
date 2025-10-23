@@ -393,6 +393,28 @@ export class ListsService {
     return { likes, dislikes, nb_clics: (list as any).nb_clics, popularite: popularity };
   }
 
+  async getVotes(id: number) {
+    // Get fresh vote data (not cached) - used for real-time vote count updates
+    const list = await this.prisma.akListesTop.findUnique({
+      where: { idListe: id },
+      select: { jaime: true, jaimepas: true }
+    });
+
+    if (!list) {
+      throw new NotFoundException(`Liste ${id} introuvable`);
+    }
+
+    const likes = this.parseVotes(list.jaime).length;
+    const dislikes = this.parseVotes(list.jaimepas).length;
+
+    return {
+      likes,
+      dislikes,
+      jaime: list.jaime || '',
+      jaimepas: list.jaimepas || ''
+    };
+  }
+
   async recalculateAllPopularity() {
     // Utility method to recalculate popularity for all public lists
     const lists = await this.prisma.akListesTop.findMany({
