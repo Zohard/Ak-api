@@ -135,7 +135,7 @@ export class SeasonsService {
       const placeholders = animeIds.map((_, index) => `$${index + 1}::integer`).join(', ');
       
       const animes = await this.prisma.$queryRawUnsafe(`
-        SELECT 
+        SELECT
           "id_anime" as id,
           "id_anime",
           "nice_url",
@@ -154,6 +154,7 @@ export class SeasonsService {
           "format"
         FROM ak_animes
         WHERE "id_anime" IN (${placeholders})
+          AND "statut" = 1
         ORDER BY "titre"
       `, ...animeIds);
 

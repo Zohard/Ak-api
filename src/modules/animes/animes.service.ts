@@ -340,6 +340,11 @@ export class AnimesService extends BaseContentService<
       throw new NotFoundException('Anime introuvable');
     }
 
+    // Only allow access to published anime (statut=1) for public endpoints
+    if (anime.statut !== 1) {
+      throw new NotFoundException('Anime introuvable');
+    }
+
     const formattedAnime = this.formatAnime(anime);
 
     // Cache the result

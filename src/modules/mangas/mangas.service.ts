@@ -315,6 +315,11 @@ export class MangasService extends BaseContentService<
       throw new NotFoundException('Manga introuvable');
     }
 
+    // Only allow access to published manga (statut=1) for public endpoints
+    if (manga.statut !== 1) {
+      throw new NotFoundException('Manga introuvable');
+    }
+
     // Fetch publisher from ak_business_to_mangas
     const publisherRelation = await this.prisma.akBusinessToManga.findFirst({
       where: {
