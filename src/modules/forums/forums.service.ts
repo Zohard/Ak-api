@@ -1538,25 +1538,67 @@ export class ForumsService {
       } else {
         // Regular reply - just delete the message
         await this.prisma.$transaction(async (prisma) => {
+          // Check if this is the last message in the topic
+          const isLastMessage = message.topic.idLastMsg === messageId;
+
           // Delete the message
           await prisma.smfMessage.delete({
             where: { idMsg: messageId }
           });
 
+          // If this was the last message, find the new last message
+          let updateData: any = {
+            numReplies: { decrement: 1 }
+          };
+
+          if (isLastMessage) {
+            // Find the new last message (most recent remaining message in this topic)
+            const newLastMessage = await prisma.smfMessage.findFirst({
+              where: { idTopic: message.idTopic },
+              orderBy: { posterTime: 'desc' }
+            });
+
+            if (newLastMessage) {
+              updateData.idLastMsg = newLastMessage.idMsg;
+            }
+          }
+
           // Update topic stats
           await prisma.smfTopic.update({
             where: { idTopic: message.idTopic },
-            data: {
-              numReplies: { decrement: 1 }
-            }
+            data: updateData
           });
+
+          // Check if we need to update board's last message pointer
+          const board = await prisma.smfBoard.findUnique({
+            where: { idBoard: message.idBoard }
+          });
+
+          let boardUpdateData: any = {
+            numPosts: { decrement: 1 }
+          };
+
+          // If the deleted message was the board's last message, find the new one
+          if (board?.idLastMsg === messageId) {
+            const newBoardLastMessage = await prisma.smfMessage.findFirst({
+              where: {
+                idBoard: message.idBoard,
+                approved: 1
+              },
+              orderBy: { posterTime: 'desc' }
+            });
+
+            if (newBoardLastMessage) {
+              boardUpdateData.idLastMsg = newBoardLastMessage.idMsg;
+            } else {
+              boardUpdateData.idLastMsg = 0;
+            }
+          }
 
           // Update board stats
           await prisma.smfBoard.update({
             where: { idBoard: message.idBoard },
-            data: {
-              numPosts: { decrement: 1 }
-            }
+            data: boardUpdateData
           });
 
           // Update user post count
@@ -1576,6 +1618,86 @@ export class ForumsService {
       }
     } catch (error) {
       this.logger.error('Error deleting post:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Fix data integrity issues for topics and boards
+   * This method finds and fixes topics/boards with invalid last message pointers
+   */
+  async fixMessagePointers(): Promise<any> {
+    try {
+      const fixedTopics: number[] = [];
+      const fixedBoards: number[] = [];
+
+      // Find topics where id_last_msg points to a message in a different topic
+      const brokenTopics = await this.prisma.$queryRaw<any[]>`
+        SELECT t.id_topic, t.id_last_msg, m.id_topic as actual_topic
+        FROM smf_topics t
+        LEFT JOIN smf_messages m ON t.id_last_msg = m.id_msg
+        WHERE m.id_topic IS NULL OR m.id_topic != t.id_topic
+      `;
+
+      this.logger.log(`Found ${brokenTopics.length} topics with invalid last message pointers`);
+
+      // Fix each broken topic
+      for (const topic of brokenTopics) {
+        const newLastMessage = await this.prisma.smfMessage.findFirst({
+          where: { idTopic: topic.id_topic },
+          orderBy: { posterTime: 'desc' }
+        });
+
+        if (newLastMessage) {
+          await this.prisma.smfTopic.update({
+            where: { idTopic: topic.id_topic },
+            data: { idLastMsg: newLastMessage.idMsg }
+          });
+          fixedTopics.push(topic.id_topic);
+          this.logger.log(`Fixed topic ${topic.id_topic}: ${topic.id_last_msg} -> ${newLastMessage.idMsg}`);
+        }
+      }
+
+      // Find boards where id_last_msg points to a message in a different board
+      const brokenBoards = await this.prisma.$queryRaw<any[]>`
+        SELECT b.id_board, b.id_last_msg, m.id_board as actual_board
+        FROM smf_boards b
+        LEFT JOIN smf_messages m ON b.id_last_msg = m.id_msg
+        WHERE b.id_last_msg > 0
+        AND (m.id_board IS NULL OR m.id_board != b.id_board)
+      `;
+
+      this.logger.log(`Found ${brokenBoards.length} boards with invalid last message pointers`);
+
+      // Fix each broken board
+      for (const board of brokenBoards) {
+        const newLastMessage = await this.prisma.smfMessage.findFirst({
+          where: {
+            idBoard: board.id_board,
+            approved: 1
+          },
+          orderBy: { posterTime: 'desc' }
+        });
+
+        const newLastMsgId = newLastMessage ? newLastMessage.idMsg : 0;
+
+        await this.prisma.smfBoard.update({
+          where: { idBoard: board.id_board },
+          data: { idLastMsg: newLastMsgId }
+        });
+        fixedBoards.push(board.id_board);
+        this.logger.log(`Fixed board ${board.id_board}: ${board.id_last_msg} -> ${newLastMsgId}`);
+      }
+
+      return {
+        success: true,
+        fixedTopicsCount: fixedTopics.length,
+        fixedBoardsCount: fixedBoards.length,
+        fixedTopics,
+        fixedBoards
+      };
+    } catch (error) {
+      this.logger.error('Error fixing message pointers:', error);
       throw error;
     }
   }

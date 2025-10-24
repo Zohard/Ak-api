@@ -232,6 +232,25 @@ export class ForumsController {
     return await this.forumsService.deletePost(messageId, userId);
   }
 
+  @Post('maintenance/fix-pointers')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Fix data integrity issues for topic/board message pointers (Admin only)' })
+  @ApiResponse({ status: 200, description: 'Message pointers fixed successfully' })
+  @ApiResponse({ status: 403, description: 'Access denied - admin only' })
+  async fixMessagePointers(@Request() req) {
+    const userId = req.user.id;
+    // Check if user is admin (group 1)
+    const userGroups = await this.forumsService['getUserGroups'](userId);
+    const isAdmin = userGroups.includes(1);
+
+    if (!isAdmin) {
+      throw new Error('Access denied - admin only');
+    }
+
+    return await this.forumsService.fixMessagePointers();
+  }
+
   @Put('topics/:topicId/move')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
