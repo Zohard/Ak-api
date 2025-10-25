@@ -47,7 +47,7 @@ export class CommentsService {
    * Get SMF member avatar by email
    * Returns the avatar URL if available
    */
-  private async getSmfMemberAvatar(email: string): Promise<string | undefined> {
+  private async getSmfMemberAvatar(email: string | null): Promise<string | undefined> {
     if (!email) return undefined;
 
     const smfMember = await this.prisma.smfMember.findFirst({
