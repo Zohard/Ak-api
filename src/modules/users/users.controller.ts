@@ -194,7 +194,8 @@ export class UsersController {
   @ApiOperation({ summary: "Recommandations personnalisées par type pour un utilisateur" })
   @ApiParam({ name: 'id', description: "ID de l'utilisateur", type: 'number' })
   @ApiParam({ name: 'media', description: 'Type de contenu', enum: ['anime', 'manga'] })
-  @ApiQuery({ name: 'genre', required: false, description: 'Filtrer par genre' })
+  @ApiQuery({ name: 'genre', required: false, description: 'Filtrer par genre (deprecated, use genres)' })
+  @ApiQuery({ name: 'genres', required: false, description: 'Filtrer par genres (séparés par virgule)' })
   @ApiQuery({ name: 'sortBy', required: false, description: 'Trier par (rating, popularity, date, title)' })
   @ApiQuery({ name: 'similarTo', required: false, description: 'ID du média similaire', type: 'number' })
   @ApiQuery({ name: 'similarToType', required: false, description: 'Type du média similaire', enum: ['anime', 'manga'] })
@@ -207,11 +208,27 @@ export class UsersController {
     @Query('limit', ParseIntPipe) limit?: number,
     @Query('offset', ParseIntPipe) offset?: number,
     @Query('genre') genre?: string,
+    @Query('genres') genres?: string,
     @Query('sortBy') sortBy?: string,
     @Query('similarTo') similarTo?: number,
     @Query('similarToType') similarToType?: 'anime' | 'manga',
     @Query('tags') tags?: string,
   ) {
+    // Support both 'genre' and 'genres' parameters for backward compatibility
+    const genresParam = genres || genre;
+
+    console.log('📊 Media-specific recommendations request:', {
+      userId: id,
+      media,
+      limit: limit || 12,
+      offset: offset || 0,
+      genres: genresParam,
+      sortBy,
+      similarTo,
+      similarToType,
+      tags
+    });
+
     const requestedLimit = limit || 12;
     const effectiveOffset = offset || 0;
     const page = Math.floor(effectiveOffset / requestedLimit) + 1;
@@ -222,7 +239,7 @@ export class UsersController {
       id,
       fetchLimit,
       page,
-      genre,
+      genresParam,
       sortBy,
       similarTo,
       similarToType,
