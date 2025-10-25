@@ -622,13 +622,23 @@ export class UsersService {
     }
 
     let userGenres: any[] = [];
+    let originalMediaTitle = '';
+    let originalMediaTagCount = 0;
 
     // If similarTo is provided, get tags from that specific media
     if (similarTo && similarToType) {
+      // Fetch the original media title
+      const originalMedia = similarToType === 'anime'
+        ? await this.prisma.$queryRaw`SELECT titre FROM ak_animes WHERE id_anime = ${similarTo} LIMIT 1` as any[]
+        : await this.prisma.$queryRaw`SELECT titre FROM ak_mangas WHERE id_manga = ${similarTo} LIMIT 1` as any[];
+
+      originalMediaTitle = originalMedia.length > 0 ? originalMedia[0].titre : '';
+
       if (tags) {
         // Use provided tags (from "Include all tags" checkbox)
         const tagList = tags.split(',').map(t => t.trim()).filter(Boolean);
         userGenres = tagList.map(tag => ({ genre: tag, count: 1 }));
+        originalMediaTagCount = tagList.length;
       } else {
         // Get tags from the specified media
         const mediaIdColumn = similarToType === 'anime' ? 'id_anime' : 'id_manga';
@@ -643,6 +653,7 @@ export class UsersService {
             AND t.tag_name IS NOT NULL
           LIMIT 10
         ` as any[];
+        originalMediaTagCount = userGenres.length;
       }
     } else {
       // Get user's most reviewed content to find preferences (using tags system)
@@ -711,7 +722,13 @@ export class UsersService {
             a.nice_url as niceUrl,
             a.moyennenotes,
             a.nb_reviews,
-            a.annee
+            a.annee,
+            ${similarTo && originalMediaTitle ? `
+              ROUND(
+                (COUNT(DISTINCT LOWER(t.tag_name))::float / ${originalMediaTagCount}::float * 70) +
+                (similarity(LOWER(a.titre), LOWER('${originalMediaTitle.replace(/'/g, "''")}')) * 30)
+              ) as pertinence
+            ` : 'NULL as pertinence'}
           FROM ak_animes a
           JOIN ak_tag2fiche tf ON a.id_anime = tf.id_fiche AND tf.type = 'anime'
           JOIN ak_tags t ON tf.id_tag = t.id_tag
@@ -723,13 +740,14 @@ export class UsersService {
             AND a.id_anime NOT IN (
               SELECT id_anime FROM collection_animes WHERE id_membre = ${id} AND id_anime IS NOT NULL
             )
+            ${similarTo ? `AND a.id_anime != ${similarTo}` : ''}
           GROUP BY a.id_anime, a.titre, a.image, a.nice_url, a.moyennenotes, a.nb_reviews, a.annee
           HAVING COUNT(DISTINCT LOWER(t.tag_name)) = ${genresToUse.length}
-          ORDER BY ${animeOrderBy}
+          ORDER BY ${similarTo && originalMediaTitle ? 'pertinence DESC,' : ''} ${animeOrderBy}
           LIMIT ${Math.ceil(limit / 2)} OFFSET ${offset}
         `)
         : await this.prisma.$queryRawUnsafe(`
-          SELECT DISTINCT
+          SELECT
             a.id_anime as id,
             a.titre,
             a.image,
@@ -737,7 +755,13 @@ export class UsersService {
             a.nice_url as niceUrl,
             a.moyennenotes,
             a.nb_reviews,
-            a.annee
+            a.annee,
+            ${similarTo && originalMediaTitle ? `
+              ROUND(
+                (COUNT(DISTINCT CASE WHEN LOWER(t.tag_name) = ANY(ARRAY[${genresToUse.map(g => `'${g.toLowerCase()}'`).join(',')}]) THEN t.tag_name END)::float / ${originalMediaTagCount}::float * 70) +
+                (similarity(LOWER(a.titre), LOWER('${originalMediaTitle.replace(/'/g, "''")}')) * 30)
+              ) as pertinence
+            ` : 'NULL as pertinence'}
           FROM ak_animes a
           JOIN ak_tag2fiche tf ON a.id_anime = tf.id_fiche AND tf.type = 'anime'
           JOIN ak_tags t ON tf.id_tag = t.id_tag
@@ -749,7 +773,9 @@ export class UsersService {
             AND a.id_anime NOT IN (
               SELECT id_anime FROM collection_animes WHERE id_membre = ${id} AND id_anime IS NOT NULL
             )
-          ORDER BY ${animeOrderBy}
+            ${similarTo ? `AND a.id_anime != ${similarTo}` : ''}
+          GROUP BY a.id_anime, a.titre, a.image, a.nice_url, a.moyennenotes, a.nb_reviews, a.annee
+          ORDER BY ${similarTo && originalMediaTitle ? 'pertinence DESC,' : ''} ${animeOrderBy}
           LIMIT ${Math.ceil(limit / 2)} OFFSET ${offset}
         `);
 
@@ -766,7 +792,13 @@ export class UsersService {
             m.nice_url as niceUrl,
             m.moyennenotes,
             m.nb_clics,
-            m.annee
+            m.annee,
+            ${similarTo && originalMediaTitle ? `
+              ROUND(
+                (COUNT(DISTINCT LOWER(t.tag_name))::float / ${originalMediaTagCount}::float * 70) +
+                (similarity(LOWER(m.titre), LOWER('${originalMediaTitle.replace(/'/g, "''")}')) * 30)
+              ) as pertinence
+            ` : 'NULL as pertinence'}
           FROM ak_mangas m
           JOIN ak_tag2fiche tf ON m.id_manga = tf.id_fiche AND tf.type = 'manga'
           JOIN ak_tags t ON tf.id_tag = t.id_tag
@@ -778,13 +810,14 @@ export class UsersService {
             AND m.id_manga NOT IN (
               SELECT id_manga FROM collection_mangas WHERE id_membre = ${id} AND id_manga IS NOT NULL
             )
+            ${similarTo && similarToType === 'manga' ? `AND m.id_manga != ${similarTo}` : ''}
           GROUP BY m.id_manga, m.titre, m.image, m.nice_url, m.moyennenotes, m.nb_clics, m.annee
           HAVING COUNT(DISTINCT LOWER(t.tag_name)) = ${genresToUse.length}
-          ORDER BY ${mangaOrderBy}
+          ORDER BY ${similarTo && originalMediaTitle ? 'pertinence DESC,' : ''} ${mangaOrderBy}
           LIMIT ${Math.floor(limit / 2)} OFFSET ${offset}
         `)
         : await this.prisma.$queryRawUnsafe(`
-          SELECT DISTINCT
+          SELECT
             m.id_manga as id,
             m.titre,
             m.image,
@@ -792,7 +825,13 @@ export class UsersService {
             m.nice_url as niceUrl,
             m.moyennenotes,
             m.nb_clics,
-            m.annee
+            m.annee,
+            ${similarTo && originalMediaTitle ? `
+              ROUND(
+                (COUNT(DISTINCT CASE WHEN LOWER(t.tag_name) = ANY(ARRAY[${genresToUse.map(g => `'${g.toLowerCase()}'`).join(',')}]) THEN t.tag_name END)::float / ${originalMediaTagCount}::float * 70) +
+                (similarity(LOWER(m.titre), LOWER('${originalMediaTitle.replace(/'/g, "''")}')) * 30)
+              ) as pertinence
+            ` : 'NULL as pertinence'}
           FROM ak_mangas m
           JOIN ak_tag2fiche tf ON m.id_manga = tf.id_fiche AND tf.type = 'manga'
           JOIN ak_tags t ON tf.id_tag = t.id_tag
@@ -804,7 +843,9 @@ export class UsersService {
             AND m.id_manga NOT IN (
               SELECT id_manga FROM collection_mangas WHERE id_membre = ${id} AND id_manga IS NOT NULL
             )
-          ORDER BY ${mangaOrderBy}
+            ${similarTo && similarToType === 'manga' ? `AND m.id_manga != ${similarTo}` : ''}
+          GROUP BY m.id_manga, m.titre, m.image, m.nice_url, m.moyennenotes, m.nb_clics, m.annee
+          ORDER BY ${similarTo && originalMediaTitle ? 'pertinence DESC,' : ''} ${mangaOrderBy}
           LIMIT ${Math.floor(limit / 2)} OFFSET ${offset}
         `);
 
