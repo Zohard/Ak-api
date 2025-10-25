@@ -696,10 +696,12 @@ export class UsersService {
       const animeOrderBy = buildOrderBy('anime');
 
       // If tags parameter is provided (includeAllTags=true), require ALL tags
+      // If multiple genres/tags are selected, require ALL of them (AND logic)
       // Otherwise, match ANY tag (user preferences)
       const requireAllTags = tags && tags.trim().length > 0;
+      const requireAllGenres = genre && genresToUse.length > 1;
 
-      const animeRecs = requireAllTags
+      const animeRecs = (requireAllTags || requireAllGenres)
         ? await this.prisma.$queryRawUnsafe(`
           SELECT
             a.id_anime as id,
@@ -754,7 +756,7 @@ export class UsersService {
       // Get manga recommendations based on favorite genres or specific genre filter
       const mangaOrderBy = buildOrderBy('manga');
 
-      const mangaRecs = requireAllTags
+      const mangaRecs = (requireAllTags || requireAllGenres)
         ? await this.prisma.$queryRawUnsafe(`
           SELECT
             m.id_manga as id,
