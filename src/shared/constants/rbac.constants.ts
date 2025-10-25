@@ -294,6 +294,18 @@ export function hasAdminAccess(groupId: number): boolean {
 }
 
 /**
+ * Check if a user has moderation access for comments
+ * Only Administrators, Global Moderators, and Moderators can moderate
+ */
+export function hasModerationAccess(groupId: number): boolean {
+  return (
+    groupId === SMFGroup.ADMINISTRATOR ||
+    groupId === SMFGroup.GLOBAL_MODERATOR ||
+    groupId === SMFGroup.MODERATOR
+  );
+}
+
+/**
  * Get user role name based on group ID
  */
 export function getRoleName(groupId: number): string {
