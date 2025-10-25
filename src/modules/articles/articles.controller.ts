@@ -243,15 +243,21 @@ export class ArticlesController {
     );
   }
 
-  @Put(':commentId')
+  @Put(':id/comments/:commentId')  // articleId and commentId
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Update a comment' })
   updateComment(
-    @Param('commentId', ParseIntPipe) commentId: number,
+    @Param('id', ParseIntPipe) articleId: number,  // Article ID from URL
+    @Param('commentId', ParseIntPipe) commentId: number,  // Comment ID from URL
     @Body() updateCommentDto: UpdateCommentDto,
     @Request() req,
   ) {
-    return this.commentsService.update(commentId, updateCommentDto, req.user?.id, req.user.isAdmin);
+    return this.commentsService.update(
+      commentId,
+      updateCommentDto,
+      req.user?.id,
+      req.user?.isAdmin
+    );
   }
 }
