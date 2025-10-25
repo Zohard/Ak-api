@@ -696,10 +696,13 @@ export class UsersService {
 
     let recommendations: any[] = [];
 
-    if ((userGenres as any[]).length > 0) {
+    // Run genre-based recommendations if either:
+    // 1. User has genre preferences from their reviews
+    // 2. OR a genre filter is explicitly provided
+    if ((userGenres as any[]).length > 0 || genre) {
       const topGenres = (userGenres as any[]).map(g => g.genre);
 
-        // Get anime recommendations based on favorite genres or specific genre filter
+      // Get anime recommendations based on favorite genres or specific genre filter
       // Support multiple genres as comma-separated string
       const genresToUse = genre
         ? genre.split(',').map(g => g.trim()).filter(Boolean)
@@ -712,7 +715,11 @@ export class UsersService {
         requireAllGenres: genre && genresToUse.length > 1
       });
 
-      const animeOrderBy = buildOrderBy('anime');
+      // Skip if no genres to filter by
+      if (genresToUse.length === 0) {
+        console.log('⚠️ No genres to filter by, skipping genre-based recommendations');
+      } else {
+        const animeOrderBy = buildOrderBy('anime');
 
       // If tags parameter is provided (includeAllTags=true), require ALL tags
       // If multiple genres/tags are selected, require ALL of them (AND logic)
@@ -861,6 +868,7 @@ export class UsersService {
         ...(animeRecs as any[]),
         ...(mangaRecs as any[])
       ];
+      }
     }
 
     // If not enough recommendations, add popular items
