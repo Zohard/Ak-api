@@ -699,11 +699,19 @@ export class UsersService {
     if ((userGenres as any[]).length > 0) {
       const topGenres = (userGenres as any[]).map(g => g.genre);
 
-      // Get anime recommendations based on favorite genres or specific genre filter
+        // Get anime recommendations based on favorite genres or specific genre filter
       // Support multiple genres as comma-separated string
       const genresToUse = genre
         ? genre.split(',').map(g => g.trim()).filter(Boolean)
         : topGenres;
+
+      console.log('🎯 Genre filtering:', {
+        genreParam: genre,
+        topGenresFromUser: topGenres,
+        genresToUse,
+        requireAllGenres: genre && genresToUse.length > 1
+      });
+
       const animeOrderBy = buildOrderBy('anime');
 
       // If tags parameter is provided (includeAllTags=true), require ALL tags
@@ -938,8 +946,16 @@ export class UsersService {
       ];
     }
 
+    const finalResults = recommendations.slice(0, limit);
+
+    console.log('✅ Returning recommendations:', {
+      totalFound: recommendations.length,
+      returning: finalResults.length,
+      firstThreeTitles: finalResults.slice(0, 3).map((r: any) => `${r.titre} (${r.type})`)
+    });
+
     return {
-      items: recommendations.slice(0, limit),
+      items: finalResults,
       pagination: { page, limit },
     };
   }
