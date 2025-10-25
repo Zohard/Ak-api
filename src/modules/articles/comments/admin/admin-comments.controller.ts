@@ -19,6 +19,7 @@ import {
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../../../common/guards/jwt-auth.guard';
 import { AdminGuard } from '../../../../common/guards/admin.guard';
+import { ModerationGuard } from '../../../../common/guards/moderation.guard';
 import { CommentsService } from '../comments.service';
 import { UpdateCommentDto } from '../dto/update-comment.dto';
 import { CommentQueryDto } from '../dto/comment-query.dto';
@@ -97,8 +98,10 @@ export class AdminCommentsController {
   }
 
   @Patch(':id/moderate')
-  @ApiOperation({ summary: 'Moderate a comment (approve/reject)' })
+  @UseGuards(JwtAuthGuard, ModerationGuard)
+  @ApiOperation({ summary: 'Moderate a comment (approve/reject) - Moderators only' })
   @ApiResponse({ status: 200, description: 'Comment moderated successfully' })
+  @ApiResponse({ status: 403, description: 'Forbidden - moderation rights required' })
   @ApiResponse({ status: 404, description: 'Comment not found' })
   moderate(
     @Param('id', ParseIntPipe) id: number,
@@ -117,8 +120,10 @@ export class AdminCommentsController {
   }
 
   @Post('bulk-moderate')
-  @ApiOperation({ summary: 'Bulk moderate comments' })
+  @UseGuards(JwtAuthGuard, ModerationGuard)
+  @ApiOperation({ summary: 'Bulk moderate comments - Moderators only' })
   @ApiResponse({ status: 200, description: 'Comments moderated successfully' })
+  @ApiResponse({ status: 403, description: 'Forbidden - moderation rights required' })
   async bulkModerate(
     @Body() body: { commentIds: number[]; status: string; reason?: string },
   ) {
