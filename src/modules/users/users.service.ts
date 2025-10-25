@@ -692,58 +692,116 @@ export class UsersService {
       const genresToUse = genre ? [genre] : topGenres;
       const animeOrderBy = buildOrderBy('anime');
 
-      const animeRecs = await this.prisma.$queryRawUnsafe(`
-        SELECT DISTINCT
-          a.id_anime as id,
-          a.titre,
-          a.image,
-          'anime' as type,
-          a.nice_url as niceUrl,
-          a.moyennenotes,
-          a.nb_reviews,
-          a.annee
-        FROM ak_animes a
-        JOIN ak_tag2fiche tf ON a.id_anime = tf.id_fiche AND tf.type = 'anime'
-        JOIN ak_tags t ON tf.id_tag = t.id_tag
-        WHERE LOWER(t.tag_name) = ANY(ARRAY[${genresToUse.map(g => `'${g.toLowerCase()}'`).join(',')}])
-          AND a.statut = 1
-          AND a.id_anime NOT IN (
-            SELECT id_anime FROM ak_critique WHERE id_membre = ${id} AND id_anime IS NOT NULL
-          )
-          AND a.id_anime NOT IN (
-            SELECT id_anime FROM collection_animes WHERE id_membre = ${id} AND id_anime IS NOT NULL
-          )
-        ORDER BY ${animeOrderBy}
-        LIMIT ${Math.ceil(limit / 2)} OFFSET ${offset}
-      `);
+      // If tags parameter is provided (includeAllTags=true), require ALL tags
+      // Otherwise, match ANY tag (user preferences)
+      const requireAllTags = tags && tags.trim().length > 0;
+
+      const animeRecs = requireAllTags
+        ? await this.prisma.$queryRawUnsafe(`
+          SELECT
+            a.id_anime as id,
+            a.titre,
+            a.image,
+            'anime' as type,
+            a.nice_url as niceUrl,
+            a.moyennenotes,
+            a.nb_reviews,
+            a.annee
+          FROM ak_animes a
+          JOIN ak_tag2fiche tf ON a.id_anime = tf.id_fiche AND tf.type = 'anime'
+          JOIN ak_tags t ON tf.id_tag = t.id_tag
+          WHERE LOWER(t.tag_name) IN (${genresToUse.map(g => `'${g.toLowerCase()}'`).join(',')})
+            AND a.statut = 1
+            AND a.id_anime NOT IN (
+              SELECT id_anime FROM ak_critique WHERE id_membre = ${id} AND id_anime IS NOT NULL
+            )
+            AND a.id_anime NOT IN (
+              SELECT id_anime FROM collection_animes WHERE id_membre = ${id} AND id_anime IS NOT NULL
+            )
+          GROUP BY a.id_anime, a.titre, a.image, a.nice_url, a.moyennenotes, a.nb_reviews, a.annee
+          HAVING COUNT(DISTINCT LOWER(t.tag_name)) = ${genresToUse.length}
+          ORDER BY ${animeOrderBy}
+          LIMIT ${Math.ceil(limit / 2)} OFFSET ${offset}
+        `)
+        : await this.prisma.$queryRawUnsafe(`
+          SELECT DISTINCT
+            a.id_anime as id,
+            a.titre,
+            a.image,
+            'anime' as type,
+            a.nice_url as niceUrl,
+            a.moyennenotes,
+            a.nb_reviews,
+            a.annee
+          FROM ak_animes a
+          JOIN ak_tag2fiche tf ON a.id_anime = tf.id_fiche AND tf.type = 'anime'
+          JOIN ak_tags t ON tf.id_tag = t.id_tag
+          WHERE LOWER(t.tag_name) = ANY(ARRAY[${genresToUse.map(g => `'${g.toLowerCase()}'`).join(',')}])
+            AND a.statut = 1
+            AND a.id_anime NOT IN (
+              SELECT id_anime FROM ak_critique WHERE id_membre = ${id} AND id_anime IS NOT NULL
+            )
+            AND a.id_anime NOT IN (
+              SELECT id_anime FROM collection_animes WHERE id_membre = ${id} AND id_anime IS NOT NULL
+            )
+          ORDER BY ${animeOrderBy}
+          LIMIT ${Math.ceil(limit / 2)} OFFSET ${offset}
+        `);
 
       // Get manga recommendations based on favorite genres or specific genre filter
       const mangaOrderBy = buildOrderBy('manga');
 
-      const mangaRecs = await this.prisma.$queryRawUnsafe(`
-        SELECT DISTINCT
-          m.id_manga as id,
-          m.titre,
-          m.image,
-          'manga' as type,
-          m.nice_url as niceUrl,
-          m.moyennenotes,
-          m.nb_clics,
-          m.annee
-        FROM ak_mangas m
-        JOIN ak_tag2fiche tf ON m.id_manga = tf.id_fiche AND tf.type = 'manga'
-        JOIN ak_tags t ON tf.id_tag = t.id_tag
-        WHERE LOWER(t.tag_name) = ANY(ARRAY[${genresToUse.map(g => `'${g.toLowerCase()}'`).join(',')}])
-          AND m.statut = 1
-          AND m.id_manga NOT IN (
-            SELECT id_manga FROM ak_critique WHERE id_membre = ${id} AND id_manga IS NOT NULL
-          )
-          AND m.id_manga NOT IN (
-            SELECT id_manga FROM collection_mangas WHERE id_membre = ${id} AND id_manga IS NOT NULL
-          )
-        ORDER BY ${mangaOrderBy}
-        LIMIT ${Math.floor(limit / 2)} OFFSET ${offset}
-      `);
+      const mangaRecs = requireAllTags
+        ? await this.prisma.$queryRawUnsafe(`
+          SELECT
+            m.id_manga as id,
+            m.titre,
+            m.image,
+            'manga' as type,
+            m.nice_url as niceUrl,
+            m.moyennenotes,
+            m.nb_clics,
+            m.annee
+          FROM ak_mangas m
+          JOIN ak_tag2fiche tf ON m.id_manga = tf.id_fiche AND tf.type = 'manga'
+          JOIN ak_tags t ON tf.id_tag = t.id_tag
+          WHERE LOWER(t.tag_name) IN (${genresToUse.map(g => `'${g.toLowerCase()}'`).join(',')})
+            AND m.statut = 1
+            AND m.id_manga NOT IN (
+              SELECT id_manga FROM ak_critique WHERE id_membre = ${id} AND id_manga IS NOT NULL
+            )
+            AND m.id_manga NOT IN (
+              SELECT id_manga FROM collection_mangas WHERE id_membre = ${id} AND id_manga IS NOT NULL
+            )
+          GROUP BY m.id_manga, m.titre, m.image, m.nice_url, m.moyennenotes, m.nb_clics, m.annee
+          HAVING COUNT(DISTINCT LOWER(t.tag_name)) = ${genresToUse.length}
+          ORDER BY ${mangaOrderBy}
+          LIMIT ${Math.floor(limit / 2)} OFFSET ${offset}
+        `)
+        : await this.prisma.$queryRawUnsafe(`
+          SELECT DISTINCT
+            m.id_manga as id,
+            m.titre,
+            m.image,
+            'manga' as type,
+            m.nice_url as niceUrl,
+            m.moyennenotes,
+            m.nb_clics,
+            m.annee
+          FROM ak_mangas m
+          JOIN ak_tag2fiche tf ON m.id_manga = tf.id_fiche AND tf.type = 'manga'
+          JOIN ak_tags t ON tf.id_tag = t.id_tag
+          WHERE LOWER(t.tag_name) = ANY(ARRAY[${genresToUse.map(g => `'${g.toLowerCase()}'`).join(',')}])
+            AND m.statut = 1
+            AND m.id_manga NOT IN (
+              SELECT id_manga FROM ak_critique WHERE id_membre = ${id} AND id_manga IS NOT NULL
+            )
+            AND m.id_manga NOT IN (
+              SELECT id_manga FROM collection_mangas WHERE id_membre = ${id} AND id_manga IS NOT NULL
+            )
+          ORDER BY ${mangaOrderBy}
+          LIMIT ${Math.floor(limit / 2)} OFFSET ${offset}
+        `);
 
       recommendations = [
         ...(animeRecs as any[]),
