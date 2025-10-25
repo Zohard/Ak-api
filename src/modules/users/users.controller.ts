@@ -270,6 +270,17 @@ export class UsersController {
     // Support both 'genre' and 'genres' parameters for backward compatibility
     const genresParam = genres || genre;
 
+    console.log('📊 Recommendations request:', {
+      userId: id,
+      limit: limit || 12,
+      page: page || 1,
+      genres: genresParam,
+      sortBy,
+      similarTo,
+      similarToType,
+      tags
+    });
+
     return this.usersService.getUserRecommendations(
       id,
       limit || 12,
