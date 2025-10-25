@@ -689,7 +689,10 @@ export class UsersService {
       const topGenres = (userGenres as any[]).map(g => g.genre);
 
       // Get anime recommendations based on favorite genres or specific genre filter
-      const genresToUse = genre ? [genre] : topGenres;
+      // Support multiple genres as comma-separated string
+      const genresToUse = genre
+        ? genre.split(',').map(g => g.trim()).filter(Boolean)
+        : topGenres;
       const animeOrderBy = buildOrderBy('anime');
 
       // If tags parameter is provided (includeAllTags=true), require ALL tags
@@ -816,11 +819,12 @@ export class UsersService {
       const mangaOrderBy = buildOrderBy('manga');
 
       // Build genre filter clause if genre is specified
+      // Support multiple genres as comma-separated string
       const genreJoinAndWhere = genre
         ? `
           JOIN ak_tag2fiche tf ON %TABLE%.%ID% = tf.id_fiche AND tf.type = '%TYPE%'
           JOIN ak_tags t ON tf.id_tag = t.id_tag
-          AND LOWER(t.tag_name) = '${genre.toLowerCase()}'
+          AND LOWER(t.tag_name) IN (${genre.split(',').map(g => `'${g.trim().toLowerCase()}'`).join(',')})
         `
         : '';
 
