@@ -243,20 +243,20 @@ export class ArticlesController {
     );
   }
 
-  @Put('comments/:commentId')
+  @Put('comments/:id')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Update a comment by ID' })
+  @ApiOperation({ summary: 'Update a comment by its ID' })
   @ApiResponse({ status: 200, description: 'Comment updated successfully' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 404, description: 'Comment not found' })
   updateCommentById(
-    @Param('commentId', ParseIntPipe) commentId: number,
+    @Param('id', ParseIntPipe) id: number,
     @Body() updateCommentDto: UpdateCommentDto,
     @Request() req,
   ) {
     return this.commentsService.update(
-      commentId,
+      id, // comment ID
       updateCommentDto,
       req.user?.id,
       req.user?.isAdmin,
