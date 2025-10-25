@@ -44,6 +44,21 @@ export class CommentsService {
   }
 
   /**
+   * Get SMF member avatar by email
+   * Returns the avatar URL if available
+   */
+  private async getSmfMemberAvatar(email: string): Promise<string | undefined> {
+    if (!email) return undefined;
+
+    const smfMember = await this.prisma.smfMember.findFirst({
+      where: { emailAddress: email },
+      select: { avatar: true }
+    });
+
+    return smfMember?.avatar || undefined;
+  }
+
+  /**
    * Convert SMF member ID to wp_users ID by email lookup
    * This is needed because the system uses SMF for authentication but WordPress for comments
    * Returns undefined if no WP account exists (user will be linked by email instead)
@@ -202,7 +217,10 @@ export class CommentsService {
       this.prisma.wpComment.count({ where }),
     ]);
 
-    const transformedComments = comments.map((comment) => {
+    const transformedComments = await Promise.all(comments.map(async (comment) => {
+      // Fetch avatar from SMF members
+      const avatar = await this.getSmfMemberAvatar(comment.commentAuthorEmail);
+
       const baseComment = {
         id: Number(comment.commentID),
         articleId: Number(comment.commentPostID),
@@ -211,6 +229,7 @@ export class CommentsService {
         website: comment.commentAuthorUrl,
         commentaire: comment.commentContent,
         date: comment.commentDate.toISOString(),
+        avatar: avatar || null,
       };
 
       if (includePrivateFields) {
@@ -240,7 +259,7 @@ export class CommentsService {
       }
 
       return baseComment;
-    });
+    }));
 
     const totalPages = Math.ceil(total / limit);
 
