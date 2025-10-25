@@ -607,7 +607,10 @@ export class UsersService {
     limit: number = 12,
     page: number = 1,
     genre?: string,
-    sortBy?: string
+    sortBy?: string,
+    similarTo?: number,
+    similarToType?: 'anime' | 'manga',
+    tags?: string
   ) {
     const user = await this.prisma.smfMember.findUnique({
       where: { idMember: id },
@@ -618,20 +621,45 @@ export class UsersService {
       throw new NotFoundException('Utilisateur introuvable');
     }
 
-    // Get user's most reviewed content to find preferences (using tags system)
-    const userGenres = await this.prisma.$queryRaw`
-      SELECT 
-        t.tag_name as genre,
-        COUNT(*) as count
-      FROM ak_critique c
-      LEFT JOIN ak_tag2fiche tf_a ON c.id_anime = tf_a.id_fiche AND tf_a.type = 'anime'
-      LEFT JOIN ak_tag2fiche tf_m ON c.id_manga = tf_m.id_fiche AND tf_m.type = 'manga'
-      LEFT JOIN ak_tags t ON (tf_a.id_tag = t.id_tag OR tf_m.id_tag = t.id_tag)
-      WHERE c.id_membre = ${id} AND t.tag_name IS NOT NULL
-      GROUP BY t.tag_name
-      ORDER BY count DESC
-      LIMIT 3
-    `;
+    let userGenres: any[] = [];
+
+    // If similarTo is provided, get tags from that specific media
+    if (similarTo && similarToType) {
+      if (tags) {
+        // Use provided tags (from "Include all tags" checkbox)
+        const tagList = tags.split(',').map(t => t.trim()).filter(Boolean);
+        userGenres = tagList.map(tag => ({ genre: tag, count: 1 }));
+      } else {
+        // Get tags from the specified media
+        const mediaIdColumn = similarToType === 'anime' ? 'id_anime' : 'id_manga';
+        userGenres = await this.prisma.$queryRaw`
+          SELECT DISTINCT
+            t.tag_name as genre,
+            1 as count
+          FROM ak_tag2fiche tf
+          JOIN ak_tags t ON tf.id_tag = t.id_tag
+          WHERE tf.id_fiche = ${similarTo}
+            AND tf.type = ${similarToType}
+            AND t.tag_name IS NOT NULL
+          LIMIT 10
+        ` as any[];
+      }
+    } else {
+      // Get user's most reviewed content to find preferences (using tags system)
+      userGenres = await this.prisma.$queryRaw`
+        SELECT
+          t.tag_name as genre,
+          COUNT(*) as count
+        FROM ak_critique c
+        LEFT JOIN ak_tag2fiche tf_a ON c.id_anime = tf_a.id_fiche AND tf_a.type = 'anime'
+        LEFT JOIN ak_tag2fiche tf_m ON c.id_manga = tf_m.id_fiche AND tf_m.type = 'manga'
+        LEFT JOIN ak_tags t ON (tf_a.id_tag = t.id_tag OR tf_m.id_tag = t.id_tag)
+        WHERE c.id_membre = ${id} AND t.tag_name IS NOT NULL
+        GROUP BY t.tag_name
+        ORDER BY count DESC
+        LIMIT 3
+      ` as any[];
+    }
 
     const offset = (page - 1) * limit;
 
