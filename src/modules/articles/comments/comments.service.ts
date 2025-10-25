@@ -30,6 +30,35 @@ export class CommentsService {
     return 0; // Default: pending
   }
 
+  /**
+   * Get SMF member email address
+   * Used to link comments for users without WordPress accounts
+   */
+  private async getSmfMemberEmail(smfUserId: number): Promise<string | undefined> {
+    const smfMember = await this.prisma.smfMember.findUnique({
+      where: { idMember: smfUserId },
+      select: { emailAddress: true }
+    });
+
+    return smfMember?.emailAddress;
+  }
+
+  /**
+   * Convert SMF member ID to wp_users ID by email lookup
+   * This is needed because the system uses SMF for authentication but WordPress for comments
+   * Returns undefined if no WP account exists (user will be linked by email instead)
+   */
+  private async convertSmfIdToWpId(smfUserId: number): Promise<number | undefined> {
+    const email = await this.getSmfMemberEmail(smfUserId);
+    if (!email) return undefined;
+
+    const wpUser = await this.prisma.wpUser.findFirst({
+      where: { userEmail: email }
+    });
+
+    return wpUser ? Number(wpUser.ID) : undefined;
+  }
+
   async create(
     createCommentDto: CreateCommentDto,
     userId?: number,
@@ -122,12 +151,20 @@ export class CommentsService {
     // Generate cache key for approved comments (public queries only)
     const shouldCache = !includePrivateFields && status === 'approved' && articleId;
     const cacheKey = shouldCache ? `comments:article:${articleId}:p${page}:l${limit}:s${sort}:o${order}` : '';
-    
+
     if (shouldCache) {
       const cached = await this.cacheService.get(cacheKey);
       if (cached) {
         return cached;
       }
+    }
+
+    // Get SMF user's WP ID and email for ownership checking
+    let wpUserId: number | undefined;
+    let smfUserEmail: string | undefined;
+    if (requestingUserId) {
+      smfUserEmail = await this.getSmfMemberEmail(requestingUserId);
+      wpUserId = await this.convertSmfIdToWpId(requestingUserId);
     }
 
     const offset = (page - 1) * limit;
@@ -187,7 +224,14 @@ export class CommentsService {
 
       // Include email and moderation for comment owner (even if not admin)
       // This allows them to edit/delete their own comments and see moderation status
-      if (requestingUserId && comment.userId === requestingUserId) {
+      // Check ownership by EITHER:
+      // 1. WP user_id match (for users WITH WordPress accounts)
+      // 2. Email match (for users WITHOUT WordPress accounts, user_id = 0)
+      const isOwner =
+        (wpUserId && comment.userId === wpUserId) ||
+        (smfUserEmail && comment.commentAuthorEmail === smfUserEmail);
+
+      if (isOwner) {
         return {
           ...baseComment,
           email: comment.commentAuthorEmail,
@@ -264,8 +308,18 @@ export class CommentsService {
       throw new NotFoundException('Comment not found');
     }
 
-    // Check permissions
-    if (!isAdmin && existingComment.userId !== userId) {
+    // Get SMF user's WP ID and email for permission check
+    const smfUserEmail = await this.getSmfMemberEmail(userId);
+    const wpUserId = await this.convertSmfIdToWpId(userId);
+
+    // Check permissions - user owns comment if EITHER:
+    // 1. WP user_id matches (users WITH WordPress accounts)
+    // 2. Email matches (users WITHOUT WordPress accounts, user_id = 0)
+    const isOwner =
+      (wpUserId && existingComment.userId === wpUserId) ||
+      (smfUserEmail && existingComment.commentAuthorEmail === smfUserEmail);
+
+    if (!isAdmin && !isOwner) {
       throw new ForbiddenException('You can only edit your own comments');
     }
 
@@ -374,8 +428,18 @@ export class CommentsService {
       throw new NotFoundException('Comment not found');
     }
 
-    // Check permissions
-    if (!isAdmin && comment.userId !== userId) {
+    // Get SMF user's WP ID and email for permission check
+    const smfUserEmail = await this.getSmfMemberEmail(userId);
+    const wpUserId = await this.convertSmfIdToWpId(userId);
+
+    // Check permissions - user owns comment if EITHER:
+    // 1. WP user_id matches (users WITH WordPress accounts)
+    // 2. Email matches (users WITHOUT WordPress accounts, user_id = 0)
+    const isOwner =
+      (wpUserId && comment.userId === wpUserId) ||
+      (smfUserEmail && comment.commentAuthorEmail === smfUserEmail);
+
+    if (!isAdmin && !isOwner) {
       throw new ForbiddenException('You can only delete your own comments');
     }
 
