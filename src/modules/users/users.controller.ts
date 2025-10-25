@@ -196,6 +196,9 @@ export class UsersController {
   @ApiParam({ name: 'media', description: 'Type de contenu', enum: ['anime', 'manga'] })
   @ApiQuery({ name: 'genre', required: false, description: 'Filtrer par genre' })
   @ApiQuery({ name: 'sortBy', required: false, description: 'Trier par (rating, popularity, date, title)' })
+  @ApiQuery({ name: 'similarTo', required: false, description: 'ID du média similaire', type: 'number' })
+  @ApiQuery({ name: 'similarToType', required: false, description: 'Type du média similaire', enum: ['anime', 'manga'] })
+  @ApiQuery({ name: 'tags', required: false, description: 'Tags séparés par virgule pour inclure tous les tags' })
   @ApiResponse({ status: 200, description: "Recommandations personnalisées (filtrées)" })
   @ApiResponse({ status: 404, description: 'Utilisateur introuvable' })
   async getUserRecommendationsByMedia(
@@ -205,6 +208,9 @@ export class UsersController {
     @Query('offset', ParseIntPipe) offset?: number,
     @Query('genre') genre?: string,
     @Query('sortBy') sortBy?: string,
+    @Query('similarTo') similarTo?: number,
+    @Query('similarToType') similarToType?: 'anime' | 'manga',
+    @Query('tags') tags?: string,
   ) {
     const requestedLimit = limit || 12;
     const effectiveOffset = offset || 0;
@@ -217,7 +223,10 @@ export class UsersController {
       fetchLimit,
       page,
       genre,
-      sortBy
+      sortBy,
+      similarTo,
+      similarToType,
+      tags
     );
 
     // Filter by media type and take only the requested limit
@@ -241,6 +250,9 @@ export class UsersController {
   @ApiQuery({ name: 'page', required: false, description: 'Numéro de page', example: 1 })
   @ApiQuery({ name: 'genre', required: false, description: 'Filtrer par genre' })
   @ApiQuery({ name: 'sortBy', required: false, description: 'Trier par (rating, popularity, date, title)' })
+  @ApiQuery({ name: 'similarTo', required: false, description: 'ID du média similaire', type: 'number' })
+  @ApiQuery({ name: 'similarToType', required: false, description: 'Type du média similaire', enum: ['anime', 'manga'] })
+  @ApiQuery({ name: 'tags', required: false, description: 'Tags séparés par virgule pour inclure tous les tags' })
   @ApiResponse({ status: 200, description: "Recommandations personnalisées" })
   @ApiResponse({ status: 404, description: 'Utilisateur introuvable' })
   async getUserRecommendations(
@@ -249,8 +261,20 @@ export class UsersController {
     @Query('page') page?: number,
     @Query('genre') genre?: string,
     @Query('sortBy') sortBy?: string,
+    @Query('similarTo') similarTo?: number,
+    @Query('similarToType') similarToType?: 'anime' | 'manga',
+    @Query('tags') tags?: string,
   ) {
-    return this.usersService.getUserRecommendations(id, limit || 12, page || 1, genre, sortBy);
+    return this.usersService.getUserRecommendations(
+      id,
+      limit || 12,
+      page || 1,
+      genre,
+      sortBy,
+      similarTo,
+      similarToType,
+      tags
+    );
   }
 
   // Public endpoints (no authentication required)
