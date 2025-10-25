@@ -874,8 +874,7 @@ export class UsersService {
       const genreJoinAndWhere = genre
         ? `
           JOIN ak_tag2fiche tf ON %TABLE%.%ID% = tf.id_fiche AND tf.type = '%TYPE%'
-          JOIN ak_tags t ON tf.id_tag = t.id_tag
-          AND LOWER(t.tag_name) IN (${genre.split(',').map(g => `'${g.trim().toLowerCase()}'`).join(',')})
+          JOIN ak_tags t ON tf.id_tag = t.id_tag AND LOWER(t.tag_name) IN (${genre.split(',').map(g => `'${g.trim().toLowerCase()}'`).join(',')})
         `
         : '';
 
