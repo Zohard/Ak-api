@@ -20,6 +20,7 @@ import {
   ApiBearerAuth,
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { OptionalJwtAuthGuard } from '../../common/guards/optional-jwt-auth.guard';
 import { ArticlePermissionsGuard } from './guards/article-permissions.guard';
 import {
   CanWriteArticles,
@@ -201,6 +202,7 @@ export class ArticlesController {
   // ============ COMMENTS ENDPOINTS ============
 
   @Get(':id/comments')
+  @UseGuards(OptionalJwtAuthGuard)
   @ApiOperation({ summary: 'Get comments for a specific article' })
   @ApiResponse({ status: 200, description: 'Comments retrieved successfully' })
   @ApiResponse({ status: 404, description: 'Article not found' })
