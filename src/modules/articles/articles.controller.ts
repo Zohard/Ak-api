@@ -243,18 +243,17 @@ export class ArticlesController {
     );
   }
 
-  @Put(':id/comments/:commentId')  // articleId and commentId
+  @Put(':id/comments')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Update a comment' })
   updateComment(
     @Param('id', ParseIntPipe) articleId: number,  // Article ID from URL
-    @Param('commentId', ParseIntPipe) commentId: number,  // Comment ID from URL
     @Body() updateCommentDto: UpdateCommentDto,
     @Request() req,
   ) {
     return this.commentsService.update(
-      commentId,
+      articleId,
       updateCommentDto,
       req.user?.id,
       req.user?.isAdmin
