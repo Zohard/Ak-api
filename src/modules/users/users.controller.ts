@@ -248,7 +248,8 @@ export class UsersController {
   @ApiParam({ name: 'id', description: "ID de l'utilisateur", type: 'number' })
   @ApiQuery({ name: 'limit', required: false, description: 'Nombre de recommandations', example: 12 })
   @ApiQuery({ name: 'page', required: false, description: 'Numéro de page', example: 1 })
-  @ApiQuery({ name: 'genre', required: false, description: 'Filtrer par genre' })
+  @ApiQuery({ name: 'genre', required: false, description: 'Filtrer par genre (deprecated, use genres)' })
+  @ApiQuery({ name: 'genres', required: false, description: 'Filtrer par genres (séparés par virgule)' })
   @ApiQuery({ name: 'sortBy', required: false, description: 'Trier par (rating, popularity, date, title)' })
   @ApiQuery({ name: 'similarTo', required: false, description: 'ID du média similaire', type: 'number' })
   @ApiQuery({ name: 'similarToType', required: false, description: 'Type du média similaire', enum: ['anime', 'manga'] })
@@ -260,16 +261,20 @@ export class UsersController {
     @Query('limit') limit?: number,
     @Query('page') page?: number,
     @Query('genre') genre?: string,
+    @Query('genres') genres?: string,
     @Query('sortBy') sortBy?: string,
     @Query('similarTo') similarTo?: number,
     @Query('similarToType') similarToType?: 'anime' | 'manga',
     @Query('tags') tags?: string,
   ) {
+    // Support both 'genre' and 'genres' parameters for backward compatibility
+    const genresParam = genres || genre;
+
     return this.usersService.getUserRecommendations(
       id,
       limit || 12,
       page || 1,
-      genre,
+      genresParam,
       sortBy,
       similarTo,
       similarToType,
