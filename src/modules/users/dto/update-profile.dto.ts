@@ -109,4 +109,12 @@ export class UpdateProfileDto {
   @IsOptional()
   @IsString()
   avatar?: string;
+
+  @ApiPropertyOptional({
+    description: "URL de l'image de bannière du profil (dimensions recommandées: 1200x320 pixels)",
+    example: 'https://cdn.example.com/banners/u123.jpg',
+  })
+  @IsOptional()
+  @IsString()
+  bannerImage?: string;
 }
