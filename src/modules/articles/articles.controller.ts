@@ -11,7 +11,7 @@ import {
   Request,
   ParseIntPipe,
   HttpCode,
-  HttpStatus, Put,
+  HttpStatus,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -240,26 +240,6 @@ export class ArticlesController {
       req.user?.id,
       req.ip,
       req.headers['user-agent'],
-    );
-  }
-
-  @Put('comments/:id')
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Update a comment by its ID' })
-  @ApiResponse({ status: 200, description: 'Comment updated successfully' })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
-  @ApiResponse({ status: 404, description: 'Comment not found' })
-  updateCommentById(
-    @Param('id', ParseIntPipe) id: number,
-    @Body() updateCommentDto: UpdateCommentDto,
-    @Request() req,
-  ) {
-    return this.commentsService.update(
-      id, // comment ID
-      updateCommentDto,
-      req.user?.id,
-      req.user?.isAdmin,
     );
   }
 }
