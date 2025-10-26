@@ -25,6 +25,8 @@ import { AnimesService } from './animes.service';
 import { CreateAnimeDto } from './dto/create-anime.dto';
 import { UpdateAnimeDto } from './dto/update-anime.dto';
 import { AnimeQueryDto } from './dto/anime-query.dto';
+import { CreateTrailerDto } from './dto/create-trailer.dto';
+import { UpdateTrailerDto } from './dto/update-trailer.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { AdminGuard } from '../../common/guards/admin.guard';
 
@@ -317,14 +319,21 @@ export class AnimesController {
     description: 'Inclure les épisodes',
     example: false,
   })
+  @ApiQuery({
+    name: 'includeTrailers',
+    required: false,
+    description: 'Inclure les bandes-annonces',
+    example: false,
+  })
   @ApiResponse({ status: 200, description: "Détails de l'anime" })
   @ApiResponse({ status: 404, description: 'Anime introuvable' })
   async findOne(
     @Param('id', ParseIntPipe) id: number,
     @Query('includeReviews') includeReviews = false,
     @Query('includeEpisodes') includeEpisodes = false,
+    @Query('includeTrailers') includeTrailers = false,
   ) {
-    return this.animesService.findOne(id, includeReviews, includeEpisodes);
+    return this.animesService.findOne(id, includeReviews, includeEpisodes, includeTrailers);
   }
 
   @Patch(':id')
@@ -361,5 +370,52 @@ export class AnimesController {
   @ApiResponse({ status: 404, description: 'Anime introuvable' })
   async remove(@Param('id', ParseIntPipe) id: number, @Request() req) {
     return this.animesService.remove(id, req.user.id, req.user.isAdmin);
+  }
+
+  // ===== Trailer Management =====
+
+  @Post('trailers')
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Ajouter une bande-annonce à un anime (Admin seulement)' })
+  @ApiResponse({ status: 201, description: 'Bande-annonce créée avec succès' })
+  @ApiResponse({ status: 401, description: 'Authentification requise' })
+  @ApiResponse({ status: 403, description: "Droits d'administrateur requis" })
+  async createTrailer(@Body() createTrailerDto: CreateTrailerDto, @Request() req) {
+    return this.animesService.createTrailer(createTrailerDto);
+  }
+
+  @Patch('trailers/:trailerId')
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Mettre à jour une bande-annonce (Admin seulement)' })
+  @ApiParam({ name: 'trailerId', description: 'ID de la bande-annonce', type: 'number' })
+  @ApiResponse({ status: 200, description: 'Bande-annonce mise à jour avec succès' })
+  @ApiResponse({ status: 401, description: 'Authentification requise' })
+  @ApiResponse({ status: 403, description: "Droits d'administrateur requis" })
+  @ApiResponse({ status: 404, description: 'Bande-annonce introuvable' })
+  async updateTrailer(
+    @Param('trailerId', ParseIntPipe) trailerId: number,
+    @Body() updateTrailerDto: UpdateTrailerDto,
+    @Request() req,
+  ) {
+    return this.animesService.updateTrailer(trailerId, updateTrailerDto);
+  }
+
+  @Delete('trailers/:trailerId')
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Supprimer une bande-annonce (Admin seulement)' })
+  @ApiParam({ name: 'trailerId', description: 'ID de la bande-annonce', type: 'number' })
+  @ApiResponse({ status: 204, description: 'Bande-annonce supprimée avec succès' })
+  @ApiResponse({ status: 401, description: 'Authentification requise' })
+  @ApiResponse({ status: 403, description: "Droits d'administrateur requis" })
+  @ApiResponse({ status: 404, description: 'Bande-annonce introuvable' })
+  async removeTrailer(
+    @Param('trailerId', ParseIntPipe) trailerId: number,
+    @Request() req,
+  ) {
+    return this.animesService.removeTrailer(trailerId);
   }
 }

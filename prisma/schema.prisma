@@ -175,6 +175,7 @@ model AkAnime {
   // Relations
   reviews      AkCritique[]
   episodes     AkAnimesEpisode[]
+  trailers     AkAnimesTrailer[]
   businessRelations AkBusinessToAnime[]
   userCollections CollectionAnime[] @relation("UserAnimeList")
 
@@ -194,6 +195,25 @@ model AkAnimesEpisode {
   anime        AkAnime   @relation(fields: [idAnime], references: [idAnime], onDelete: Cascade)
 
   @@map("ak_animes_episodes")
+}
+
+// Anime Trailers
+model AkAnimesTrailer {
+  idTrailer    Int       @id @default(autoincrement()) @map("id_trailer")
+  idAnime      Int       @map("id_anime")
+  titre        String?   @db.VarChar(255)
+  url          String    @db.VarChar(500)
+  platform     String?   @db.VarChar(50)
+  langue       String?   @default("ja") @db.VarChar(10)
+  typeTrailer  String?   @default("PV") @map("type_trailer") @db.VarChar(50)
+  ordre        Int       @default(0)
+  dateAjout    DateTime? @default(now()) @map("date_ajout") @db.Timestamptz
+  statut       Int       @default(1) @db.SmallInt
+
+  // Relations
+  anime        AkAnime   @relation(fields: [idAnime], references: [idAnime], onDelete: Cascade)
+
+  @@map("ak_animes_trailers")
 }
 
 // Mangas
