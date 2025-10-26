@@ -54,6 +54,7 @@ export class UsersService {
           experience: true,
           idGroup: true,
           avatar: true,
+          bannerImage: true,
           personalText: true,
           location: true,
           // Don't include password fields
@@ -90,6 +91,7 @@ export class UsersService {
         experience: true,
         idGroup: true,
         avatar: true,
+        bannerImage: true,
         personalText: true,
         signature: true,
         location: true,
@@ -248,6 +250,7 @@ export class UsersService {
         experience: true,
         idGroup: true,
         avatar: true,
+        bannerImage: true,
         personalText: true,
         signature: true,
         location: true,
@@ -989,6 +992,7 @@ export class UsersService {
         experience: true,
         idGroup: true,
         avatar: true,
+        bannerImage: true,
         personalText: true,
         location: true,
         // Don't include email, password, or other sensitive fields

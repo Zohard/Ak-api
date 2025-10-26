@@ -44,6 +44,7 @@ model SmfMember {
   idPostGroup      Int?     @map("id_post_group")
   additionalGroups String?  @map("additional_groups") @db.VarChar(255)
   avatar           String?  @db.Text
+  bannerImage      String?  @map("banner_image") @db.VarChar(500)
   signature        String?  @db.Text
   personalText     String?  @map("personal_text") @db.Text
   location         String?  @db.VarChar(255)
