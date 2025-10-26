@@ -221,6 +221,21 @@ export class CommentsService {
       // Fetch avatar from SMF members
       const avatar = await this.getSmfMemberAvatar(comment.commentAuthorEmail);
 
+      // Fetch article info for admin view
+      let articleInfo: { titre: string; niceUrl: string } | undefined;
+      if (includePrivateFields) {
+        const article = await this.prisma.wpPost.findUnique({
+          where: { ID: comment.commentPostID },
+          select: { postTitle: true, postName: true }
+        });
+        if (article) {
+          articleInfo = {
+            titre: article.postTitle,
+            niceUrl: article.postName
+          };
+        }
+      }
+
       const baseComment = {
         id: Number(comment.commentID),
         articleId: Number(comment.commentPostID),
@@ -230,6 +245,7 @@ export class CommentsService {
         commentaire: comment.commentContent,
         date: comment.commentDate.toISOString(),
         avatar: avatar || null,
+        article: articleInfo,
       };
 
       if (includePrivateFields) {
