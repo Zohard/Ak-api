@@ -300,11 +300,11 @@ export class AnimesService extends BaseContentService<
     return result;
   }
 
-  async findOne(id: number, includeReviews = false, includeEpisodes = false) {
+  async findOne(id: number, includeReviews = false, includeEpisodes = false, includeTrailers = false) {
     // Try to get from cache first
-    const cacheKey = `${id}_${includeReviews}_${includeEpisodes}`;
+    const cacheKey = `${id}_${includeReviews}_${includeEpisodes}_${includeTrailers}`;
     const cached = await this.cacheService.getAnime(parseInt(cacheKey.replace(/[^0-9]/g, '')));
-    if (cached && cached.includeReviews === includeReviews && cached.includeEpisodes === includeEpisodes) {
+    if (cached && cached.includeReviews === includeReviews && cached.includeEpisodes === includeEpisodes && cached.includeTrailers === includeTrailers) {
       return cached.data;
     }
 
@@ -331,6 +331,13 @@ export class AnimesService extends BaseContentService<
       };
     }
 
+    if (includeTrailers) {
+      include.trailers = {
+        where: { statut: 1 }, // Only include visible trailers
+        orderBy: { ordre: 'asc' },
+      };
+    }
+
     const anime = await this.prisma.akAnime.findUnique({
       where: { idAnime: id },
       include,
@@ -352,6 +359,7 @@ export class AnimesService extends BaseContentService<
       data: formattedAnime,
       includeReviews,
       includeEpisodes,
+      includeTrailers,
     };
     await this.cacheService.setAnime(id, cacheData, 600); // 10 minutes
 
@@ -1172,6 +1180,74 @@ export class AnimesService extends BaseContentService<
     await this.cacheService.invalidateAnime(id);
     // Also invalidate related caches
     await this.cacheService.invalidateSearchCache();
+  }
+
+  // ===== Trailer Management =====
+
+  async createTrailer(createTrailerDto: any) {
+    // Verify anime exists
+    const anime = await this.prisma.akAnime.findUnique({
+      where: { idAnime: createTrailerDto.idAnime },
+    });
+
+    if (!anime) {
+      throw new NotFoundException('Anime introuvable');
+    }
+
+    const trailer = await this.prisma.akAnimesTrailer.create({
+      data: {
+        idAnime: createTrailerDto.idAnime,
+        titre: createTrailerDto.titre,
+        url: createTrailerDto.url,
+        platform: createTrailerDto.platform,
+        langue: createTrailerDto.langue || 'ja',
+        typeTrailer: createTrailerDto.typeTrailer || 'PV',
+        ordre: createTrailerDto.ordre || 0,
+        statut: createTrailerDto.statut !== undefined ? createTrailerDto.statut : 1,
+      },
+    });
+
+    // Invalidate anime cache
+    await this.cacheService.invalidateAnime(createTrailerDto.idAnime);
+
+    return trailer;
+  }
+
+  async updateTrailer(trailerId: number, updateTrailerDto: any) {
+    const trailer = await this.prisma.akAnimesTrailer.findUnique({
+      where: { idTrailer: trailerId },
+    });
+
+    if (!trailer) {
+      throw new NotFoundException('Bande-annonce introuvable');
+    }
+
+    const updated = await this.prisma.akAnimesTrailer.update({
+      where: { idTrailer: trailerId },
+      data: updateTrailerDto,
+    });
+
+    // Invalidate anime cache
+    await this.cacheService.invalidateAnime(trailer.idAnime);
+
+    return updated;
+  }
+
+  async removeTrailer(trailerId: number) {
+    const trailer = await this.prisma.akAnimesTrailer.findUnique({
+      where: { idTrailer: trailerId },
+    });
+
+    if (!trailer) {
+      throw new NotFoundException('Bande-annonce introuvable');
+    }
+
+    await this.prisma.akAnimesTrailer.delete({
+      where: { idTrailer: trailerId },
+    });
+
+    // Invalidate anime cache
+    await this.cacheService.invalidateAnime(trailer.idAnime);
   }
 
   // Utility method to create consistent cache keys
