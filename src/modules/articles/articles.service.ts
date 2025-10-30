@@ -341,8 +341,12 @@ export class ArticlesService {
       return cached;
     }
 
-    const post = await this.prisma.wpPost.findUnique({
-      where: { ID: BigInt(id) },
+    const post = await this.prisma.wpPost.findFirst({
+      where: {
+        ID: BigInt(id),
+        postStatus: 'publish',
+        postType: 'post',
+      },
       include: {
         wpAuthor: {
           select: {
