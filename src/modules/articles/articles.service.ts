@@ -210,6 +210,8 @@ export class ArticlesService {
                 { metaKey: '_thumbnail_id' },
                 { metaKey: 'ak_img' },
                 { metaKey: 'img' },
+                { metaKey: 'imgunebig' },
+                { metaKey: 'imgunebig2' },
                 { metaKey: 'views' },
                 { metaKey: 'excerpt' },
               ],
@@ -253,6 +255,8 @@ export class ArticlesService {
       const viewsMeta = post.postMeta.find(meta => meta.metaKey === 'views');
       const imgMeta = post.postMeta.find(meta => meta.metaKey === 'img');
       const akImgMeta = post.postMeta.find(meta => meta.metaKey === 'ak_img');
+      const imgunebigMeta = post.postMeta.find(meta => meta.metaKey === 'imgunebig');
+      const imgunebig2Meta = post.postMeta.find(meta => meta.metaKey === 'imgunebig2');
 
       // Extract categories (filter for category taxonomy only) with better safety checks
       const categories = post.termRelationships
@@ -284,8 +288,8 @@ export class ArticlesService {
         date: post.postDate.toISOString(),
         postDate: post.postDate.toISOString(),
         img: imageUrl,
-        imgunebig: null, // WordPress doesn't have this concept by default
-        imgunebig2: null,
+        imgunebig: imgunebigMeta?.metaValue || null,
+        imgunebig2: imgunebig2Meta?.metaValue || null,
         auteur: post.postAuthor,
         postAuthor: post.postAuthor,
         metaDescription: excerptMeta?.metaValue || post.postExcerpt,
@@ -1029,6 +1033,7 @@ export class ArticlesService {
     const imgMeta = post.postMeta?.find(meta => meta.metaKey === 'img');
     const akImgMeta = post.postMeta?.find(meta => meta.metaKey === 'ak_img');
     const imgunebigMeta = post.postMeta?.find(meta => meta.metaKey === 'imgunebig');
+    const imgunebig2Meta = post.postMeta?.find(meta => meta.metaKey === 'imgunebig2');
     const tagsMeta = post.postMeta?.find(meta => meta.metaKey === 'tags');
 
     // Extract categories with better safety checks
@@ -1096,8 +1101,8 @@ export class ArticlesService {
 
         return this.transformImageUrl(webzineImg || akImg || img || thumbnail || extracted);
       })(),
-      imgunebig: imgunebigMeta?.metaValue || null,
-      imgunebig2: null,
+      imgunebig: this.transformImageUrl(imgunebigMeta?.metaValue),
+      imgunebig2: this.transformImageUrl(imgunebig2Meta?.metaValue),
       auteur: post.postAuthor,
       postAuthor: post.postAuthor,
       metaDescription: excerptMeta?.metaValue || post.postExcerpt,
