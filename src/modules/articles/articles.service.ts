@@ -207,7 +207,6 @@ export class ArticlesService {
           postMeta: {
             where: {
               OR: [
-                { metaKey: '_thumbnail_id' },
                 { metaKey: 'ak_img' },
                 { metaKey: 'img' },
                 { metaKey: 'imgunebig' },
