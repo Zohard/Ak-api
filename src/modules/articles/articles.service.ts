@@ -269,12 +269,15 @@ export class ArticlesService {
           niceUrl: rel.termTaxonomy.term.slug,
         }));
 
-      // Get the best image URL (prioritize ak_webzine_img, then ak_img, then img, then thumbnail, then extract from content)
+      // Get the best image URL (prioritize imgunebig, don't use _thumbnail_id as it's just an integer ID)
       const webzineImageUrl = post.images?.[0]?.urlImg;
-      const imageUrl = webzineImageUrl ||
+      const imgunebig = imgunebigMeta?.metaValue;
+      const imgunebig2 = imgunebig2Meta?.metaValue;
+      const imageUrl = imgunebig ||
+        imgunebig2 ||
+        webzineImageUrl ||
         akImgMeta?.metaValue ||
         imgMeta?.metaValue ||
-        thumbnailMeta?.metaValue ||
         this.extractFirstImageFromContent(post.postContent);
 
       return {
@@ -286,9 +289,9 @@ export class ArticlesService {
         postName: post.postName,
         date: post.postDate.toISOString(),
         postDate: post.postDate.toISOString(),
-        img: imageUrl,
-        imgunebig: imgunebigMeta?.metaValue || null,
-        imgunebig2: imgunebig2Meta?.metaValue || null,
+        img: this.transformImageUrl(imageUrl),
+        imgunebig: this.transformImageUrl(imgunebig),
+        imgunebig2: this.transformImageUrl(imgunebig2),
         auteur: post.postAuthor,
         postAuthor: post.postAuthor,
         metaDescription: excerptMeta?.metaValue || post.postExcerpt,
@@ -1091,14 +1094,16 @@ export class ArticlesService {
         const webzineImg = post.images?.[0]?.urlImg;
         const akImg = akImgMeta?.metaValue;
         const img = imgMeta?.metaValue;
-        const thumbnail = thumbnailMeta?.metaValue;
+        const imgunebig = imgunebigMeta?.metaValue;
+        const imgunebig2 = imgunebig2Meta?.metaValue;
         const extracted = this.extractFirstImageFromContent(post.postContent);
 
         console.log(`Article ${post.ID} image sources:`, {
-          webzineImg, akImg, img, thumbnail, extracted
+          webzineImg, akImg, img, imgunebig, imgunebig2, extracted
         });
 
-        return this.transformImageUrl(webzineImg || akImg || img || thumbnail || extracted);
+        // Prioritize imgunebig over other sources, don't use _thumbnail_id (it's just an integer ID)
+        return this.transformImageUrl(imgunebig || imgunebig2 || webzineImg || akImg || img || extracted);
       })(),
       imgunebig: this.transformImageUrl(imgunebigMeta?.metaValue),
       imgunebig2: this.transformImageUrl(imgunebig2Meta?.metaValue),
