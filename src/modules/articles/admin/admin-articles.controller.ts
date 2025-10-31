@@ -122,7 +122,8 @@ export class AdminArticlesController {
   @ApiResponse({ status: 200, description: 'Article retrieved successfully' })
   @ApiResponse({ status: 404, description: 'Article not found' })
   findOne(@Param('id', ParseIntPipe) id: number) {
-    return this.articlesService.getById(id, true);
+    // Skip cache for admin to always get fresh data from database
+    return this.articlesService.getById(id, true, true);
   }
 
   @Patch(':id')
