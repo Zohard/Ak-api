@@ -308,7 +308,15 @@ export class AnimesService extends BaseContentService<
       return cached.data;
     }
 
-    const include: any = {};
+    const include: any = {
+      // Always include business relations to get studio ID
+      businessRelations: {
+        select: {
+          idBusiness: true,
+          type: true,
+        },
+      },
+    };
 
     if (includeReviews) {
       include.reviews = {
@@ -1143,13 +1151,26 @@ export class AnimesService extends BaseContentService<
   }
 
   private formatAnime(anime: any) {
-    const { idAnime, dateAjout, image, lienForum, ...otherFields } = anime;
+    const { idAnime, dateAjout, image, lienForum, businessRelations, ...otherFields } = anime;
+
+    // Find studio ID from business relations
+    let idStudio = null;
+    if (businessRelations && Array.isArray(businessRelations)) {
+      const studioRelation = businessRelations.find((rel: any) =>
+        rel.type === "Studio d'animation" || rel.type === "Studio d'animation (sous-traitance)"
+      );
+      if (studioRelation) {
+        idStudio = studioRelation.idBusiness;
+      }
+    }
 
     return {
       id: idAnime,
       addedDate: dateAjout?.toISOString(),
       image: image ? (typeof image === 'string' && /^https?:\/\//.test(image) ? image : `/api/media/serve/anime/${image}`) : null,
       lienforum: lienForum || null,
+      idStudio,
+      autresTitres: otherFields.titresAlternatifs || null,
       ...otherFields,
     };
   }
