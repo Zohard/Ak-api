@@ -341,18 +341,28 @@ export class ArticlesService {
     return result;
   }
 
-  async getById(id: number, includeContent: boolean = true) {
-    const cached = await this.cacheService.getArticle(id);
-    if (cached) {
-      return cached;
+  async getById(id: number, includeContent: boolean = true, skipCache: boolean = false) {
+    // Skip cache for admin requests to always get fresh data
+    if (!skipCache) {
+      const cached = await this.cacheService.getArticle(id);
+      if (cached) {
+        return cached;
+      }
+    }
+
+    // Build where clause - skip postStatus filter for admin (when skipCache is true)
+    const whereClause: any = {
+      ID: BigInt(id),
+      postType: 'post',
+    };
+
+    // Only filter by publish status for public requests (when not skipping cache)
+    if (!skipCache) {
+      whereClause.postStatus = 'publish';
     }
 
     const post = await this.prisma.wpPost.findFirst({
-      where: {
-        ID: BigInt(id),
-        postStatus: 'publish',
-        postType: 'post',
-      },
+      where: whereClause,
       include: {
         wpAuthor: {
           select: {
@@ -416,7 +426,10 @@ export class ArticlesService {
 
     const result = this.transformPost(post, includeContent);
 
-    await this.cacheService.setArticle(id, result, 1800);
+    // Only cache if not skipping cache (i.e., not an admin request)
+    if (!skipCache) {
+      await this.cacheService.setArticle(id, result, 1800);
+    }
 
     return result;
   }
