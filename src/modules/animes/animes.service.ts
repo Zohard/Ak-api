@@ -947,7 +947,7 @@ export class AnimesService extends BaseContentService<
     return this.getTags(id, 'anime');
   }
 
-  async getAnimeSeason(id: number): Promise<{ season: string; year: number } | null> {
+  async getAnimeSeason(id: number): Promise<{ season: string; year: number; id: number } | null> {
     try {
       // Query to find the season where this anime ID is in the json_data
       // Updated to correctly parse JSON object with 'animes' array
