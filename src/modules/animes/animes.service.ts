@@ -309,11 +309,16 @@ export class AnimesService extends BaseContentService<
     }
 
     const include: any = {
-      // Always include business relations to get studio ID
+      // Always include business relations to get studio ID and name
       businessRelations: {
         select: {
           idBusiness: true,
           type: true,
+          business: {
+            select: {
+              denomination: true,
+            },
+          },
         },
       },
     };
@@ -1153,14 +1158,19 @@ export class AnimesService extends BaseContentService<
   private formatAnime(anime: any) {
     const { idAnime, dateAjout, image, lienForum, businessRelations, ...otherFields } = anime;
 
-    // Find studio ID from business relations
+    // Find studio ID and name from business relations
     let idStudio = null;
+    let studioName = otherFields.studio || null; // Use existing studio field as fallback
     if (businessRelations && Array.isArray(businessRelations)) {
       const studioRelation = businessRelations.find((rel: any) =>
         rel.type === "Studio d'animation" || rel.type === "Studio d'animation (sous-traitance)"
       );
       if (studioRelation) {
         idStudio = studioRelation.idBusiness;
+        // If studio field is empty but we have business relation, use business name
+        if (studioRelation.business?.denomination && !studioName) {
+          studioName = studioRelation.business.denomination;
+        }
       }
     }
 
@@ -1170,6 +1180,7 @@ export class AnimesService extends BaseContentService<
       image: image ? (typeof image === 'string' && /^https?:\/\//.test(image) ? image : `/api/media/serve/anime/${image}`) : null,
       lienforum: lienForum || null,
       idStudio,
+      studio: studioName,
       autresTitres: otherFields.titresAlternatifs || null,
       ...otherFields,
     };
