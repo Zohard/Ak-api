@@ -1156,11 +1156,11 @@ export class AnimesService extends BaseContentService<
   }
 
   private formatAnime(anime: any) {
-    const { idAnime, dateAjout, image, lienForum, businessRelations, ...otherFields } = anime;
+    const { idAnime, dateAjout, image, lienForum, businessRelations, studio: dbStudio, ...otherFields } = anime;
 
     // Find studio ID and name from business relations
     let idStudio = null;
-    let studioName = otherFields.studio || null; // Use existing studio field as fallback
+    let studioName = dbStudio || null; // Use existing studio field as fallback
     if (businessRelations && Array.isArray(businessRelations)) {
       const studioRelation = businessRelations.find((rel: any) =>
         rel.type === "Studio d'animation" || rel.type === "Studio d'animation (sous-traitance)"
