@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, NotFoundException, Param, ParseIntPipe, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, NotFoundException, Param, ParseIntPipe, Patch, Post, UseGuards } from '@nestjs/common';
 import { SeasonsService } from './seasons.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { AdminGuard } from '../../common/guards/admin.guard';
@@ -14,6 +14,20 @@ export class AdminSeasonsController {
       throw new NotFoundException('annee and saison are required')
     }
     return this.seasonsService.createSeason(body)
+  }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @Patch(':id')
+  async updateSeasonStatus(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: { statut: number },
+  ) {
+    if (!body || typeof body.statut !== 'number') {
+      throw new NotFoundException('statut is required')
+    }
+    const season = await this.seasonsService.findById(id)
+    if (!season) throw new NotFoundException(`Season with ID ${id} not found`)
+    return this.seasonsService.updateSeasonStatus(id, body.statut)
   }
 
   @UseGuards(JwtAuthGuard, AdminGuard)

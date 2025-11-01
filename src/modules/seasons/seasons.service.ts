@@ -252,4 +252,26 @@ export class SeasonsService {
     }
     return { success: true, seasonId, animeId }
   }
+
+  // Admin: update season status
+  async updateSeasonStatus(seasonId: number, statut: number) {
+    const season = await this.findById(seasonId)
+    if (!season) return null
+
+    await this.prisma.$executeRaw`
+      UPDATE ak_animes_saisons
+      SET statut = ${statut}
+      WHERE id_saison = ${seasonId}
+    `
+
+    // Invalidate caches
+    await this.cacheService.del(`season:${seasonId}`)
+    await this.cacheService.del(`season_animes:${seasonId}`)
+    await this.cacheService.del('seasons:all')
+    await this.cacheService.del('seasons:current')
+    // Invalidate homepage cache since season status affects current season
+    await this.cacheService.del('homepage:v1')
+
+    return { success: true, seasonId, statut }
+  }
 }
