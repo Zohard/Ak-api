@@ -370,7 +370,7 @@ export class AnimesService extends BaseContentService<
 
     // Get tags
     const tagsResponse = await this.getTags(id, 'anime');
-    const tags = tagsResponse?.tags || [];
+    const tags = (tagsResponse?.tags as any[]) || [];
 
     const formattedAnime = this.formatAnime(anime, season, tags);
 
