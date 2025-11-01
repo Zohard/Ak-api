@@ -196,5 +196,60 @@ export class HomePageService {
 
     return debug;
   }
+
+  async getPublicStats() {
+    const cacheKey = 'public:stats';
+
+    // Try cache first (cache for 1 hour)
+    const cached = await this.cache.get(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
+    this.logger.log('📊 Generating fresh public stats...');
+
+    try {
+      const [
+        totalAnimes,
+        totalMangas,
+        animeReviews,
+        mangaReviews,
+      ] = await Promise.all([
+        this.prisma.akAnime.count({ where: { statut: 1 } }),
+        this.prisma.akManga.count({ where: { statut: 1 } }),
+        this.prisma.akCritique.count({
+          where: {
+            idAnime: { not: null },
+            statut: 1,
+          },
+        }),
+        this.prisma.akCritique.count({
+          where: {
+            idManga: { not: null },
+            statut: 1,
+          },
+        }),
+      ]);
+
+      const stats = {
+        animes: {
+          total: totalAnimes,
+          reviews: animeReviews,
+        },
+        mangas: {
+          total: totalMangas,
+          reviews: mangaReviews,
+        },
+      };
+
+      // Cache for 1 hour
+      await this.cache.set(cacheKey, stats, 3600);
+
+      return stats;
+    } catch (error) {
+      this.logger.error('❌ Error generating public stats:', error);
+      throw error;
+    }
+  }
 }
 
