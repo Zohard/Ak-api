@@ -959,7 +959,12 @@ export class AnimesService extends BaseContentService<
       }>>`
         SELECT id_saison, saison, annee, json_data
         FROM ak_animes_saisons
-        WHERE json_data LIKE ${'%"' + id + '"%'}
+        WHERE (
+          json_data LIKE ${'%[' + id + ',%'} OR
+          json_data LIKE ${'%,' + id + ',%'} OR
+          json_data LIKE ${'%,' + id + ']%'} OR
+          json_data LIKE ${'%[' + id + ']%'}
+        )
         AND statut = 1
         ORDER BY annee DESC, saison DESC
         LIMIT 1
