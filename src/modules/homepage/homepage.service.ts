@@ -219,13 +219,13 @@ export class HomePageService {
         this.prisma.akManga.count({ where: { statut: 1 } }),
         this.prisma.akCritique.count({
           where: {
-            idAnime: { not: null },
+            idAnime: { gt: 0 },
             statut: 1,
           },
         }),
         this.prisma.akCritique.count({
           where: {
-            idManga: { not: null },
+            idManga: { gt: 0 },
             statut: 1,
           },
         }),
