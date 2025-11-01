@@ -950,6 +950,7 @@ export class AnimesService extends BaseContentService<
   async getAnimeSeason(id: number): Promise<{ season: string; year: number } | null> {
     try {
       // Query to find the season where this anime ID is in the json_data
+      // Updated to correctly parse JSON object with 'animes' array
       const seasons = await this.prisma.$queryRaw<Array<{
         id_saison: number;
         saison: number;
