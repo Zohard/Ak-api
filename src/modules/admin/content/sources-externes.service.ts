@@ -890,6 +890,7 @@ export class SourcesExternesService {
       'Cosplay': { id: 't_74', name: 'cosplay' },
       'Cuisine': { id: 't_105', name: 'cuisine' },
       'Gastronomie': { id: 't_105', name: 'cuisine' },
+      'Gourmet': { id: 't_105', name: 'cuisine' },
       'Musique': { id: 't_73', name: 'musique' },
       'Music': { id: 't_73', name: 'musique' },
 
