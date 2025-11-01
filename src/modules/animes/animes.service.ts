@@ -986,6 +986,7 @@ export class AnimesService extends BaseContentService<
             return {
               season: seasonNames[seasonData.saison] || 'Inconnu',
               year: seasonData.annee,
+              id: seasonData.id_saison,
             };
           }
         } catch (e) {
