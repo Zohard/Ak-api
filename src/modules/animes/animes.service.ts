@@ -365,7 +365,13 @@ export class AnimesService extends BaseContentService<
       throw new NotFoundException('Anime introuvable');
     }
 
-    const formattedAnime = this.formatAnime(anime);
+    // Get season information
+    const season = await this.getAnimeSeason(id);
+
+    // Get tags
+    const tags = await this.getTags(id, 'anime');
+
+    const formattedAnime = this.formatAnime(anime, season, tags);
 
     // Cache the result
     const cacheData = {
@@ -940,6 +946,51 @@ export class AnimesService extends BaseContentService<
     return this.getTags(id, 'anime');
   }
 
+  async getAnimeSeason(id: number): Promise<{ season: string; year: number } | null> {
+    try {
+      // Query to find the season where this anime ID is in the json_data
+      const seasons = await this.prisma.$queryRaw<Array<{
+        id_saison: number;
+        saison: number;
+        annee: number;
+        json_data: string;
+      }>>`
+        SELECT id_saison, saison, annee, json_data
+        FROM ak_animes_saisons
+        WHERE json_data LIKE ${'%"' + id + '"%'}
+        AND statut = 1
+        ORDER BY annee DESC, saison DESC
+        LIMIT 1
+      `;
+
+      if (seasons && seasons.length > 0) {
+        const seasonData = seasons[0];
+        // Verify the anime ID is actually in the JSON array
+        try {
+          const animeIds = JSON.parse(seasonData.json_data);
+          if (Array.isArray(animeIds) && animeIds.includes(String(id))) {
+            const seasonNames = {
+              1: 'Hiver',
+              2: 'Printemps',
+              3: 'Été',
+              4: 'Automne',
+            };
+            return {
+              season: seasonNames[seasonData.saison] || 'Inconnu',
+              year: seasonData.annee,
+            };
+          }
+        } catch (e) {
+          console.error('Error parsing season json_data:', e);
+        }
+      }
+      return null;
+    } catch (error) {
+      console.error('Error fetching anime season:', error);
+      return null;
+    }
+  }
+
   // Use inherited autocomplete() method
 
   async getAnimeRelations(id: number): Promise<RelationsResponse> {
@@ -1155,7 +1206,7 @@ export class AnimesService extends BaseContentService<
     };
   }
 
-  private formatAnime(anime: any) {
+  private formatAnime(anime: any, season?: any, tags?: any[]) {
     const { idAnime, dateAjout, image, lienForum, businessRelations, studio: dbStudio, ...otherFields } = anime;
 
     // Find studio ID and name from business relations
@@ -1182,6 +1233,8 @@ export class AnimesService extends BaseContentService<
       idStudio,
       studio: studioName,
       autresTitres: otherFields.titresAlternatifs || null,
+      season: season || null,
+      tags: tags || [],
       ...otherFields,
     };
   }
