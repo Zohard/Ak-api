@@ -968,8 +968,9 @@ export class AnimesService extends BaseContentService<
         const seasonData = seasons[0];
         // Verify the anime ID is actually in the JSON array
         try {
-          const animeIds = JSON.parse(seasonData.json_data);
-          if (Array.isArray(animeIds) && animeIds.includes(String(id))) {
+          const parsedData = JSON.parse(seasonData.json_data);
+          const animeIds = parsedData.animes || parsedData;
+          if (Array.isArray(animeIds) && (animeIds.includes(id) || animeIds.includes(String(id)))) {
             const seasonNames = {
               1: 'Hiver',
               2: 'Printemps',
