@@ -34,5 +34,34 @@ export class HomePageController {
   async debugHomepage() {
     return this.homePageService.debugDataSources();
   }
+
+  @Get('stats')
+  @ApiOperation({ summary: 'Get public site statistics' })
+  @ApiResponse({
+    status: 200,
+    description: 'Site statistics',
+    schema: {
+      type: 'object',
+      properties: {
+        animes: {
+          type: 'object',
+          properties: {
+            total: { type: 'number' },
+            reviews: { type: 'number' },
+          },
+        },
+        mangas: {
+          type: 'object',
+          properties: {
+            total: { type: 'number' },
+            reviews: { type: 'number' },
+          },
+        },
+      },
+    },
+  })
+  async getStats() {
+    return this.homePageService.getPublicStats();
+  }
 }
 
