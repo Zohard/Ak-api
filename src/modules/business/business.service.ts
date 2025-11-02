@@ -291,7 +291,7 @@ export class BusinessService {
     // Get manga IDs related to this business
     const relations = await this.prisma.$queryRaw<Array<{ id_manga: number; type: string; precisions: string }>>`
       SELECT id_manga, type, precisions
-      FROM ak_business_to_manga
+      FROM ak_business_to_mangas
       WHERE id_business = ${businessId}
         AND doublon = 0
     `;
