@@ -274,4 +274,24 @@ export class SeasonsService {
 
     return { success: true, seasonId, statut }
   }
+
+  // Admin: delete a season
+  async deleteSeason(seasonId: number) {
+    const season = await this.findById(seasonId)
+    if (!season) return null
+
+    await this.prisma.$executeRaw`
+      DELETE FROM ak_animes_saisons
+      WHERE id_saison = ${seasonId}
+    `
+
+    // Invalidate caches
+    await this.cacheService.del(`season:${seasonId}`)
+    await this.cacheService.del(`season_animes:${seasonId}`)
+    await this.cacheService.del('seasons:all')
+    await this.cacheService.del('seasons:current')
+    await this.cacheService.del('homepage:v1')
+
+    return { success: true, seasonId }
+  }
 }

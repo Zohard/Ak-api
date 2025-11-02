@@ -54,5 +54,15 @@ export class AdminSeasonsController {
     if (!season) throw new NotFoundException(`Season with ID ${id} not found`)
     return this.seasonsService.removeAnimeFromSeason(id, animeId)
   }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @Delete(':id')
+  async deleteSeason(
+    @Param('id', ParseIntPipe) id: number,
+  ) {
+    const season = await this.seasonsService.findById(id)
+    if (!season) throw new NotFoundException(`Season with ID ${id} not found`)
+    return this.seasonsService.deleteSeason(id)
+  }
 }
 
