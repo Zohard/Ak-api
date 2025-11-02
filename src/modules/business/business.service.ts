@@ -305,7 +305,7 @@ export class BusinessService {
     // Fetch manga details
     const mangas = await this.prisma.$queryRaw<any[]>`
       SELECT
-        id,
+        id_manga,
         nice_url as "niceUrl",
         titre,
         annee,
@@ -321,7 +321,7 @@ export class BusinessService {
 
     // Combine manga data with relation info
     return mangas.map(manga => {
-      const relation = relations.find(r => r.id_manga === manga.id);
+      const relation = relations.find(r => r.id_manga === manga.id_manga);
       return {
         ...manga,
         relationType: relation?.type,
