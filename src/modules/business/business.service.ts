@@ -314,7 +314,7 @@ export class BusinessService {
         nb_reviews as "nbReviews",
         statut
       FROM ak_mangas
-      WHERE id = ANY(${mangaIds}::int[])
+      WHERE id_manga = ANY(${mangaIds}::int[])
         AND statut = 1
       ORDER BY titre
     `;
