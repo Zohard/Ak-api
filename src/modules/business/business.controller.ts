@@ -150,6 +150,38 @@ export class BusinessController {
     return this.businessService.findOne(id);
   }
 
+  @Get(':id/animes')
+  @ApiOperation({
+    summary: 'Récupérer les animes liés à une entité business',
+    description: "Récupère tous les animes associés à une entité business (studio, auteur, etc.)",
+  })
+  @ApiParam({
+    name: 'id',
+    description: "ID de l'entité business",
+    type: 'number',
+  })
+  @ApiResponse({ status: 200, description: "Liste des animes liés" })
+  @ApiResponse({ status: 404, description: 'Entité business introuvable' })
+  async getRelatedAnimes(@Param('id', ParseIntPipe) id: number) {
+    return this.businessService.getRelatedAnimes(id);
+  }
+
+  @Get(':id/mangas')
+  @ApiOperation({
+    summary: 'Récupérer les mangas liés à une entité business',
+    description: "Récupère tous les mangas associés à une entité business (studio, auteur, etc.)",
+  })
+  @ApiParam({
+    name: 'id',
+    description: "ID de l'entité business",
+    type: 'number',
+  })
+  @ApiResponse({ status: 200, description: "Liste des mangas liés" })
+  @ApiResponse({ status: 404, description: 'Entité business introuvable' })
+  async getRelatedMangas(@Param('id', ParseIntPipe) id: number) {
+    return this.businessService.getRelatedMangas(id);
+  }
+
   @Patch(':id')
   @UseGuards(JwtAuthGuard, AdminGuard)
   @ApiBearerAuth()

@@ -234,6 +234,102 @@ export class BusinessService {
     return this.formatBusiness(updatedBusiness);
   }
 
+  async getRelatedAnimes(businessId: number) {
+    // Get anime IDs related to this business
+    const relations = await this.prisma.$queryRaw<Array<{ id_anime: number; type: string; precisions: string }>>`
+      SELECT id_anime, type, precisions
+      FROM ak_business_to_animes
+      WHERE id_business = ${businessId}
+        AND doublon = 0
+    `;
+
+    if (!relations || relations.length === 0) {
+      return [];
+    }
+
+    const animeIds = relations.map(r => r.id_anime);
+
+    // Fetch anime details
+    const animes = await this.prisma.$queryRaw<any[]>`
+      SELECT
+        id_anime,
+        nice_url,
+        titre,
+        annee,
+        image,
+        format,
+        moyennenotes,
+        nb_reviews,
+        statut
+      FROM ak_animes
+      WHERE id_anime = ANY(${animeIds}::int[])
+        AND statut = 1
+      ORDER BY titre
+    `;
+
+    // Combine anime data with relation info
+    return animes.map(anime => {
+      const relation = relations.find(r => r.id_anime === anime.id_anime);
+      return {
+        id: anime.id_anime,
+        idAnime: anime.id_anime,
+        niceUrl: anime.nice_url,
+        titre: anime.titre,
+        annee: anime.annee,
+        image: anime.image,
+        format: anime.format,
+        moyenneNotes: anime.moyennenotes,
+        nbReviews: anime.nb_reviews,
+        statut: anime.statut,
+        relationType: relation?.type,
+        relationDetails: relation?.precisions
+      };
+    });
+  }
+
+  async getRelatedMangas(businessId: number) {
+    // Get manga IDs related to this business
+    const relations = await this.prisma.$queryRaw<Array<{ id_manga: number; type: string; precisions: string }>>`
+      SELECT id_manga, type, precisions
+      FROM ak_business_to_manga
+      WHERE id_business = ${businessId}
+        AND doublon = 0
+    `;
+
+    if (!relations || relations.length === 0) {
+      return [];
+    }
+
+    const mangaIds = relations.map(r => r.id_manga);
+
+    // Fetch manga details
+    const mangas = await this.prisma.$queryRaw<any[]>`
+      SELECT
+        id,
+        nice_url as "niceUrl",
+        titre,
+        annee,
+        image,
+        moyennenotes as "moyenneNotes",
+        nb_reviews as "nbReviews",
+        statut
+      FROM ak_mangas
+      WHERE id = ANY(${mangaIds}::int[])
+        AND statut = 1
+      ORDER BY titre
+    `;
+
+    // Combine manga data with relation info
+    return mangas.map(manga => {
+      const relation = relations.find(r => r.id_manga === manga.id);
+      return {
+        ...manga,
+        relationType: relation?.type,
+        relationDetails: relation?.precisions
+      };
+    });
+  }
+
   private formatBusiness(business: any) {
     const { idBusiness, dateAjout, dateModification, ...otherFields } =
       business;
