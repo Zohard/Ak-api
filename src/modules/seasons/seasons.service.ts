@@ -22,7 +22,7 @@ export class SeasonsService {
       const seasons = await this.prisma.$queryRaw`
         SELECT id_saison, saison, annee, statut, json_data
         FROM ak_animes_saisons
-        ORDER BY annee DESC, saison DESC
+        ORDER BY annee DESC, saison DESC, id_saison DESC
       `;
       
       // Cache for 1 hour (3600 seconds) - seasons don't change often
