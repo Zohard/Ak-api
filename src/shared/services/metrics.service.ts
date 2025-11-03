@@ -11,6 +11,8 @@ export class MetricsService {
   private readonly cacheHitRatio: Counter<string>;
   private readonly businessMetrics: Counter<string>;
   private readonly errorCounter: Counter<string>;
+  private readonly searchCounter: Counter<string>;
+  private readonly filterCounter: Counter<string>;
   private readonly gateway: Pushgateway<PrometheusContentType> | null = null;
 
   constructor(private readonly configService: ConfigService) {
@@ -84,6 +86,22 @@ export class MetricsService {
       name: 'application_errors_total',
       help: 'Total application errors',
       labelNames: ['endpoint', 'error_type', 'severity'],
+      registers: [register]
+    });
+
+    // Search tracking
+    this.searchCounter = new Counter({
+      name: 'search_queries_total',
+      help: 'Total number of search queries',
+      labelNames: ['page', 'has_results'],
+      registers: [register]
+    });
+
+    // Filter tracking
+    this.filterCounter = new Counter({
+      name: 'filter_usage_total',
+      help: 'Total number of filter applications',
+      labelNames: ['filter_type', 'page', 'has_results'],
       registers: [register]
     });
   }
@@ -187,5 +205,26 @@ export class MetricsService {
   async getPageViewMetrics() {
     const metrics = await register.getSingleMetricAsString('homepage_view_clicks_total');
     return metrics;
+  }
+
+  /**
+   * Track search queries
+   */
+  trackSearch(searchTerm: string, resultsCount: number, page: string) {
+    this.searchCounter.inc({
+      page,
+      has_results: resultsCount > 0 ? 'true' : 'false'
+    });
+  }
+
+  /**
+   * Track filter usage
+   */
+  trackFilter(filterType: string, filterValue: string, resultsCount: number, page: string) {
+    this.filterCounter.inc({
+      filter_type: filterType,
+      page,
+      has_results: resultsCount > 0 ? 'true' : 'false'
+    });
   }
 }

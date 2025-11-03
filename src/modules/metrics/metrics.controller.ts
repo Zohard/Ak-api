@@ -1,6 +1,6 @@
 import { Controller, Get, Post, Body, HttpCode, HttpStatus } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
-import { IsString, IsNotEmpty, IsOptional } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, IsNumber } from 'class-validator';
 import { MetricsService } from '../../shared/services/metrics.service';
 
 export class TrackViewClickDto {
@@ -24,6 +24,42 @@ export class TrackPageViewDto {
   @IsOptional()
   @IsString()
   userId?: string;
+}
+
+export class TrackSearchDto {
+  @IsString()
+  @IsNotEmpty()
+  searchTerm: string;
+
+  @IsNumber()
+  resultsCount: number;
+
+  @IsString()
+  @IsNotEmpty()
+  page: string;
+
+  @IsNumber()
+  timestamp: number;
+}
+
+export class TrackFilterDto {
+  @IsString()
+  @IsNotEmpty()
+  filterType: string;
+
+  @IsString()
+  @IsNotEmpty()
+  filterValue: string;
+
+  @IsNumber()
+  resultsCount: number;
+
+  @IsString()
+  @IsNotEmpty()
+  page: string;
+
+  @IsNumber()
+  timestamp: number;
 }
 
 @ApiTags('metrics')
@@ -55,6 +91,31 @@ export class MetricsController {
       dto.section,
       dto.itemType,
       dto.itemId
+    );
+  }
+
+  @Post('search')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Track search query' })
+  @ApiResponse({ status: 204, description: 'Search tracked successfully' })
+  async trackSearch(@Body() dto: TrackSearchDto): Promise<void> {
+    this.metricsService.trackSearch(
+      dto.searchTerm,
+      dto.resultsCount,
+      dto.page
+    );
+  }
+
+  @Post('filter')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Track filter usage' })
+  @ApiResponse({ status: 204, description: 'Filter tracked successfully' })
+  async trackFilter(@Body() dto: TrackFilterDto): Promise<void> {
+    this.metricsService.trackFilter(
+      dto.filterType,
+      dto.filterValue,
+      dto.resultsCount,
+      dto.page
     );
   }
 }
