@@ -149,8 +149,16 @@ export class MediaService {
     } else {
       // Generate ImageKit URL from filename
       // Database stores: "screenshots/filename.jpg" or just "filename.jpg"
+      // For screenshots, ensure they're in the screenshots subfolder
+      let imagePath = result.filename;
+
+      // If filename doesn't already have screenshots/ prefix, add it for type 1 (anime) and 2 (manga)
+      if (!imagePath.startsWith('screenshots/') && (result.type === 1 || result.type === 2)) {
+        imagePath = `screenshots/${imagePath}`;
+      }
+
       // ImageKit path should be: "/images/animes/screenshots/filename.jpg"
-      const fullPath = `/images/${typeName}s/${result.filename}`;
+      const fullPath = `/images/${typeName}s/${imagePath}`;
       url = this.imagekitService.getImageUrl(fullPath);
     }
 
@@ -190,9 +198,17 @@ export class MediaService {
         } else {
           // Generate ImageKit URL from filename
           // Database stores: "screenshots/filename.jpg" or just "filename.jpg"
-          // ImageKit path should be: "/images/animes/screenshots/filename.jpg" or "/images/animes/filename.jpg"
+          // For screenshots, ensure they're in the screenshots subfolder
+          let imagePath = item.filename;
+
+          // If filename doesn't already have screenshots/ prefix, add it for type 1 (anime) and 2 (manga)
+          if (!imagePath.startsWith('screenshots/') && (typeId === 1 || typeId === 2)) {
+            imagePath = `screenshots/${imagePath}`;
+          }
+
+          // ImageKit path should be: "/images/animes/screenshots/filename.jpg"
           // Note: ImageKit's url() function expects path starting with /
-          const fullPath = `/images/${type}s/${item.filename}`;
+          const fullPath = `/images/${type}s/${imagePath}`;
           url = this.imagekitService.getImageUrl(fullPath);
         }
 
