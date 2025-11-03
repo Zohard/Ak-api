@@ -7,6 +7,7 @@ import {
 import { PrismaService } from '../../shared/services/prisma.service';
 import { CacheService } from '../../shared/services/cache.service';
 import { PopularityService } from '../../shared/services/popularity.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { CreateReviewDto } from './dto/create-review.dto';
 import { UpdateReviewDto } from './dto/update-review.dto';
 import { ReviewQueryDto } from './dto/review-query.dto';
@@ -17,6 +18,7 @@ export class ReviewsService {
     private readonly prisma: PrismaService,
     private readonly cacheService: CacheService,
     private readonly popularityService: PopularityService,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   async create(createReviewDto: CreateReviewDto, userId: number) {
@@ -921,6 +923,89 @@ export class ReviewsService {
     const allQuestions = this.parseQuestions(updatedQuestionsJson);
     const totals = this.calculateRatingTotals(allQuestions);
     const currentUserRatings = allQuestions[userId.toString()] || { c: 0, a: 0, o: 0, y: 0, n: 0 };
+
+    // Send notification for positive reactions (c, a, o, y) but not for negative (n)
+    const isPositiveReaction = ['c', 'a', 'o', 'y'].includes(normalizedRatingType);
+    const isNewReaction = currentUserRatings[normalizedRatingType] === 1;
+
+    if (isPositiveReaction && isNewReaction) {
+      try {
+        // Get review details with author and anime/manga info
+        const reviewDetails = await this.prisma.akCritique.findUnique({
+          where: { idCritique: reviewId },
+          select: {
+            idCritique: true,
+            titre: true,
+            niceUrl: true,
+            idMembre: true,
+            membre: {
+              select: {
+                idMember: true,
+                memberName: true,
+              },
+            },
+            anime: {
+              select: {
+                idAnime: true,
+                titre: true,
+              },
+            },
+            manga: {
+              select: {
+                idManga: true,
+                titre: true,
+              },
+            },
+          },
+        });
+
+        // Get the reactor's information
+        const reactor = await this.prisma.smfMember.findUnique({
+          where: { idMember: userId },
+          select: {
+            idMember: true,
+            memberName: true,
+          },
+        });
+
+        if (reviewDetails && reactor) {
+          const contentTitle = reviewDetails.anime?.titre || reviewDetails.manga?.titre || 'votre contenu';
+
+          // Map reaction types to French labels
+          const reactionLabels = {
+            c: 'trouve votre critique convaincante',
+            a: 'trouve votre critique amusante',
+            o: 'trouve votre critique originale',
+            y: 'partage votre avis',
+          };
+
+          const reactionMessage = reactionLabels[normalizedRatingType] || 'a réagi à votre critique';
+
+          // Send notification to review author
+          await this.notificationsService.sendNotification({
+            userId: reviewDetails.idMembre,
+            type: 'review_liked',
+            title: contentTitle,
+            message: `${reactor.memberName} ${reactionMessage} sur "${contentTitle}"`,
+            data: {
+              reviewId: reviewDetails.idCritique,
+              reviewSlug: reviewDetails.niceUrl,
+              reviewTitle: reviewDetails.titre,
+              likerName: reactor.memberName,
+              likerId: reactor.idMember,
+              reactionType: normalizedRatingType,
+              reactionLabel: reactionLabels[normalizedRatingType],
+              animeId: reviewDetails.anime?.idAnime,
+              mangaId: reviewDetails.manga?.idManga,
+            },
+            priority: 'low',
+          });
+        }
+      } catch (error) {
+        // Log error but don't fail the rating operation
+        console.error('Failed to send review reaction notification:', error);
+      }
+    }
 
     return {
       ratingType,

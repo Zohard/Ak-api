@@ -16,6 +16,7 @@ export interface NotificationPreferences {
   emailReviewModerated: boolean;
   emailSecurityAlerts: boolean;
   emailMarketing: boolean;
+  emailReviewLiked: boolean;
 }
 
 export interface NotificationData {
@@ -25,6 +26,7 @@ export interface NotificationData {
     | 'new_anime'
     | 'new_manga'
     | 'review_moderated'
+    | 'review_liked'
     | 'security_alert'
     | 'marketing'
     | 'friend_request'
@@ -127,6 +129,7 @@ export class NotificationsService {
         emailReviewModerated: prefs.email_review_moderated || false,
         emailSecurityAlerts: prefs.email_security_alerts || true, // Default to true for security
         emailMarketing: prefs.email_marketing || false,
+        emailReviewLiked: prefs.email_review_liked !== false, // Default to true
       };
     } catch (error) {
       this.logger.warn(
@@ -302,6 +305,7 @@ export class NotificationsService {
       emailReviewModerated: false,
       emailSecurityAlerts: true, // Security alerts should be enabled by default
       emailMarketing: false,
+      emailReviewLiked: true, // Default to true for review likes
     };
   }
 
@@ -322,8 +326,13 @@ export class NotificationsService {
         return preferences.emailNewManga;
       case 'review_moderated':
         return preferences.emailReviewModerated;
+      case 'review_liked':
+        return preferences.emailReviewLiked;
       case 'marketing':
         return preferences.emailMarketing;
+      case 'friend_request':
+      case 'friend_accepted':
+        return true; // Always send friend notifications
       default:
         return false;
     }
@@ -434,6 +443,27 @@ export class NotificationsService {
             <p style="color: #6c757d; font-size: 0.9em;">Si vous n'êtes pas à l'origine de cette action, veuillez contacter immédiatement notre support.</p>
             <a href="${baseUrl}/profile/security" style="background-color: #dc3545; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Vérifier mon compte</a>
           `,
+        };
+
+      case 'review_liked':
+        const reactionEmojis = {
+          c: '💡',  // Convincing
+          a: '😄',  // Amusing
+          o: '⭐',  // Original
+          y: '👍',  // Agree
+        };
+        const reactionType = data.data?.reactionType || 'y';
+        const emoji = reactionEmojis[reactionType] || '👍';
+
+        return {
+          subject: `${emoji} ${data.data?.likerName || 'Quelqu\'un'} a réagi à votre critique`,
+          html: `
+            <h2>${emoji} Votre critique a reçu une réaction !</h2>
+            <p><strong>${data.data?.likerName || 'Un membre'}</strong> ${data.data?.reactionLabel || 'a réagi à votre critique'} pour <strong>${data.title}</strong>.</p>
+            <p>${data.message}</p>
+            <a href="${baseUrl}/review/${data.data?.reviewSlug || data.data?.reviewId}" style="background-color: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Voir votre critique</a>
+          `,
+          text: `${data.data?.likerName || 'Quelqu\'un'} ${data.data?.reactionLabel || 'a réagi à votre critique'} pour ${data.title}. ${data.message}`,
         };
 
       default:
