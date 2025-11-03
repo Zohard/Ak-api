@@ -191,6 +191,9 @@ export class AnimesService extends BaseContentService<
 
     if (statut !== undefined) {
       where.statut = statut;
+    } else {
+      // Default to published anime only for public listings
+      where.statut = 1;
     }
 
     if (format) {
