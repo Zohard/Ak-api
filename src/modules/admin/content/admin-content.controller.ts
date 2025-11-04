@@ -144,6 +144,47 @@ export class AdminContentController {
     return this.adminContentService.getStaffRoleTypes(type, query);
   }
 
+  @Get('tags/search')
+  @ApiOperation({ summary: 'Search tags for autocomplete' })
+  @ApiQuery({ name: 'q', required: true })
+  @ApiQuery({ name: 'limit', required: false, example: 10 })
+  @ApiQuery({ name: 'categorie', required: false, description: 'Filter by category (e.g., Genre)' })
+  async searchTags(
+    @Query('q') q: string,
+    @Query('limit', new ParseIntPipe({ optional: true })) limit?: number,
+    @Query('categorie') categorie?: string,
+  ) {
+    if (!q || !q.trim()) return { items: [] };
+    const lim = limit || 10;
+    return this.adminContentService.searchTags(q.trim(), lim, categorie);
+  }
+
+  @Get('anime/search')
+  @ApiOperation({ summary: 'Search anime by name for autocomplete' })
+  @ApiQuery({ name: 'q', required: true, description: 'Search query' })
+  @ApiQuery({ name: 'limit', required: false, example: 10 })
+  async searchAnime(
+    @Query('q') q: string,
+    @Query('limit', new ParseIntPipe({ optional: true })) limit?: number,
+  ) {
+    if (!q || !q.trim()) return { items: [] };
+    const lim = limit || 10;
+    return this.adminContentService.searchAnimeByName(q.trim(), lim);
+  }
+
+  @Get('manga/search')
+  @ApiOperation({ summary: 'Search manga by name for autocomplete' })
+  @ApiQuery({ name: 'q', required: true, description: 'Search query' })
+  @ApiQuery({ name: 'limit', required: false, example: 10 })
+  async searchManga(
+    @Query('q') q: string,
+    @Query('limit', new ParseIntPipe({ optional: true })) limit?: number,
+  ) {
+    if (!q || !q.trim()) return { items: [] };
+    const lim = limit || 10;
+    return this.adminContentService.searchMangaByName(q.trim(), lim);
+  }
+
   @Get(':type/:id')
   @ApiOperation({ summary: 'Get content details for admin management' })
   @ApiParam({
@@ -360,47 +401,6 @@ export class AdminContentController {
   ) {
     const username = req.user?.pseudo || req.user?.member_name || 'admin';
     return this.adminContentService.removeContentTag(id, type, tagId, username);
-  }
-
-  @Get('tags/search')
-  @ApiOperation({ summary: 'Search tags for autocomplete' })
-  @ApiQuery({ name: 'q', required: true })
-  @ApiQuery({ name: 'limit', required: false, example: 10 })
-  @ApiQuery({ name: 'categorie', required: false, description: 'Filter by category (e.g., Genre)' })
-  async searchTags(
-    @Query('q') q: string,
-    @Query('limit', new ParseIntPipe({ optional: true })) limit?: number,
-    @Query('categorie') categorie?: string,
-  ) {
-    if (!q || !q.trim()) return { items: [] };
-    const lim = limit || 10;
-    return this.adminContentService.searchTags(q.trim(), lim, categorie);
-  }
-
-  @Get('anime/search')
-  @ApiOperation({ summary: 'Search anime by name for autocomplete' })
-  @ApiQuery({ name: 'q', required: true, description: 'Search query' })
-  @ApiQuery({ name: 'limit', required: false, example: 10 })
-  async searchAnime(
-    @Query('q') q: string,
-    @Query('limit', new ParseIntPipe({ optional: true })) limit?: number,
-  ) {
-    if (!q || !q.trim()) return { items: [] };
-    const lim = limit || 10;
-    return this.adminContentService.searchAnimeByName(q.trim(), lim);
-  }
-
-  @Get('manga/search')
-  @ApiOperation({ summary: 'Search manga by name for autocomplete' })
-  @ApiQuery({ name: 'q', required: true, description: 'Search query' })
-  @ApiQuery({ name: 'limit', required: false, example: 10 })
-  async searchManga(
-    @Query('q') q: string,
-    @Query('limit', new ParseIntPipe({ optional: true })) limit?: number,
-  ) {
-    if (!q || !q.trim()) return { items: [] };
-    const lim = limit || 10;
-    return this.adminContentService.searchMangaByName(q.trim(), lim);
   }
 
 }
