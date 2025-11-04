@@ -382,7 +382,8 @@ export class AnimesController {
   @ApiResponse({ status: 401, description: 'Authentification requise' })
   @ApiResponse({ status: 403, description: "Droits d'administrateur requis" })
   async createTrailer(@Body() createTrailerDto: CreateTrailerDto, @Request() req) {
-    return this.animesService.createTrailer(createTrailerDto);
+    const username = req.user?.pseudo || req.user?.member_name || req.user?.memberName || 'admin';
+    return this.animesService.createTrailer(createTrailerDto, username);
   }
 
   @Patch('trailers/:trailerId')
@@ -399,7 +400,8 @@ export class AnimesController {
     @Body() updateTrailerDto: UpdateTrailerDto,
     @Request() req,
   ) {
-    return this.animesService.updateTrailer(trailerId, updateTrailerDto);
+    const username = req.user?.pseudo || req.user?.member_name || req.user?.memberName || 'admin';
+    return this.animesService.updateTrailer(trailerId, updateTrailerDto, username);
   }
 
   @Delete('trailers/:trailerId')
@@ -416,6 +418,7 @@ export class AnimesController {
     @Param('trailerId', ParseIntPipe) trailerId: number,
     @Request() req,
   ) {
-    return this.animesService.removeTrailer(trailerId);
+    const username = req.user?.pseudo || req.user?.member_name || req.user?.memberName || 'admin';
+    return this.animesService.removeTrailer(trailerId, username);
   }
 }

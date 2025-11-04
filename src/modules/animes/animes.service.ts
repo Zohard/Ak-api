@@ -6,6 +6,7 @@ import {
 import { PrismaService } from '../../shared/services/prisma.service';
 import { CacheService } from '../../shared/services/cache.service';
 import { BaseContentService } from '../../shared/services/base-content.service';
+import { AdminLoggingService } from '../admin/logging/admin-logging.service';
 import { CreateAnimeDto } from './dto/create-anime.dto';
 import { UpdateAnimeDto } from './dto/update-anime.dto';
 import { AnimeQueryDto } from './dto/anime-query.dto';
@@ -26,6 +27,7 @@ export class AnimesService extends BaseContentService<
     private readonly cacheService: CacheService,
     private readonly imageKitService: ImageKitService,
     private readonly aniListService: AniListService,
+    private readonly adminLoggingService: AdminLoggingService,
   ) {
     super(prisma);
   }
@@ -1281,7 +1283,7 @@ export class AnimesService extends BaseContentService<
 
   // ===== Trailer Management =====
 
-  async createTrailer(createTrailerDto: any) {
+  async createTrailer(createTrailerDto: any, username?: string) {
     // Verify anime exists
     const anime = await this.prisma.akAnime.findUnique({
       where: { idAnime: createTrailerDto.idAnime },
@@ -1304,13 +1306,23 @@ export class AnimesService extends BaseContentService<
       },
     });
 
+    // Log activity
+    if (username) {
+      await this.adminLoggingService.addLog(
+        createTrailerDto.idAnime,
+        'anime',
+        username,
+        `Ajout vidéo: ${trailer.titre || trailer.typeTrailer} (${trailer.platform})`
+      );
+    }
+
     // Invalidate anime cache
     await this.cacheService.invalidateAnime(createTrailerDto.idAnime);
 
     return trailer;
   }
 
-  async updateTrailer(trailerId: number, updateTrailerDto: any) {
+  async updateTrailer(trailerId: number, updateTrailerDto: any, username?: string) {
     const trailer = await this.prisma.akAnimesTrailer.findUnique({
       where: { idTrailer: trailerId },
     });
@@ -1324,13 +1336,23 @@ export class AnimesService extends BaseContentService<
       data: updateTrailerDto,
     });
 
+    // Log activity
+    if (username) {
+      await this.adminLoggingService.addLog(
+        trailer.idAnime,
+        'anime',
+        username,
+        `Modification vidéo: ${updated.titre || updated.typeTrailer} (${updated.platform})`
+      );
+    }
+
     // Invalidate anime cache
     await this.cacheService.invalidateAnime(trailer.idAnime);
 
     return updated;
   }
 
-  async removeTrailer(trailerId: number) {
+  async removeTrailer(trailerId: number, username?: string) {
     const trailer = await this.prisma.akAnimesTrailer.findUnique({
       where: { idTrailer: trailerId },
     });
@@ -1342,6 +1364,16 @@ export class AnimesService extends BaseContentService<
     await this.prisma.akAnimesTrailer.delete({
       where: { idTrailer: trailerId },
     });
+
+    // Log activity
+    if (username) {
+      await this.adminLoggingService.addLog(
+        trailer.idAnime,
+        'anime',
+        username,
+        `Suppression vidéo: ${trailer.titre || trailer.typeTrailer} (${trailer.platform})`
+      );
+    }
 
     // Invalidate anime cache
     await this.cacheService.invalidateAnime(trailer.idAnime);
