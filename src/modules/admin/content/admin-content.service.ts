@@ -660,10 +660,10 @@ export class AdminContentService {
       SELECT
         id_anime as id,
         titre as name,
-        titre_original as "originalName",
+        titre_orig as "originalName",
         statut
       FROM ak_animes
-      WHERE titre ILIKE ${q} OR titre_original ILIKE ${q}
+      WHERE titre ILIKE ${q} OR titre_orig ILIKE ${q}
       ORDER BY titre
       LIMIT ${limit}
     `;
@@ -676,10 +676,10 @@ export class AdminContentService {
       SELECT
         id_manga as id,
         titre as name,
-        titre_original as "originalName",
+        titre_orig as "originalName",
         statut
       FROM ak_mangas
-      WHERE titre ILIKE ${q} OR titre_original ILIKE ${q}
+      WHERE titre ILIKE ${q} OR titre_orig ILIKE ${q}
       ORDER BY titre
       LIMIT ${limit}
     `;
