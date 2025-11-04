@@ -334,6 +334,7 @@ export class ForumsService {
             avatar: post.member?.avatar || null,
             signature: post.member?.signature || null,
             personalText: post.member?.personalText || null,
+            gender: post.member?.gender || 0,
             posts: post.member?.posts || 0,
             dateRegistered: post.member?.dateRegistered || 0,
             nbCritiques: post.member?.nbCritiques || 0,
