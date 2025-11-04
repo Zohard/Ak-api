@@ -654,6 +654,37 @@ export class AdminContentService {
     return { items: rows };
   }
 
+  async searchAnimeByName(query: string, limit = 10) {
+    const q = `%${query}%`;
+    const rows = await this.prisma.$queryRaw`
+      SELECT
+        id_anime as id,
+        titre as name,
+        titre_original as "originalName",
+        statut
+      FROM ak_animes
+      WHERE titre ILIKE ${q} OR titre_original ILIKE ${q}
+      ORDER BY titre
+      LIMIT ${limit}
+    `;
+    return { items: rows };
+  }
+
+  async searchMangaByName(query: string, limit = 10) {
+    const q = `%${query}%`;
+    const rows = await this.prisma.$queryRaw`
+      SELECT
+        id_manga as id,
+        titre as name,
+        titre_original as "originalName",
+        statut
+      FROM ak_mangas
+      WHERE titre ILIKE ${q} OR titre_original ILIKE ${q}
+      ORDER BY titre
+      LIMIT ${limit}
+    `;
+    return { items: rows };
+  }
 
   async removeContentTag(id: number, type: string, tagId: number, username: string) {
     await this.prisma.$queryRaw`

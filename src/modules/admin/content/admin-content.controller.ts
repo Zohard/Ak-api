@@ -377,4 +377,30 @@ export class AdminContentController {
     return this.adminContentService.searchTags(q.trim(), lim, categorie);
   }
 
+  @Get('anime/search')
+  @ApiOperation({ summary: 'Search anime by name for autocomplete' })
+  @ApiQuery({ name: 'q', required: true, description: 'Search query' })
+  @ApiQuery({ name: 'limit', required: false, example: 10 })
+  async searchAnime(
+    @Query('q') q: string,
+    @Query('limit', new ParseIntPipe({ optional: true })) limit?: number,
+  ) {
+    if (!q || !q.trim()) return { items: [] };
+    const lim = limit || 10;
+    return this.adminContentService.searchAnimeByName(q.trim(), lim);
+  }
+
+  @Get('manga/search')
+  @ApiOperation({ summary: 'Search manga by name for autocomplete' })
+  @ApiQuery({ name: 'q', required: true, description: 'Search query' })
+  @ApiQuery({ name: 'limit', required: false, example: 10 })
+  async searchManga(
+    @Query('q') q: string,
+    @Query('limit', new ParseIntPipe({ optional: true })) limit?: number,
+  ) {
+    if (!q || !q.trim()) return { items: [] };
+    const lim = limit || 10;
+    return this.adminContentService.searchMangaByName(q.trim(), lim);
+  }
+
 }
