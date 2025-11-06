@@ -1238,102 +1238,101 @@ export class AnimesService extends BaseContentService<
     }
 
     // Optimized query using UNION strategy for better performance
-    // Prioritize studio matches, then format/year, then tags
-    // This avoids scanning the entire table
+// Prioritize studio matches, then format/year, then tags
     const similarAnimes = await this.prisma.$queryRaw`
-      WITH results AS (
-        -- Priority 1: Same studio (highest relevance)
-        SELECT DISTINCT
-          a.id_anime as "idAnime",
-          a.titre,
-          a.titre_orig as "titreOrig",
-          a.studio,
-          a.format,
-          a.annee,
-          a.image,
-          a.nb_ep as "nbEp",
-          a.moyennenotes as "moyenneNotes",
-          a.statut,
-          a.nice_url as "niceUrl",
-          5 as similarity_score
-        FROM ak_animes a
-        WHERE a.studio = ${anime.studio}
-          AND a.id_anime != ${id}
-          AND a.statut = 1
-          AND a.studio IS NOT NULL
+        WITH results AS (
+            -- Priority 1: Same studio (highest relevance)
+            (SELECT DISTINCT
+                 a.id_anime as "idAnime",
+                 a.titre,
+                 a.titre_orig as "titreOrig",
+                 a.studio,
+                 a.format,
+                 a.annee,
+                 a.image,
+                 a.nb_ep as "nbEp",
+                 a.moyennenotes as "moyenneNotes",
+                 a.statut,
+                 a.nice_url as "niceUrl",
+                 5 as similarity_score
+             FROM ak_animes a
+             WHERE a.studio = ${anime.studio}
+               AND a.id_anime != ${id}
+               AND a.statut = 1
+               AND a.studio IS NOT NULL
+             ORDER BY a.moyennenotes DESC NULLS LAST
+                 LIMIT ${limit * 2})
+
+            UNION ALL
+
+            -- Priority 2: Same format and similar year
+            (SELECT DISTINCT
+                 a.id_anime as "idAnime",
+                 a.titre,
+                 a.titre_orig as "titreOrig",
+                 a.studio,
+                 a.format,
+                 a.annee,
+                 a.image,
+                 a.nb_ep as "nbEp",
+                 a.moyennenotes as "moyenneNotes",
+                 a.statut,
+                 a.nice_url as "niceUrl",
+                 3 as similarity_score
+             FROM ak_animes a
+             WHERE a.format = ${anime.format}
+               AND ABS(a.annee - ${anime.annee || 0}) <= 2
+               AND a.id_anime != ${id}
+               AND a.statut = 1
+             ORDER BY a.moyennenotes DESC NULLS LAST
+                 LIMIT ${limit * 2})
+
+            UNION ALL
+
+            -- Priority 3: Shared tags (if any)
+            (SELECT DISTINCT
+                 a.id_anime as "idAnime",
+                 a.titre,
+                 a.titre_orig as "titreOrig",
+                 a.studio,
+                 a.format,
+                 a.annee,
+                 a.image,
+                 a.nb_ep as "nbEp",
+                 a.moyennenotes as "moyenneNotes",
+                 a.statut,
+                 a.nice_url as "niceUrl",
+                 2 as similarity_score
+             FROM ak_animes a
+                      INNER JOIN ak_tag2fiche tf ON tf.id_fiche = a.id_anime AND tf.type = 'anime'
+             WHERE tf.id_tag IN (
+                 SELECT tf2.id_tag
+                 FROM ak_tag2fiche tf2
+                 WHERE tf2.id_fiche = ${id} AND tf2.type = 'anime'
+                 LIMIT 10
+            )
+            AND a.id_anime != ${id}
+            AND a.statut = 1
         ORDER BY a.moyennenotes DESC NULLS LAST
-        LIMIT ${limit * 2}
-
-        UNION ALL
-
-        -- Priority 2: Same format and similar year
-        SELECT DISTINCT
-          a.id_anime as "idAnime",
-          a.titre,
-          a.titre_orig as "titreOrig",
-          a.studio,
-          a.format,
-          a.annee,
-          a.image,
-          a.nb_ep as "nbEp",
-          a.moyennenotes as "moyenneNotes",
-          a.statut,
-          a.nice_url as "niceUrl",
-          3 as similarity_score
-        FROM ak_animes a
-        WHERE a.format = ${anime.format}
-          AND ABS(a.annee - ${anime.annee || 0}) <= 2
-          AND a.id_anime != ${id}
-          AND a.statut = 1
-        ORDER BY a.moyennenotes DESC NULLS LAST
-        LIMIT ${limit * 2}
-
-        UNION ALL
-
-        -- Priority 3: Shared tags (if any)
-        SELECT DISTINCT
-          a.id_anime as "idAnime",
-          a.titre,
-          a.titre_orig as "titreOrig",
-          a.studio,
-          a.format,
-          a.annee,
-          a.image,
-          a.nb_ep as "nbEp",
-          a.moyennenotes as "moyenneNotes",
-          a.statut,
-          a.nice_url as "niceUrl",
-          2 as similarity_score
-        FROM ak_animes a
-        INNER JOIN ak_tag2fiche tf ON tf.id_fiche = a.id_anime AND tf.type = 'anime'
-        WHERE tf.id_tag IN (
-          SELECT tf2.id_tag
-          FROM ak_tag2fiche tf2
-          WHERE tf2.id_fiche = ${id} AND tf2.type = 'anime'
-          LIMIT 10
-        )
-        AND a.id_anime != ${id}
-        AND a.statut = 1
-        ORDER BY a.moyennenotes DESC NULLS LAST
-        LIMIT ${limit * 2}
-      )
-      SELECT DISTINCT ON ("idAnime")
-        "idAnime",
-        titre,
-        "titreOrig",
-        studio,
-        format,
-        annee,
-        image,
-        "nbEp",
-        "moyenneNotes",
-        statut,
-        "niceUrl",
-        MAX(similarity_score) as similarity_score
-      FROM results
-      GROUP BY "idAnime", titre, "titreOrig", studio, format, annee, image, "nbEp", "moyenneNotes", statut, "niceUrl"
-      ORDER BY "idAnime", similarity_score DESC, "moyenneNotes" DESC NULLS LAST
-      LIMIT ${limit}
+            LIMIT ${limit * 2})
+            )
+        SELECT DISTINCT ON ("idAnime")
+            "idAnime",
+            titre,
+            "titreOrig",
+            studio,
+            format,
+            annee,
+            image,
+            "nbEp",
+            "moyenneNotes",
+            statut,
+            "niceUrl",
+            MAX(similarity_score) as similarity_score
+        FROM results
+        GROUP BY "idAnime", titre, "titreOrig", studio, format, annee, image, "nbEp", "moyenneNotes", statut, "niceUrl"
+        ORDER BY "idAnime", similarity_score DESC, "moyenneNotes" DESC NULLS LAST
+            LIMIT ${limit}
     ` as any[];
 
     return {
