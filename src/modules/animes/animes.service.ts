@@ -1237,113 +1237,104 @@ export class AnimesService extends BaseContentService<
       throw new NotFoundException('Anime introuvable');
     }
 
-    // Get tags for the source anime
-    const animeTags = await this.prisma.$queryRaw`
-      SELECT t.tag_name
-      FROM ak_tag2fiche tf
-      JOIN ak_tags t ON tf.id_tag = t.id_tag
-      WHERE tf.id_fiche = ${id} AND tf.type = 'anime'
+    // Optimized query using UNION strategy for better performance
+    // Prioritize studio matches, then format/year, then tags
+    // This avoids scanning the entire table
+    const similarAnimes = await this.prisma.$queryRaw`
+      WITH results AS (
+        -- Priority 1: Same studio (highest relevance)
+        SELECT DISTINCT
+          a.id_anime as "idAnime",
+          a.titre,
+          a.titre_orig as "titreOrig",
+          a.studio,
+          a.format,
+          a.annee,
+          a.image,
+          a.nb_ep as "nbEp",
+          a.moyennenotes as "moyenneNotes",
+          a.statut,
+          a.nice_url as "niceUrl",
+          5 as similarity_score
+        FROM ak_animes a
+        WHERE a.studio = ${anime.studio}
+          AND a.id_anime != ${id}
+          AND a.statut = 1
+          AND a.studio IS NOT NULL
+        ORDER BY a.moyennenotes DESC NULLS LAST
+        LIMIT ${limit * 2}
+
+        UNION ALL
+
+        -- Priority 2: Same format and similar year
+        SELECT DISTINCT
+          a.id_anime as "idAnime",
+          a.titre,
+          a.titre_orig as "titreOrig",
+          a.studio,
+          a.format,
+          a.annee,
+          a.image,
+          a.nb_ep as "nbEp",
+          a.moyennenotes as "moyenneNotes",
+          a.statut,
+          a.nice_url as "niceUrl",
+          3 as similarity_score
+        FROM ak_animes a
+        WHERE a.format = ${anime.format}
+          AND ABS(a.annee - ${anime.annee || 0}) <= 2
+          AND a.id_anime != ${id}
+          AND a.statut = 1
+        ORDER BY a.moyennenotes DESC NULLS LAST
+        LIMIT ${limit * 2}
+
+        UNION ALL
+
+        -- Priority 3: Shared tags (if any)
+        SELECT DISTINCT
+          a.id_anime as "idAnime",
+          a.titre,
+          a.titre_orig as "titreOrig",
+          a.studio,
+          a.format,
+          a.annee,
+          a.image,
+          a.nb_ep as "nbEp",
+          a.moyennenotes as "moyenneNotes",
+          a.statut,
+          a.nice_url as "niceUrl",
+          2 as similarity_score
+        FROM ak_animes a
+        INNER JOIN ak_tag2fiche tf ON tf.id_fiche = a.id_anime AND tf.type = 'anime'
+        WHERE tf.id_tag IN (
+          SELECT tf2.id_tag
+          FROM ak_tag2fiche tf2
+          WHERE tf2.id_fiche = ${id} AND tf2.type = 'anime'
+          LIMIT 10
+        )
+        AND a.id_anime != ${id}
+        AND a.statut = 1
+        ORDER BY a.moyennenotes DESC NULLS LAST
+        LIMIT ${limit * 2}
+      )
+      SELECT DISTINCT ON ("idAnime")
+        "idAnime",
+        titre,
+        "titreOrig",
+        studio,
+        format,
+        annee,
+        image,
+        "nbEp",
+        "moyenneNotes",
+        statut,
+        "niceUrl",
+        MAX(similarity_score) as similarity_score
+      FROM results
+      GROUP BY "idAnime", titre, "titreOrig", studio, format, annee, image, "nbEp", "moyenneNotes", statut, "niceUrl"
+      ORDER BY "idAnime", similarity_score DESC, "moyenneNotes" DESC NULLS LAST
+      LIMIT ${limit}
     ` as any[];
-
-    const tagNames = animeTags.map((t: any) => t.tag_name);
-
-    // Build similarity query with scoring
-    // Priority: Studio (3 points) > Shared tags (1 point each) > Same format (1 point) > Similar year (1 point)
-    let similarAnimes: any[];
-
-    if (tagNames.length === 0) {
-      // If no tags, use simplified query without tag matching
-      similarAnimes = await this.prisma.$queryRaw`
-        WITH anime_tags AS (
-          SELECT
-            a.id_anime,
-            a.titre,
-            a.titre_orig,
-            a.studio,
-            a.format,
-            a.annee,
-            a.image,
-            a.nb_ep,
-            a.moyennenotes,
-            a.statut,
-            a.nice_url,
-            0 as shared_tags_count,
-            CASE WHEN a.studio IS NOT NULL AND a.studio = ${anime.studio} THEN 3 ELSE 0 END as studio_match,
-            CASE WHEN a.format = ${anime.format} THEN 1 ELSE 0 END as format_match,
-            CASE WHEN ABS(a.annee - ${anime.annee || 0}) <= 2 THEN 1 ELSE 0 END as year_match
-          FROM ak_animes a
-          WHERE a.id_anime != ${id}
-          AND a.statut = 1
-        )
-        SELECT
-          id_anime as "idAnime",
-          titre,
-          titre_orig as "titreOrig",
-          studio,
-          format,
-          annee,
-          image,
-          nb_ep as "nbEp",
-          moyennenotes as "moyenneNotes",
-          statut,
-          nice_url as "niceUrl",
-          (studio_match + shared_tags_count + format_match + year_match) as similarity_score
-        FROM anime_tags
-        WHERE (studio_match > 0 OR format_match > 0 OR year_match > 0)
-        ORDER BY similarity_score DESC, moyennenotes DESC NULLS LAST
-        LIMIT ${limit}
-      ` as any[];
-    } else {
-      // If tags exist, use full query with tag matching
-      similarAnimes = await this.prisma.$queryRaw`
-        WITH anime_tags AS (
-          SELECT
-            a.id_anime,
-            a.titre,
-            a.titre_orig,
-            a.studio,
-            a.format,
-            a.annee,
-            a.image,
-            a.nb_ep,
-            a.moyennenotes,
-            a.statut,
-            a.nice_url,
-            COALESCE(
-              (SELECT COUNT(*)
-               FROM ak_tag2fiche tf
-               JOIN ak_tags t ON tf.id_tag = t.id_tag
-               WHERE tf.id_fiche = a.id_anime
-               AND tf.type = 'anime'
-               AND t.tag_name = ANY(${tagNames}::text[])
-              ), 0
-            ) as shared_tags_count,
-            CASE WHEN a.studio IS NOT NULL AND a.studio = ${anime.studio} THEN 3 ELSE 0 END as studio_match,
-            CASE WHEN a.format = ${anime.format} THEN 1 ELSE 0 END as format_match,
-            CASE WHEN ABS(a.annee - ${anime.annee || 0}) <= 2 THEN 1 ELSE 0 END as year_match
-          FROM ak_animes a
-          WHERE a.id_anime != ${id}
-          AND a.statut = 1
-        )
-        SELECT
-          id_anime as "idAnime",
-          titre,
-          titre_orig as "titreOrig",
-          studio,
-          format,
-          annee,
-          image,
-          nb_ep as "nbEp",
-          moyennenotes as "moyenneNotes",
-          statut,
-          nice_url as "niceUrl",
-          (studio_match + shared_tags_count + format_match + year_match) as similarity_score
-        FROM anime_tags
-        WHERE (studio_match > 0 OR shared_tags_count > 0 OR format_match > 0 OR year_match > 0)
-        ORDER BY similarity_score DESC, moyennenotes DESC NULLS LAST
-        LIMIT ${limit}
-      ` as any[];
-    }
 
     return {
       anime_id: id,
