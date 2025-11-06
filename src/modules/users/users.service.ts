@@ -1272,9 +1272,9 @@ export class UsersService {
       throw new NotFoundException('Utilisateur introuvable');
     }
 
-    // Get only published reviews
+    // Get only published reviews (statut = 0)
     const reviews = await this.prisma.$queryRaw`
-      SELECT 
+      SELECT
         c.id_critique as id,
         c.titre,
         c.critique,
@@ -1291,7 +1291,7 @@ export class UsersService {
       FROM ak_critique c
       LEFT JOIN ak_animes a ON c.id_anime = a.id_anime
       LEFT JOIN ak_mangas m ON c.id_manga = m.id_manga
-      WHERE c.id_membre = ${user.idMember} AND c.statut = 1
+      WHERE c.id_membre = ${user.idMember} AND c.statut = 0
       ORDER BY c.date_critique DESC
       LIMIT ${limit}
     `;
@@ -1344,7 +1344,7 @@ export class UsersService {
       FROM ak_critique c
       LEFT JOIN ak_animes a ON c.id_anime = a.id_anime
       LEFT JOIN ak_mangas m ON c.id_manga = m.id_manga
-      WHERE c.id_membre = ${user.idMember} AND c.statut = 1
+      WHERE c.id_membre = ${user.idMember} AND c.statut = 0
       ORDER BY c.date_critique DESC
       LIMIT ${limit}
     `;
