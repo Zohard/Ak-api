@@ -304,6 +304,20 @@ export class AnimesController {
     return this.animesService.getAnimeStaff(id);
   }
 
+  @Get(':id/similar')
+  @ApiOperation({ summary: 'Animes similaires basés sur plusieurs critères' })
+  @ApiParam({ name: 'id', description: "ID de l'anime", type: 'number' })
+  @ApiQuery({ name: 'limit', required: false, description: 'Nombre de résultats (défaut: 6)', type: 'number' })
+  @ApiResponse({ status: 200, description: 'Liste des animes similaires' })
+  @ApiResponse({ status: 404, description: 'Anime introuvable' })
+  async getSimilarAnimes(
+    @Param('id', ParseIntPipe) id: number,
+    @Query('limit') limit?: string,
+  ) {
+    const parsedLimit = limit ? parseInt(limit) : 6;
+    return this.animesService.getSimilarAnimes(id, parsedLimit);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Récupérer un anime par ID' })
   @ApiParam({ name: 'id', description: "ID de l'anime", type: 'number' })
