@@ -1025,40 +1025,40 @@ export class UsersService {
 
     // Get public review stats overall, and by media type
     const reviewStats = await this.prisma.$queryRaw`
-      SELECT 
+      SELECT
         notation as rating,
         COUNT(*) as count
-      FROM ak_critique 
-      WHERE id_membre = ${user.idMember} AND statut = 1
-      GROUP BY notation 
+      FROM ak_critique
+      WHERE id_membre = ${user.idMember} AND statut = 0
+      GROUP BY notation
       ORDER BY notation DESC
     `;
 
     const reviewStatsAnime = await this.prisma.$queryRaw`
-      SELECT 
+      SELECT
         notation as rating,
         COUNT(*) as count
-      FROM ak_critique 
-      WHERE id_membre = ${user.idMember} AND statut = 1 AND id_anime IS NOT NULL AND id_anime > 0
-      GROUP BY notation 
+      FROM ak_critique
+      WHERE id_membre = ${user.idMember} AND statut = 0 AND id_anime IS NOT NULL AND id_anime > 0
+      GROUP BY notation
       ORDER BY notation DESC
     `;
 
     const reviewStatsManga = await this.prisma.$queryRaw`
-      SELECT 
+      SELECT
         notation as rating,
         COUNT(*) as count
-      FROM ak_critique 
-      WHERE id_membre = ${user.idMember} AND statut = 1 AND id_manga IS NOT NULL AND id_manga > 0
-      GROUP BY notation 
+      FROM ak_critique
+      WHERE id_membre = ${user.idMember} AND statut = 0 AND id_manga IS NOT NULL AND id_manga > 0
+      GROUP BY notation
       ORDER BY notation DESC
     `;
 
     // Get total review count
     const totalReviewsResult = await this.prisma.akCritique.count({
-      where: { 
+      where: {
         idMembre: user.idMember,
-        statut: 1  // Only published reviews
+        statut: 0  // Only published reviews
       }
     });
 
@@ -1069,7 +1069,7 @@ export class UsersService {
       LEFT JOIN ak_tag2fiche tf_a ON c.id_anime = tf_a.id_fiche AND tf_a.type = 'anime'
       LEFT JOIN ak_tag2fiche tf_m ON c.id_manga = tf_m.id_fiche AND tf_m.type = 'manga'
       LEFT JOIN ak_tags t ON (tf_a.id_tag = t.id_tag OR tf_m.id_tag = t.id_tag)
-      WHERE c.id_membre = ${user.idMember} AND c.statut = 1 AND t.tag_name IS NOT NULL
+      WHERE c.id_membre = ${user.idMember} AND c.statut = 0 AND t.tag_name IS NOT NULL
       GROUP BY t.tag_name
       ORDER BY count DESC, t.tag_name ASC
       LIMIT 12
@@ -1080,7 +1080,7 @@ export class UsersService {
       FROM ak_critique c
       JOIN ak_tag2fiche tf_a ON c.id_anime = tf_a.id_fiche AND tf_a.type = 'anime'
       JOIN ak_tags t ON tf_a.id_tag = t.id_tag
-      WHERE c.id_membre = ${user.idMember} AND c.statut = 1
+      WHERE c.id_membre = ${user.idMember} AND c.statut = 0
       GROUP BY t.tag_name
       ORDER BY count DESC, t.tag_name ASC
       LIMIT 12
@@ -1091,7 +1091,7 @@ export class UsersService {
       FROM ak_critique c
       JOIN ak_tag2fiche tf_m ON c.id_manga = tf_m.id_fiche AND tf_m.type = 'manga'
       JOIN ak_tags t ON tf_m.id_tag = t.id_tag
-      WHERE c.id_membre = ${user.idMember} AND c.statut = 1
+      WHERE c.id_membre = ${user.idMember} AND c.statut = 0
       GROUP BY t.tag_name
       ORDER BY count DESC, t.tag_name ASC
       LIMIT 12
