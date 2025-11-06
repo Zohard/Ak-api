@@ -1260,7 +1260,7 @@ export class AnimesService extends BaseContentService<
           a.annee,
           a.image,
           a.nb_ep,
-          a.moyenne_notes,
+          a.moyennenotes,
           a.statut,
           a.nice_url,
           COALESCE(
@@ -1288,13 +1288,13 @@ export class AnimesService extends BaseContentService<
         annee,
         image,
         nb_ep as "nbEp",
-        moyenne_notes as "moyenneNotes",
+        moyennenotes as "moyenneNotes",
         statut,
         nice_url as "niceUrl",
         (studio_match + shared_tags_count + format_match + year_match) as similarity_score
       FROM anime_tags
       WHERE (studio_match > 0 OR shared_tags_count > 0 OR format_match > 0)
-      ORDER BY similarity_score DESC, moyenne_notes DESC NULLS LAST
+      ORDER BY similarity_score DESC, moyennenotes DESC NULLS LAST
       LIMIT ${limit}
     ` as any[];
 
