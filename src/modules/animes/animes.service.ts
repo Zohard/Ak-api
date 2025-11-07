@@ -1243,7 +1243,7 @@ export class AnimesService extends BaseContentService<
   const similarAnimes = await this.prisma.$queryRaw`
         WITH results AS (
             -- Priority 1: Shared tags (highest relevance - same themes/genres)
-            (SELECT DISTINCT
+            (SELECT
                  a.id_anime as "idAnime",
                  a.titre,
                  a.titre_orig as "titreOrig",
@@ -1272,7 +1272,7 @@ export class AnimesService extends BaseContentService<
         UNION ALL
 
         -- Priority 2: Similar titles (but not too similar to avoid same series)
-        (SELECT DISTINCT
+        (SELECT
             a.id_anime as "idAnime",
             a.titre,
             a.titre_orig as "titreOrig",
@@ -1306,7 +1306,7 @@ export class AnimesService extends BaseContentService<
         UNION ALL
 
         -- Priority 3: Same format and similar year
-        (SELECT DISTINCT
+        (SELECT
             a.id_anime as "idAnime",
             a.titre,
             a.titre_orig as "titreOrig",
@@ -1330,7 +1330,7 @@ export class AnimesService extends BaseContentService<
         UNION ALL
 
         -- Priority 4: Same studio (lowest priority - just production company)
-        (SELECT DISTINCT
+        (SELECT
             a.id_anime as "idAnime",
             a.titre,
             a.titre_orig as "titreOrig",
