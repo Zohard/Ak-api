@@ -1275,7 +1275,7 @@ export class AnimesService extends BaseContentService<
         (SELECT DISTINCT
             a.id_anime as "idAnime",
             a.titre,
-            a.titreOrig as "titreOrig",
+            a.titre_orig as "titreOrig",
             a.studio,
             a.format,
             a.annee,
@@ -1291,9 +1291,9 @@ export class AnimesService extends BaseContentService<
           AND (
             (similarity(a.titre, ${anime.titre}) BETWEEN 0.6 AND 0.9)
            OR
-            (a.titreOrig IS NOT NULL
+            (a.titre_orig IS NOT NULL
           AND ${anime.titreOrig || ''} != ''
-          AND similarity(a.titreOrig, ${anime.titreOrig || ''}) BETWEEN 0.6 AND 0.9)
+          AND similarity(a.titre_orig, ${anime.titreOrig || ''}) BETWEEN 0.6 AND 0.9)
             )
         ORDER BY
             GREATEST(
@@ -1333,7 +1333,7 @@ export class AnimesService extends BaseContentService<
         (SELECT DISTINCT
             a.id_anime as "idAnime",
             a.titre,
-            a.titreOrig as "titreOrig",
+            a.titre_orig as "titreOrig",
             a.studio,
             a.format,
             a.annee,
