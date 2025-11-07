@@ -788,7 +788,7 @@ export class CollectionsService {
       username: user.memberName,
       email: user.emailAddress,
       avatarUrl: user.avatar,
-      joinedAt: user.dateRegistered,
+      joinedAt: user.dateRegistered ? new Date(user.dateRegistered * 1000).toISOString() : new Date().toISOString(),
       collections,
       totalPublicAnimes,
       totalPublicMangas,
@@ -1173,10 +1173,10 @@ export class CollectionsService {
         }).filter(c => c.hasItems); // Only include collections with items
 
         return {
-          id: user.id,
-          username: user.pseudo,
-          avatarUrl: user.avatarUrl,
-          joinedAt: user.createdAt,
+          id: user.idMember,
+          username: user.memberName,
+          avatarUrl: user.avatar,
+          joinedAt: user.dateRegistered ? new Date(user.dateRegistered * 1000).toISOString() : new Date().toISOString(),
           collections,
           totalPublicAnimes: user._count.animeCollections,
           totalPublicMangas: user._count.mangaCollections,
