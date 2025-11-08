@@ -1327,6 +1327,7 @@ export class CollectionsService {
 
     // Transform status counts for frontend
     const statusCountsMap = {
+      all: 0,
       watching: 0,
       completed: 0,
       'plan-to-watch': 0,
@@ -1334,7 +1335,9 @@ export class CollectionsService {
       'on-hold': 0
     };
 
+    let totalFromCounts = 0;
     statusCounts.forEach(count => {
+      totalFromCounts += count._count.type;
       switch (count.type) {
         case 1: statusCountsMap.completed = count._count.type; break;
         case 2: statusCountsMap.watching = count._count.type; break;
@@ -1344,11 +1347,15 @@ export class CollectionsService {
       }
     });
 
+    // Set the "all" count to the total from the count query
+    statusCountsMap.all = totalFromCounts;
+
     const result = {
       success: true,
       data: transformedItems,
       meta: {
         total,
+        totalCount: total,
         page,
         limit,
         totalPages: Math.ceil(total / limit),
@@ -1535,6 +1542,7 @@ export class CollectionsService {
 
     // Transform status counts for frontend
     const statusCountsMap = {
+      all: 0,
       watching: 0,
       completed: 0,
       'plan-to-watch': 0,
@@ -1542,7 +1550,9 @@ export class CollectionsService {
       'on-hold': 0
     };
 
+    let totalFromCounts = 0;
     statusCounts.forEach(count => {
+      totalFromCounts += count._count.type;
       switch (count.type) {
         case 1: statusCountsMap.completed = count._count.type; break;
         case 2: statusCountsMap.watching = count._count.type; break;
@@ -1552,11 +1562,15 @@ export class CollectionsService {
       }
     });
 
+    // Set the "all" count to the total from the count query
+    statusCountsMap.all = totalFromCounts;
+
     const result = {
       success: true,
       data: transformedItems,
       meta: {
         total,
+        totalCount: total,
         page,
         limit,
         totalPages: Math.ceil(total / limit),
