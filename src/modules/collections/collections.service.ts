@@ -1257,10 +1257,10 @@ export class CollectionsService {
   // Optimized anime collections fetch with efficient queries
   async getCollectionAnimes(userId: number, type: number, page: number = 1, limit: number = 20, currentUserId?: number) {
     const isOwnCollection = currentUserId === userId;
-    
+
     // Create cache key for this specific request
     const cacheKey = `collection_animes:${userId}:${type}:${page}:${limit}:${isOwnCollection ? 'own' : 'public'}`;
-    
+
     // Try to get from cache first
     const cached = await this.cacheService.get(cacheKey);
     if (cached) {
@@ -1270,7 +1270,7 @@ export class CollectionsService {
     // Use Promise.all for parallel queries
     const whereClause = {
       idMembre: userId,
-      type: type,
+      ...(type !== undefined && type !== null ? { type: type } : {}),
       ...(isOwnCollection ? {} : { isPublic: true })
     };
 
@@ -1463,10 +1463,10 @@ export class CollectionsService {
   // Optimized manga collections fetch with efficient queries
   async getCollectionMangas(userId: number, type: number, page: number = 1, limit: number = 20, currentUserId?: number) {
     const isOwnCollection = currentUserId === userId;
-    
+
     // Create cache key for this specific request
     const cacheKey = `collection_mangas:${userId}:${type}:${page}:${limit}:${isOwnCollection ? 'own' : 'public'}`;
-    
+
     // Try to get from cache first
     const cached = await this.cacheService.get(cacheKey);
     if (cached) {
@@ -1476,7 +1476,7 @@ export class CollectionsService {
     // Use Promise.all for parallel queries
     const whereClause = {
       idMembre: userId,
-      type: type,
+      ...(type !== undefined && type !== null ? { type: type } : {}),
       ...(isOwnCollection ? {} : { isPublic: true })
     };
 
