@@ -1355,7 +1355,7 @@ export class MangasService extends BaseContentService<
 
   async getMangaBusinesses(mangaId: number) {
     // Check if manga exists
-    const manga = await this.prisma.akMangas.findUnique({
+    const manga = await this.prisma.akManga.findUnique({
       where: { idManga: mangaId },
     });
 
@@ -1403,7 +1403,7 @@ export class MangasService extends BaseContentService<
     precisions?: string,
   ) {
     // Check if manga exists
-    const manga = await this.prisma.akMangas.findUnique({
+    const manga = await this.prisma.akManga.findUnique({
       where: { idManga: mangaId },
     });
 
