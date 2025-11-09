@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   ForbiddenException,
+  BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '../../shared/services/prisma.service';
 import { CacheService } from '../../shared/services/cache.service';
@@ -1546,6 +1547,137 @@ export class AnimesService extends BaseContentService<
 
     // Invalidate anime cache
     await this.cacheService.invalidateAnime(trailer.idAnime);
+  }
+
+  // ===== Business Relationships Management =====
+
+  async getAnimeBusinesses(animeId: number) {
+    // Check if anime exists
+    const anime = await this.prisma.akAnimes.findUnique({
+      where: { idAnime: animeId },
+    });
+
+    if (!anime) {
+      throw new NotFoundException('Anime introuvable');
+    }
+
+    // Get all business relationships for this anime
+    const relationships = await this.prisma.$queryRaw<Array<{
+      id_relation: number;
+      id_business: number;
+      type: string;
+      precisions: string | null;
+      denomination: string;
+      origine: string | null;
+    }>>`
+      SELECT
+        bta.id_relation,
+        bta.id_business,
+        bta.type,
+        bta.precisions,
+        b.denomination,
+        b.origine
+      FROM ak_business_to_animes bta
+      INNER JOIN ak_business b ON b.id_business = bta.id_business
+      WHERE bta.id_anime = ${animeId}
+        AND bta.doublon = 0
+      ORDER BY bta.type, b.denomination
+    `;
+
+    return relationships.map(rel => ({
+      relationId: rel.id_relation,
+      businessId: rel.id_business,
+      denomination: rel.denomination,
+      type: rel.type,
+      precisions: rel.precisions,
+      origine: rel.origine,
+    }));
+  }
+
+  async addAnimeBusiness(
+    animeId: number,
+    businessId: number,
+    type: string,
+    precisions?: string,
+  ) {
+    // Check if anime exists
+    const anime = await this.prisma.akAnimes.findUnique({
+      where: { idAnime: animeId },
+    });
+
+    if (!anime) {
+      throw new NotFoundException('Anime introuvable');
+    }
+
+    // Check if business exists
+    const business = await this.prisma.akBusiness.findUnique({
+      where: { idBusiness: businessId },
+    });
+
+    if (!business) {
+      throw new NotFoundException('Entité business introuvable');
+    }
+
+    // Check if relationship already exists
+    const existingRelation = await this.prisma.$queryRaw<Array<{ id_relation: number }>>`
+      SELECT id_relation
+      FROM ak_business_to_animes
+      WHERE id_anime = ${animeId}
+        AND id_business = ${businessId}
+        AND type = ${type}
+        AND doublon = 0
+      LIMIT 1
+    `;
+
+    if (existingRelation && existingRelation.length > 0) {
+      throw new BadRequestException('Cette relation business existe déjà');
+    }
+
+    // Create the relationship
+    const result = await this.prisma.$queryRaw<Array<{ id_relation: number }>>`
+      INSERT INTO ak_business_to_animes (id_anime, id_business, type, precisions, doublon)
+      VALUES (${animeId}, ${businessId}, ${type}, ${precisions || null}, 0)
+      RETURNING id_relation
+    `;
+
+    // Invalidate anime cache
+    await this.cacheService.invalidateAnime(animeId);
+
+    return {
+      relationId: result[0].id_relation,
+      animeId,
+      businessId,
+      type,
+      precisions,
+      denomination: business.denomination,
+    };
+  }
+
+  async removeAnimeBusiness(animeId: number, businessId: number) {
+    // Find the relationship
+    const relationship = await this.prisma.$queryRaw<Array<{ id_relation: number }>>`
+      SELECT id_relation
+      FROM ak_business_to_animes
+      WHERE id_anime = ${animeId}
+        AND id_business = ${businessId}
+        AND doublon = 0
+      LIMIT 1
+    `;
+
+    if (!relationship || relationship.length === 0) {
+      throw new NotFoundException('Relation business introuvable');
+    }
+
+    // Delete the relationship
+    await this.prisma.$queryRaw`
+      DELETE FROM ak_business_to_animes
+      WHERE id_relation = ${relationship[0].id_relation}
+    `;
+
+    // Invalidate anime cache
+    await this.cacheService.invalidateAnime(animeId);
+
+    return { message: 'Relation business supprimée avec succès' };
   }
 
   // Utility method to create consistent cache keys

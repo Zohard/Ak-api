@@ -435,4 +435,55 @@ export class AnimesController {
     const username = req.user?.pseudo || req.user?.member_name || req.user?.memberName || 'admin';
     return this.animesService.removeTrailer(trailerId, username);
   }
+
+  // ===== Business Relationships Management =====
+
+  @Get(':id/businesses')
+  @ApiOperation({ summary: "Récupérer les relations business d'un anime" })
+  @ApiParam({ name: 'id', description: "ID de l'anime", type: 'number' })
+  @ApiResponse({ status: 200, description: "Liste des relations business de l'anime" })
+  @ApiResponse({ status: 404, description: 'Anime introuvable' })
+  async getAnimeBusinesses(@Param('id', ParseIntPipe) id: number) {
+    return this.animesService.getAnimeBusinesses(id);
+  }
+
+  @Post(':id/businesses')
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: "Ajouter une relation business à un anime (Admin seulement)" })
+  @ApiParam({ name: 'id', description: "ID de l'anime", type: 'number' })
+  @ApiResponse({ status: 201, description: 'Relation business créée avec succès' })
+  @ApiResponse({ status: 400, description: 'Données invalides' })
+  @ApiResponse({ status: 401, description: 'Authentification requise' })
+  @ApiResponse({ status: 403, description: "Droits d'administrateur requis" })
+  @ApiResponse({ status: 404, description: 'Anime ou business introuvable' })
+  async addAnimeBusiness(
+    @Param('id', ParseIntPipe) animeId: number,
+    @Body() body: { businessId: number; type: string; precisions?: string },
+  ) {
+    return this.animesService.addAnimeBusiness(
+      animeId,
+      body.businessId,
+      body.type,
+      body.precisions,
+    );
+  }
+
+  @Delete(':id/businesses/:businessId')
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: "Supprimer une relation business d'un anime (Admin seulement)" })
+  @ApiParam({ name: 'id', description: "ID de l'anime", type: 'number' })
+  @ApiParam({ name: 'businessId', description: "ID du business", type: 'number' })
+  @ApiResponse({ status: 204, description: 'Relation business supprimée avec succès' })
+  @ApiResponse({ status: 401, description: 'Authentification requise' })
+  @ApiResponse({ status: 403, description: "Droits d'administrateur requis" })
+  @ApiResponse({ status: 404, description: 'Relation business introuvable' })
+  async removeAnimeBusiness(
+    @Param('id', ParseIntPipe) animeId: number,
+    @Param('businessId', ParseIntPipe) businessId: number,
+  ) {
+    return this.animesService.removeAnimeBusiness(animeId, businessId);
+  }
 }

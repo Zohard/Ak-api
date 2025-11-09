@@ -1351,6 +1351,137 @@ export class MangasService extends BaseContentService<
     };
   }
 
+  // ===== Business Relationships Management =====
+
+  async getMangaBusinesses(mangaId: number) {
+    // Check if manga exists
+    const manga = await this.prisma.akMangas.findUnique({
+      where: { idManga: mangaId },
+    });
+
+    if (!manga) {
+      throw new NotFoundException('Manga introuvable');
+    }
+
+    // Get all business relationships for this manga
+    const relationships = await this.prisma.$queryRaw<Array<{
+      id_relation: number;
+      id_business: number;
+      type: string;
+      precisions: string | null;
+      denomination: string;
+      origine: string | null;
+    }>>`
+      SELECT
+        btm.id_relation,
+        btm.id_business,
+        btm.type,
+        btm.precisions,
+        b.denomination,
+        b.origine
+      FROM ak_business_to_mangas btm
+      INNER JOIN ak_business b ON b.id_business = btm.id_business
+      WHERE btm.id_manga = ${mangaId}
+        AND btm.doublon = 0
+      ORDER BY btm.type, b.denomination
+    `;
+
+    return relationships.map(rel => ({
+      relationId: rel.id_relation,
+      businessId: rel.id_business,
+      denomination: rel.denomination,
+      type: rel.type,
+      precisions: rel.precisions,
+      origine: rel.origine,
+    }));
+  }
+
+  async addMangaBusiness(
+    mangaId: number,
+    businessId: number,
+    type: string,
+    precisions?: string,
+  ) {
+    // Check if manga exists
+    const manga = await this.prisma.akMangas.findUnique({
+      where: { idManga: mangaId },
+    });
+
+    if (!manga) {
+      throw new NotFoundException('Manga introuvable');
+    }
+
+    // Check if business exists
+    const business = await this.prisma.akBusiness.findUnique({
+      where: { idBusiness: businessId },
+    });
+
+    if (!business) {
+      throw new NotFoundException('Entité business introuvable');
+    }
+
+    // Check if relationship already exists
+    const existingRelation = await this.prisma.$queryRaw<Array<{ id_relation: number }>>`
+      SELECT id_relation
+      FROM ak_business_to_mangas
+      WHERE id_manga = ${mangaId}
+        AND id_business = ${businessId}
+        AND type = ${type}
+        AND doublon = 0
+      LIMIT 1
+    `;
+
+    if (existingRelation && existingRelation.length > 0) {
+      throw new BadRequestException('Cette relation business existe déjà');
+    }
+
+    // Create the relationship
+    const result = await this.prisma.$queryRaw<Array<{ id_relation: number }>>`
+      INSERT INTO ak_business_to_mangas (id_manga, id_business, type, precisions, doublon)
+      VALUES (${mangaId}, ${businessId}, ${type}, ${precisions || null}, 0)
+      RETURNING id_relation
+    `;
+
+    // Invalidate manga cache
+    await this.invalidateMangaCache(mangaId);
+
+    return {
+      relationId: result[0].id_relation,
+      mangaId,
+      businessId,
+      type,
+      precisions,
+      denomination: business.denomination,
+    };
+  }
+
+  async removeMangaBusiness(mangaId: number, businessId: number) {
+    // Find the relationship
+    const relationship = await this.prisma.$queryRaw<Array<{ id_relation: number }>>`
+      SELECT id_relation
+      FROM ak_business_to_mangas
+      WHERE id_manga = ${mangaId}
+        AND id_business = ${businessId}
+        AND doublon = 0
+      LIMIT 1
+    `;
+
+    if (!relationship || relationship.length === 0) {
+      throw new NotFoundException('Relation business introuvable');
+    }
+
+    // Delete the relationship
+    await this.prisma.$queryRaw`
+      DELETE FROM ak_business_to_mangas
+      WHERE id_relation = ${relationship[0].id_relation}
+    `;
+
+    // Invalidate manga cache
+    await this.invalidateMangaCache(mangaId);
+
+    return { message: 'Relation business supprimée avec succès' };
+  }
+
   // Cache helper methods
   private createCacheKey(query: MangaQueryDto): string {
     const {
