@@ -73,6 +73,21 @@ export class ForumsController {
     return { success: true };
   }
 
+  @Get('topics/:topicId/metadata')
+  @ApiOperation({ summary: 'Get topic basic metadata (for admin selectors)' })
+  @ApiParam({ name: 'topicId', type: 'number', description: 'Topic ID' })
+  @ApiResponse({ status: 200, description: 'Topic metadata retrieved successfully' })
+  @ApiResponse({ status: 404, description: 'Topic not found' })
+  async getTopicMetadata(
+    @Param('topicId', ParseIntPipe) topicId: number
+  ) {
+    const metadata = await this.forumsService.getTopicMetadata(topicId);
+    if (!metadata) {
+      throw new NotFoundException('Topic not found');
+    }
+    return metadata;
+  }
+
   @Get('topics/:topicId/preview')
   @UseGuards(OptionalJwtAuthGuard)
   @ApiOperation({ summary: 'Get topic preview for media pages' })

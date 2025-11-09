@@ -375,6 +375,44 @@ export class ForumsService {
     }
   }
 
+  async getTopicMetadata(topicId: number) {
+    try {
+      const topic = await this.prisma.smfTopic.findUnique({
+        where: { idTopic: topicId },
+        include: {
+          board: {
+            select: {
+              idBoard: true,
+              name: true
+            }
+          },
+          firstMessage: {
+            select: {
+              subject: true
+            }
+          }
+        }
+      });
+
+      if (!topic || !topic.firstMessage) {
+        return null;
+      }
+
+      return {
+        id: topic.idTopic,
+        subject: topic.firstMessage.subject || 'Untitled',
+        boardId: topic.board.idBoard,
+        boardName: topic.board.name,
+        replies: topic.numReplies,
+        views: topic.numViews,
+        locked: topic.locked === 1
+      };
+    } catch (error) {
+      this.logger.error('Error fetching topic metadata:', error);
+      return null;
+    }
+  }
+
   async getTopicPreview(topicId: number, userId?: number) {
     try {
       const topic = await this.prisma.smfTopic.findUnique({
