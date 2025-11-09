@@ -180,6 +180,10 @@ model AkAnime {
   businessRelations AkBusinessToAnime[]
   userCollections CollectionAnime[] @relation("UserAnimeList")
 
+  @@index([statut])
+  @@index([dateAjout])
+  @@index([licence])
+  @@index([niceUrl])
   @@map("ak_animes")
 }
 
@@ -195,6 +199,8 @@ model AkAnimesEpisode {
   // Relations
   anime        AkAnime   @relation(fields: [idAnime], references: [idAnime], onDelete: Cascade)
 
+  @@index([idAnime])
+  @@index([idAnime, numero])
   @@map("ak_animes_episodes")
 }
 
@@ -214,6 +220,8 @@ model AkAnimesTrailer {
   // Relations
   anime        AkAnime   @relation(fields: [idAnime], references: [idAnime], onDelete: Cascade)
 
+  @@index([idAnime])
+  @@index([statut])
   @@map("ak_animes_trailers")
 }
 
@@ -260,6 +268,10 @@ model AkManga {
   businessRelations    AkBusinessToManga[]
   userCollections      CollectionManga[] @relation("UserMangaList")
 
+  @@index([statut])
+  @@index([dateAjout])
+  @@index([licence])
+  @@index([niceUrl])
   @@map("ak_mangas")
 }
 
@@ -379,6 +391,11 @@ model AkCritique {
   anime        AkAnime?  @relation(fields: [idAnime], references: [idAnime], onDelete: Cascade)
   manga        AkManga?  @relation(fields: [idManga], references: [idManga], onDelete: Cascade)
 
+  @@index([idMembre])
+  @@index([idAnime])
+  @@index([idManga])
+  @@index([statut])
+  @@index([dateCritique])
   @@map("ak_critique")
 }
 
@@ -560,7 +577,7 @@ model CollectionAnime {
   evaluation       Int       @map("evaluation") @db.SmallInt
   notes            String?   @db.Text
   doublon          Int?      @default(0) @db.SmallInt
-  
+
   // New fields for named collections
   collectionName   String?   @map("collection_name") @db.VarChar(100)
   isPublic         Boolean   @default(true) @map("is_public")
@@ -571,6 +588,11 @@ model CollectionAnime {
   user             SmfMember @relation("UserAnimeCollection", fields: [idMembre], references: [idMember], onDelete: Cascade)
   anime            AkAnime   @relation("UserAnimeList", fields: [idAnime], references: [idAnime], onDelete: Cascade)
 
+  @@index([idMembre])
+  @@index([idAnime])
+  @@index([idMembre, idAnime])
+  @@index([idMembre, type])
+  @@index([createdAt])
   @@map("collection_animes")
 }
 
@@ -582,7 +604,7 @@ model CollectionManga {
   evaluation       Int       @map("evaluation") @db.SmallInt
   notes            String?   @db.Text
   doublon          Int?      @default(0) @db.SmallInt
-  
+
   // New fields for named collections
   collectionName   String?   @map("collection_name") @db.VarChar(100)
   isPublic         Boolean   @default(true) @map("is_public")
@@ -593,6 +615,11 @@ model CollectionManga {
   user             SmfMember @relation("UserMangaCollection", fields: [idMembre], references: [idMember], onDelete: Cascade)
   manga            AkManga   @relation("UserMangaList", fields: [idManga], references: [idManga], onDelete: Cascade)
 
+  @@index([idMembre])
+  @@index([idManga])
+  @@index([idMembre, idManga])
+  @@index([idMembre, type])
+  @@index([createdAt])
   @@map("collection_mangas")
 }
 
