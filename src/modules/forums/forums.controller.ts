@@ -73,6 +73,21 @@ export class ForumsController {
     return { success: true };
   }
 
+  @Get('topics/search')
+  @ApiOperation({ summary: 'Search topics by subject (for admin selectors)' })
+  @ApiQuery({ name: 'q', required: true, type: String, description: 'Search query' })
+  @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Max results (default: 10)' })
+  @ApiResponse({ status: 200, description: 'Topics retrieved successfully' })
+  async searchTopics(
+    @Query('q') query: string,
+    @Query('limit') limit: string = '10'
+  ) {
+    if (!query || query.trim().length === 0) {
+      return [];
+    }
+    return await this.forumsService.searchTopics(query, parseInt(limit));
+  }
+
   @Get('topics/:topicId/metadata')
   @ApiOperation({ summary: 'Get topic basic metadata (for admin selectors)' })
   @ApiParam({ name: 'topicId', type: 'number', description: 'Topic ID' })

@@ -375,6 +375,53 @@ export class ForumsService {
     }
   }
 
+  async searchTopics(query: string, limit: number = 10) {
+    try {
+      const topics = await this.prisma.smfTopic.findMany({
+        where: {
+          firstMessage: {
+            subject: {
+              contains: query,
+              mode: 'insensitive'
+            }
+          }
+        },
+        include: {
+          board: {
+            select: {
+              idBoard: true,
+              name: true
+            }
+          },
+          firstMessage: {
+            select: {
+              subject: true
+            }
+          }
+        },
+        take: limit,
+        orderBy: {
+          numViews: 'desc' // Most viewed first
+        }
+      });
+
+      return topics
+        .filter(topic => topic.firstMessage)
+        .map(topic => ({
+          id: topic.idTopic,
+          subject: topic.firstMessage.subject || 'Untitled',
+          boardId: topic.board.idBoard,
+          boardName: topic.board.name,
+          replies: topic.numReplies,
+          views: topic.numViews,
+          locked: topic.locked === 1
+        }));
+    } catch (error) {
+      this.logger.error('Error searching topics:', error);
+      return [];
+    }
+  }
+
   async getTopicMetadata(topicId: number) {
     try {
       const topic = await this.prisma.smfTopic.findUnique({
