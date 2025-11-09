@@ -75,6 +75,24 @@ export class CreateMangaDto {
   statut?: number;
 
   @ApiPropertyOptional({
+    description: 'Manga licencié en France (0 = Non, 1 = Oui)',
+    example: 1,
+  })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  @Max(1)
+  licence?: number;
+
+  @ApiPropertyOptional({
+    description: 'Titre français (si licencié)',
+    example: 'One Piece',
+  })
+  @IsOptional()
+  @IsString()
+  titreFr?: string;
+
+  @ApiPropertyOptional({
     description: 'ID AniList pour importer automatiquement les données',
     example: 30011,
   })
