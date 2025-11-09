@@ -406,7 +406,9 @@ export class ForumsService {
       });
 
       return topics
-        .filter(topic => topic.firstMessage)
+        .filter((topic): topic is typeof topic & { firstMessage: NonNullable<typeof topic.firstMessage> } =>
+          topic.firstMessage !== null
+        )
         .map(topic => ({
           id: topic.idTopic,
           subject: topic.firstMessage.subject || 'Untitled',
@@ -421,7 +423,6 @@ export class ForumsService {
       return [];
     }
   }
-
   async getTopicMetadata(topicId: number) {
     try {
       const topic = await this.prisma.smfTopic.findUnique({
