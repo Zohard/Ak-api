@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Delete, Query, Param, ParseIntPipe, UseGuards, Request, Body } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Query, Param, ParseIntPipe, UseGuards, Request, Body, NotFoundException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiQuery, ApiResponse, ApiParam, ApiBearerAuth } from '@nestjs/swagger';
 import { ForumsService } from './forums.service';
 import { ForumMessageQueryDto } from './dto/forum-message.dto';

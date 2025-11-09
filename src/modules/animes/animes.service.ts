@@ -1553,7 +1553,7 @@ export class AnimesService extends BaseContentService<
 
   async getAnimeBusinesses(animeId: number) {
     // Check if anime exists
-    const anime = await this.prisma.akAnimes.findUnique({
+    const anime = await this.prisma.akAnime.findUnique({
       where: { idAnime: animeId },
     });
 
@@ -1601,7 +1601,7 @@ export class AnimesService extends BaseContentService<
     precisions?: string,
   ) {
     // Check if anime exists
-    const anime = await this.prisma.akAnimes.findUnique({
+    const anime = await this.prisma.akAnime.findUnique({
       where: { idAnime: animeId },
     });
 
