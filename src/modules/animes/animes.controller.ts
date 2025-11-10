@@ -295,6 +295,20 @@ export class AnimesController {
     }
   }
 
+  @Get(':id/articles')
+  @ApiOperation({ summary: 'Articles webzine liés à un anime' })
+  @ApiParam({ name: 'id', description: "ID de l'anime", type: 'number' })
+  @ApiResponse({ status: 200, description: 'Liste des articles' })
+  @ApiResponse({ status: 404, description: 'Anime introuvable' })
+  async getAnimeArticles(@Param('id', ParseIntPipe) id: number) {
+    try {
+      return await this.animesService.getAnimeArticles(id);
+    } catch (error) {
+      console.error('Controller error in getAnimeArticles:', error);
+      throw error;
+    }
+  }
+
   @Get(':id/staff')
   @ApiOperation({ summary: 'Staff et équipe technique pour un anime spécifique' })
   @ApiParam({ name: 'id', description: "ID de l'anime", type: 'number' })

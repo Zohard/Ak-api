@@ -1167,6 +1167,61 @@ export class AnimesService extends BaseContentService<
     }
   }
 
+  async getAnimeArticles(id: number) {
+    // First check if anime exists
+    const anime = await this.prisma.akAnime.findUnique({
+      where: { idAnime: id, statut: 1 },
+      select: { idAnime: true },
+    });
+
+    if (!anime) {
+      throw new NotFoundException('Anime introuvable');
+    }
+
+    // Get articles linked to this anime
+    const articles = await this.prisma.akWebzineToFiches.findMany({
+      where: {
+        idFiche: id,
+        type: 'anime',
+      },
+      include: {
+        wpPost: {
+          select: {
+            ID: true,
+            postTitle: true,
+            postContent: true,
+            postExcerpt: true,
+            postDate: true,
+            postName: true,
+            postStatus: true,
+            images: {
+              select: {
+                urlImg: true,
+              },
+              take: 1,
+            },
+          },
+        },
+      },
+      orderBy: {
+        idRelation: 'desc',
+      },
+    });
+
+    // Format the response
+    return articles
+      .filter((article) => article.wpPost && article.wpPost.postStatus === 'publish')
+      .map((article) => ({
+        id: article.wpPost.ID,
+        title: article.wpPost.postTitle,
+        excerpt: article.wpPost.postExcerpt,
+        content: article.wpPost.postContent,
+        date: article.wpPost.postDate,
+        slug: article.wpPost.postName,
+        coverImage: article.wpPost.images?.[0]?.urlImg || null,
+      }));
+  }
+
   async getAnimeStaff(id: number) {
     // First check if anime exists
     const anime = await this.prisma.akAnime.findUnique({
