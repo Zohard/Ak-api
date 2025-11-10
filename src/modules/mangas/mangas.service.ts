@@ -335,7 +335,7 @@ export class MangasService extends BaseContentService<
     }
 
     // Get the first publisher name for backward compatibility with editeur field
-    const publisherRelation = manga.businessRelations?.find((rel: any) => rel.type === 'editeur');
+    const publisherRelation: any = manga.businessRelations?.find((rel: any) => rel.type === 'editeur');
 
     // Enrich manga with publisher name (for backward compatibility)
     const enrichedManga = {
