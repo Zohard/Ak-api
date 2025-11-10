@@ -289,7 +289,21 @@ export class MangasService extends BaseContentService<
       return cached.data;
     }
 
-    const include: any = {};
+    const include: any = {
+      // Always include business relations to get editeurs and other business info
+      businessRelations: {
+        select: {
+          idBusiness: true,
+          type: true,
+          precisions: true,
+          business: {
+            select: {
+              denomination: true,
+            },
+          },
+        },
+      },
+    };
 
     if (includeReviews) {
       include.reviews = {
@@ -320,21 +334,10 @@ export class MangasService extends BaseContentService<
       throw new NotFoundException('Manga introuvable');
     }
 
-    // Fetch publisher from ak_business_to_mangas
-    const publisherRelation = await this.prisma.akBusinessToManga.findFirst({
-      where: {
-        idManga: id,
-        type: 'Editeur',
-      },
-      include: {
-        business: {
-          select: { idBusiness: true, denomination: true },
-        },
-      },
-      orderBy: { idRelation: 'asc' }, // Get the first one if multiple exist
-    });
+    // Get the first publisher name for backward compatibility with editeur field
+    const publisherRelation = manga.businessRelations?.find((rel: any) => rel.type === 'editeur');
 
-    // Enrich manga with publisher name
+    // Enrich manga with publisher name (for backward compatibility)
     const enrichedManga = {
       ...manga,
       editeur: publisherRelation?.business?.denomination || manga.editeur,

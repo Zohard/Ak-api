@@ -465,6 +465,7 @@ model WpPost {
   postMeta             WpPostMeta[]
   termRelationships    WpTermRelationship[]
   images               AkWebzineImg[]
+  ficheRelations       AkWebzineToFiches[]
 
   @@map("wp_posts")
 }
@@ -662,6 +663,23 @@ model AkWebzineImg {
   article      WpPost  @relation(fields: [idArt], references: [ID], onDelete: Cascade)
 
   @@map("ak_webzine_img")
+}
+
+// Webzine to Fiches (Articles linked to Anime/Manga/Business)
+model AkWebzineToFiches {
+  idRelation   Int    @id @default(autoincrement()) @map("id_relation")
+  idArticle    Int    @default(0) @map("id_article") // For legacy ak_webzine_articles (unused)
+  idWpArticle  BigInt @default(0) @map("id_wp_article") // WordPress post ID
+  idFiche      Int    @map("id_fiche") // anime/manga/business ID
+  type         String @db.VarChar(50) // 'anime', 'manga', or 'business'
+
+  // Relations
+  wpPost       WpPost? @relation(fields: [idWpArticle], references: [ID], onDelete: Cascade)
+
+  @@unique([idFiche, idWpArticle, type])
+  @@index([idFiche, type])
+  @@index([idWpArticle])
+  @@map("ak_webzine_to_fiches")
 }
 
 // SMF Private Messages
