@@ -378,7 +378,21 @@ export class AnimesService extends BaseContentService<
     const tagsResponse = await this.getTags(id, 'anime');
     const tags = (tagsResponse?.tags as any[]) || [];
 
-    const formattedAnime = this.formatAnime(anime, season, tags);
+    // Get articles count
+    const articlesCount = await this.prisma.akWebzineToFiches.count({
+      where: {
+        idFiche: id,
+        type: 'anime',
+        wpPost: {
+          postStatus: 'publish',
+        },
+      },
+    });
+
+    const formattedAnime = {
+      ...this.formatAnime(anime, season, tags),
+      articlesCount,
+    };
 
     // Cache the result
     const cacheData = {

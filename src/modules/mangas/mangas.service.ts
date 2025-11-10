@@ -343,7 +343,21 @@ export class MangasService extends BaseContentService<
       editeur: publisherRelation?.business?.denomination || manga.editeur,
     };
 
-    const formattedManga = this.formatManga(enrichedManga);
+    // Get articles count
+    const articlesCount = await this.prisma.akWebzineToFiches.count({
+      where: {
+        idFiche: id,
+        type: 'manga',
+        wpPost: {
+          postStatus: 'publish',
+        },
+      },
+    });
+
+    const formattedManga = {
+      ...this.formatManga(enrichedManga),
+      articlesCount,
+    };
 
     // Cache the result
     const cacheData = {
