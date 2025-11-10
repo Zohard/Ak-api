@@ -162,6 +162,7 @@ model AkAnime {
   dateAjout    DateTime? @map("date_ajout") @db.Timestamptz
   synopsis     String?   @db.Text
   statut       Int       @default(0)
+  ficheComplete Int?     @default(0) @map("fiche_complete") @db.SmallInt
   realisateur  String?   @db.VarChar(255)
   nbReviews    Int?      @default(0) @map("nb_reviews")
   moyenneNotes Float?    @default(0) @map("moyennenotes") @db.Real
@@ -255,7 +256,7 @@ model AkManga {
   moyenneNotes         Float?    @default(0) @map("moyennenotes") @db.Real
   lienForum            Int?      @default(0) @map("lienforum")
   statut               Int       @default(0)
-  ficheComplete        Int?      @default(0) @map("fiche_complete")
+  ficheComplete        Int?      @default(0) @map("fiche_complete") @db.SmallInt
   dateAjout            DateTime? @map("date_ajout") @db.Timestamptz
   dateModification     Int?      @map("date_modification")
   latestCache          Int?      @map("latest_cache")
