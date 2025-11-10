@@ -1210,16 +1210,20 @@ export class AnimesService extends BaseContentService<
 
     // Format the response
     return articles
-      .filter((article) => article.wpPost && article.wpPost.postStatus === 'publish')
-      .map((article) => ({
-        id: article.wpPost.ID,
-        title: article.wpPost.postTitle,
-        excerpt: article.wpPost.postExcerpt,
-        content: article.wpPost.postContent,
-        date: article.wpPost.postDate,
-        slug: article.wpPost.postName,
-        coverImage: article.wpPost.images?.[0]?.urlImg || null,
-      }));
+      .filter((article) => article.wpPost !== null && article.wpPost.postStatus === 'publish')
+      .map((article) => {
+        // TypeScript now knows wpPost is not null due to the filter above
+        const post = article.wpPost!;
+        return {
+          id: post.ID,
+          title: post.postTitle,
+          excerpt: post.postExcerpt,
+          content: post.postContent,
+          date: post.postDate,
+          slug: post.postName,
+          coverImage: post.images?.[0]?.urlImg || null,
+        };
+      });
   }
 
   async getAnimeStaff(id: number) {
