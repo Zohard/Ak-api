@@ -237,6 +237,20 @@ export class MangasController {
     return this.mangasService.getMangaRelations(id);
   }
 
+  @Get(':id/articles')
+  @ApiOperation({ summary: 'Articles webzine liés à un manga' })
+  @ApiParam({ name: 'id', description: 'ID du manga', type: 'number' })
+  @ApiResponse({ status: 200, description: 'Liste des articles' })
+  @ApiResponse({ status: 404, description: 'Manga introuvable' })
+  async getMangaArticles(@Param('id', ParseIntPipe) id: number) {
+    try {
+      return await this.mangasService.getMangaArticles(id);
+    } catch (error) {
+      console.error('Controller error in getMangaArticles:', error);
+      throw error;
+    }
+  }
+
   @Get(':id/staff')
   @ApiOperation({ summary: 'Staff et équipe technique pour un manga spécifique' })
   @ApiParam({ name: 'id', description: 'ID du manga', type: 'number' })

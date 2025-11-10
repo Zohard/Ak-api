@@ -1160,6 +1160,65 @@ export class MangasService extends BaseContentService<
     };
   }
 
+  async getMangaArticles(id: number) {
+    // First check if manga exists
+    const manga = await this.prisma.akManga.findUnique({
+      where: { idManga: id, statut: 1 },
+      select: { idManga: true },
+    });
+
+    if (!manga) {
+      throw new NotFoundException('Manga introuvable');
+    }
+
+    // Get articles linked to this manga
+    const articles = await this.prisma.akWebzineToFiches.findMany({
+      where: {
+        idFiche: id,
+        type: 'manga',
+      },
+      include: {
+        wpPost: {
+          select: {
+            ID: true,
+            postTitle: true,
+            postContent: true,
+            postExcerpt: true,
+            postDate: true,
+            postName: true,
+            postStatus: true,
+            images: {
+              select: {
+                urlImg: true,
+              },
+              take: 1,
+            },
+          },
+        },
+      },
+      orderBy: {
+        idRelation: 'desc',
+      },
+    });
+
+    // Format the response
+    return articles
+      .filter((article) => article.wpPost !== null && article.wpPost.postStatus === 'publish')
+      .map((article) => {
+        // TypeScript now knows wpPost is not null due to the filter above
+        const post = article.wpPost!;
+        return {
+          id: post.ID,
+          title: post.postTitle,
+          excerpt: post.postExcerpt,
+          content: post.postContent,
+          date: post.postDate,
+          slug: post.postName,
+          coverImage: post.images?.[0]?.urlImg || null,
+        };
+      });
+  }
+
   async getMangaStaff(id: number) {
     // First check if manga exists
     const manga = await this.prisma.akManga.findUnique({
