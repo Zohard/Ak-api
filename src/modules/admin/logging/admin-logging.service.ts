@@ -6,15 +6,15 @@ export class AdminLoggingService {
   constructor(private prisma: PrismaService) {}
 
   /**
-   * Add a log entry for anime, manga, or business modification
-   * @param contentId - The ID of the anime, manga, or business
-   * @param contentType - 'anime', 'manga', or 'business'
+   * Add a log entry for anime, manga, business, or video game modification
+   * @param contentId - The ID of the anime, manga, business, or video game
+   * @param contentType - 'anime', 'manga', 'business', or 'jeu_video'
    * @param username - The username performing the action
    * @param action - Description of the action (e.g., "Création fiche", "Modification des tags")
    */
   async addLog(
     contentId: number,
-    contentType: 'anime' | 'manga' | 'business',
+    contentType: 'anime' | 'manga' | 'business' | 'jeu_video',
     username: string,
     action: string,
   ): Promise<void> {
@@ -26,6 +26,7 @@ export class AdminLoggingService {
         anime: 0,
         manga: 0,
         business: 0,
+        jeu_video: 0,
       };
       whereClause[contentType] = contentId;
 
@@ -51,11 +52,12 @@ export class AdminLoggingService {
         };
 
         await this.prisma.$queryRaw`
-          INSERT INTO ak_logs_admin (anime, manga, business, json_data, last_mod)
+          INSERT INTO ak_logs_admin (anime, manga, business, jeu_video, json_data, last_mod)
           VALUES (
             ${contentType === 'anime' ? contentId : 0},
             ${contentType === 'manga' ? contentId : 0},
             ${contentType === 'business' ? contentId : 0},
+            ${contentType === 'jeu_video' ? contentId : 0},
             ${JSON.stringify(initialData)},
             ${timestamp}
           )
@@ -75,7 +77,7 @@ export class AdminLoggingService {
    */
   async getLogs(
     contentId: number,
-    contentType: 'anime' | 'manga' | 'business',
+    contentType: 'anime' | 'manga' | 'business' | 'jeu_video',
   ): Promise<any> {
     try {
       const result = await this.prisma.$queryRawUnsafe<any[]>(
@@ -103,7 +105,7 @@ export class AdminLoggingService {
   async getRecentLogs(limit = 50): Promise<any[]> {
     try {
       const logs = await this.prisma.$queryRaw<any[]>`
-        SELECT id_log, anime, manga, business, json_data, last_mod
+        SELECT id_log, anime, manga, business, jeu_video, json_data, last_mod
         FROM ak_logs_admin
         ORDER BY last_mod DESC
         LIMIT ${limit}
@@ -126,7 +128,7 @@ export class AdminLoggingService {
     try {
       // Get recent logs
       const logs = await this.prisma.$queryRaw<any[]>`
-        SELECT id_log, anime, manga, business, json_data, last_mod
+        SELECT id_log, anime, manga, business, jeu_video, json_data, last_mod
         FROM ak_logs_admin
         ORDER BY last_mod DESC
         LIMIT ${limit}
@@ -138,7 +140,7 @@ export class AdminLoggingService {
           const jsonData = JSON.parse(log.json_data || '{}');
 
           // Determine content type and ID
-          let contentType: 'anime' | 'manga' | 'business' = 'anime';
+          let contentType: 'anime' | 'manga' | 'business' | 'jeu_video' = 'anime';
           let contentId = 0;
           let title = '';
           let status = '';
@@ -175,6 +177,17 @@ export class AdminLoggingService {
             if (business && business.length > 0) {
               title = business[0].denomination;
             }
+          } else if (log.jeu_video > 0) {
+            contentType = 'jeu_video';
+            contentId = log.jeu_video;
+            // Fetch video game title and status
+            const game = await this.prisma.$queryRaw<any[]>`
+              SELECT titre, statut FROM ak_jeux_video WHERE id_jeu = ${contentId} LIMIT 1
+            `;
+            if (game && game.length > 0) {
+              title = game[0].titre;
+              status = game[0].statut === 1 ? '' : 'en attente';
+            }
           }
 
           // Parse activities from JSON and sort by timestamp descending
@@ -202,7 +215,9 @@ export class AdminLoggingService {
                 ? `/admin/animes/${contentId}`
                 : contentType === 'manga'
                   ? `/admin/mangas/${contentId}`
-                  : `/admin/business/${contentId}`,
+                  : contentType === 'jeu_video'
+                    ? `/admin/jeux-video/${contentId}`
+                    : `/admin/business/${contentId}`,
             activities,
           };
         }),
