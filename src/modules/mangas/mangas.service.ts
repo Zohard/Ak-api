@@ -15,6 +15,7 @@ import { ImageKitService } from '../media/imagekit.service';
 import { AniListService, AniListManga } from '../anilist/anilist.service';
 import { Prisma } from '@prisma/client';
 import axios from 'axios';
+import { hasAdminAccess } from '../../shared/constants/rbac.constants';
 
 @Injectable()
 export class MangasService extends BaseContentService<
@@ -286,7 +287,7 @@ export class MangasService extends BaseContentService<
     return result;
   }
 
-  async findOne(id: number, includeReviews = false) {
+  async findOne(id: number, includeReviews = false, user?: any) {
     // Try to get from cache first
     const cacheKey = `${id}_${includeReviews}`;
     const cached = await this.cacheService.getManga(parseInt(cacheKey.replace(/[^0-9]/g, '')));
@@ -335,7 +336,9 @@ export class MangasService extends BaseContentService<
     }
 
     // Only allow access to published manga (statut=1) for public endpoints
-    if (manga.statut !== 1) {
+    // Allow admins to view unpublished content
+    const isAdmin = user && (hasAdminAccess(user.groupId) || user.isAdmin);
+    if (manga.statut !== 1 && !isAdmin) {
       throw new NotFoundException('Manga introuvable');
     }
 

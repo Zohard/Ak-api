@@ -28,6 +28,7 @@ import { AnimeQueryDto } from './dto/anime-query.dto';
 import { CreateTrailerDto } from './dto/create-trailer.dto';
 import { UpdateTrailerDto } from './dto/update-trailer.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { OptionalJwtAuthGuard } from '../../common/guards/optional-jwt-auth.guard';
 import { AdminGuard } from '../../common/guards/admin.guard';
 
 @ApiTags('Animes')
@@ -333,6 +334,7 @@ export class AnimesController {
   }
 
   @Get(':id')
+  @UseGuards(OptionalJwtAuthGuard)
   @ApiOperation({ summary: 'Récupérer un anime par ID' })
   @ApiParam({ name: 'id', description: "ID de l'anime", type: 'number' })
   @ApiQuery({
@@ -360,8 +362,9 @@ export class AnimesController {
     @Query('includeReviews') includeReviews = false,
     @Query('includeEpisodes') includeEpisodes = false,
     @Query('includeTrailers') includeTrailers = false,
+    @Request() req?,
   ) {
-    return this.animesService.findOne(id, includeReviews, includeEpisodes, includeTrailers);
+    return this.animesService.findOne(id, includeReviews, includeEpisodes, includeTrailers, req?.user);
   }
 
   @Patch(':id')

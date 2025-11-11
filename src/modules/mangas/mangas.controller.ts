@@ -30,6 +30,7 @@ import { CreateMangaDto } from './dto/create-manga.dto';
 import { UpdateMangaDto } from './dto/update-manga.dto';
 import { MangaQueryDto } from './dto/manga-query.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { OptionalJwtAuthGuard } from '../../common/guards/optional-jwt-auth.guard';
 import { AdminGuard } from '../../common/guards/admin.guard';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ImageKitService } from '../media/imagekit.service';
@@ -261,6 +262,7 @@ export class MangasController {
   }
 
   @Get(':id')
+  @UseGuards(OptionalJwtAuthGuard)
   @ApiOperation({ summary: 'Récupérer un manga par ID' })
   @ApiParam({ name: 'id', description: 'ID du manga', type: 'number' })
   @ApiResponse({ status: 200, description: 'Détails du manga' })
@@ -268,8 +270,9 @@ export class MangasController {
   async findOne(
     @Param('id', ParseIntPipe) id: number,
     @Query('includeReviews') includeReviews = false,
+    @Request() req?,
   ) {
-    return this.mangasService.findOne(id, includeReviews);
+    return this.mangasService.findOne(id, includeReviews, req?.user);
   }
 
   @Patch(':id')

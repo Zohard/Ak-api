@@ -15,6 +15,7 @@ import { RelatedContentItem, RelationsResponse } from '../shared/types/relations
 import { ImageKitService } from '../media/imagekit.service';
 import { AniListService } from '../anilist/anilist.service';
 import { Prisma } from '@prisma/client';
+import { hasAdminAccess } from '../../shared/constants/rbac.constants';
 
 @Injectable()
 export class AnimesService extends BaseContentService<
@@ -311,7 +312,7 @@ export class AnimesService extends BaseContentService<
     return result;
   }
 
-  async findOne(id: number, includeReviews = false, includeEpisodes = false, includeTrailers = false) {
+  async findOne(id: number, includeReviews = false, includeEpisodes = false, includeTrailers = false, user?: any) {
     // Try to get from cache first (v2 includes season data fix)
     const cacheKey = `${id}_${includeReviews}_${includeEpisodes}_${includeTrailers}_v2`;
     const cached = await this.cacheService.getAnime(parseInt(cacheKey.replace(/[^0-9]/g, '')));
@@ -372,7 +373,9 @@ export class AnimesService extends BaseContentService<
     }
 
     // Only allow access to published anime (statut=1) for public endpoints
-    if (anime.statut !== 1) {
+    // Allow admins to view unpublished content
+    const isAdmin = user && (hasAdminAccess(user.groupId) || user.isAdmin);
+    if (anime.statut !== 1 && !isAdmin) {
       throw new NotFoundException('Anime introuvable');
     }
 
