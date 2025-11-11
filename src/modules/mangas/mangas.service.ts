@@ -131,6 +131,7 @@ export class MangasService extends BaseContentService<
       sortBy = 'dateAjout',
       sortOrder = 'desc',
       includeReviews = false,
+      ficheComplete,
     } = query;
 
     // Create cache key from query parameters
@@ -170,6 +171,10 @@ export class MangasService extends BaseContentService<
 
     if (statut !== undefined) {
       where.statut = statut;
+    }
+
+    if (ficheComplete !== undefined) {
+      where.ficheComplete = ficheComplete;
     }
 
     // Handle genre filtering via tags (supports multiple genres, AND logic)

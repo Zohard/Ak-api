@@ -145,6 +145,7 @@ export class AnimesService extends BaseContentService<
       studio,
       annee,
       statut,
+      ficheComplete,
       format,
       genre,
       sortBy,
@@ -197,6 +198,10 @@ export class AnimesService extends BaseContentService<
     } else {
       // Default to published anime only for public listings
       where.statut = 1;
+    }
+
+    if (ficheComplete !== undefined) {
+      where.ficheComplete = ficheComplete;
     }
 
     if (format) {

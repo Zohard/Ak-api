@@ -73,6 +73,19 @@ export class AnimeQueryDto {
   statut?: number;
 
   @ApiPropertyOptional({
+    description: 'Filtrer par fiche complète (0 = incomplète, 1 = complète)',
+    example: 1,
+    minimum: 0,
+    maximum: 1,
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  @Max(1)
+  ficheComplete?: number;
+
+  @ApiPropertyOptional({
     description: 'Filtrer par format',
     example: 'Série TV',
     enum: ['Série TV', 'Film', 'OAV', 'ONA', 'Clip', 'Spécial'],
