@@ -47,7 +47,7 @@ export class MediaController {
   @ApiBearerAuth()
   async uploadImage(
     @UploadedFile() file: Express.Multer.File,
-    @Body('type') type: 'anime' | 'manga' | 'avatar' | 'cover',
+    @Body('type') type: 'anime' | 'manga' | 'avatar' | 'cover' | 'game',
     @Body('relatedId') relatedId?: string,
     @Body('isScreenshot') isScreenshot?: string,
     @CurrentUser() user?: any,
@@ -60,10 +60,10 @@ export class MediaController {
       throw new BadRequestException('Media type is required');
     }
 
-    const validTypes = ['anime', 'manga', 'avatar', 'cover'];
+    const validTypes = ['anime', 'manga', 'avatar', 'cover', 'game'];
     if (!validTypes.includes(type)) {
       throw new BadRequestException(
-        'Invalid media type. Must be one of: anime, manga, avatar, cover',
+        'Invalid media type. Must be one of: anime, manga, avatar, cover, game',
       );
     }
 

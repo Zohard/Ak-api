@@ -28,7 +28,7 @@ export class MediaService {
 
   async uploadImage(
     file: Express.Multer.File,
-    type: 'anime' | 'manga' | 'avatar' | 'cover',
+    type: 'anime' | 'manga' | 'avatar' | 'cover' | 'game',
     relatedId?: number,
     isScreenshot?: boolean,
   ) {
@@ -59,9 +59,11 @@ export class MediaService {
 
       // Upload to ImageKit
       // For screenshots, upload to screenshots/ subfolder
+      // Handle special case for 'game' type (pluralizes to 'games' not 'games')
+      const typeFolder = type === 'game' ? 'games' : `${type}s`;
       const folderPath = isScreenshot
-        ? `images/${type}s/screenshots`
-        : `images/${type}s`;
+        ? `images/${typeFolder}/screenshots`
+        : `images/${typeFolder}`;
 
       uploadResult = await this.imagekitService.uploadImage(
         processedImage,
@@ -279,6 +281,7 @@ export class MediaService {
       manga: 2,
       avatar: 3,
       cover: 4,
+      game: 5,
     };
     return typeMap[type] || 1;
   }
@@ -289,6 +292,7 @@ export class MediaService {
       2: 'manga',
       3: 'avatar',
       4: 'cover',
+      5: 'game',
     };
     return typeMap[typeId] || 'anime';
   }
