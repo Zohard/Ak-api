@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsInt, IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import { IsInt, IsNotEmpty, IsOptional, IsString, IsDateString } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class CreateAdminJeuxVideoDto {
@@ -32,6 +32,26 @@ export class CreateAdminJeuxVideoDto {
   @IsOptional()
   @IsInt()
   annee?: number;
+
+  @ApiPropertyOptional({ description: 'Date de sortie au Japon (YYYY-MM-DD)' })
+  @IsOptional()
+  @IsDateString()
+  dateSortieJapon?: string;
+
+  @ApiPropertyOptional({ description: 'Date de sortie aux USA (YYYY-MM-DD)' })
+  @IsOptional()
+  @IsDateString()
+  dateSortieUsa?: string;
+
+  @ApiPropertyOptional({ description: 'Date de sortie en Europe (YYYY-MM-DD)' })
+  @IsOptional()
+  @IsDateString()
+  dateSortieEurope?: string;
+
+  @ApiPropertyOptional({ description: 'Date de sortie mondiale (YYYY-MM-DD)' })
+  @IsOptional()
+  @IsDateString()
+  dateSortieWorldwide?: string;
 
   @ApiPropertyOptional()
   @IsOptional()

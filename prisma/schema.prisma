@@ -313,6 +313,10 @@ model AkJeuxVideo {
   image             String?   @db.VarChar(255)
   titreAlternatif   String?   @map("titre_alternatif") @db.Text
   annee             Int       @default(0)
+  dateSortieJapon   DateTime? @map("date_sortie_japon") @db.Date
+  dateSortieUsa     DateTime? @map("date_sortie_usa") @db.Date
+  dateSortieEurope  DateTime? @map("date_sortie_europe") @db.Date
+  dateSortieWorldwide DateTime? @map("date_sortie_worldwide") @db.Date
   genre             String?   @db.VarChar(255)
   developpeur       String?   @db.VarChar(255)
   editeur           String?   @db.VarChar(255)

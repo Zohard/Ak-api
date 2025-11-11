@@ -34,6 +34,10 @@ export class AdminJeuxVideoService {
           genre: true,
           editeur: true,
           annee: true,
+          dateSortieJapon: true,
+          dateSortieUsa: true,
+          dateSortieEurope: true,
+          dateSortieWorldwide: true,
           statut: true,
           image: true,
         }
@@ -64,6 +68,10 @@ export class AdminJeuxVideoService {
         genre: true,
         editeur: true,
         annee: true,
+        dateSortieJapon: true,
+        dateSortieUsa: true,
+        dateSortieEurope: true,
+        dateSortieWorldwide: true,
         presentation: true,
         image: true,
         statut: true,
@@ -88,6 +96,12 @@ export class AdminJeuxVideoService {
       data.presentation = data.description;
       delete data.description;
     }
+
+    // Convert date strings to Date objects
+    if (data.dateSortieJapon) data.dateSortieJapon = new Date(data.dateSortieJapon);
+    if (data.dateSortieUsa) data.dateSortieUsa = new Date(data.dateSortieUsa);
+    if (data.dateSortieEurope) data.dateSortieEurope = new Date(data.dateSortieEurope);
+    if (data.dateSortieWorldwide) data.dateSortieWorldwide = new Date(data.dateSortieWorldwide);
 
     if (!data.niceUrl && data.titre) {
       data.niceUrl = this.slugify(data.titre);
@@ -118,6 +132,12 @@ export class AdminJeuxVideoService {
       data.presentation = data.description;
       delete data.description;
     }
+
+    // Convert date strings to Date objects
+    if (data.dateSortieJapon) data.dateSortieJapon = new Date(data.dateSortieJapon);
+    if (data.dateSortieUsa) data.dateSortieUsa = new Date(data.dateSortieUsa);
+    if (data.dateSortieEurope) data.dateSortieEurope = new Date(data.dateSortieEurope);
+    if (data.dateSortieWorldwide) data.dateSortieWorldwide = new Date(data.dateSortieWorldwide);
 
     if (dto.titre && !dto.niceUrl) {
       data.niceUrl = this.slugify(dto.titre);
