@@ -305,6 +305,40 @@ model AkBusiness {
   @@map("ak_business")
 }
 
+// Video Games
+model AkJeuxVideo {
+  idJeu             Int       @id @default(autoincrement()) @map("id_jeu")
+  niceUrl           String?   @map("nice_url") @db.VarChar(255)
+  titre             String?   @db.Text
+  image             String?   @db.VarChar(255)
+  titreAlternatif   String?   @map("titre_alternatif") @db.Text
+  annee             Int       @default(0)
+  genre             String?   @db.VarChar(255)
+  developpeur       String?   @db.VarChar(255)
+  editeur           String?   @db.VarChar(255)
+  plateforme        String?   @db.VarChar(255)
+  siteOfficiel      String?   @map("site_officiel") @db.VarChar(255)
+  disponibilite     Int       @default(0)
+  presentation      String?   @db.Text
+  relations         String?   @db.Text
+  label             Int       @default(0)
+  nbReviews         Int       @default(0) @map("nb_reviews")
+  moyenneNotes      Float     @default(0) @map("moyenne_notes") @db.Real
+  nbClics           Int       @default(0) @map("nb_clics")
+  nbClicsDay        Int       @map("nb_clics_day")
+  nbClicsWeek       Int       @map("nb_clics_week")
+  nbClicsMonth      Int       @map("nb_clics_month")
+  lienForum         Int       @default(0) @map("lienforum")
+  statut            Int       @default(1)
+  playasia          String?   @db.Text
+  dateAjout         DateTime  @default(now()) @map("date_ajout") @db.Timestamp
+  dateModification  Int       @map("date_modification")
+  moyennenotes      Float?    @db.Real
+  latestCache       Int?      @map("latest_cache")
+
+  @@map("ak_jeux_video")
+}
+
 // Business to Anime Relations
 model AkBusinessToAnime {
   idRelation  Int       @id @default(autoincrement()) @map("id_relation")
