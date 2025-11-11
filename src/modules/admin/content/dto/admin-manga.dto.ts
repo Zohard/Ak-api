@@ -142,10 +142,12 @@ export class AdminMangaListQueryDto {
   @IsString()
   annee?: string;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ description: 'Fiche complète (0=incomplète, 1=complète)', enum: [0, 1] })
   @IsOptional()
-  @IsString()
-  editeur?: string;
+  @Type(() => Number)
+  @IsInt()
+  @IsIn([0, 1])
+  ficheComplete?: number;
 
   @ApiPropertyOptional({ enum: [0, 1, 2] })
   @IsOptional()

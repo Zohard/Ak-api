@@ -26,7 +26,7 @@ export class AdminAnimesService {
       limit = 20,
       search,
       annee,
-      format,
+      ficheComplete,
       statut,
       sortBy = 'dateAjout',
       sortOrder = 'desc',
@@ -41,7 +41,7 @@ export class AdminAnimesService {
       ];
     }
     if (annee) where.annee = annee;
-    if (format) where.format = { contains: format, mode: 'insensitive' };
+    if (ficheComplete !== undefined) where.ficheComplete = ficheComplete;
     if (statut !== undefined) where.statut = statut;
 
     // Sort "En attente" (status 2) first, then by the requested sort

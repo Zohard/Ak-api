@@ -17,12 +17,12 @@ export class AdminMangasService {
   ) {}
 
   async list(query: AdminMangaListQueryDto) {
-    const { page = 1, limit = 20, search, annee, editeur, statut } = query;
+    const { page = 1, limit = 20, search, annee, ficheComplete, statut } = query;
     const skip = (page - 1) * limit;
     const where: any = {};
     if (search) where.titre = { contains: search, mode: 'insensitive' };
     if (annee) where.annee = annee;
-    if (editeur) where.editeur = { contains: editeur, mode: 'insensitive' };
+    if (ficheComplete !== undefined) where.ficheComplete = ficheComplete;
     if (statut !== undefined) where.statut = statut;
 
     const [items, total] = await Promise.all([

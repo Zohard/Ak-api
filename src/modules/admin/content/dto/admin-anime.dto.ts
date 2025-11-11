@@ -270,10 +270,12 @@ export class AdminAnimeListQueryDto {
   @IsInt()
   annee?: number;
 
-  @ApiPropertyOptional({ description: 'Filtrer par format' })
+  @ApiPropertyOptional({ description: 'Fiche complète (0=incomplète, 1=complète)', enum: [0, 1] })
   @IsOptional()
-  @IsString()
-  format?: string;
+  @Type(() => Number)
+  @IsInt()
+  @IsIn([0, 1])
+  ficheComplete?: number;
 
   @ApiPropertyOptional({ description: 'Filtrer par statut', enum: [0, 1, 2] })
   @IsOptional()
