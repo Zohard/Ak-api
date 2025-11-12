@@ -71,6 +71,11 @@ export class IgdbService {
       this.tokenExpiry = Date.now() + (data.expires_in - 300) * 1000;
 
       this.logger.log('Successfully obtained IGDB access token');
+
+      if (!this.accessToken) {
+        throw new Error('Failed to obtain access token from response');
+      }
+
       return this.accessToken;
     } catch (error) {
       this.logger.error('Failed to get IGDB access token', error);
