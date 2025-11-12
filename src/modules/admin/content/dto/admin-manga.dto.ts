@@ -86,8 +86,9 @@ export class CreateAdminMangaDto {
   @Min(0)
   lienForum?: number;
 
-  @ApiPropertyOptional({ description: 'Fiche complète (0=non, 1=oui)', minimum: 0, maximum: 1 })
+  @ApiPropertyOptional({ description: 'Fiche complète (0=non, 1=oui)', enum: [0, 1] })
   @IsOptional()
+  @Type(() => Number)
   @IsInt()
   @IsIn([0, 1])
   ficheComplete?: number;

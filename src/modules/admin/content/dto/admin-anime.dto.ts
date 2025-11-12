@@ -133,6 +133,13 @@ export class CreateAdminAnimeDto {
   @IsOptional()
   @IsInt()
   lienforum?: number;
+
+  @ApiPropertyOptional({ description: 'Fiche complète (0=non, 1=oui)', enum: [0, 1] })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @IsIn([0, 1])
+  ficheComplete?: number;
 }
 
 export class UpdateAdminAnimeDto {
@@ -241,6 +248,13 @@ export class UpdateAdminAnimeDto {
   @IsOptional()
   @IsInt()
   lienforum?: number;
+
+  @ApiPropertyOptional({ description: 'Fiche complète (0=non, 1=oui)', enum: [0, 1] })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @IsIn([0, 1])
+  ficheComplete?: number;
 }
 
 export class AdminAnimeListQueryDto {
