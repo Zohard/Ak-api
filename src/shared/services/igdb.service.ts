@@ -31,15 +31,28 @@ interface IgdbGame {
 @Injectable()
 export class IgdbService {
   private readonly logger = new Logger(IgdbService.name);
-  private readonly clientId = process.env.IGDB_CLIENT_ID;
-  private readonly clientSecret = process.env.IGDB_CLIENT_SECRET;
+  private readonly clientId: string;
+  private readonly clientSecret: string;
   private accessToken: string | null = null;
   private tokenExpiry: number = 0;
+
+  constructor() {
+    this.clientId = process.env.IGDB_CLIENT_ID || '';
+    this.clientSecret = process.env.IGDB_CLIENT_SECRET || '';
+
+    if (!this.clientId || !this.clientSecret) {
+      this.logger.warn('IGDB credentials not configured');
+    }
+  }
 
   async getAccessToken(): Promise<string> {
     // Return cached token if still valid
     if (this.accessToken && Date.now() < this.tokenExpiry) {
       return this.accessToken;
+    }
+
+    if (!this.clientId || !this.clientSecret) {
+      throw new Error('IGDB credentials not configured');
     }
 
     try {
