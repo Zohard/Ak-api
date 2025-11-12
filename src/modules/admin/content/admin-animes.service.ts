@@ -15,7 +15,19 @@ export class AdminAnimesService {
   ) {}
 
   async getOne(id: number) {
-    const anime = await this.prisma.akAnime.findUnique({ where: { idAnime: id } });
+    const anime = await this.prisma.akAnime.findUnique({
+      where: { idAnime: id },
+      include: {
+        trailers: {
+          select: {
+            idTrailer: true,
+            titre: true,
+            lien: true,
+            dateAjout: true,
+          },
+        },
+      },
+    });
     if (!anime) throw new NotFoundException('Anime introuvable');
     return anime;
   }
