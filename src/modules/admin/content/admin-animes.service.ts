@@ -22,7 +22,7 @@ export class AdminAnimesService {
           select: {
             idTrailer: true,
             titre: true,
-            lien: true,
+            url: true,
             dateAjout: true,
           },
         },
