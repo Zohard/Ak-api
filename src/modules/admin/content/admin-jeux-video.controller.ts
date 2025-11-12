@@ -50,4 +50,17 @@ export class AdminJeuxVideoController {
   remove(@Param('id', ParseIntPipe) id: number) {
     return this.service.remove(id);
   }
+
+  @Get('igdb/search')
+  @ApiOperation({ summary: 'Rechercher des jeux sur IGDB' })
+  searchIgdb(@Query('query') query: string) {
+    return this.service.searchIgdb(query);
+  }
+
+  @Post('igdb/import/:igdbId')
+  @ApiOperation({ summary: 'Importer un jeu depuis IGDB' })
+  importFromIgdb(@Request() req, @Param('igdbId', ParseIntPipe) igdbId: number) {
+    const username = req.user?.pseudo || req.user?.member_name || 'admin';
+    return this.service.importFromIgdb(igdbId, username);
+  }
 }

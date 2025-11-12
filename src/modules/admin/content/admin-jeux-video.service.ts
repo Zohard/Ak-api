@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../../shared/services/prisma.service';
+import { IgdbService } from '../../../shared/services/igdb.service';
 import { AdminLoggingService } from '../logging/admin-logging.service';
 import { AdminJeuxVideoListQueryDto, CreateAdminJeuxVideoDto, UpdateAdminJeuxVideoDto } from './dto/admin-jeux-video.dto';
 
@@ -8,6 +9,7 @@ export class AdminJeuxVideoService {
   constructor(
     private prisma: PrismaService,
     private adminLogging: AdminLoggingService,
+    private igdbService: IgdbService,
   ) {}
 
   async list(query: AdminJeuxVideoListQueryDto) {
@@ -288,6 +290,229 @@ export class AdminJeuxVideoService {
 
     await this.prisma.akJeuxVideo.delete({ where: { idJeu: id } });
     return { message: 'Jeu vidéo supprimé' };
+  }
+
+  /**
+   * Search IGDB for games
+   */
+  async searchIgdb(query: string) {
+    const games = await this.igdbService.searchGames(query, 20);
+
+    return games.map(game => ({
+      igdbId: game.id,
+      name: game.name,
+      summary: game.summary,
+      releaseDate: game.first_release_date ? new Date(game.first_release_date * 1000) : null,
+      cover: game.cover ? `https://images.igdb.com/igdb/image/upload/t_cover_big/${game.cover.image_id}.jpg` : null,
+      platforms: game.platforms?.map(p => p.name).join(', ') || null,
+      genres: game.genres?.map(g => g.name).join(', ') || null,
+    }));
+  }
+
+  /**
+   * Import a game from IGDB
+   */
+  async importFromIgdb(igdbId: number, username?: string) {
+    // Fetch full game data from IGDB
+    const igdbGame = await this.igdbService.getGameById(igdbId);
+
+    if (!igdbGame) {
+      throw new NotFoundException('Game not found on IGDB');
+    }
+
+    // Extract release year
+    const releaseYear = igdbGame.first_release_date
+      ? new Date(igdbGame.first_release_date * 1000).getFullYear()
+      : undefined;
+
+    // Get or create publisher
+    const publisher = igdbGame.involved_companies?.find(c => c.publisher)?.company?.name;
+
+    // Map genres from IGDB to our database
+    const genreIds = await this.mapIgdbGenres(igdbGame.genres || []);
+
+    // Map platforms from IGDB to our database
+    const platformIds = await this.mapIgdbPlatforms(igdbGame.platforms || []);
+
+    // Map regional release dates
+    const releaseDates = this.mapIgdbReleaseDates(igdbGame.release_dates || []);
+
+    // Create the game
+    const gameData: any = {
+      titre: igdbGame.name,
+      niceUrl: this.slugify(igdbGame.name),
+      presentation: igdbGame.summary || null,
+      annee: releaseYear || 0,
+      editeur: publisher || null,
+      dateSortieJapon: releaseDates.japon || null,
+      dateSortieUsa: releaseDates.usa || null,
+      dateSortieEurope: releaseDates.europe || null,
+      dateSortieWorldwide: releaseDates.worldwide || null,
+      statut: 2, // En attente by default
+    };
+
+    // Download and save cover image if available
+    if (igdbGame.cover?.image_id) {
+      const imageBuffer = await this.igdbService.downloadCoverImage(igdbGame.cover.image_id);
+      if (imageBuffer) {
+        // Save the image with a unique filename
+        const filename = `igdb-${igdbId}-${Date.now()}.jpg`;
+        gameData.image = filename;
+        // TODO: You might want to save the image to your storage here
+        // For now, we'll just store the filename
+      }
+    }
+
+    const created = await this.prisma.akJeuxVideo.create({ data: gameData });
+
+    // Create platform associations
+    if (platformIds.length > 0) {
+      await this.prisma.akJeuxVideoPlatform.createMany({
+        data: platformIds.map((idPlatform: number, index: number) => ({
+          idJeu: created.idJeu,
+          idPlatform,
+          isPrimary: index === 0,
+        })),
+        skipDuplicates: true,
+      });
+    }
+
+    // Create genre associations
+    if (genreIds.length > 0) {
+      await this.prisma.akJeuxVideoGenre.createMany({
+        data: genreIds.map((idGenre: number) => ({
+          idJeu: created.idJeu,
+          idGenre,
+        })),
+        skipDuplicates: true,
+      });
+    }
+
+    // Log the creation
+    if (username) {
+      await this.adminLogging.addLog(created.idJeu, 'jeu_video', username, `Import IGDB (ID: ${igdbId})`);
+    }
+
+    return {
+      ...created,
+      idJeuVideo: created.idJeu,
+      description: created.presentation,
+      platformIds,
+      genreIds,
+    };
+  }
+
+  /**
+   * Map IGDB genres to database genre IDs
+   */
+  private async mapIgdbGenres(igdbGenres: Array<{ id: number; name: string }>): Promise<number[]> {
+    const genreMap: Record<string, string> = {
+      'Role-playing (RPG)': 'RPG',
+      'Shooter': 'Action',
+      'Platform': 'Platformer',
+      'Fighting': 'Combat',
+      'Strategy': 'Strategy',
+      'Adventure': 'Adventure',
+      'Puzzle': 'Puzzle',
+      'Racing': 'Racing',
+      'Sport': 'Sports',
+      'Simulator': 'Simulation',
+    };
+
+    const genreIds: number[] = [];
+
+    for (const igdbGenre of igdbGenres) {
+      const mappedName = genreMap[igdbGenre.name] || igdbGenre.name;
+
+      // Try to find existing genre
+      let genre = await this.prisma.akGenre.findFirst({
+        where: { name: { equals: mappedName, mode: 'insensitive' } }
+      });
+
+      // Create if doesn't exist
+      if (!genre) {
+        genre = await this.prisma.akGenre.create({
+          data: {
+            name: mappedName,
+            slug: this.slugify(mappedName),
+          }
+        });
+      }
+
+      genreIds.push(genre.idGenre);
+    }
+
+    return genreIds;
+  }
+
+  /**
+   * Map IGDB platforms to database platform IDs
+   */
+  private async mapIgdbPlatforms(igdbPlatforms: Array<{ id: number; name: string; abbreviation?: string }>): Promise<number[]> {
+    const platformMap: Record<string, string> = {
+      'PC (Microsoft Windows)': 'PC',
+      'PlayStation 5': 'PlayStation 5',
+      'PlayStation 4': 'PlayStation 4',
+      'Xbox Series X|S': 'Xbox Series X|S',
+      'Nintendo Switch': 'Nintendo Switch',
+      'PlayStation 3': 'PlayStation 3',
+      'Xbox 360': 'Xbox 360',
+      'Wii U': 'Wii U',
+    };
+
+    const platformIds: number[] = [];
+
+    for (const igdbPlatform of igdbPlatforms) {
+      const mappedName = platformMap[igdbPlatform.name] || igdbPlatform.abbreviation || igdbPlatform.name;
+
+      // Try to find existing platform
+      let platform = await this.prisma.akPlatform.findFirst({
+        where: { name: { equals: mappedName, mode: 'insensitive' } }
+      });
+
+      // Create if doesn't exist
+      if (!platform) {
+        platform = await this.prisma.akPlatform.create({
+          data: {
+            name: mappedName,
+          }
+        });
+      }
+
+      platformIds.push(platform.idPlatform);
+    }
+
+    return platformIds;
+  }
+
+  /**
+   * Map IGDB release dates to regional dates
+   */
+  private mapIgdbReleaseDates(releaseDates: Array<{ date?: number; region?: number }>): {
+    japon: Date | null;
+    usa: Date | null;
+    europe: Date | null;
+    worldwide: Date | null;
+  } {
+    const result = {
+      japon: null as Date | null,
+      usa: null as Date | null,
+      europe: null as Date | null,
+      worldwide: null as Date | null,
+    };
+
+    for (const release of releaseDates) {
+      if (!release.date) continue;
+
+      const date = new Date(release.date * 1000);
+      const region = this.igdbService.mapRegion(release.region);
+
+      if (region && !result[region]) {
+        result[region] = date;
+      }
+    }
+
+    return result;
   }
 
   private slugify(text: string) {

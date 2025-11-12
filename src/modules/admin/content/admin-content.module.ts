@@ -14,13 +14,14 @@ import { AdminGenresController } from './admin-genres.controller';
 import { SourcesExternesController } from './sources-externes.controller';
 import { SourcesExternesService } from './sources-externes.service';
 import { PrismaService } from '../../../shared/services/prisma.service';
+import { IgdbService } from '../../../shared/services/igdb.service';
 import { MediaModule } from '../../media/media.module';
 import { AdminLoggingModule } from '../logging/admin-logging.module';
 
 @Module({
   imports: [MediaModule, AdminLoggingModule],
   controllers: [AdminContentController, AdminAnimesController, AdminMangasController, AdminBusinessController, AdminJeuxVideoController, AdminPlatformsController, AdminGenresController, SourcesExternesController],
-  providers: [AdminContentService, AdminAnimesService, AdminMangasService, AdminBusinessService, AdminJeuxVideoService, SourcesExternesService, PrismaService],
+  providers: [AdminContentService, AdminAnimesService, AdminMangasService, AdminBusinessService, AdminJeuxVideoService, SourcesExternesService, PrismaService, IgdbService],
   exports: [AdminContentService],
 })
 export class AdminContentModule {}
