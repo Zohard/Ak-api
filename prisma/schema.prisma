@@ -342,8 +342,38 @@ model AkJeuxVideo {
 
   // Relations
   platforms         AkJeuxVideoPlatform[]
+  genres            AkJeuxVideoGenre[]
 
   @@map("ak_jeux_video")
+}
+
+// Gaming Genres
+model AkGenre {
+  idGenre       Int       @id @default(autoincrement()) @map("id_genre")
+  name          String    @unique @db.VarChar(100)
+  slug          String    @unique @db.VarChar(100)
+  sortOrder     Int       @default(0) @map("sort_order")
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamp
+
+  // Relations
+  jeuxVideoGenres AkJeuxVideoGenre[]
+
+  @@map("ak_genres")
+}
+
+// Junction table for game-genre many-to-many relationship
+model AkJeuxVideoGenre {
+  idRelation    Int       @id @default(autoincrement()) @map("id_relation")
+  idJeu         Int       @map("id_jeu")
+  idGenre       Int       @map("id_genre")
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamp
+
+  // Relations
+  jeuVideo      AkJeuxVideo @relation(fields: [idJeu], references: [idJeu], onDelete: Cascade)
+  genre         AkGenre     @relation(fields: [idGenre], references: [idGenre], onDelete: Restrict)
+
+  @@unique([idJeu, idGenre])
+  @@map("ak_jeux_video_genres")
 }
 
 // Gaming Platforms

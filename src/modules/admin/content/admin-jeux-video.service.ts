@@ -91,6 +91,19 @@ export class AdminJeuxVideoService {
             }
           },
           orderBy: { isPrimary: 'desc' }
+        },
+        genres: {
+          select: {
+            idRelation: true,
+            idGenre: true,
+            genre: {
+              select: {
+                idGenre: true,
+                name: true,
+                slug: true,
+              }
+            }
+          }
         }
       }
     });
@@ -103,13 +116,16 @@ export class AdminJeuxVideoService {
       idJeuVideo: item.idJeu,
       description: item.presentation,
       platformIds: item.platforms.map(p => p.idPlatform),
+      genreIds: item.genres.map(g => g.idGenre),
     };
   }
 
   async create(dto: CreateAdminJeuxVideoDto, username?: string) {
     const data: any = { ...dto };
     const platformIds = data.platformIds || [];
+    const genreIds = data.genreIds || [];
     delete data.platformIds; // Remove from main data object
+    delete data.genreIds; // Remove from main data object
 
     // Map description to presentation for database
     if (data.description !== undefined) {
@@ -140,6 +156,16 @@ export class AdminJeuxVideoService {
       });
     }
 
+    // Create genre associations if genreIds provided
+    if (genreIds.length > 0) {
+      await this.prisma.akJeuxVideoGenre.createMany({
+        data: genreIds.map((idGenre: number) => ({
+          idJeu: created.idJeu,
+          idGenre,
+        })),
+      });
+    }
+
     // Log the creation
     if (username) {
       await this.adminLogging.addLog(created.idJeu, 'jeu_video', username, 'Création fiche');
@@ -150,6 +176,7 @@ export class AdminJeuxVideoService {
       idJeuVideo: created.idJeu,
       description: created.presentation,
       platformIds,
+      genreIds,
     };
   }
 
@@ -159,7 +186,9 @@ export class AdminJeuxVideoService {
 
     const data: any = { ...dto };
     const platformIds = data.platformIds;
+    const genreIds = data.genreIds;
     delete data.platformIds; // Remove from main data object
+    delete data.genreIds; // Remove from main data object
 
     // Map description to presentation for database
     if (data.description !== undefined) {
@@ -201,6 +230,24 @@ export class AdminJeuxVideoService {
       }
     }
 
+    // Update genre associations if genreIds provided
+    if (genreIds !== undefined) {
+      // Delete existing associations
+      await this.prisma.akJeuxVideoGenre.deleteMany({
+        where: { idJeu: id }
+      });
+
+      // Create new associations
+      if (genreIds.length > 0) {
+        await this.prisma.akJeuxVideoGenre.createMany({
+          data: genreIds.map((idGenre: number) => ({
+            idJeu: id,
+            idGenre,
+          })),
+        });
+      }
+    }
+
     // Log the update
     if (username) {
       await this.adminLogging.addLog(id, 'jeu_video', username, 'Modification infos principales');
@@ -211,6 +258,7 @@ export class AdminJeuxVideoService {
       idJeuVideo: updated.idJeu,
       description: updated.presentation,
       platformIds,
+      genreIds,
     };
   }
 

@@ -25,10 +25,17 @@ export class CreateAdminJeuxVideoDto {
   @Type(() => Number)
   platformIds?: number[];
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ description: 'Legacy genre field (deprecated, use genreIds)' })
   @IsOptional()
   @IsString()
   genre?: string;
+
+  @ApiPropertyOptional({ description: 'Array of genre IDs', type: [Number] })
+  @IsOptional()
+  @IsArray()
+  @IsInt({ each: true })
+  @Type(() => Number)
+  genreIds?: number[];
 
   @ApiPropertyOptional()
   @IsOptional()
