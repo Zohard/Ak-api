@@ -7,6 +7,7 @@ import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
 import { AnimesModule } from './modules/animes/animes.module';
 import { MangasModule } from './modules/mangas/mangas.module';
+import { JeuxVideoModule } from './modules/jeux-video/jeux-video.module';
 import { ReviewsModule } from './modules/reviews/reviews.module';
 import { SearchModule } from './modules/search/search.module';
 import { BusinessModule } from './modules/business/business.module';
@@ -54,6 +55,7 @@ import jwtConfig from './config/jwt.config';
     UsersModule,
     AnimesModule,
     MangasModule,
+    JeuxVideoModule,
     ReviewsModule,
     SearchModule,
     BusinessModule,
