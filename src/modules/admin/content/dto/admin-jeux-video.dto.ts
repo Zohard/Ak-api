@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsInt, IsNotEmpty, IsOptional, IsString, IsDateString } from 'class-validator';
+import { IsInt, IsNotEmpty, IsOptional, IsString, IsDateString, IsArray } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class CreateAdminJeuxVideoDto {
@@ -13,10 +13,17 @@ export class CreateAdminJeuxVideoDto {
   @IsString()
   niceUrl?: string;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ description: 'Legacy platform field (deprecated, use platformIds)' })
   @IsOptional()
   @IsString()
   plateforme?: string;
+
+  @ApiPropertyOptional({ description: 'Array of platform IDs', type: [Number] })
+  @IsOptional()
+  @IsArray()
+  @IsInt({ each: true })
+  @Type(() => Number)
+  platformIds?: number[];
 
   @ApiPropertyOptional()
   @IsOptional()

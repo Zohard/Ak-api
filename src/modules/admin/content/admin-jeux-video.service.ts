@@ -75,6 +75,23 @@ export class AdminJeuxVideoService {
         presentation: true,
         image: true,
         statut: true,
+        platforms: {
+          select: {
+            idRelation: true,
+            idPlatform: true,
+            releaseDate: true,
+            isPrimary: true,
+            platform: {
+              select: {
+                idPlatform: true,
+                name: true,
+                manufacturer: true,
+                platformType: true,
+              }
+            }
+          },
+          orderBy: { isPrimary: 'desc' }
+        }
       }
     });
 
@@ -85,11 +102,14 @@ export class AdminJeuxVideoService {
       ...item,
       idJeuVideo: item.idJeu,
       description: item.presentation,
+      platformIds: item.platforms.map(p => p.idPlatform),
     };
   }
 
   async create(dto: CreateAdminJeuxVideoDto, username?: string) {
     const data: any = { ...dto };
+    const platformIds = data.platformIds || [];
+    delete data.platformIds; // Remove from main data object
 
     // Map description to presentation for database
     if (data.description !== undefined) {
@@ -109,6 +129,17 @@ export class AdminJeuxVideoService {
 
     const created = await this.prisma.akJeuxVideo.create({ data });
 
+    // Create platform associations if platformIds provided
+    if (platformIds.length > 0) {
+      await this.prisma.akJeuxVideoPlatform.createMany({
+        data: platformIds.map((idPlatform: number, index: number) => ({
+          idJeu: created.idJeu,
+          idPlatform,
+          isPrimary: index === 0, // First platform is primary
+        })),
+      });
+    }
+
     // Log the creation
     if (username) {
       await this.adminLogging.addLog(created.idJeu, 'jeu_video', username, 'Création fiche');
@@ -118,6 +149,7 @@ export class AdminJeuxVideoService {
       ...created,
       idJeuVideo: created.idJeu,
       description: created.presentation,
+      platformIds,
     };
   }
 
@@ -126,6 +158,8 @@ export class AdminJeuxVideoService {
     if (!existing) throw new NotFoundException('Jeu vidéo introuvable');
 
     const data: any = { ...dto };
+    const platformIds = data.platformIds;
+    delete data.platformIds; // Remove from main data object
 
     // Map description to presentation for database
     if (data.description !== undefined) {
@@ -148,6 +182,25 @@ export class AdminJeuxVideoService {
       data
     });
 
+    // Update platform associations if platformIds provided
+    if (platformIds !== undefined) {
+      // Delete existing associations
+      await this.prisma.akJeuxVideoPlatform.deleteMany({
+        where: { idJeu: id }
+      });
+
+      // Create new associations
+      if (platformIds.length > 0) {
+        await this.prisma.akJeuxVideoPlatform.createMany({
+          data: platformIds.map((idPlatform: number, index: number) => ({
+            idJeu: id,
+            idPlatform,
+            isPrimary: index === 0, // First platform is primary
+          })),
+        });
+      }
+    }
+
     // Log the update
     if (username) {
       await this.adminLogging.addLog(id, 'jeu_video', username, 'Modification infos principales');
@@ -157,6 +210,7 @@ export class AdminJeuxVideoService {
       ...updated,
       idJeuVideo: updated.idJeu,
       description: updated.presentation,
+      platformIds,
     };
   }
 
