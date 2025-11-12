@@ -83,7 +83,7 @@ export class JeuxVideoService {
           annee: true,
           image: true,
           moyenneNotes: true,
-          nbNotes: true,
+          nbReviews: true,
           dateAjout: true,
           dateSortieJapon: true,
           dateSortieUsa: true,
@@ -149,7 +149,7 @@ export class JeuxVideoService {
         presentation: true,
         image: true,
         moyenneNotes: true,
-        nbNotes: true,
+        nbReviews: true,
         dateAjout: true,
         platforms: {
           select: {
