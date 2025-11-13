@@ -353,7 +353,9 @@ export class AdminJeuxVideoService {
     const platformIds = await this.mapIgdbPlatforms(igdbGame.platforms || []);
 
     // Map regional release dates
+    console.log('IGDB release_dates raw data:', JSON.stringify(igdbGame.release_dates, null, 2));
     const releaseDates = this.mapIgdbReleaseDates(igdbGame.release_dates || []);
+    console.log('Mapped release dates:', releaseDates);
 
     // Create the game
     const gameData: any = {
@@ -583,17 +585,28 @@ export class AdminJeuxVideoService {
       worldwide: null as Date | null,
     };
 
+    console.log(`Processing ${releaseDates.length} release dates`);
+
     for (const release of releaseDates) {
-      if (!release.date) continue;
+      console.log('Processing release:', { date: release.date, region: release.region });
+
+      if (!release.date) {
+        console.log('Skipping release - no date');
+        continue;
+      }
 
       const date = new Date(release.date * 1000);
       const region = this.igdbService.mapRegion(release.region);
 
+      console.log(`Converted: region code ${release.region} -> ${region}, date: ${date.toISOString()}`);
+
       if (region && !result[region]) {
         result[region] = date;
+        console.log(`Set ${region} to ${date.toISOString()}`);
       }
     }
 
+    console.log('Final result:', result);
     return result;
   }
 

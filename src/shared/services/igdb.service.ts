@@ -99,7 +99,7 @@ export class IgdbService {
           fields name, summary, first_release_date, cover.url, cover.image_id,
                  genres.name, platforms.name, platforms.abbreviation,
                  involved_companies.company.name, involved_companies.publisher, involved_companies.developer,
-                 release_dates.date, release_dates.region, release_dates.platform.name;
+                 release_dates.date, release_dates.region, release_dates.platform;
           limit ${limit};
         `,
       });
@@ -133,7 +133,7 @@ export class IgdbService {
           fields name, summary, first_release_date, cover.url, cover.image_id,
                  genres.name, platforms.name, platforms.abbreviation,
                  involved_companies.company.name, involved_companies.publisher, involved_companies.developer,
-                 release_dates.date, release_dates.region, release_dates.platform.name;
+                 release_dates.date, release_dates.region, release_dates.platform;
           limit 1;
         `,
       });
@@ -143,7 +143,15 @@ export class IgdbService {
       }
 
       const games = await response.json();
-      return games.length > 0 ? games[0] : null;
+      const game = games.length > 0 ? games[0] : null;
+      if (game) {
+        this.logger.log(`IGDB game data for ID ${igdbId}:`);
+        this.logger.log(`Release dates count: ${game.release_dates?.length || 0}`);
+        if (game.release_dates) {
+          this.logger.log(`Release dates: ${JSON.stringify(game.release_dates, null, 2)}`);
+        }
+      }
+      return game;
     } catch (error) {
       this.logger.error(`Failed to get game ${igdbId} from IGDB`, error);
       throw error;
