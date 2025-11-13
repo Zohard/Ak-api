@@ -63,6 +63,22 @@ export class AdminJeuxVideoService {
     };
   }
 
+  async searchByName(query: string, limit = 10) {
+    const q = `%${query}%`;
+    const rows = await this.prisma.$queryRaw`
+      SELECT
+        id_jeu as id,
+        id_jeu as "idJeuVideo",
+        titre,
+        statut
+      FROM ak_jeux_video
+      WHERE titre ILIKE ${q}
+      ORDER BY titre
+      LIMIT ${limit}
+    `;
+    return { items: rows };
+  }
+
   async getOne(id: number) {
     const item = await this.prisma.akJeuxVideo.findUnique({
       where: { idJeu: id },

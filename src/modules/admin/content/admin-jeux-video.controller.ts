@@ -20,6 +20,17 @@ export class AdminJeuxVideoController {
     return this.service.list(query);
   }
 
+  @Get('search')
+  @ApiOperation({ summary: 'Search jeux video by name for autocomplete' })
+  async searchJeuxVideo(
+    @Query('q') q: string,
+    @Query('limit', new ParseIntPipe({ optional: true })) limit?: number,
+  ) {
+    if (!q || !q.trim()) return { items: [] };
+    const lim = limit || 10;
+    return this.service.searchByName(q.trim(), lim);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Obtenir une fiche jeu vidéo (admin)' })
   getOne(@Param('id', ParseIntPipe) id: number) {

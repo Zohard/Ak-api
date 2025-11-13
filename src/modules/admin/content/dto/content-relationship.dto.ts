@@ -10,10 +10,10 @@ export class CreateContentRelationshipDto {
 
   @ApiProperty({
     description: 'Type of the related content',
-    enum: ['anime', 'manga'],
+    enum: ['anime', 'manga', 'jeu-video', 'article'],
   })
   @IsString()
-  @IsIn(['anime', 'manga'])
+  @IsIn(['anime', 'manga', 'jeu-video', 'article'])
   related_type: string;
 
   @ApiPropertyOptional({

@@ -675,7 +675,8 @@ export class AdminContentService {
     const rows = await this.prisma.$queryRaw`
       SELECT
         id_anime as id,
-        titre as name,
+        id_anime as "idAnime",
+        titre,
         titre_orig as "originalName",
         statut
       FROM ak_animes
@@ -691,7 +692,8 @@ export class AdminContentService {
     const rows = await this.prisma.$queryRaw`
       SELECT
         id_manga as id,
-        titre as name,
+        id_manga as "idManga",
+        titre,
         titre_orig as "originalName",
         statut
       FROM ak_mangas
