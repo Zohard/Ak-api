@@ -376,7 +376,7 @@ export class AdminJeuxVideoService {
       nbClicsDay: 0,
       nbClicsWeek: 0,
       nbClicsMonth: 0,
-      lienforum: 0,
+      lienForum: 0, // Note: camelCase for Prisma
       dateModification: Math.floor(Date.now() / 1000), // Unix timestamp
     };
 
