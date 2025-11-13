@@ -15,6 +15,13 @@ export class JeuxVideoController {
     return this.jeuxVideoService.findAll(query);
   }
 
+  @Get('platforms')
+  @ApiOperation({ summary: 'Liste des plateformes disponibles' })
+  @ApiResponse({ status: 200, description: 'Liste des plateformes' })
+  async getPlatforms() {
+    return this.jeuxVideoService.getPlatforms();
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Obtenir un jeu vidéo par ID' })
   @ApiParam({ name: 'id', description: 'ID du jeu vidéo' })

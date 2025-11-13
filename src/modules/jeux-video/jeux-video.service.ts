@@ -191,4 +191,21 @@ export class JeuxVideoService {
       description: item.presentation,
     };
   }
+
+  async getPlatforms() {
+    const platforms = await this.prisma.akPlatform.findMany({
+      orderBy: { sortOrder: 'asc' },
+      select: {
+        idPlatform: true,
+        name: true,
+        manufacturer: true,
+        generation: true,
+        releaseYear: true,
+        platformType: true,
+        sortOrder: true,
+      }
+    });
+
+    return { platforms };
+  }
 }
