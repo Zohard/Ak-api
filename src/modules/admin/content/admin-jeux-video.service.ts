@@ -3,6 +3,8 @@ import { PrismaService } from '../../../shared/services/prisma.service';
 import { IgdbService } from '../../../shared/services/igdb.service';
 import { AdminLoggingService } from '../logging/admin-logging.service';
 import { AdminJeuxVideoListQueryDto, CreateAdminJeuxVideoDto, UpdateAdminJeuxVideoDto } from './dto/admin-jeux-video.dto';
+import { CreateJeuVideoTrailerDto } from './dto/create-jeu-video-trailer.dto';
+import { UpdateJeuVideoTrailerDto } from './dto/update-jeu-video-trailer.dto';
 
 @Injectable()
 export class AdminJeuxVideoService {
@@ -106,6 +108,20 @@ export class AdminJeuxVideoService {
               }
             }
           }
+        },
+        trailers: {
+          select: {
+            idTrailer: true,
+            titre: true,
+            url: true,
+            platform: true,
+            langue: true,
+            typeTrailer: true,
+            ordre: true,
+            dateAjout: true,
+            statut: true,
+          },
+          orderBy: { ordre: 'asc' }
         }
       }
     });
@@ -513,6 +529,72 @@ export class AdminJeuxVideoService {
     }
 
     return result;
+  }
+
+  /**
+   * Add a trailer to a video game
+   */
+  async addTrailer(dto: CreateJeuVideoTrailerDto, username?: string) {
+    // Verify game exists
+    const game = await this.prisma.akJeuxVideo.findUnique({ where: { idJeu: dto.idJeu } });
+    if (!game) throw new NotFoundException('Jeu vidéo introuvable');
+
+    const trailer = await this.prisma.akJeuxVideoTrailer.create({
+      data: {
+        idJeu: dto.idJeu,
+        titre: dto.titre || null,
+        url: dto.url,
+        platform: dto.platform || null,
+        langue: dto.langue || 'en',
+        typeTrailer: dto.typeTrailer || 'Trailer',
+        ordre: dto.ordre || 0,
+        statut: dto.statut !== undefined ? dto.statut : 1,
+      }
+    });
+
+    // Log the action
+    if (username) {
+      await this.adminLogging.addLog(dto.idJeu, 'jeu_video', username, 'Ajout bande-annonce');
+    }
+
+    return trailer;
+  }
+
+  /**
+   * Update a trailer
+   */
+  async updateTrailer(trailerId: number, dto: UpdateJeuVideoTrailerDto, username?: string) {
+    const existing = await this.prisma.akJeuxVideoTrailer.findUnique({ where: { idTrailer: trailerId } });
+    if (!existing) throw new NotFoundException('Bande-annonce introuvable');
+
+    const updated = await this.prisma.akJeuxVideoTrailer.update({
+      where: { idTrailer: trailerId },
+      data: dto
+    });
+
+    // Log the action
+    if (username) {
+      await this.adminLogging.addLog(existing.idJeu, 'jeu_video', username, 'Modification bande-annonce');
+    }
+
+    return updated;
+  }
+
+  /**
+   * Delete a trailer
+   */
+  async removeTrailer(trailerId: number, username?: string) {
+    const existing = await this.prisma.akJeuxVideoTrailer.findUnique({ where: { idTrailer: trailerId } });
+    if (!existing) throw new NotFoundException('Bande-annonce introuvable');
+
+    await this.prisma.akJeuxVideoTrailer.delete({ where: { idTrailer: trailerId } });
+
+    // Log the action
+    if (username) {
+      await this.adminLogging.addLog(existing.idJeu, 'jeu_video', username, 'Suppression bande-annonce');
+    }
+
+    return { message: 'Bande-annonce supprimée' };
   }
 
   private slugify(text: string) {

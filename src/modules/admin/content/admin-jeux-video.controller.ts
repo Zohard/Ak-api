@@ -1,9 +1,11 @@
-import { Body, Controller, Delete, Get, Param, ParseIntPipe, Post, Put, Query, Request, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, ParseIntPipe, Post, Put, Query, Request, UseGuards, Patch } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { AdminGuard } from '../../../common/guards/admin.guard';
 import { AdminJeuxVideoService } from './admin-jeux-video.service';
 import { AdminJeuxVideoListQueryDto, CreateAdminJeuxVideoDto, UpdateAdminJeuxVideoDto } from './dto/admin-jeux-video.dto';
+import { CreateJeuVideoTrailerDto } from './dto/create-jeu-video-trailer.dto';
+import { UpdateJeuVideoTrailerDto } from './dto/update-jeu-video-trailer.dto';
 
 @ApiTags('Admin - Jeux Vidéo')
 @ApiBearerAuth()
@@ -62,5 +64,33 @@ export class AdminJeuxVideoController {
   importFromIgdb(@Request() req, @Param('igdbId', ParseIntPipe) igdbId: number) {
     const username = req.user?.pseudo || req.user?.member_name || 'admin';
     return this.service.importFromIgdb(igdbId, username);
+  }
+
+  @Post('trailers')
+  @ApiOperation({ summary: 'Ajouter une bande-annonce' })
+  addTrailer(@Request() req, @Body() dto: CreateJeuVideoTrailerDto) {
+    const username = req.user?.pseudo || req.user?.member_name || 'admin';
+    return this.service.addTrailer(dto, username);
+  }
+
+  @Patch('trailers/:trailerId')
+  @ApiOperation({ summary: 'Modifier une bande-annonce' })
+  updateTrailer(
+    @Request() req,
+    @Param('trailerId', ParseIntPipe) trailerId: number,
+    @Body() dto: UpdateJeuVideoTrailerDto
+  ) {
+    const username = req.user?.pseudo || req.user?.member_name || 'admin';
+    return this.service.updateTrailer(trailerId, dto, username);
+  }
+
+  @Delete('trailers/:trailerId')
+  @ApiOperation({ summary: 'Supprimer une bande-annonce' })
+  removeTrailer(
+    @Request() req,
+    @Param('trailerId', ParseIntPipe) trailerId: number
+  ) {
+    const username = req.user?.pseudo || req.user?.member_name || 'admin';
+    return this.service.removeTrailer(trailerId, username);
   }
 }
