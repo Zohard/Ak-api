@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../../shared/services/prisma.service';
 import { IgdbService } from '../../../shared/services/igdb.service';
 import { AdminLoggingService } from '../logging/admin-logging.service';
+import { ImageKitService } from '../../media/imagekit.service';
 import { AdminJeuxVideoListQueryDto, CreateAdminJeuxVideoDto, UpdateAdminJeuxVideoDto } from './dto/admin-jeux-video.dto';
 import { CreateJeuVideoTrailerDto } from './dto/create-jeu-video-trailer.dto';
 import { UpdateJeuVideoTrailerDto } from './dto/update-jeu-video-trailer.dto';
@@ -12,6 +13,7 @@ export class AdminJeuxVideoService {
     private prisma: PrismaService,
     private adminLogging: AdminLoggingService,
     private igdbService: IgdbService,
+    private imagekitService: ImageKitService,
   ) {}
 
   async list(query: AdminJeuxVideoListQueryDto) {
@@ -369,13 +371,27 @@ export class AdminJeuxVideoService {
 
     // Download and save cover image if available
     if (igdbGame.cover?.image_id) {
-      const imageBuffer = await this.igdbService.downloadCoverImage(igdbGame.cover.image_id);
-      if (imageBuffer) {
-        // Save the image with a unique filename
-        const filename = `igdb-${igdbId}-${Date.now()}.jpg`;
-        gameData.image = filename;
-        // TODO: You might want to save the image to your storage here
-        // For now, we'll just store the filename
+      try {
+        const imageBuffer = await this.igdbService.downloadCoverImage(igdbGame.cover.image_id);
+        if (imageBuffer) {
+          // Upload to ImageKit
+          const filename = `igdb-${igdbId}-${Date.now()}.jpg`;
+          const uploadResult = await this.imagekitService.uploadImage(
+            imageBuffer,
+            filename,
+            'images/games', // Upload to images/games folder
+            true // Replace existing if same name
+          );
+
+          if (uploadResult && uploadResult.name) {
+            // Store just the filename (not the full URL)
+            gameData.image = uploadResult.name;
+            console.log(`Successfully uploaded cover image for IGDB ID ${igdbId}: ${uploadResult.name}`);
+          }
+        }
+      } catch (error) {
+        console.error(`Failed to upload cover image for IGDB ID ${igdbId}:`, error);
+        // Continue without image if upload fails
       }
     }
 
