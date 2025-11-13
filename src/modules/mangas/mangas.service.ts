@@ -212,6 +212,7 @@ export class MangasService extends BaseContentService<
     const include: any = {};
     if (includeReviews) {
       include.reviews = {
+        where: { statut: 0 }, // Only include published/visible reviews
         take: 5,
         orderBy: { dateCritique: 'desc' },
         include: {
@@ -313,6 +314,7 @@ export class MangasService extends BaseContentService<
 
     if (includeReviews) {
       include.reviews = {
+        where: { statut: 0 }, // Only include published/visible reviews
         include: {
           membre: {
             select: {

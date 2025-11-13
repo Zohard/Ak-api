@@ -251,6 +251,7 @@ export class AnimesService extends BaseContentService<
     const include: any = {};
     if (includeReviews) {
       include.reviews = {
+        where: { statut: 0 }, // Only include published/visible reviews
         select: {
           idCritique: true,
           titre: true,
@@ -337,6 +338,7 @@ export class AnimesService extends BaseContentService<
 
     if (includeReviews) {
       include.reviews = {
+        where: { statut: 0 }, // Only include published/visible reviews
         include: {
           membre: {
             select: {
