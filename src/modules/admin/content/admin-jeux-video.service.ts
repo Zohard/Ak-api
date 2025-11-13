@@ -455,20 +455,45 @@ export class AdminJeuxVideoService {
 
     for (const igdbGenre of igdbGenres) {
       const mappedName = genreMap[igdbGenre.name] || igdbGenre.name;
+      const slug = this.slugify(mappedName);
 
-      // Try to find existing genre
+      // Try to find existing genre by name or slug
       let genre = await this.prisma.akGenre.findFirst({
-        where: { name: { equals: mappedName, mode: 'insensitive' } }
+        where: {
+          OR: [
+            { name: { equals: mappedName, mode: 'insensitive' } },
+            { slug: slug }
+          ]
+        }
       });
 
       // Create if doesn't exist
       if (!genre) {
-        genre = await this.prisma.akGenre.create({
-          data: {
-            name: mappedName,
-            slug: this.slugify(mappedName),
+        try {
+          genre = await this.prisma.akGenre.create({
+            data: {
+              name: mappedName,
+              slug: slug,
+            }
+          });
+        } catch (error) {
+          // If creation failed due to unique constraint (race condition), try to find again
+          if (error.code === 'P2002') {
+            genre = await this.prisma.akGenre.findFirst({
+              where: {
+                OR: [
+                  { name: { equals: mappedName, mode: 'insensitive' } },
+                  { slug: slug }
+                ]
+              }
+            });
           }
-        });
+
+          // If still not found, re-throw the error
+          if (!genre) {
+            throw error;
+          }
+        }
       }
 
       genreIds.push(genre.idGenre);
@@ -504,11 +529,25 @@ export class AdminJeuxVideoService {
 
       // Create if doesn't exist
       if (!platform) {
-        platform = await this.prisma.akPlatform.create({
-          data: {
-            name: mappedName,
+        try {
+          platform = await this.prisma.akPlatform.create({
+            data: {
+              name: mappedName,
+            }
+          });
+        } catch (error) {
+          // If creation failed due to unique constraint (race condition), try to find again
+          if (error.code === 'P2002') {
+            platform = await this.prisma.akPlatform.findFirst({
+              where: { name: { equals: mappedName, mode: 'insensitive' } }
+            });
           }
-        });
+
+          // If still not found, re-throw the error
+          if (!platform) {
+            throw error;
+          }
+        }
       }
 
       platformIds.push(platform.idPlatform);
