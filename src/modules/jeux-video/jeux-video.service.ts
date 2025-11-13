@@ -29,7 +29,13 @@ export class JeuxVideoService {
 
     // Platform filter
     if (plateforme) {
-      where.plateforme = { contains: plateforme, mode: 'insensitive' };
+      where.platforms = {
+        some: {
+          platform: {
+            name: { equals: plateforme, mode: 'insensitive' }
+          }
+        }
+      };
     }
 
     // Publisher filter
