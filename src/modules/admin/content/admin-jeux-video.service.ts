@@ -367,6 +367,7 @@ export class AdminJeuxVideoService {
       dateSortieEurope: releaseDates.europe || null,
       dateSortieWorldwide: releaseDates.worldwide || null,
       statut: 2, // En attente by default
+      nbClicsDay: 0, // Initialize click counter
     };
 
     // Download and save cover image if available

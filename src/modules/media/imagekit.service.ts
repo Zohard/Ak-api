@@ -52,12 +52,12 @@ export class ImageKitService {
 
   private async deleteExistingImage(fileName: string, folder: string): Promise<void> {
     try {
-      // Construct folder path for search (should start and end with '/')
-      const folderPath = folder ? `/${folder}/` : '/';
-
-      // Search for existing file with the same name in the folder
+      // Search for existing file with the same name
+      // Note: ImageKit's search API has changed, folderPath is no longer supported in searchQuery
+      // We'll use path parameter and name filter instead
       const files = await this.imagekit.listFiles({
-        searchQuery: `name = \"${fileName}\" AND folderPath = \"${folderPath}\"`,
+        searchQuery: `name = \"${fileName}\"`,
+        path: folder || undefined,
         limit: 1,
       } as any);
 
@@ -115,9 +115,13 @@ export class ImageKitService {
     }
 
     try {
-      // Use advanced search to fetch file by name and folder path
+      // Extract folder path without leading/trailing slashes for path parameter
+      const folderPath = parsed.folderPath.replace(/^\/|\/$/g, '');
+
+      // Use search by name only, with path parameter
       const files = await this.imagekit.listFiles({
-        searchQuery: `name = \"${parsed.name}\" AND folderPath = \"${parsed.folderPath}\"`,
+        searchQuery: `name = \"${parsed.name}\"`,
+        path: folderPath || undefined,
         limit: 1,
       } as any);
 
