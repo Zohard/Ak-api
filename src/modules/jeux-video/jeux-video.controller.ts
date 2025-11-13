@@ -30,4 +30,12 @@ export class JeuxVideoController {
   async findOne(@Param('id', ParseIntPipe) id: number) {
     return this.jeuxVideoService.findOne(id);
   }
+
+  @Get(':id/relationships')
+  @ApiOperation({ summary: 'Get relationships for a video game' })
+  @ApiParam({ name: 'id', description: 'ID du jeu vidéo' })
+  @ApiResponse({ status: 200, description: 'Relations retrieved successfully' })
+  async getRelationships(@Param('id', ParseIntPipe) id: number) {
+    return this.jeuxVideoService.getRelationships(id);
+  }
 }
