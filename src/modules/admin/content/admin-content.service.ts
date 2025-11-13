@@ -158,6 +158,10 @@ export class AdminContentService {
         table: 'ak_mangas',
         id: 'id_manga',
       },
+      'jeu-video': {
+        table: 'ak_jeux_video',
+        id: 'id_jeu',
+      },
       business: {
         table: 'ak_business',
         id: 'id_business',
@@ -375,17 +379,23 @@ export class AdminContentService {
   }
 
   async getContentRelationships(id: number, type: string) {
-    // Relationships are stored with the source in id_fiche_depart as 'anime<ID>' or 'manga<ID>'
+    // Relationships are stored with the source in id_fiche_depart as 'anime<ID>', 'manga<ID>', or 'jeu<ID>'
     // We query BIDIRECTIONALLY: both where this content is the source AND where it's the target
-    const sourceKey = `${type}${id}`;
-    const idColumn = type === 'anime' ? 'id_anime' : 'id_manga';
+    const sourceKey = type === 'jeu-video' ? `jeu${id}` : `${type}${id}`;
 
     // Build the WHERE clause dynamically based on type
-    const whereClause = type === 'anime'
-      ? `WHERE r.id_fiche_depart = $1 OR r.id_anime = $2`
-      : `WHERE r.id_fiche_depart = $1 OR r.id_manga = $2`;
+    let whereClause: string;
+    if (type === 'anime') {
+      whereClause = `WHERE r.id_fiche_depart = $1 OR r.id_anime = $2`;
+    } else if (type === 'manga') {
+      whereClause = `WHERE r.id_fiche_depart = $1 OR r.id_manga = $2`;
+    } else if (type === 'jeu-video') {
+      whereClause = `WHERE r.id_fiche_depart = $1 OR r.id_jeu = $2`;
+    } else {
+      whereClause = `WHERE r.id_fiche_depart = $1`;
+    }
 
-    // Filter to only anime/manga relationships (exclude jeu, ost, business, etc.)
+    // Filter to anime/manga/jeu relationships
     const relationships = await this.prisma.$queryRawUnsafe<any[]>(
       `
       SELECT
@@ -396,7 +406,7 @@ export class AdminContentService {
         base.related_id,
         base.related_type,
         base.type_relation,
-        COALESCE(a.titre, m.titre) as related_title
+        COALESCE(a.titre, m.titre, j.titre) as related_title
       FROM (
         SELECT
           r.id_relation,
@@ -408,10 +418,12 @@ export class AdminContentService {
               CASE
                 WHEN r.id_anime > 0 THEN r.id_anime
                 WHEN r.id_manga > 0 THEN r.id_manga
+                WHEN r.id_jeu > 0 THEN r.id_jeu
                 ELSE NULL
               END
             WHEN r.id_fiche_depart ~ '^anime[0-9]+\$' THEN CAST(SUBSTRING(r.id_fiche_depart, 6) AS INTEGER)
             WHEN r.id_fiche_depart ~ '^manga[0-9]+\$' THEN CAST(SUBSTRING(r.id_fiche_depart, 6) AS INTEGER)
+            WHEN r.id_fiche_depart ~ '^jeu[0-9]+\$' THEN CAST(SUBSTRING(r.id_fiche_depart, 4) AS INTEGER)
             ELSE NULL
           END as related_id,
           'related'::text as type_relation,
@@ -420,18 +432,21 @@ export class AdminContentService {
               CASE
                 WHEN r.id_anime > 0 THEN 'anime'::text
                 WHEN r.id_manga > 0 THEN 'manga'::text
+                WHEN r.id_jeu > 0 THEN 'jeu-video'::text
                 ELSE 'unknown'::text
               END
             WHEN r.id_fiche_depart ~ '^anime[0-9]+\$' THEN 'anime'::text
             WHEN r.id_fiche_depart ~ '^manga[0-9]+\$' THEN 'manga'::text
+            WHEN r.id_fiche_depart ~ '^jeu[0-9]+\$' THEN 'jeu-video'::text
             ELSE 'unknown'::text
           END as related_type
         FROM ak_fiche_to_fiche r
         ${whereClause}
-        AND (r.id_anime > 0 OR r.id_manga > 0 OR r.id_fiche_depart ~ '^anime[0-9]+\$' OR r.id_fiche_depart ~ '^manga[0-9]+\$')
+        AND (r.id_anime > 0 OR r.id_manga > 0 OR r.id_jeu > 0 OR r.id_fiche_depart ~ '^anime[0-9]+\$' OR r.id_fiche_depart ~ '^manga[0-9]+\$' OR r.id_fiche_depart ~ '^jeu[0-9]+\$')
       ) base
       LEFT JOIN ak_animes a ON base.related_type = 'anime' AND base.related_id = a.id_anime
       LEFT JOIN ak_mangas m ON base.related_type = 'manga' AND base.related_id = m.id_manga
+      LEFT JOIN ak_jeux_video j ON base.related_type = 'jeu-video' AND base.related_id = j.id_jeu
       WHERE base.related_id IS NOT NULL
     `,
       sourceKey,
@@ -465,11 +480,12 @@ export class AdminContentService {
     await this.getContentById(related_id, related_type);
 
     // Create relationship following actual schema:
-    // - id_fiche_depart stores the source as 'anime<ID>' or 'manga<ID>'
-    // - id_anime or id_manga stores the related target id
-    const sourceKey = `${type}${id}`;
+    // - id_fiche_depart stores the source as 'anime<ID>', 'manga<ID>', or 'jeu<ID>'
+    // - id_anime, id_manga, or id_jeu stores the related target id
+    const sourceKey = type === 'jeu-video' ? `jeu${id}` : `${type}${id}`;
     const targetAnimeId = related_type === 'anime' ? related_id : 0;
     const targetMangaId = related_type === 'manga' ? related_id : 0;
+    const targetJeuId = related_type === 'jeu-video' ? related_id : 0;
 
     // Note: Some legacy DBs have NOT NULL without defaults on id_ost/id_jeu/id_business
     // so we insert explicit zeros to satisfy constraints.
@@ -486,7 +502,7 @@ export class AdminContentService {
         ${targetAnimeId},
         ${targetMangaId},
         0,
-        0,
+        ${targetJeuId},
         0
       )
     `;

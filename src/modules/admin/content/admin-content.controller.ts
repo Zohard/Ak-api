@@ -264,7 +264,7 @@ export class AdminContentController {
   @ApiParam({
     name: 'type',
     description: 'Content type',
-    enum: ['anime', 'manga'],
+    enum: ['anime', 'manga', 'jeu-video'],
   })
   @ApiParam({ name: 'id', description: 'Content ID' })
   async getRelationships(
@@ -279,7 +279,7 @@ export class AdminContentController {
   @ApiParam({
     name: 'type',
     description: 'Content type',
-    enum: ['anime', 'manga'],
+    enum: ['anime', 'manga', 'jeu-video'],
   })
   @ApiParam({ name: 'id', description: 'Content ID' })
   async createRelationship(
