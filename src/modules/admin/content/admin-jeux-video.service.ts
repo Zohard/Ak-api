@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../../shared/services/prisma.service';
 import { IgdbService } from '../../../shared/services/igdb.service';
+import { DeepLService } from '../../../shared/services/deepl.service';
 import { AdminLoggingService } from '../logging/admin-logging.service';
 import { ImageKitService } from '../../media/imagekit.service';
 import { AdminJeuxVideoListQueryDto, CreateAdminJeuxVideoDto, UpdateAdminJeuxVideoDto } from './dto/admin-jeux-video.dto';
@@ -14,6 +15,7 @@ export class AdminJeuxVideoService {
     private adminLogging: AdminLoggingService,
     private igdbService: IgdbService,
     private imagekitService: ImageKitService,
+    private deepLService: DeepLService,
   ) {}
 
   async list(query: AdminJeuxVideoListQueryDto) {
@@ -373,11 +375,21 @@ export class AdminJeuxVideoService {
     const releaseDates = this.mapIgdbReleaseDates(igdbGame.release_dates || []);
     console.log('Mapped release dates:', releaseDates);
 
+    // Translate summary to French if available
+    let translatedSummary: string | null = null;
+    if (igdbGame.summary) {
+      translatedSummary = await this.deepLService.translateToFrench(igdbGame.summary);
+      // If translation fails, fall back to original summary
+      if (!translatedSummary) {
+        translatedSummary = igdbGame.summary;
+      }
+    }
+
     // Create the game
     const gameData: any = {
       titre: igdbGame.name,
       niceUrl: this.slugify(igdbGame.name),
-      presentation: igdbGame.summary || null,
+      presentation: translatedSummary,
       annee: releaseYear || 0,
       editeur: publisher || null,
       dateSortieJapon: releaseDates.japon || null,
