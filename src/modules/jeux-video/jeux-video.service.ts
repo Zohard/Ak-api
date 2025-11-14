@@ -182,6 +182,19 @@ export class JeuxVideoService {
               }
             }
           }
+        },
+        trailers: {
+          where: { statut: 1 }, // Only include visible trailers
+          select: {
+            idTrailer: true,
+            titre: true,
+            url: true,
+            platform: true,
+            langue: true,
+            typeTrailer: true,
+            ordre: true,
+          },
+          orderBy: { ordre: 'asc' }
         }
       },
     });
