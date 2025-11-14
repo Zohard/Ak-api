@@ -77,6 +77,12 @@ export class AdminJeuxVideoController {
     return this.service.importFromIgdb(igdbId, username);
   }
 
+  @Get('igdb/fetch/:igdbId')
+  @ApiOperation({ summary: 'Récupérer les données IGDB sans créer d\'entrée (pour mise à jour de formulaire)' })
+  fetchFromIgdb(@Param('igdbId', ParseIntPipe) igdbId: number) {
+    return this.service.fetchFromIgdb(igdbId);
+  }
+
   @Post('trailers')
   @ApiOperation({ summary: 'Ajouter une bande-annonce' })
   addTrailer(@Request() req, @Body() dto: CreateJeuVideoTrailerDto) {

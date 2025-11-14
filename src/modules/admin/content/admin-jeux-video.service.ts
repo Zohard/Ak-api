@@ -520,6 +520,60 @@ export class AdminJeuxVideoService {
   }
 
   /**
+   * Fetch game data from IGDB for form update (without creating database entry or uploading images)
+   */
+  async fetchFromIgdb(igdbId: number) {
+    // Fetch full game data from IGDB
+    const igdbGame = await this.igdbService.getGameById(igdbId);
+
+    if (!igdbGame) {
+      throw new NotFoundException('Game not found on IGDB');
+    }
+
+    // Extract release year
+    const releaseYear = igdbGame.first_release_date
+      ? new Date(igdbGame.first_release_date * 1000).getFullYear()
+      : undefined;
+
+    // Get or create publisher
+    const publisher = igdbGame.involved_companies?.find(c => c.publisher)?.company?.name;
+
+    // Map genres from IGDB to our database
+    const genreIds = await this.mapIgdbGenres(igdbGame.genres || []);
+
+    // Map platforms from IGDB to our database
+    const platformIds = await this.mapIgdbPlatforms(igdbGame.platforms || []);
+
+    // Map regional release dates
+    const releaseDates = this.mapIgdbReleaseDates(igdbGame.release_dates || []);
+
+    // Translate summary to French if available
+    let translatedSummary: string | null = null;
+    if (igdbGame.summary) {
+      translatedSummary = await this.deepLService.translateToFrench(igdbGame.summary);
+      // If translation fails, fall back to original summary
+      if (!translatedSummary) {
+        translatedSummary = igdbGame.summary;
+      }
+    }
+
+    // Return formatted data for form update (without images)
+    return {
+      titre: igdbGame.name,
+      description: translatedSummary,
+      annee: releaseYear || 0,
+      editeur: publisher || null,
+      dateSortieJapon: releaseDates.japon || null,
+      dateSortieUsa: releaseDates.usa || null,
+      dateSortieEurope: releaseDates.europe || null,
+      dateSortieWorldwide: releaseDates.worldwide || null,
+      platformIds,
+      genreIds,
+      // Note: Image is not included - preserves existing image in edit mode
+    };
+  }
+
+  /**
    * Map IGDB genres to database genre IDs
    */
   private async mapIgdbGenres(igdbGenres: Array<{ id: number; name: string }>): Promise<number[]> {
