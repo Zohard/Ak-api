@@ -547,6 +547,15 @@ export class AdminJeuxVideoService {
     // Map regional release dates
     const releaseDates = this.mapIgdbReleaseDates(igdbGame.release_dates || []);
 
+    // Helper function to format Date to YYYY-MM-DD for HTML date inputs
+    const formatDate = (date: Date | null): string | null => {
+      if (!date) return null;
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    };
+
     // Translate summary to French if available
     let translatedSummary: string | null = null;
     if (igdbGame.summary) {
@@ -563,10 +572,10 @@ export class AdminJeuxVideoService {
       description: translatedSummary,
       annee: releaseYear || 0,
       editeur: publisher || null,
-      dateSortieJapon: releaseDates.japon || null,
-      dateSortieUsa: releaseDates.usa || null,
-      dateSortieEurope: releaseDates.europe || null,
-      dateSortieWorldwide: releaseDates.worldwide || null,
+      dateSortieJapon: formatDate(releaseDates.japon),
+      dateSortieUsa: formatDate(releaseDates.usa),
+      dateSortieEurope: formatDate(releaseDates.europe),
+      dateSortieWorldwide: formatDate(releaseDates.worldwide),
       platformIds,
       genreIds,
       // Note: Image is not included - preserves existing image in edit mode
