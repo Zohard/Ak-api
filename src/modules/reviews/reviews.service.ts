@@ -174,8 +174,11 @@ export class ReviewsService {
       };
     }
 
+    // Default to showing only published reviews (statut: 0) unless explicitly specified
     if (statut !== undefined) {
       where.statut = statut;
+    } else {
+      where.statut = 0; // Only show published reviews by default
     }
 
     if (minNotation) {
