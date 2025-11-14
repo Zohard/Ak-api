@@ -249,10 +249,8 @@ export class SourcesExternesService {
         }
       }
 
-      // Extract episode count
-      if (ressources.episode_count) {
-        adminDto.nb_epduree = String(ressources.episode_count);
-      }
+      // Extract episode count (use 'NC' if not available)
+      adminDto.nb_epduree = ressources.episode_count ? String(ressources.episode_count) : 'NC';
 
       // Skip synopsis due to copyright concerns
 
