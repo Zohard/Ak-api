@@ -301,8 +301,11 @@ export class ReviewsService {
       return cached;
     }
 
-    const review = await this.prisma.akCritique.findUnique({
-      where: { idCritique: id },
+    const review = await this.prisma.akCritique.findFirst({
+      where: {
+        idCritique: id,
+        statut: 0, // Only show published reviews
+      },
         include: {
           membre: {
             select: {
@@ -375,7 +378,10 @@ export class ReviewsService {
 
   async findBySlug(slug: string) {
     const review = await this.prisma.akCritique.findFirst({
-      where: { niceUrl: slug },
+      where: {
+        niceUrl: slug,
+        statut: 0, // Only show published reviews
+      },
       include: {
         membre: {
           select: {
