@@ -11,6 +11,7 @@
     "vercel-build": "npm run build:vercel",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "warm-cache": "node -r ts-node/register -r tsconfig-paths/register scripts/warmup-cache.ts",
+    "fix-sequences": "npx prisma db execute --file ./prisma/fix-sequences.sql --schema ./prisma/schema.prisma",
     "start": "nest start",
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
