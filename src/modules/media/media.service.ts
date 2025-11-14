@@ -174,7 +174,7 @@ export class MediaService {
     };
   }
 
-  async getMediaByRelatedId(relatedId: number, type: 'anime' | 'manga') {
+  async getMediaByRelatedId(relatedId: number, type: 'anime' | 'manga' | 'game') {
     const typeId = this.getTypeId(type);
 
     const media = await this.prisma.$queryRaw`
