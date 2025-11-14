@@ -426,6 +426,50 @@ export class AdminJeuxVideoService {
 
     const created = await this.prisma.akJeuxVideo.create({ data: gameData });
 
+    // Download and save screenshots if available
+    if (igdbGame.screenshots && igdbGame.screenshots.length > 0) {
+      let sortorder = 0;
+      for (const screenshot of igdbGame.screenshots.slice(0, 10)) { // Limit to first 10 screenshots
+        try {
+          const imageBuffer = await this.igdbService.downloadCoverImage(
+            screenshot.image_id,
+            'screenshot_med' // Medium size for balance between quality and file size
+          );
+
+          if (imageBuffer) {
+            // Upload to ImageKit
+            const filename = `igdb-${igdbId}-screenshot-${screenshot.id}-${Date.now()}.jpg`;
+            const uploadResult = await this.imagekitService.uploadImage(
+              imageBuffer,
+              filename,
+              'images/games/screenshots', // Screenshots folder
+              true // Replace if exists
+            );
+
+            if (uploadResult && uploadResult.name) {
+              // Save to database
+              await this.prisma.akJeuxVideoScreenshot.create({
+                data: {
+                  jeuVideoId: created.idJeu,
+                  filename: uploadResult.name,
+                  sortorder: sortorder++,
+                  createdat: new Date(),
+                }
+              });
+              console.log(`Successfully imported screenshot ${screenshot.id} for game ${created.idJeu}`);
+            }
+          }
+        } catch (error) {
+          console.error(`Failed to import screenshot ${screenshot.id} for IGDB ID ${igdbId}:`, error);
+          // Continue with other screenshots even if one fails
+        }
+      }
+
+      if (sortorder > 0) {
+        console.log(`Successfully imported ${sortorder} screenshot(s) for IGDB ID ${igdbId}`);
+      }
+    }
+
     // Create platform associations
     if (platformIds.length > 0) {
       await this.prisma.akJeuxVideoPlatform.createMany({

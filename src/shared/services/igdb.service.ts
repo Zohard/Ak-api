@@ -10,6 +10,10 @@ interface IgdbGame {
     url: string;
     image_id: string;
   };
+  screenshots?: Array<{
+    id: number;
+    image_id: string;
+  }>;
   genres?: Array<{ id: number; name: string }>;
   platforms?: Array<{ id: number; name: string; abbreviation?: string }>;
   involved_companies?: Array<{
@@ -97,6 +101,7 @@ export class IgdbService {
         body: `
           search "${query}";
           fields name, summary, first_release_date, cover.url, cover.image_id,
+                 screenshots.image_id,
                  genres.name, platforms.name, platforms.abbreviation,
                  involved_companies.company.name, involved_companies.publisher, involved_companies.developer,
                  release_dates.date, release_dates.region, release_dates.platform;
@@ -131,6 +136,7 @@ export class IgdbService {
         body: `
           where id = ${igdbId};
           fields name, summary, first_release_date, cover.url, cover.image_id,
+                 screenshots.image_id,
                  genres.name, platforms.name, platforms.abbreviation,
                  involved_companies.company.name, involved_companies.publisher, involved_companies.developer,
                  release_dates.date, release_dates.region, release_dates.platform;
