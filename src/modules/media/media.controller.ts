@@ -143,6 +143,28 @@ export class MediaController {
     };
   }
 
+  @Post('upload-from-url')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Upload image from external URL' })
+  @ApiResponse({ status: 201, description: 'Image uploaded successfully from URL' })
+  @ApiResponse({ status: 400, description: 'Invalid URL or parameters' })
+  @ApiBearerAuth()
+  async uploadImageFromUrl(
+    @Body('imageUrl') imageUrl: string,
+    @Body('type') type: 'anime' | 'manga' | 'avatar' | 'cover' | 'game',
+    @Body('relatedId') relatedId?: number,
+  ) {
+    if (!imageUrl || !imageUrl.trim()) {
+      throw new BadRequestException('Image URL is required');
+    }
+
+    if (!['anime', 'manga', 'avatar', 'cover', 'game'].includes(type)) {
+      throw new BadRequestException('Invalid type. Must be anime, manga, avatar, cover, or game');
+    }
+
+    return this.mediaService.uploadImageFromUrl(imageUrl, type, relatedId);
+  }
+
   @Get('serve/:type/:filename')
   @ApiOperation({ summary: 'Serve image file' })
   @ApiResponse({ status: 200, description: 'Image file served' })

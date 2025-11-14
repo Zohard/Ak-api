@@ -136,6 +136,114 @@ export class MediaService {
     }
   }
 
+  async uploadImageFromUrl(
+    imageUrl: string,
+    type: 'anime' | 'manga' | 'avatar' | 'cover' | 'game',
+    relatedId?: number,
+  ) {
+    try {
+      // Download the image from the URL
+      const response = await axios.get(imageUrl, {
+        responseType: 'arraybuffer',
+        timeout: 30000, // 30 second timeout
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        },
+      });
+
+      if (!response.data) {
+        throw new BadRequestException('Failed to download image from URL');
+      }
+
+      // Detect image type from Content-Type header
+      const contentType = response.headers['content-type'] || 'image/jpeg';
+      if (!this.allowedMimeTypes.includes(contentType)) {
+        throw new BadRequestException(
+          `Invalid image type: ${contentType}. Only JPEG, PNG, WebP, and GIF are allowed.`,
+        );
+      }
+
+      // Generate filename
+      const extension = contentType.split('/')[1] || 'jpg';
+      const filename = `${type}_${Date.now()}_${Math.random().toString(36).substring(7)}.${extension}`;
+
+      // Process image with Sharp
+      const processedImage = await this.processImage(Buffer.from(response.data), type);
+
+      // Upload to ImageKit
+      const typeFolder = type === 'game' ? 'games' : `${type}s`;
+      const folderPath = `images/${typeFolder}`;
+
+      const uploadResult = await this.imagekitService.uploadImage(
+        processedImage,
+        filename,
+        folderPath
+      );
+
+      // Save to database if relatedId provided
+      if (relatedId) {
+        try {
+          const result = await this.prisma.$queryRaw`
+            INSERT INTO ak_screenshots (url_screen, id_titre, type, upload_date)
+            VALUES (${uploadResult.name}, ${relatedId}, ${this.getTypeId(type)}, NOW())
+            RETURNING id_screen
+          `;
+
+          return {
+            id: (result as any[])[0]?.id_screen,
+            filename: uploadResult.name,
+            size: processedImage.length,
+            type,
+            url: uploadResult.url,
+            relatedId,
+            imagekitFileId: uploadResult.fileId,
+          };
+        } catch (dbError) {
+          // Database save failed - delete the uploaded file from ImageKit
+          console.error('[MediaService] Database save failed, deleting ImageKit file:', {
+            fileId: uploadResult.fileId,
+            filename: uploadResult.name,
+            dbError: dbError.message,
+          });
+
+          try {
+            await this.imagekitService.deleteImage(uploadResult.fileId);
+          } catch (deleteError) {
+            console.error('[MediaService] Failed to cleanup ImageKit file:', deleteError);
+          }
+
+          throw new BadRequestException(`Failed to save image metadata: ${dbError.message}`);
+        }
+      }
+
+      // No relatedId - just return upload result
+      return {
+        filename: uploadResult.name,
+        size: processedImage.length,
+        type,
+        url: uploadResult.url,
+        imagekitFileId: uploadResult.fileId,
+      };
+    } catch (error) {
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+
+      // Handle axios errors
+      if (error.code === 'ECONNABORTED') {
+        throw new BadRequestException('Image download timeout. URL may be unreachable.');
+      }
+
+      if (error.response) {
+        throw new BadRequestException(
+          `Failed to download image: ${error.response.status} ${error.response.statusText}`,
+        );
+      }
+
+      throw new BadRequestException(`Image upload from URL failed: ${error.message}`);
+    }
+  }
+
   async getMediaById(id: number) {
     const media = await this.prisma.$queryRaw`
       SELECT
