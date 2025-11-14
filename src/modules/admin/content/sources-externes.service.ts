@@ -8,6 +8,7 @@ import {
 import { CreateAdminAnimeDto } from './dto/admin-anime.dto';
 import { AdminAnimesService } from './admin-animes.service';
 import { ImageKitService } from '../../media/imagekit.service';
+import { DeepLService } from '../../../shared/services/deepl.service';
 import { spawn } from 'child_process';
 import { promises as fs } from 'fs';
 import { join } from 'path';
@@ -18,6 +19,7 @@ export class SourcesExternesService {
     private prisma: PrismaService,
     private adminAnimesService: AdminAnimesService,
     private imageKitService: ImageKitService,
+    private deepLService: DeepLService,
   ) {}
 
   async importSeasonAnimes(importDto: SourcesExternesImportDto): Promise<SourcesExternesAnimeComparisonDto[]> {
@@ -993,5 +995,33 @@ export class SourcesExternesService {
     } catch (error) {
       throw new BadRequestException('Failed to import staff: ' + error.message);
     }
+  }
+
+  /**
+   * Translate text using DeepL service
+   * @param text Text to translate
+   * @param targetLang Target language code (default: 'FR')
+   * @param sourceLang Source language code (optional)
+   * @returns Translation result with success status
+   */
+  async translateText(
+    text: string,
+    targetLang: string = 'FR',
+    sourceLang?: string
+  ): Promise<{ translatedText: string | null; success: boolean }> {
+    if (!text || text.trim().length === 0) {
+      return { translatedText: null, success: false };
+    }
+
+    const translatedText = await this.deepLService.translate(
+      text,
+      targetLang,
+      sourceLang
+    );
+
+    return {
+      translatedText,
+      success: !!translatedText
+    };
   }
 }

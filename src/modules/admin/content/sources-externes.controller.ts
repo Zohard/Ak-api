@@ -157,4 +157,40 @@ export class SourcesExternesController {
   ): Promise<any> {
     return this.sourcesExternesService.importAnimeImage(importData.imageUrl, importData.animeTitle);
   }
+
+  @Post('translate')
+  @ApiOperation({
+    summary: 'Translate text to French using DeepL',
+    description: 'Translate text from English to French for synopsis and descriptions'
+  })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        text: { type: 'string', description: 'Text to translate' },
+        sourceLang: { type: 'string', description: 'Source language code (optional, auto-detect if not provided)', required: false },
+        targetLang: { type: 'string', description: 'Target language code (default: FR)', required: false }
+      }
+    }
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Translation result',
+    schema: {
+      type: 'object',
+      properties: {
+        translatedText: { type: 'string' },
+        success: { type: 'boolean' }
+      }
+    }
+  })
+  async translate(
+    @Body() translateData: { text: string; sourceLang?: string; targetLang?: string },
+  ): Promise<{ translatedText: string | null; success: boolean }> {
+    return this.sourcesExternesService.translateText(
+      translateData.text,
+      translateData.targetLang,
+      translateData.sourceLang
+    );
+  }
 }
