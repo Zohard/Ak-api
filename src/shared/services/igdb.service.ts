@@ -186,17 +186,26 @@ export class IgdbService {
   }
 
   /**
-   * Map IGDB region codes to our database format
+   * Map IGDB region codes to database region names
+   * IGDB Region Codes:
+   * 1 = Europe
+   * 2 = North America
+   * 3 = Australia
+   * 4 = New Zealand
+   * 5 = Japan
+   * 6 = China
+   * 7 = Asia
+   * 8 = Worldwide
    */
   mapRegion(regionCode?: number): 'japon' | 'usa' | 'europe' | 'worldwide' | null {
     if (!regionCode) return null;
 
     switch (regionCode) {
-      case 2: // North America
-        return 'usa';
       case 1: // Europe
         return 'europe';
-      case 4: // Japan
+      case 2: // North America
+        return 'usa';
+      case 5: // Japan (fixed from 4)
         return 'japon';
       case 8: // Worldwide
         return 'worldwide';
