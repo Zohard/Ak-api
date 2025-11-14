@@ -37,6 +37,11 @@ async function findOrphanedImages(dryRun = true) {
       console.log(`  Found ${files.length} files`);
 
       for (const file of files) {
+        // Skip folders - only process files
+        if (file.type !== 'file') {
+          continue;
+        }
+
         const filename = file.name;
 
         // Check if filename exists in ak_screenshots table
