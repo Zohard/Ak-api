@@ -344,6 +344,7 @@ model AkJeuxVideo {
   platforms         AkJeuxVideoPlatform[]
   genres            AkJeuxVideoGenre[]
   trailers          AkJeuxVideoTrailer[]
+  screenshots       AkJeuxVideoScreenshot[]
 
   @@map("ak_jeux_video")
 }
@@ -430,6 +431,21 @@ model AkJeuxVideoTrailer {
   @@index([idJeu])
   @@index([statut])
   @@map("ak_jeux_video_trailers")
+}
+
+model AkJeuxVideoScreenshot {
+  id           Int       @id @default(autoincrement())
+  filename     String?   @db.VarChar(255)
+  caption      String?   @db.VarChar(255)
+  sortorder    Int?
+  createdat    DateTime? @db.Timestamp
+  jeuVideoId   Int       @map("jeu_video_id")
+
+  // Relations
+  jeuVideo     AkJeuxVideo @relation(fields: [jeuVideoId], references: [idJeu], onDelete: Cascade)
+
+  @@index([jeuVideoId])
+  @@map("ak_jeux_video_screenshots")
 }
 
 // Business to Anime Relations
