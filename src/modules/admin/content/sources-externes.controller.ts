@@ -166,10 +166,11 @@ export class SourcesExternesController {
   @ApiBody({
     schema: {
       type: 'object',
+      required: ['text'],
       properties: {
         text: { type: 'string', description: 'Text to translate' },
-        sourceLang: { type: 'string', description: 'Source language code (optional, auto-detect if not provided)', required: false },
-        targetLang: { type: 'string', description: 'Target language code (default: FR)', required: false }
+        sourceLang: { type: 'string', description: 'Source language code (optional, auto-detect if not provided)' },
+        targetLang: { type: 'string', description: 'Target language code (default: FR)' }
       }
     }
   })
