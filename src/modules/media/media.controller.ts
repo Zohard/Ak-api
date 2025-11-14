@@ -171,13 +171,15 @@ export class MediaController {
   @ApiResponse({ status: 200, description: 'Media list retrieved' })
   async getMediaByContentId(
     @Param('relatedId', ParseIntPipe) relatedId: number,
-    @Query('type') type: 'anime' | 'manga' = 'anime',
+    @Query('type') type: 'anime' | 'manga' | 'jeu-video' = 'anime',
   ) {
-    if (!['anime', 'manga'].includes(type)) {
-      throw new BadRequestException('Type must be either anime or manga');
+    if (!['anime', 'manga', 'jeu-video'].includes(type)) {
+      throw new BadRequestException('Type must be anime, manga, or jeu-video');
     }
 
-    return this.mediaService.getMediaByRelatedId(relatedId, type);
+    // Map 'jeu-video' to 'game' for internal use
+    const serviceType = type === 'jeu-video' ? 'game' : type;
+    return this.mediaService.getMediaByRelatedId(relatedId, serviceType as 'anime' | 'manga' | 'game');
   }
 
   @Get(':id')
