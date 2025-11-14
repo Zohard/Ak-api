@@ -12,6 +12,8 @@
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "warm-cache": "node -r ts-node/register -r tsconfig-paths/register scripts/warmup-cache.ts",
     "fix-sequences": "npx prisma db execute --file ./prisma/fix-sequences.sql --schema ./prisma/schema.prisma",
+    "cleanup-images": "ts-node -r tsconfig-paths/register scripts/cleanup-orphaned-images.ts",
+    "cleanup-images:dry-run": "npm run cleanup-images -- --dry-run",
     "start": "nest start",
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",

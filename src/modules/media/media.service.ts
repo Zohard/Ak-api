@@ -93,13 +93,24 @@ export class MediaService {
         };
       } catch (dbError) {
         // Database save failed - delete the uploaded file from ImageKit to prevent orphaned files
-        console.error('[MediaService] Database save failed, deleting ImageKit file:', uploadResult.fileId);
+        console.error('[MediaService] Database save failed, deleting ImageKit file:', {
+          fileId: uploadResult.fileId,
+          filename: uploadResult.name,
+          folder: folderPath,
+          dbError: dbError.message,
+        });
 
         try {
           await this.imagekitService.deleteImage(uploadResult.fileId);
           console.log('[MediaService] Successfully deleted orphaned ImageKit file:', uploadResult.fileId);
         } catch (deleteError) {
-          console.error('[MediaService] Failed to delete ImageKit file after database error:', deleteError);
+          console.error('[MediaService] ⚠️ ORPHANED FILE - Manual cleanup needed:', {
+            fileId: uploadResult.fileId,
+            filename: uploadResult.name,
+            folder: folderPath,
+            deleteError: deleteError.message,
+          });
+          console.error('[MediaService] Run: npm run cleanup-images:dry-run');
           // Log this for manual cleanup but don't fail the operation
         }
 
