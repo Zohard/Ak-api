@@ -935,11 +935,11 @@ export class MangasService extends BaseContentService<
 
   async lookupByIsbn(isbn: string) {
     try {
-      let bookInfo = null;
+      let bookInfo: any = null;
       let rawTitle = '';
       let authors = '';
       let description = '';
-      let thumbnail = null;
+      let thumbnail: string | null = null;
       let bookSource = 'none';
 
       // Strategy 1: Try Google Books API first (best for French ISBNs)
@@ -1031,7 +1031,7 @@ export class MangasService extends BaseContentService<
       console.log('ISBN lookup - Cleaned title:', cleanedTitle);
 
       // Search local ak_mangas database
-      let mangaResults = [];
+      let mangaResults: any[] = [];
 
       // Strategy 1: Search by ISBN first (exact match)
       if (isbn) {
