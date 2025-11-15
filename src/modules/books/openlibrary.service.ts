@@ -302,7 +302,7 @@ export class OpenLibraryService {
         }).pipe(timeout(this.requestTimeout))
       );
 
-      return response.data.docs || [];
+      return (response as any).data.docs || [];
     } catch (error) {
       this.logger.error(`Error searching books by title "${title}":`, error.message);
       return [];
