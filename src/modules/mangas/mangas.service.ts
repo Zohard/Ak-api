@@ -946,7 +946,10 @@ export class MangasService extends BaseContentService<
       try {
         console.log(`Trying Google Books API for ISBN ${isbn}`);
         const cleanIsbn = isbn.replace(/[-\s]/g, '');
-        const googleBooksUrl = `https://www.googleapis.com/books/v1/volumes?q=isbn:${cleanIsbn}`;
+        const apiKey = process.env.GOOGLE_BOOKS_API_KEY || '';
+        const googleBooksUrl = apiKey
+          ? `https://www.googleapis.com/books/v1/volumes?q=isbn:${cleanIsbn}&key=${apiKey}`
+          : `https://www.googleapis.com/books/v1/volumes?q=isbn:${cleanIsbn}`;
         const googleResponse = await axios.get(googleBooksUrl, { timeout: 8000 });
 
         if (googleResponse.data.items && googleResponse.data.items.length > 0) {
