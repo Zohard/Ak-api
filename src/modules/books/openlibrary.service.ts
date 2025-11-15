@@ -218,8 +218,11 @@ export class OpenLibraryService {
         return workDetails.description;
       }
       // Handle object format with 'value' property
-      if (typeof workDetails.description === 'object' && 'value' in workDetails.description) {
-        return workDetails.description.value;
+      if (typeof workDetails.description === 'object' && workDetails.description !== null) {
+        const descObj = workDetails.description as { type?: string; value?: string };
+        if (descObj.value) {
+          return descObj.value;
+        }
       }
     }
 
