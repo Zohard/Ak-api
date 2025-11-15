@@ -1050,7 +1050,7 @@ export class MangasService extends BaseContentService<
           origine: string | null;
           editeur: string | null;
           nice_url: string | null;
-          moyenne_notes: number | null;
+          moyennenotes: number | null;
           similarity_score: number;
         }>>`
           SELECT
@@ -1064,7 +1064,7 @@ export class MangasService extends BaseContentService<
             origine,
             editeur,
             nice_url,
-            moyenne_notes,
+            moyennenotes,
             1.0 as similarity_score
           FROM ak_mangas
           WHERE statut = 1
@@ -1093,7 +1093,7 @@ export class MangasService extends BaseContentService<
             origine: string | null;
             editeur: string | null;
             nice_url: string | null;
-            moyenne_notes: number | null;
+            moyennenotes: number | null;
             similarity_score: number;
           }>>`
             SELECT
@@ -1107,7 +1107,7 @@ export class MangasService extends BaseContentService<
               origine,
               editeur,
               nice_url,
-              moyenne_notes,
+              moyennenotes,
               GREATEST(
                 SIMILARITY(titre, ${searchTitle}),
                 SIMILARITY(COALESCE(titre_orig, ''), ${searchTitle}),
@@ -1140,7 +1140,7 @@ export class MangasService extends BaseContentService<
             origine: string | null;
             editeur: string | null;
             nice_url: string | null;
-            moyenne_notes: number | null;
+            moyennenotes: number | null;
             similarity_score: number;
           }>>`
             SELECT
@@ -1154,7 +1154,7 @@ export class MangasService extends BaseContentService<
               origine,
               editeur,
               nice_url,
-              moyenne_notes,
+              moyennenotes,
               0.8 as similarity_score
             FROM ak_mangas
             WHERE statut = 1
@@ -1187,7 +1187,7 @@ export class MangasService extends BaseContentService<
           origin: manga.origine,
           publisher: manga.editeur,
           niceUrl: manga.nice_url,
-          rating: manga.moyenne_notes,
+          rating: manga.moyennenotes,
           similarityScore: Math.round((manga.similarity_score || 0) * 100), // Convert to percentage
         })),
         message: this.buildResultMessage(bookSource, mangaResults.length),
