@@ -935,22 +935,78 @@ export class MangasService extends BaseContentService<
 
   async lookupByIsbn(isbn: string) {
     try {
-      // Try to fetch book details from OpenLibrary
-      let openLibraryBook = null;
+      let bookInfo = null;
       let rawTitle = '';
       let authors = '';
       let description = '';
       let thumbnail = null;
+      let bookSource = 'none';
 
+      // Strategy 1: Try Google Books API first (best for French ISBNs)
       try {
-        openLibraryBook = await this.openLibraryService.getBookByIsbn(isbn);
-        rawTitle = openLibraryBook.title || '';
-        authors = openLibraryBook.authors?.join(', ') || '';
-        description = openLibraryBook.description || '';
-        thumbnail = openLibraryBook.coverUrl || null;
-      } catch (openLibraryError) {
-        // OpenLibrary doesn't have this ISBN - that's OK, we'll search local database only
-        console.log(`OpenLibrary doesn't have ISBN ${isbn}, searching local database only`);
+        console.log(`Trying Google Books API for ISBN ${isbn}`);
+        const cleanIsbn = isbn.replace(/[-\s]/g, '');
+        const googleBooksUrl = `https://www.googleapis.com/books/v1/volumes?q=isbn:${cleanIsbn}`;
+        const googleResponse = await axios.get(googleBooksUrl, { timeout: 8000 });
+
+        if (googleResponse.data.items && googleResponse.data.items.length > 0) {
+          const volumeInfo = googleResponse.data.items[0].volumeInfo;
+          rawTitle = volumeInfo.title || '';
+          authors = volumeInfo.authors ? volumeInfo.authors.join(', ') : '';
+          description = volumeInfo.description || '';
+          thumbnail = volumeInfo.imageLinks?.thumbnail || volumeInfo.imageLinks?.smallThumbnail || null;
+
+          bookInfo = {
+            title: rawTitle,
+            authors,
+            description,
+            thumbnail,
+            publishedDate: volumeInfo.publishedDate,
+            pageCount: volumeInfo.pageCount,
+            publisher: volumeInfo.publisher,
+            language: volumeInfo.language,
+          };
+          bookSource = 'google';
+          console.log(`✓ Found in Google Books: ${rawTitle}`);
+        }
+      } catch (googleError) {
+        console.log(`Google Books API failed or no results for ISBN ${isbn}`);
+      }
+
+      // Strategy 2: If Google Books failed, try OpenLibrary
+      if (!bookInfo) {
+        try {
+          console.log(`Trying OpenLibrary API for ISBN ${isbn}`);
+          const openLibraryBook = await this.openLibraryService.getBookByIsbn(isbn);
+          rawTitle = openLibraryBook.title || '';
+          authors = openLibraryBook.authors?.join(', ') || '';
+          description = openLibraryBook.description || '';
+          thumbnail = openLibraryBook.coverUrl || null;
+
+          bookInfo = {
+            title: rawTitle,
+            authors,
+            description,
+            thumbnail,
+            publishedDate: openLibraryBook.publishDate,
+            pageCount: openLibraryBook.numberOfPages,
+            publisher: openLibraryBook.publisher,
+            language: openLibraryBook.language,
+            subjects: openLibraryBook.subjects,
+            openLibraryUrl: openLibraryBook.openLibraryUrl,
+          };
+          bookSource = 'openlibrary';
+          console.log(`✓ Found in OpenLibrary: ${rawTitle}`);
+        } catch (openLibraryError) {
+          console.log(`OpenLibrary API failed or no results for ISBN ${isbn}`);
+        }
+      }
+
+      // If we found book info, log the source
+      if (bookInfo) {
+        console.log(`Book metadata source: ${bookSource}`);
+      } else {
+        console.log(`No book metadata found in Google Books or OpenLibrary, will search local database only`);
       }
 
       // Clean the title for better matching
@@ -1069,18 +1125,8 @@ export class MangasService extends BaseContentService<
 
       return {
         isbn: isbn,
-        bookInfo: openLibraryBook ? {
-          title: rawTitle,
-          authors,
-          description,
-          thumbnail,
-          publishedDate: openLibraryBook.publishDate,
-          pageCount: openLibraryBook.numberOfPages,
-          publisher: openLibraryBook.publisher,
-          language: openLibraryBook.language,
-          subjects: openLibraryBook.subjects,
-          openLibraryUrl: openLibraryBook.openLibraryUrl,
-        } : null, // No book info if OpenLibrary doesn't have it
+        bookInfo: bookInfo, // Book metadata from Google Books or OpenLibrary (or null)
+        bookSource: bookSource, // 'google', 'openlibrary', or 'none'
         mangaResults: mangaResults.map(manga => ({
           id: manga.id_manga,
           title: manga.titre,
@@ -1095,13 +1141,7 @@ export class MangasService extends BaseContentService<
           rating: manga.moyenne_notes,
           similarityScore: Math.round((manga.similarity_score || 0) * 100), // Convert to percentage
         })),
-        message: mangaResults.length > 0
-          ? (openLibraryBook
-              ? `Found ${mangaResults.length} matching manga in local database.`
-              : `ISBN not in OpenLibrary, but found ${mangaResults.length} matching manga in local database.`)
-          : (openLibraryBook
-              ? 'Book found in OpenLibrary but no matching manga in local database.'
-              : 'ISBN not found in OpenLibrary or local database.'),
+        message: this.buildResultMessage(bookSource, mangaResults.length),
       };
     } catch (error: any) {
       if (error instanceof BadRequestException || error instanceof NotFoundException) {
@@ -1685,5 +1725,26 @@ export class MangasService extends BaseContentService<
       hash = hash & hash;
     }
     return Math.abs(hash).toString(36);
+  }
+
+  // Build result message based on book source and manga results
+  private buildResultMessage(bookSource: string, mangaCount: number): string {
+    if (mangaCount > 0) {
+      if (bookSource === 'google') {
+        return `Found book in Google Books and ${mangaCount} matching manga in local database.`;
+      } else if (bookSource === 'openlibrary') {
+        return `Found book in OpenLibrary and ${mangaCount} matching manga in local database.`;
+      } else {
+        return `Book not found in external APIs, but found ${mangaCount} matching manga in local database.`;
+      }
+    } else {
+      if (bookSource === 'google') {
+        return 'Book found in Google Books but no matching manga in local database.';
+      } else if (bookSource === 'openlibrary') {
+        return 'Book found in OpenLibrary but no matching manga in local database.';
+      } else {
+        return 'ISBN not found in any book database or local manga database.';
+      }
+    }
   }
 }
