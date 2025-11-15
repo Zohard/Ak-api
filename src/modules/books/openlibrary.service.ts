@@ -16,8 +16,8 @@ export class OpenLibraryService {
     private readonly httpService: HttpService,
     private readonly configService: ConfigService,
   ) {
-    this.accessKey = this.configService.get<string>('OPENLIBRARY_ACCESS_KEY');
-    this.secret = this.configService.get<string>('OPENLIBRARY_SECRET');
+    this.accessKey = this.configService.get<string>('OPENLIBRARY_ACCESS_KEY') || '';
+    this.secret = this.configService.get<string>('OPENLIBRARY_SECRET') || '';
   }
 
   /**
@@ -116,8 +116,8 @@ export class OpenLibraryService {
         }).pipe(timeout(this.requestTimeout))
       );
 
-      return response.data;
-    } catch (error) {
+      return (response as any).data;
+    } catch (error: any) {
       if (error.response?.status === 404) {
         return null;
       }
@@ -138,7 +138,7 @@ export class OpenLibraryService {
         }).pipe(timeout(this.requestTimeout))
       );
 
-      return response.data;
+      return (response as any).data;
     } catch (error) {
       this.logger.warn(`Failed to fetch work details for ${workKey}`);
       return null;
