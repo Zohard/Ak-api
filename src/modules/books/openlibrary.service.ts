@@ -217,7 +217,8 @@ export class OpenLibraryService {
       if (typeof workDetails.description === 'string') {
         return workDetails.description;
       }
-      if (workDetails.description.value) {
+      // Handle object format with 'value' property
+      if (typeof workDetails.description === 'object' && 'value' in workDetails.description) {
         return workDetails.description.value;
       }
     }
@@ -227,7 +228,7 @@ export class OpenLibraryService {
       if (typeof bookData.description === 'string') {
         return bookData.description;
       }
-      if (bookData.description.value) {
+      if (typeof bookData.description === 'object' && bookData.description.value) {
         return bookData.description.value;
       }
     }
@@ -238,7 +239,7 @@ export class OpenLibraryService {
   /**
    * Extract subjects/genres
    */
-  private extractSubjects(bookData: any, workDetails: OpenLibraryWorkDto | null): string[] {
+  private extractSubjects(bookData: any, workDetails: OpenLibraryWorkDto | null): string[] | undefined {
     const subjects: string[] = [];
 
     if (bookData.subjects && Array.isArray(bookData.subjects)) {
