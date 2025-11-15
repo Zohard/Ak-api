@@ -943,7 +943,7 @@ export class MangasService extends BaseContentService<
       const description = openLibraryBook.description || '';
       const thumbnail = openLibraryBook.coverUrl || null;
 
-      // Clean the title for better AniList matching
+      // Clean the title for better matching
       // Remove volume/tome indicators and numbers
       let cleanedTitle = rawTitle
         // Remove common volume patterns (French)
@@ -964,27 +964,56 @@ export class MangasService extends BaseContentService<
       console.log('ISBN lookup - Raw title:', rawTitle);
       console.log('ISBN lookup - Cleaned title:', cleanedTitle);
 
-      // Try multiple search strategies
-      let anilistResults: AniListManga[] = [];
+      // Search local ak_mangas database using PostgreSQL similarity
+      // We use pg_trgm extension for trigram similarity matching
+      const searchTitle = cleanedTitle || rawTitle;
 
-      // Strategy 1: Search with cleaned title
-      if (cleanedTitle) {
-        anilistResults = await this.aniListService.searchManga(cleanedTitle, 5);
-        console.log('ISBN lookup - Results from cleaned title:', anilistResults.length);
-      }
+      // Search with similarity threshold (70-80% match)
+      const mangaResults = await this.prisma.$queryRaw<Array<{
+        id_manga: number;
+        titre: string;
+        auteur: string | null;
+        image: string | null;
+        annee: string | null;
+        nb_volumes: string | null;
+        synopsis: string | null;
+        origine: string | null;
+        editeur: string | null;
+        nice_url: string | null;
+        moyenne_notes: number | null;
+        similarity_score: number;
+      }>>`
+        SELECT
+          id_manga,
+          titre,
+          auteur,
+          image,
+          annee,
+          nb_volumes,
+          synopsis,
+          origine,
+          editeur,
+          nice_url,
+          moyenne_notes,
+          GREATEST(
+            SIMILARITY(titre, ${searchTitle}),
+            SIMILARITY(COALESCE(titre_orig, ''), ${searchTitle}),
+            SIMILARITY(COALESCE(titre_fr, ''), ${searchTitle}),
+            SIMILARITY(COALESCE(titres_alternatifs, ''), ${searchTitle})
+          ) as similarity_score
+        FROM ak_mangas
+        WHERE statut = 1
+          AND (
+            SIMILARITY(titre, ${searchTitle}) >= 0.3
+            OR SIMILARITY(COALESCE(titre_orig, ''), ${searchTitle}) >= 0.3
+            OR SIMILARITY(COALESCE(titre_fr, ''), ${searchTitle}) >= 0.3
+            OR SIMILARITY(COALESCE(titres_alternatifs, ''), ${searchTitle}) >= 0.3
+          )
+        ORDER BY similarity_score DESC
+        LIMIT 10
+      `;
 
-      // Strategy 2: If no results, try with raw title
-      if (anilistResults.length === 0 && rawTitle !== cleanedTitle) {
-        anilistResults = await this.aniListService.searchManga(rawTitle, 5);
-        console.log('ISBN lookup - Results from raw title:', anilistResults.length);
-      }
-
-      // Strategy 3: If still no results and we have an author, try searching by author
-      if (anilistResults.length === 0 && authors) {
-        const firstAuthor = authors.split(',')[0].trim();
-        anilistResults = await this.aniListService.searchManga(firstAuthor, 5);
-        console.log('ISBN lookup - Results from author search:', anilistResults.length);
-      }
+      console.log('ISBN lookup - Found', mangaResults.length, 'local manga matches');
 
       return {
         isbn: openLibraryBook.isbn,
@@ -1000,20 +1029,23 @@ export class MangasService extends BaseContentService<
           subjects: openLibraryBook.subjects,
           openLibraryUrl: openLibraryBook.openLibraryUrl,
         },
-        anilistResults: anilistResults.map(manga => ({
-          id: manga.id,
-          title: manga.title,
-          coverImage: manga.coverImage,
-          description: manga.description,
-          chapters: manga.chapters,
-          volumes: manga.volumes,
-          startDate: manga.startDate,
-          genres: manga.genres,
-          staff: manga.staff,
+        mangaResults: mangaResults.map(manga => ({
+          id: manga.id_manga,
+          title: manga.titre,
+          author: manga.auteur,
+          image: manga.image ? (typeof manga.image === 'string' && /^https?:\/\//.test(manga.image) ? manga.image : `/api/media/serve/manga/${manga.image}`) : null,
+          year: manga.annee,
+          volumes: manga.nb_volumes,
+          synopsis: manga.synopsis,
+          origin: manga.origine,
+          publisher: manga.editeur,
+          niceUrl: manga.nice_url,
+          rating: manga.moyenne_notes,
+          similarityScore: Math.round((manga.similarity_score || 0) * 100), // Convert to percentage
         })),
-        message: anilistResults.length > 0
-          ? 'Book found. Please select the matching manga from AniList results.'
-          : 'Book found but no matching manga on AniList. You may need to search manually.',
+        message: mangaResults.length > 0
+          ? `Found ${mangaResults.length} matching manga in local database.`
+          : 'Book found but no matching manga in database. You may need to search manually.',
       };
     } catch (error: any) {
       if (error instanceof BadRequestException || error instanceof NotFoundException) {
