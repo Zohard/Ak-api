@@ -935,13 +935,23 @@ export class MangasService extends BaseContentService<
 
   async lookupByIsbn(isbn: string) {
     try {
-      // Use OpenLibrary service to fetch book details
-      const openLibraryBook = await this.openLibraryService.getBookByIsbn(isbn);
+      // Try to fetch book details from OpenLibrary
+      let openLibraryBook = null;
+      let rawTitle = '';
+      let authors = '';
+      let description = '';
+      let thumbnail = null;
 
-      const rawTitle = openLibraryBook.title || '';
-      const authors = openLibraryBook.authors?.join(', ') || '';
-      const description = openLibraryBook.description || '';
-      const thumbnail = openLibraryBook.coverUrl || null;
+      try {
+        openLibraryBook = await this.openLibraryService.getBookByIsbn(isbn);
+        rawTitle = openLibraryBook.title || '';
+        authors = openLibraryBook.authors?.join(', ') || '';
+        description = openLibraryBook.description || '';
+        thumbnail = openLibraryBook.coverUrl || null;
+      } catch (openLibraryError) {
+        // OpenLibrary doesn't have this ISBN - that's OK, we'll search local database only
+        console.log(`OpenLibrary doesn't have ISBN ${isbn}, searching local database only`);
+      }
 
       // Clean the title for better matching
       // Remove volume/tome indicators and numbers
@@ -964,60 +974,102 @@ export class MangasService extends BaseContentService<
       console.log('ISBN lookup - Raw title:', rawTitle);
       console.log('ISBN lookup - Cleaned title:', cleanedTitle);
 
-      // Search local ak_mangas database using PostgreSQL similarity
-      // We use pg_trgm extension for trigram similarity matching
-      const searchTitle = cleanedTitle || rawTitle;
+      // Search local ak_mangas database
+      let mangaResults = [];
 
-      // Search with similarity threshold (70-80% match)
-      const mangaResults = await this.prisma.$queryRaw<Array<{
-        id_manga: number;
-        titre: string;
-        auteur: string | null;
-        image: string | null;
-        annee: string | null;
-        nb_volumes: string | null;
-        synopsis: string | null;
-        origine: string | null;
-        editeur: string | null;
-        nice_url: string | null;
-        moyenne_notes: number | null;
-        similarity_score: number;
-      }>>`
-        SELECT
-          id_manga,
-          titre,
-          auteur,
-          image,
-          annee,
-          nb_volumes,
-          synopsis,
-          origine,
-          editeur,
-          nice_url,
-          moyenne_notes,
-          GREATEST(
-            SIMILARITY(titre, ${searchTitle}),
-            SIMILARITY(COALESCE(titre_orig, ''), ${searchTitle}),
-            SIMILARITY(COALESCE(titre_fr, ''), ${searchTitle}),
-            SIMILARITY(COALESCE(titres_alternatifs, ''), ${searchTitle})
-          ) as similarity_score
-        FROM ak_mangas
-        WHERE statut = 1
-          AND (
-            SIMILARITY(titre, ${searchTitle}) >= 0.3
-            OR SIMILARITY(COALESCE(titre_orig, ''), ${searchTitle}) >= 0.3
-            OR SIMILARITY(COALESCE(titre_fr, ''), ${searchTitle}) >= 0.3
-            OR SIMILARITY(COALESCE(titres_alternatifs, ''), ${searchTitle}) >= 0.3
-          )
-        ORDER BY similarity_score DESC
-        LIMIT 10
-      `;
+      // Strategy 1: Search by ISBN first (exact match)
+      if (isbn) {
+        const cleanIsbn = isbn.replace(/[-\s]/g, '');
+        mangaResults = await this.prisma.$queryRaw<Array<{
+          id_manga: number;
+          titre: string;
+          auteur: string | null;
+          image: string | null;
+          annee: string | null;
+          nb_volumes: string | null;
+          synopsis: string | null;
+          origine: string | null;
+          editeur: string | null;
+          nice_url: string | null;
+          moyenne_notes: number | null;
+          similarity_score: number;
+        }>>`
+          SELECT
+            id_manga,
+            titre,
+            auteur,
+            image,
+            annee,
+            nb_volumes,
+            synopsis,
+            origine,
+            editeur,
+            nice_url,
+            moyenne_notes,
+            1.0 as similarity_score
+          FROM ak_mangas
+          WHERE statut = 1
+            AND (
+              isbn LIKE ${`%${cleanIsbn}%`}
+              OR isbn LIKE ${`%${isbn}%`}
+            )
+          LIMIT 10
+        `;
+      }
+
+      // Strategy 2: If no ISBN match and we have a title, search by title similarity
+      if (mangaResults.length === 0 && (cleanedTitle || rawTitle)) {
+        const searchTitle = cleanedTitle || rawTitle;
+        mangaResults = await this.prisma.$queryRaw<Array<{
+          id_manga: number;
+          titre: string;
+          auteur: string | null;
+          image: string | null;
+          annee: string | null;
+          nb_volumes: string | null;
+          synopsis: string | null;
+          origine: string | null;
+          editeur: string | null;
+          nice_url: string | null;
+          moyenne_notes: number | null;
+          similarity_score: number;
+        }>>`
+          SELECT
+            id_manga,
+            titre,
+            auteur,
+            image,
+            annee,
+            nb_volumes,
+            synopsis,
+            origine,
+            editeur,
+            nice_url,
+            moyenne_notes,
+            GREATEST(
+              SIMILARITY(titre, ${searchTitle}),
+              SIMILARITY(COALESCE(titre_orig, ''), ${searchTitle}),
+              SIMILARITY(COALESCE(titre_fr, ''), ${searchTitle}),
+              SIMILARITY(COALESCE(titres_alternatifs, ''), ${searchTitle})
+            ) as similarity_score
+          FROM ak_mangas
+          WHERE statut = 1
+            AND (
+              SIMILARITY(titre, ${searchTitle}) >= 0.3
+              OR SIMILARITY(COALESCE(titre_orig, ''), ${searchTitle}) >= 0.3
+              OR SIMILARITY(COALESCE(titre_fr, ''), ${searchTitle}) >= 0.3
+              OR SIMILARITY(COALESCE(titres_alternatifs, ''), ${searchTitle}) >= 0.3
+            )
+          ORDER BY similarity_score DESC
+          LIMIT 10
+        `;
+      }
 
       console.log('ISBN lookup - Found', mangaResults.length, 'local manga matches');
 
       return {
-        isbn: openLibraryBook.isbn,
-        bookInfo: {
+        isbn: isbn,
+        bookInfo: openLibraryBook ? {
           title: rawTitle,
           authors,
           description,
@@ -1028,7 +1080,7 @@ export class MangasService extends BaseContentService<
           language: openLibraryBook.language,
           subjects: openLibraryBook.subjects,
           openLibraryUrl: openLibraryBook.openLibraryUrl,
-        },
+        } : null, // No book info if OpenLibrary doesn't have it
         mangaResults: mangaResults.map(manga => ({
           id: manga.id_manga,
           title: manga.titre,
@@ -1044,8 +1096,12 @@ export class MangasService extends BaseContentService<
           similarityScore: Math.round((manga.similarity_score || 0) * 100), // Convert to percentage
         })),
         message: mangaResults.length > 0
-          ? `Found ${mangaResults.length} matching manga in local database.`
-          : 'Book found but no matching manga in database. You may need to search manually.',
+          ? (openLibraryBook
+              ? `Found ${mangaResults.length} matching manga in local database.`
+              : `ISBN not in OpenLibrary, but found ${mangaResults.length} matching manga in local database.`)
+          : (openLibraryBook
+              ? 'Book found in OpenLibrary but no matching manga in local database.'
+              : 'ISBN not found in OpenLibrary or local database.'),
       };
     } catch (error: any) {
       if (error instanceof BadRequestException || error instanceof NotFoundException) {
