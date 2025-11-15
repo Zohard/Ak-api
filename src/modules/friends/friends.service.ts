@@ -654,8 +654,8 @@ export class FriendsService {
 
     // Verify that the requester has actually sent a friend request
     const requester = await this.prisma.$queryRaw<Array<{ buddy_list: string }>>`
-      SELECT buddy_list 
-      FROM smf_members 
+      SELECT buddy_list
+      FROM smf_members
       WHERE id_member = ${requesterId}
       LIMIT 1
     `;
@@ -678,7 +678,7 @@ export class FriendsService {
     const newBuddyList = updatedBuddies.length > 0 ? updatedBuddies.join(',') : '';
 
     await this.prisma.$queryRaw`
-      UPDATE smf_members 
+      UPDATE smf_members
       SET buddy_list = ${newBuddyList}
       WHERE id_member = ${requesterId}
     `;
@@ -687,5 +687,340 @@ export class FriendsService {
       success: true,
       message: 'Friend request declined'
     };
+  }
+
+  /**
+   * Get friends' activity timeline
+   */
+  async getFriendsActivity(
+    userId: number,
+    page: number = 1,
+    limit: number = 20,
+    typeFilter: string = 'all',
+    contentTypeFilter: string = 'all'
+  ): Promise<{
+    activities: any[];
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+    hasMore: boolean;
+  }> {
+    if (!userId || userId <= 0) {
+      throw new BadRequestException('Invalid user ID');
+    }
+
+    if (page < 1) page = 1;
+    if (limit < 1 || limit > 50) limit = 20;
+
+    // Get user's friends list
+    const { friends } = await this.getFriends(userId);
+    const friendIds = friends.map(f => f.id);
+
+    if (friendIds.length === 0) {
+      return {
+        activities: [],
+        total: 0,
+        page,
+        limit,
+        totalPages: 0,
+        hasMore: false
+      };
+    }
+
+    const offset = (page - 1) * limit;
+    const activities: any[] = [];
+
+    // Fetch anime ratings
+    if (typeFilter === 'all' || typeFilter === 'rating') {
+      const animeRatings = await this.prisma.$queryRaw<Array<{
+        id: number;
+        user_id: number;
+        anime_id: number;
+        rating: number;
+        updatedat: Date;
+        real_name: string;
+        avatar: string;
+        titre: string;
+        image: string;
+      }>>`
+        SELECT
+          ual.id, ual.user_id, ual.anime_id, ual.rating, ual.updatedat,
+          m.real_name, m.avatar,
+          a.titre, a.image
+        FROM ak_user_anime_list ual
+        JOIN smf_members m ON ual.user_id = m.id_member
+        JOIN ak_animes a ON ual.anime_id = a.id_anime
+        WHERE ual.user_id IN (${Prisma.join(friendIds)})
+          AND ual.rating IS NOT NULL
+          AND ual.rating > 0
+          AND ual.updatedat IS NOT NULL
+        ORDER BY ual.updatedat DESC
+        LIMIT ${limit + 100}
+      `;
+
+      activities.push(...animeRatings.map(r => ({
+        id: `anime-rating-${r.id}`,
+        type: 'rating',
+        userId: r.user_id,
+        userName: r.real_name,
+        userAvatar: r.avatar || '../img/noavatar.png',
+        createdAt: r.updatedat,
+        contentType: 'anime',
+        contentId: r.anime_id,
+        contentTitle: r.titre,
+        contentImage: r.image,
+        rating: r.rating,
+        actionText: `a attribué ${r.rating}/10 à la série ${r.titre}`
+      })));
+    }
+
+    // Fetch game ratings
+    if (typeFilter === 'all' || typeFilter === 'rating') {
+      const gameRatings = await this.prisma.$queryRaw<Array<{
+        id_collection: number;
+        id_membre: number;
+        id_jeu: number;
+        evaluation: number;
+        date_modified: Date;
+        real_name: string;
+        avatar: string;
+        titre: string;
+        image: string;
+      }>>`
+        SELECT
+          cj.id_collection, cj.id_membre, cj.id_jeu, cj.evaluation, cj.date_modified,
+          m.real_name, m.avatar,
+          jv.titre, jv.image
+        FROM collection_jeuxvideo cj
+        JOIN smf_members m ON cj.id_membre = m.id_member
+        JOIN ak_jeux_video jv ON cj.id_jeu = jv.id_jeu
+        WHERE cj.id_membre IN (${Prisma.join(friendIds)})
+          AND cj.evaluation IS NOT NULL
+          AND cj.evaluation > 0
+          AND cj.date_modified IS NOT NULL
+        ORDER BY cj.date_modified DESC
+        LIMIT ${limit + 100}
+      `;
+
+      activities.push(...gameRatings.map(r => ({
+        id: `game-rating-${r.id_collection}`,
+        type: 'rating',
+        userId: r.id_membre,
+        userName: r.real_name,
+        userAvatar: r.avatar || '../img/noavatar.png',
+        createdAt: r.date_modified,
+        contentType: 'game',
+        contentId: r.id_jeu,
+        contentTitle: r.titre,
+        contentImage: r.image,
+        rating: r.evaluation,
+        actionText: `a attribué ${r.evaluation}/10 au jeu ${r.titre}`
+      })));
+    }
+
+    // Fetch manga ratings
+    if (typeFilter === 'all' || typeFilter === 'rating') {
+      const mangaRatings = await this.prisma.$queryRaw<Array<{
+        id_collection: number;
+        id_membre: number;
+        id_manga: number;
+        evaluation: number;
+        updated_at: Date;
+        real_name: string;
+        avatar: string;
+        titre: string;
+        image: string;
+      }>>`
+        SELECT
+          cm.id_collection, cm.id_membre, cm.id_manga, cm.evaluation, cm.updated_at,
+          m.real_name, m.avatar,
+          mg.titre, mg.image
+        FROM collection_mangas cm
+        JOIN smf_members m ON cm.id_membre = m.id_member
+        JOIN ak_mangas mg ON cm.id_manga = mg.id_manga
+        WHERE cm.id_membre IN (${Prisma.join(friendIds)})
+          AND cm.evaluation IS NOT NULL
+          AND cm.evaluation > 0
+          AND cm.updated_at IS NOT NULL
+        ORDER BY cm.updated_at DESC
+        LIMIT ${limit + 100}
+      `;
+
+      activities.push(...mangaRatings.map(r => ({
+        id: `manga-rating-${r.id_collection}`,
+        type: 'rating',
+        userId: r.id_membre,
+        userName: r.real_name,
+        userAvatar: r.avatar || '../img/noavatar.png',
+        createdAt: r.updated_at,
+        contentType: 'manga',
+        contentId: r.id_manga,
+        contentTitle: r.titre,
+        contentImage: r.image,
+        rating: r.evaluation,
+        actionText: `a attribué ${r.evaluation}/10 au manga ${r.titre}`
+      })));
+    }
+
+    // Fetch reviews
+    if (typeFilter === 'all' || typeFilter === 'review') {
+      const reviews = await this.prisma.$queryRaw<Array<{
+        id_critique: number;
+        id_membre: number;
+        titre: string;
+        critique: string;
+        notation: number;
+        date_critique: Date;
+        id_anime: number | null;
+        id_manga: number | null;
+        id_jeu: number | null;
+        real_name: string;
+        avatar: string;
+        content_titre: string | null;
+        content_image: string | null;
+        content_type: string;
+      }>>`
+        SELECT
+          c.id_critique, c.id_membre, c.titre, c.critique, c.notation, c.date_critique,
+          c.id_anime, c.id_manga, c.id_jeu,
+          m.real_name, m.avatar,
+          COALESCE(a.titre, mg.titre, jv.titre) as content_titre,
+          COALESCE(a.image, mg.image, jv.image) as content_image,
+          CASE
+            WHEN c.id_anime > 0 THEN 'anime'
+            WHEN c.id_manga > 0 THEN 'manga'
+            WHEN c.id_jeu > 0 THEN 'game'
+            ELSE 'other'
+          END as content_type
+        FROM ak_critique c
+        JOIN smf_members m ON c.id_membre = m.id_member
+        LEFT JOIN ak_animes a ON c.id_anime = a.id_anime
+        LEFT JOIN ak_mangas mg ON c.id_manga = mg.id_manga
+        LEFT JOIN ak_jeux_video jv ON c.id_jeu = jv.id_jeu
+        WHERE c.id_membre IN (${Prisma.join(friendIds)})
+          AND c.date_critique IS NOT NULL
+          AND c.statut = 1
+        ORDER BY c.date_critique DESC
+        LIMIT ${limit + 100}
+      `;
+
+      activities.push(...reviews.map(r => {
+        const excerpt = r.critique ? r.critique.substring(0, 150).replace(/<[^>]*>/g, '') : '';
+        return {
+          id: `review-${r.id_critique}`,
+          type: 'review',
+          userId: r.id_membre,
+          userName: r.real_name,
+          userAvatar: r.avatar || '../img/noavatar.png',
+          createdAt: r.date_critique,
+          contentType: r.content_type,
+          contentId: r.id_anime || r.id_manga || r.id_jeu,
+          contentTitle: r.content_titre,
+          contentImage: r.content_image,
+          rating: r.notation,
+          reviewTitle: r.titre,
+          reviewExcerpt: excerpt,
+          actionText: `a écrit une critique sur ${r.content_type === 'anime' ? 'la série' : r.content_type === 'manga' ? 'le manga' : 'le jeu'} ${r.content_titre}${r.notation ? ` et lui a attribué ${r.notation}/10` : ''}`
+        };
+      }));
+    }
+
+    // Fetch top lists
+    if (typeFilter === 'all' || typeFilter === 'top_list') {
+      const topLists = await this.prisma.$queryRaw<Array<{
+        id: number;
+        title: string;
+        createdat: Date;
+        updatedat: Date;
+        createdby_id: number;
+        real_name: string;
+        avatar: string;
+        items_count: number;
+      }>>`
+        SELECT
+          tl.id, tl.title, tl.createdat, tl.updatedat, tl.createdby_id,
+          m.real_name, m.avatar,
+          COUNT(tli.id) as items_count
+        FROM ak_top_lists tl
+        JOIN smf_members m ON tl.createdby_id = m.id_member
+        LEFT JOIN ak_top_list_items tli ON tl.id = tli.toplist_id
+        WHERE tl.createdby_id IN (${Prisma.join(friendIds)})
+          AND tl.ispublic = 1
+          AND tl.updatedat IS NOT NULL
+        GROUP BY tl.id, tl.title, tl.createdat, tl.updatedat, tl.createdby_id, m.real_name, m.avatar
+        ORDER BY tl.updatedat DESC
+        LIMIT ${limit + 50}
+      `;
+
+      activities.push(...topLists.map(tl => ({
+        id: `top-list-${tl.id}`,
+        type: 'top_list',
+        userId: tl.createdby_id,
+        userName: tl.real_name,
+        userAvatar: tl.avatar || '../img/noavatar.png',
+        createdAt: tl.updatedat,
+        listName: tl.title,
+        itemsCount: Number(tl.items_count),
+        actionText: `a créé/mis à jour la liste "${tl.title}"`
+      })));
+    }
+
+    // Sort all activities by date
+    activities.sort((a, b) => {
+      const dateA = new Date(a.createdAt).getTime();
+      const dateB = new Date(b.createdAt).getTime();
+      return dateB - dateA;
+    });
+
+    // Apply content type filter
+    let filteredActivities = activities;
+    if (contentTypeFilter !== 'all') {
+      filteredActivities = activities.filter(a =>
+        a.contentType === contentTypeFilter || a.type === 'top_list' || a.type === 'following'
+      );
+    }
+
+    const total = filteredActivities.length;
+    const paginatedActivities = filteredActivities.slice(offset, offset + limit);
+
+    // Format time ago
+    const formattedActivities = paginatedActivities.map(activity => ({
+      ...activity,
+      createdAt: new Date(activity.createdAt).toISOString(),
+      timeAgo: this.formatTimeAgo(new Date(activity.createdAt))
+    }));
+
+    return {
+      activities: formattedActivities,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+      hasMore: offset + limit < total
+    };
+  }
+
+  /**
+   * Format time ago
+   */
+  private formatTimeAgo(date: Date): string {
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMinutes = Math.floor(diffMs / (1000 * 60));
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    const diffWeeks = Math.floor(diffDays / 7);
+    const diffMonths = Math.floor(diffDays / 30);
+
+    if (diffMinutes < 1) return 'À l\'instant';
+    if (diffMinutes < 60) return `Il y a ${diffMinutes} minute${diffMinutes > 1 ? 's' : ''}`;
+    if (diffHours < 24) return `Il y a ${diffHours} heure${diffHours > 1 ? 's' : ''}`;
+    if (diffDays === 1) return 'Hier';
+    if (diffDays < 7) return `Il y a ${diffDays} jours`;
+    if (diffWeeks < 4) return `Il y a ${diffWeeks} semaine${diffWeeks > 1 ? 's' : ''}`;
+    if (diffMonths < 12) return `Il y a ${diffMonths} mois`;
+
+    return date.toLocaleDateString('fr-FR');
   }
 }

@@ -549,4 +549,125 @@ export class FriendsController {
     }
     return await this.friendsService.declineFriendRequest(req.user.id, parsedRequesterId);
   }
+
+  @Get('activity')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Get friends activity timeline',
+    description: 'Retrieve a timeline of recent activities from the user\'s friends (ratings, reviews, lists, etc.)'
+  })
+  @ApiQuery({ name: 'page', type: 'number', required: false, description: 'Page number (default: 1)' })
+  @ApiQuery({ name: 'limit', type: 'number', required: false, description: 'Items per page (default: 20, max: 50)' })
+  @ApiQuery({ name: 'type', type: 'string', required: false, description: 'Filter by activity type (rating, review, top_list, all)', enum: ['rating', 'review', 'top_list', 'all'] })
+  @ApiQuery({ name: 'contentType', type: 'string', required: false, description: 'Filter by content type (anime, manga, game, all)', enum: ['anime', 'manga', 'game', 'all'] })
+  @ApiResponse({
+    status: 200,
+    description: 'Activity timeline retrieved successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        activities: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              id: { type: 'string', example: 'anime-rating-123' },
+              type: { type: 'string', example: 'rating' },
+              userId: { type: 'number', example: 123 },
+              userName: { type: 'string', example: 'Sacrilege' },
+              userAvatar: { type: 'string', example: '../img/avatar.jpg' },
+              createdAt: { type: 'string', example: '2025-11-14T10:30:00Z' },
+              timeAgo: { type: 'string', example: 'Hier' },
+              contentType: { type: 'string', example: 'anime' },
+              contentId: { type: 'number', example: 456 },
+              contentTitle: { type: 'string', example: 'Indociles' },
+              contentImage: { type: 'string', example: 'https://example.com/image.jpg' },
+              rating: { type: 'number', example: 6 },
+              actionText: { type: 'string', example: 'a attribué 6/10 à la série Indociles' }
+            }
+          }
+        },
+        total: { type: 'number', example: 50 },
+        page: { type: 'number', example: 1 },
+        limit: { type: 'number', example: 20 },
+        totalPages: { type: 'number', example: 3 },
+        hasMore: { type: 'boolean', example: true }
+      }
+    }
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  async getFriendsActivity(
+    @Request() req: any,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('type') type?: string,
+    @Query('contentType') contentType?: string
+  ) {
+    const parsedPage = page ? parseInt(page) : 1;
+    const parsedLimit = limit ? parseInt(limit) : 20;
+
+    if (isNaN(parsedPage) || parsedPage < 1) {
+      throw new BadRequestException('Invalid page number');
+    }
+
+    if (isNaN(parsedLimit) || parsedLimit < 1 || parsedLimit > 50) {
+      throw new BadRequestException('Invalid limit (must be between 1 and 50)');
+    }
+
+    return await this.friendsService.getFriendsActivity(
+      req.user.id,
+      parsedPage,
+      parsedLimit,
+      type || 'all',
+      contentType || 'all'
+    );
+  }
+
+  @Get('activity/public/:userId')
+  @ApiOperation({
+    summary: 'Get user\'s friends activity timeline (public)',
+    description: 'Retrieve a timeline of recent activities from a user\'s friends (public, no authentication required)'
+  })
+  @ApiParam({ name: 'userId', type: 'number', description: 'User ID' })
+  @ApiQuery({ name: 'page', type: 'number', required: false, description: 'Page number (default: 1)' })
+  @ApiQuery({ name: 'limit', type: 'number', required: false, description: 'Items per page (default: 20, max: 50)' })
+  @ApiQuery({ name: 'type', type: 'string', required: false, description: 'Filter by activity type' })
+  @ApiQuery({ name: 'contentType', type: 'string', required: false, description: 'Filter by content type' })
+  @ApiResponse({
+    status: 200,
+    description: 'Activity timeline retrieved successfully'
+  })
+  @ApiResponse({ status: 400, description: 'Invalid user ID' })
+  async getPublicFriendsActivity(
+    @Param('userId') userId: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('type') type?: string,
+    @Query('contentType') contentType?: string
+  ) {
+    const parsedUserId = parseInt(userId);
+    const parsedPage = page ? parseInt(page) : 1;
+    const parsedLimit = limit ? parseInt(limit) : 20;
+
+    if (isNaN(parsedUserId)) {
+      throw new BadRequestException('Invalid user ID');
+    }
+
+    if (isNaN(parsedPage) || parsedPage < 1) {
+      throw new BadRequestException('Invalid page number');
+    }
+
+    if (isNaN(parsedLimit) || parsedLimit < 1 || parsedLimit > 50) {
+      throw new BadRequestException('Invalid limit (must be between 1 and 50)');
+    }
+
+    return await this.friendsService.getFriendsActivity(
+      parsedUserId,
+      parsedPage,
+      parsedLimit,
+      type || 'all',
+      contentType || 'all'
+    );
+  }
 }
