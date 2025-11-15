@@ -13,6 +13,7 @@ import { MangaQueryDto } from './dto/manga-query.dto';
 import { RelatedContentItem, RelationsResponse } from '../shared/types/relations.types';
 import { ImageKitService } from '../media/imagekit.service';
 import { AniListService, AniListManga } from '../anilist/anilist.service';
+import { OpenLibraryService } from '../books/openlibrary.service';
 import { Prisma } from '@prisma/client';
 import axios from 'axios';
 import { hasAdminAccess } from '../../shared/constants/rbac.constants';
@@ -29,6 +30,7 @@ export class MangasService extends BaseContentService<
     private readonly cacheService: CacheService,
     private readonly imageKitService: ImageKitService,
     private readonly aniListService: AniListService,
+    private readonly openLibraryService: OpenLibraryService,
   ) {
     super(prisma);
   }
@@ -933,25 +935,13 @@ export class MangasService extends BaseContentService<
 
   async lookupByIsbn(isbn: string) {
     try {
-      // Validate ISBN format (ISBN-10 or ISBN-13)
-      const cleanIsbn = isbn.replace(/[-\s]/g, '');
-      if (!/^\d{10}(\d{3})?$/.test(cleanIsbn)) {
-        throw new BadRequestException('Invalid ISBN format. Must be ISBN-10 or ISBN-13');
-      }
+      // Use OpenLibrary service to fetch book details
+      const openLibraryBook = await this.openLibraryService.getBookByIsbn(isbn);
 
-      // Try Google Books API first
-      const googleBooksUrl = `https://www.googleapis.com/books/v1/volumes?q=isbn:${cleanIsbn}`;
-      const googleResponse = await axios.get(googleBooksUrl, { timeout: 10000 });
-
-      if (!googleResponse.data.items || googleResponse.data.items.length === 0) {
-        throw new NotFoundException('No book found with this ISBN');
-      }
-
-      const bookInfo = googleResponse.data.items[0].volumeInfo;
-      const rawTitle = bookInfo.title || '';
-      const authors = bookInfo.authors ? bookInfo.authors.join(', ') : '';
-      const description = bookInfo.description || '';
-      const thumbnail = bookInfo.imageLinks?.thumbnail || bookInfo.imageLinks?.smallThumbnail || null;
+      const rawTitle = openLibraryBook.title || '';
+      const authors = openLibraryBook.authors?.join(', ') || '';
+      const description = openLibraryBook.description || '';
+      const thumbnail = openLibraryBook.coverUrl || null;
 
       // Clean the title for better AniList matching
       // Remove volume/tome indicators and numbers
@@ -997,14 +987,18 @@ export class MangasService extends BaseContentService<
       }
 
       return {
-        isbn: cleanIsbn,
+        isbn: openLibraryBook.isbn,
         bookInfo: {
           title: rawTitle,
           authors,
           description,
           thumbnail,
-          publishedDate: bookInfo.publishedDate,
-          pageCount: bookInfo.pageCount,
+          publishedDate: openLibraryBook.publishDate,
+          pageCount: openLibraryBook.numberOfPages,
+          publisher: openLibraryBook.publisher,
+          language: openLibraryBook.language,
+          subjects: openLibraryBook.subjects,
+          openLibraryUrl: openLibraryBook.openLibraryUrl,
         },
         anilistResults: anilistResults.map(manga => ({
           id: manga.id,

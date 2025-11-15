@@ -28,6 +28,7 @@ import { LegacyModule } from './modules/legacy/legacy.module';
 import { SynopsisModule } from './modules/synopsis/synopsis.module';
 import { MetricsModule } from './modules/metrics/metrics.module';
 import { MessagesModule } from './modules/messages/messages.module';
+import { BooksModule } from './modules/books/books.module';
 import { PrismaService } from './shared/services/prisma.service';
 import { CacheService } from './shared/services/cache.service';
 import { ActivityTrackerService } from './shared/services/activity-tracker.service';
@@ -76,6 +77,7 @@ import jwtConfig from './config/jwt.config';
     LegacyModule,
     MetricsModule,
     MessagesModule,
+    BooksModule,
   ],
   controllers: [AppController],
   providers: [AppService, PrismaService, CacheService, ActivityTrackerService],

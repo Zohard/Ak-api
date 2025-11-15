@@ -5,9 +5,10 @@ import { PrismaService } from '../../shared/services/prisma.service';
 import { CacheService } from '../../shared/services/cache.service';
 import { MediaModule } from '../media/media.module';
 import { AniListModule } from '../anilist/anilist.module';
+import { BooksModule } from '../books/books.module';
 
 @Module({
-  imports: [MediaModule, AniListModule],
+  imports: [MediaModule, AniListModule, BooksModule],
   controllers: [MangasController],
   providers: [MangasService, PrismaService, CacheService],
   exports: [MangasService],
