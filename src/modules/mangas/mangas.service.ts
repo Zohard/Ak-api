@@ -1176,19 +1176,19 @@ export class MangasService extends BaseContentService<
       let userCollections: Map<number, { collectionType: number }> = new Map();
       if (userId && mangaResults.length > 0) {
         const mangaIds = mangaResults.map(m => m.id_manga);
-        const collections = await this.prisma.smfUserCollection.findMany({
+        const collections = await this.prisma.collectionManga.findMany({
           where: {
-            idUser: userId,
+            idMembre: userId,
             idManga: { in: mangaIds },
           },
           select: {
             idManga: true,
-            idCollectionType: true,
+            type: true,
           },
         });
 
         collections.forEach(c => {
-          userCollections.set(c.idManga, { collectionType: c.idCollectionType });
+          userCollections.set(c.idManga, { collectionType: c.type });
         });
       }
 
