@@ -1798,4 +1798,198 @@ export class MangasService extends BaseContentService<
       }
     }
   }
+
+  // ==================== MANGA VOLUMES METHODS ====================
+
+  /**
+   * Get all volumes for a manga
+   */
+  async getMangaVolumes(mangaId: number) {
+    return this.prisma.mangaVolume.findMany({
+      where: { idManga: mangaId },
+      orderBy: { volumeNumber: 'asc' },
+    });
+  }
+
+  /**
+   * Get a specific volume
+   */
+  async getVolume(volumeId: number) {
+    const volume = await this.prisma.mangaVolume.findUnique({
+      where: { idVolume: volumeId },
+      include: { manga: true },
+    });
+
+    if (!volume) {
+      throw new NotFoundException(`Volume with ID ${volumeId} not found`);
+    }
+
+    return volume;
+  }
+
+  /**
+   * Get volume by ISBN
+   */
+  async getVolumeByIsbn(isbn: string) {
+    const volume = await this.prisma.mangaVolume.findUnique({
+      where: { isbn },
+      include: { manga: true },
+    });
+
+    if (!volume) {
+      throw new NotFoundException(`Volume with ISBN ${isbn} not found`);
+    }
+
+    return volume;
+  }
+
+  /**
+   * Create a new volume for a manga
+   */
+  async createVolume(mangaId: number, createVolumeDto: any) {
+    // Check if manga exists
+    const manga = await this.findOne(mangaId);
+    if (!manga) {
+      throw new NotFoundException(`Manga with ID ${mangaId} not found`);
+    }
+
+    // Check if volume number already exists for this manga
+    const existingVolume = await this.prisma.mangaVolume.findUnique({
+      where: {
+        unique_manga_volume: {
+          idManga: mangaId,
+          volumeNumber: createVolumeDto.volumeNumber,
+        },
+      },
+    });
+
+    if (existingVolume) {
+      throw new BadRequestException(
+        `Volume ${createVolumeDto.volumeNumber} already exists for this manga`,
+      );
+    }
+
+    // Check if ISBN already exists
+    if (createVolumeDto.isbn) {
+      const existingIsbn = await this.prisma.mangaVolume.findUnique({
+        where: { isbn: createVolumeDto.isbn },
+      });
+
+      if (existingIsbn) {
+        throw new BadRequestException(
+          `ISBN ${createVolumeDto.isbn} already exists for another volume`,
+        );
+      }
+    }
+
+    return this.prisma.mangaVolume.create({
+      data: {
+        idManga: mangaId,
+        volumeNumber: createVolumeDto.volumeNumber,
+        isbn: createVolumeDto.isbn,
+        coverImage: createVolumeDto.coverImage,
+        title: createVolumeDto.title,
+        releaseDate: createVolumeDto.releaseDate
+          ? new Date(createVolumeDto.releaseDate)
+          : undefined,
+        description: createVolumeDto.description,
+      },
+    });
+  }
+
+  /**
+   * Update a volume
+   */
+  async updateVolume(volumeId: number, updateVolumeDto: any) {
+    // Check if volume exists
+    await this.getVolume(volumeId);
+
+    // If updating ISBN, check it doesn't exist
+    if (updateVolumeDto.isbn) {
+      const existingIsbn = await this.prisma.mangaVolume.findFirst({
+        where: {
+          isbn: updateVolumeDto.isbn,
+          idVolume: { not: volumeId },
+        },
+      });
+
+      if (existingIsbn) {
+        throw new BadRequestException(
+          `ISBN ${updateVolumeDto.isbn} already exists for another volume`,
+        );
+      }
+    }
+
+    return this.prisma.mangaVolume.update({
+      where: { idVolume: volumeId },
+      data: {
+        ...updateVolumeDto,
+        releaseDate: updateVolumeDto.releaseDate
+          ? new Date(updateVolumeDto.releaseDate)
+          : undefined,
+      },
+    });
+  }
+
+  /**
+   * Delete a volume
+   */
+  async deleteVolume(volumeId: number) {
+    // Check if volume exists
+    await this.getVolume(volumeId);
+
+    await this.prisma.mangaVolume.delete({
+      where: { idVolume: volumeId },
+    });
+
+    return { message: 'Volume deleted successfully' };
+  }
+
+  /**
+   * Create or update volume from ISBN scan
+   */
+  async upsertVolumeFromIsbn(mangaId: number, isbn: string, bookData: any) {
+    // Check if volume with this ISBN already exists
+    const existingVolume = await this.prisma.mangaVolume.findUnique({
+      where: { isbn },
+    });
+
+    if (existingVolume) {
+      return {
+        volume: existingVolume,
+        created: false,
+        message: 'Volume already exists',
+      };
+    }
+
+    // Get current max volume number for this manga
+    const maxVolume = await this.prisma.mangaVolume.findFirst({
+      where: { idManga: mangaId },
+      orderBy: { volumeNumber: 'desc' },
+      select: { volumeNumber: true },
+    });
+
+    const nextVolumeNumber = maxVolume ? maxVolume.volumeNumber + 1 : 1;
+
+    // Create new volume
+    const volume = await this.prisma.mangaVolume.create({
+      data: {
+        idManga: mangaId,
+        volumeNumber: nextVolumeNumber,
+        isbn,
+        title: bookData?.title,
+        description: bookData?.description,
+        releaseDate: bookData?.publishedDate
+          ? new Date(bookData.publishedDate)
+          : undefined,
+        coverImage: bookData?.coverImage,
+      },
+    });
+
+    return {
+      volume,
+      created: true,
+      message: 'Volume created successfully',
+    };
+  }
 }

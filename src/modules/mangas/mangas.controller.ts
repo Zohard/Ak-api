@@ -389,4 +389,98 @@ export class MangasController {
   ) {
     return this.mangasService.removeMangaBusiness(mangaId, businessId);
   }
+
+  // ==================== MANGA VOLUMES ENDPOINTS ====================
+
+  @Get(':id/volumes')
+  @ApiOperation({ summary: 'Get all volumes for a manga' })
+  @ApiParam({ name: 'id', description: 'Manga ID' })
+  @ApiResponse({ status: 200, description: 'Returns all volumes' })
+  @ApiResponse({ status: 404, description: 'Manga not found' })
+  async getMangaVolumes(@Param('id', ParseIntPipe) mangaId: number) {
+    return this.mangasService.getMangaVolumes(mangaId);
+  }
+
+  @Get('volumes/:volumeId')
+  @ApiOperation({ summary: 'Get a specific volume by ID' })
+  @ApiParam({ name: 'volumeId', description: 'Volume ID' })
+  @ApiResponse({ status: 200, description: 'Returns the volume' })
+  @ApiResponse({ status: 404, description: 'Volume not found' })
+  async getVolume(@Param('volumeId', ParseIntPipe) volumeId: number) {
+    return this.mangasService.getVolume(volumeId);
+  }
+
+  @Get('volumes/isbn/:isbn')
+  @ApiOperation({ summary: 'Get volume by ISBN' })
+  @ApiParam({ name: 'isbn', description: 'ISBN-13' })
+  @ApiResponse({ status: 200, description: 'Returns the volume' })
+  @ApiResponse({ status: 404, description: 'Volume not found' })
+  async getVolumeByIsbn(@Param('isbn') isbn: string) {
+    return this.mangasService.getVolumeByIsbn(isbn);
+  }
+
+  @Post(':id/volumes')
+  @UseGuards(AuthGuard)
+  @Roles('admin', 'moderator')
+  @ApiOperation({ summary: 'Create a new volume for a manga' })
+  @ApiParam({ name: 'id', description: 'Manga ID' })
+  @ApiResponse({ status: 201, description: 'Volume created' })
+  @ApiResponse({ status: 400, description: 'Invalid data' })
+  @ApiResponse({ status: 404, description: 'Manga not found' })
+  async createVolume(
+    @Param('id', ParseIntPipe) mangaId: number,
+    @Body() createVolumeDto: any,
+  ) {
+    return this.mangasService.createVolume(mangaId, createVolumeDto);
+  }
+
+  @Patch('volumes/:volumeId')
+  @UseGuards(AuthGuard)
+  @Roles('admin', 'moderator')
+  @ApiOperation({ summary: 'Update a volume' })
+  @ApiParam({ name: 'volumeId', description: 'Volume ID' })
+  @ApiResponse({ status: 200, description: 'Volume updated' })
+  @ApiResponse({ status: 404, description: 'Volume not found' })
+  async updateVolume(
+    @Param('volumeId', ParseIntPipe) volumeId: number,
+    @Body() updateVolumeDto: any,
+  ) {
+    return this.mangasService.updateVolume(volumeId, updateVolumeDto);
+  }
+
+  @Delete('volumes/:volumeId')
+  @UseGuards(AuthGuard)
+  @Roles('admin', 'moderator')
+  @ApiOperation({ summary: 'Delete a volume' })
+  @ApiParam({ name: 'volumeId', description: 'Volume ID' })
+  @ApiResponse({ status: 200, description: 'Volume deleted' })
+  @ApiResponse({ status: 404, description: 'Volume not found' })
+  async deleteVolume(@Param('volumeId', ParseIntPipe) volumeId: number) {
+    return this.mangasService.deleteVolume(volumeId);
+  }
+
+  @Post(':id/volumes/scan')
+  @UseGuards(AuthGuard)
+  @ApiOperation({ summary: 'Add volume from ISBN scan' })
+  @ApiParam({ name: 'id', description: 'Manga ID' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        isbn: { type: 'string', example: '9782756078519' },
+      },
+    },
+  })
+  @ApiResponse({ status: 201, description: 'Volume created from scan' })
+  @ApiResponse({ status: 400, description: 'Invalid ISBN' })
+  async scanVolumeIsbn(
+    @Param('id', ParseIntPipe) mangaId: number,
+    @Body('isbn') isbn: string,
+  ) {
+    // Lookup book data from Google Books or OpenLibrary
+    const bookData = await this.mangasService.lookupByIsbn(isbn);
+
+    // Create volume with the book data
+    return this.mangasService.upsertVolumeFromIsbn(mangaId, isbn, bookData);
+  }
 }

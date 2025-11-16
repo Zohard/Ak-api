@@ -268,12 +268,35 @@ model AkManga {
   reviews              AkCritique[]
   businessRelations    AkBusinessToManga[]
   userCollections      CollectionManga[] @relation("UserMangaList")
+  volumes              MangaVolume[] @relation("MangaVolumes")
 
   @@index([statut])
   @@index([dateAjout])
   @@index([licence])
   @@index([niceUrl])
   @@map("ak_mangas")
+}
+
+// Manga Volumes (Tomes)
+model MangaVolume {
+  idVolume      Int       @id @default(autoincrement()) @map("id_volume")
+  idManga       Int       @map("id_manga")
+  volumeNumber  Int       @map("volume_number")
+  isbn          String?   @db.VarChar(13)
+  coverImage    String?   @map("cover_image") @db.VarChar(255)
+  title         String?   @db.VarChar(255)
+  releaseDate   DateTime? @map("release_date") @db.Date
+  description   String?   @db.Text
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  manga         AkManga   @relation("MangaVolumes", fields: [idManga], references: [idManga], onDelete: Cascade)
+
+  @@unique([idManga, volumeNumber], name: "unique_manga_volume")
+  @@unique([isbn], name: "unique_isbn")
+  @@index([idManga])
+  @@index([isbn])
+  @@map("manga_volumes")
 }
 
 // Business entities (Studios, Authors, Publishers, etc.)
