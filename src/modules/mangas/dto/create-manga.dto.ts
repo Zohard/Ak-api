@@ -6,6 +6,7 @@ import {
   Min,
   Max,
   IsUrl,
+  ValidateIf,
 } from 'class-validator';
 
 export class CreateMangaDto {
@@ -35,10 +36,12 @@ export class CreateMangaDto {
   @ApiPropertyOptional({
     description: "URL de l'image de couverture",
     example: 'https://example.com/image.jpg',
+    nullable: true,
   })
   @IsOptional()
+  @ValidateIf((o) => o.image !== null && o.image !== undefined && o.image !== '')
   @IsUrl()
-  image?: string;
+  image?: string | null;
 
   @ApiPropertyOptional({
     description: 'Auteur du manga',
