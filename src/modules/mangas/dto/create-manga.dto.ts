@@ -34,12 +34,12 @@ export class CreateMangaDto {
   synopsis?: string;
 
   @ApiPropertyOptional({
-    description: "URL de l'image de couverture",
+    description: "URL de l'image de couverture (empty string to clear)",
     example: 'https://example.com/image.jpg',
     nullable: true,
   })
   @IsOptional()
-  @ValidateIf((o) => o.image !== null && o.image !== undefined && o.image !== '')
+  @ValidateIf((o) => o.image && o.image.trim() !== '')
   @IsUrl()
   image?: string | null;
 

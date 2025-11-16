@@ -531,6 +531,11 @@ export class MangasService extends BaseContentService<
 
     delete (updateData as any).anilistId;
 
+    // Normalize empty string to null for image field
+    if (updateData.image === '') {
+      updateData.image = null;
+    }
+
     // Upload external image to ImageKit if present
     if (updateData.image && updateData.image.startsWith('http')) {
       updateData.image = await this.uploadExternalImageToImageKit(updateData.image);
