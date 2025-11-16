@@ -933,7 +933,7 @@ export class MangasService extends BaseContentService<
     }
   }
 
-  async lookupByIsbn(isbn: string) {
+  async lookupByIsbn(isbn: string, userId?: number) {
     try {
       let bookInfo: any = null;
       let rawTitle = '';
@@ -1172,6 +1172,26 @@ export class MangasService extends BaseContentService<
 
       console.log('ISBN lookup - Found', mangaResults.length, 'local manga matches');
 
+      // Fetch user's collection status for these mangas if userId is provided
+      let userCollections: Map<number, { collectionType: number }> = new Map();
+      if (userId && mangaResults.length > 0) {
+        const mangaIds = mangaResults.map(m => m.id_manga);
+        const collections = await this.prisma.smfUserCollection.findMany({
+          where: {
+            idUser: userId,
+            idManga: { in: mangaIds },
+          },
+          select: {
+            idManga: true,
+            idCollectionType: true,
+          },
+        });
+
+        collections.forEach(c => {
+          userCollections.set(c.idManga, { collectionType: c.idCollectionType });
+        });
+      }
+
       return {
         isbn: isbn,
         bookInfo: bookInfo, // Book metadata from Google Books or OpenLibrary (or null)
@@ -1189,6 +1209,7 @@ export class MangasService extends BaseContentService<
           niceUrl: manga.nice_url,
           rating: manga.moyennenotes,
           similarityScore: Math.round((manga.similarity_score || 0) * 100), // Convert to percentage
+          userCollectionStatus: userCollections.get(manga.id_manga)?.collectionType || null,
         })),
         message: this.buildResultMessage(bookSource, mangaResults.length),
       };
