@@ -1600,32 +1600,52 @@ export class CollectionsService {
       throw new NotFoundException('Manga not found');
     }
 
-    // Check if already in collection
+    // Check if already in ANY collection type
     const existing = await this.prisma.collectionManga.findFirst({
       where: {
         idMembre: userId,
-        idManga: addMangaDto.mangaId,
-        type: type
+        idManga: addMangaDto.mangaId
       }
     });
 
+    let collectionItem;
     if (existing) {
-      throw new ConflictException('Manga already in this collection type');
-    }
-
-    const collectionItem = await this.prisma.collectionManga.create({
-      data: {
-        type: type,
-        idMembre: userId,
-        idManga: addMangaDto.mangaId,
-        evaluation: addMangaDto.rating || 0,
-        notes: addMangaDto.notes || null,
-        isPublic: true
-      },
-      include: {
-        manga: true
+      // Update existing entry if changing collection type
+      if (existing.type === type) {
+        throw new ConflictException('Manga already in this collection type');
       }
-    });
+
+      // Update the collection type
+      collectionItem = await this.prisma.collectionManga.update({
+        where: {
+          idCollection: existing.idCollection
+        },
+        data: {
+          type: type,
+          evaluation: addMangaDto.rating !== undefined ? addMangaDto.rating : existing.evaluation,
+          notes: addMangaDto.notes !== undefined ? addMangaDto.notes : existing.notes,
+          updatedAt: new Date()
+        },
+        include: {
+          manga: true
+        }
+      });
+    } else {
+      // Create new collection entry
+      collectionItem = await this.prisma.collectionManga.create({
+        data: {
+          type: type,
+          idMembre: userId,
+          idManga: addMangaDto.mangaId,
+          evaluation: addMangaDto.rating || 0,
+          notes: addMangaDto.notes || null,
+          isPublic: true
+        },
+        include: {
+          manga: true
+        }
+      });
+    }
 
     const result = {
       id: collectionItem.idCollection,
