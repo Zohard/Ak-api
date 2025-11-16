@@ -676,9 +676,14 @@ export class CollectionsService {
   }
 
   async updateRating(userId: number, mediaId: number, mediaType: 'anime' | 'manga' | 'game', rating: number) {
-    // Validate rating
+    // Validate rating (allow 0.5 increments)
     if (rating < 0 || rating > 5) {
       throw new BadRequestException('Rating must be between 0 and 5');
+    }
+
+    // Validate that rating is in 0.5 increments
+    if (rating % 0.5 !== 0) {
+      throw new BadRequestException('Rating must be in 0.5 increments (e.g., 3.5, 4.0, 4.5)');
     }
 
     if (mediaType === 'anime') {
