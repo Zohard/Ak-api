@@ -1962,6 +1962,16 @@ export class MangasService extends BaseContentService<
       };
     }
 
+    // Get manga details for AniList search
+    const manga = await this.prisma.akManga.findUnique({
+      where: { idManga: mangaId },
+      select: { titre: true, titreOriginal: true },
+    });
+
+    if (!manga) {
+      throw new NotFoundException(`Manga with ID ${mangaId} not found`);
+    }
+
     // Get current max volume number for this manga
     const maxVolume = await this.prisma.mangaVolume.findFirst({
       where: { idManga: mangaId },
@@ -1970,6 +1980,45 @@ export class MangasService extends BaseContentService<
     });
 
     const nextVolumeNumber = maxVolume ? maxVolume.volumeNumber + 1 : 1;
+
+    // Try to fetch cover from AniList and upload to ImageKit
+    let coverImagePath = bookData?.coverImage;
+    try {
+      // Search AniList using manga title (prefer original title, fallback to French)
+      const searchQuery = manga.titreOriginal || manga.titre;
+      const anilistResults = await this.aniListService.searchManga(searchQuery, 1);
+
+      if (anilistResults && anilistResults.length > 0) {
+        const anilistManga = anilistResults[0];
+        const coverUrl = anilistManga.coverImage?.large || anilistManga.coverImage?.medium;
+
+        if (coverUrl) {
+          // Generate filename: sanitize manga title + tome number
+          const sanitizedTitle = manga.titre
+            .toLowerCase()
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '') // Remove accents
+            .replace(/[^a-z0-9]+/g, '-') // Replace non-alphanumeric with hyphens
+            .replace(/^-+|-+$/g, ''); // Trim hyphens
+
+          const filename = `${sanitizedTitle}-tome-${nextVolumeNumber}.jpg`;
+
+          // Upload to ImageKit
+          const uploadResult = await this.imageKitService.uploadImageFromUrl(
+            coverUrl,
+            filename,
+            'images/mangas/covers',
+          );
+
+          if (uploadResult && uploadResult.filePath) {
+            coverImagePath = uploadResult.filePath;
+          }
+        }
+      }
+    } catch (error) {
+      // Log error but don't fail volume creation
+      console.error('Failed to fetch/upload cover from AniList:', error.message);
+    }
 
     // Create new volume
     const volume = await this.prisma.mangaVolume.create({
@@ -1982,7 +2031,7 @@ export class MangasService extends BaseContentService<
         releaseDate: bookData?.publishedDate
           ? new Date(bookData.publishedDate)
           : undefined,
-        coverImage: bookData?.coverImage,
+        coverImage: coverImagePath,
       },
     });
 
