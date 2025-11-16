@@ -499,55 +499,11 @@ export class MangasService extends BaseContentService<
       console.warn('Failed to delete previous ImageKit image (manga):', (e as Error).message);
     }
 
-    // Merge with AniList if anilistId provided in update
     let updateData: any = { ...updateMangaDto };
-    if ((updateMangaDto as any).anilistId) {
-      try {
-        const anilistId = Number((updateMangaDto as any).anilistId);
-        const anilistManga = await this.aniListService.getMangaById(anilistId);
-        if (anilistManga) {
-          const anilistData = this.aniListService.mapToCreateMangaDto(anilistManga);
-
-          // Normalize existing manga image (treat empty string as null)
-          const existingImage = manga.image?.trim() || null;
-          const updateImage = updateData.image?.trim() || null;
-
-          // Only apply AniList data for fields that are empty in both existing manga and updateData
-          // Preserve existing titre and image if they're already set
-          updateData = {
-            ...anilistData,
-            ...updateData,
-            // Don't overwrite titre if it's already set in the existing manga
-            titre: updateData.titre || manga.titre || anilistData.titre,
-            commentaire: JSON.stringify({
-              ...(anilistData.commentaire ? JSON.parse(anilistData.commentaire) : {}),
-              anilistId,
-              originalData: anilistManga,
-            }),
-          };
-
-          // Handle image separately - only import if not already set
-          // If image needs to be imported, it will be uploaded to ImageKit later
-          if (!updateImage && !existingImage && anilistData.image) {
-            // Store the AniList image URL temporarily - will be uploaded to ImageKit below
-            updateData.image = anilistData.image;
-          }
-        }
-      } catch (error: any) {
-        console.warn(`Failed to fetch AniList manga for ID ${(updateMangaDto as any).anilistId}:`, error.message);
-      }
-    }
-
-    delete (updateData as any).anilistId;
 
     // Normalize empty string to null for image field
     if (updateData.image === '') {
       updateData.image = null;
-    }
-
-    // Upload external image to ImageKit if present
-    if (updateData.image && updateData.image.startsWith('http')) {
-      updateData.image = await this.uploadExternalImageToImageKit(updateData.image);
     }
 
     const updatedManga = await this.prisma.akManga.update({

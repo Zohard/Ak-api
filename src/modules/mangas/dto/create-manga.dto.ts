@@ -96,12 +96,4 @@ export class CreateMangaDto {
   @IsOptional()
   @IsString()
   titreFr?: string;
-
-  @ApiPropertyOptional({
-    description: 'ID AniList pour importer automatiquement les données',
-    example: 30011,
-  })
-  @IsOptional()
-  @IsNumber()
-  anilistId?: number;
 }
