@@ -1831,7 +1831,7 @@ export class MangasService extends BaseContentService<
    * Get volume by ISBN
    */
   async getVolumeByIsbn(isbn: string) {
-    const volume = await this.prisma.mangaVolume.findUnique({
+    const volume = await this.prisma.mangaVolume.findFirst({
       where: { isbn },
       include: { manga: true },
     });
@@ -1950,7 +1950,7 @@ export class MangasService extends BaseContentService<
    */
   async upsertVolumeFromIsbn(mangaId: number, isbn: string, bookData: any) {
     // Check if volume with this ISBN already exists
-    const existingVolume = await this.prisma.mangaVolume.findUnique({
+    const existingVolume = await this.prisma.mangaVolume.findFirst({
       where: { isbn },
     });
 
