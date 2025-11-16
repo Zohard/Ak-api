@@ -12,6 +12,7 @@ import {
   HttpCode,
   HttpStatus,
   Res,
+  Patch,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam, ApiQuery } from '@nestjs/swagger';
 import { CollectionsService } from './collections.service';
@@ -68,6 +69,24 @@ export class CollectionsController {
     return this.collectionsService.addToCollection(
       req.user.id,
       addToCollectionDto,
+    );
+  }
+
+  @Patch('update-rating')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Mettre à jour la note d\'un anime/manga dans la collection' })
+  @ApiResponse({ status: 200, description: 'Note mise à jour avec succès' })
+  @ApiResponse({ status: 404, description: 'Média non trouvé dans la collection' })
+  async updateRating(
+    @Body() body: { mediaId: number; mediaType: 'anime' | 'manga' | 'jeu-video'; rating: number },
+    @Request() req,
+  ) {
+    return this.collectionsService.updateRating(
+      req.user.id,
+      body.mediaId,
+      body.mediaType === 'jeu-video' ? 'game' : body.mediaType,
+      body.rating,
     );
   }
 

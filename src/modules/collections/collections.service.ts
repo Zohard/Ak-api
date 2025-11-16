@@ -675,6 +675,51 @@ export class CollectionsService {
     return { success: true };
   }
 
+  async updateRating(userId: number, mediaId: number, mediaType: 'anime' | 'manga' | 'game', rating: number) {
+    // Validate rating
+    if (rating < 0 || rating > 5) {
+      throw new BadRequestException('Rating must be between 0 and 5');
+    }
+
+    if (mediaType === 'anime') {
+      const updated = await this.prisma.collectionAnime.updateMany({
+        where: {
+          idMembre: userId,
+          idAnime: mediaId,
+        },
+        data: {
+          evaluation: rating,
+        },
+      });
+
+      if (updated.count === 0) {
+        throw new NotFoundException('Anime not found in any collection');
+      }
+    } else if (mediaType === 'manga') {
+      const updated = await this.prisma.collectionManga.updateMany({
+        where: {
+          idMembre: userId,
+          idManga: mediaId,
+        },
+        data: {
+          evaluation: rating,
+        },
+      });
+
+      if (updated.count === 0) {
+        throw new NotFoundException('Manga not found in any collection');
+      }
+    } else if (mediaType === 'game') {
+      // For now, games are not supported in collections
+      throw new NotFoundException('Game collections are not yet supported');
+    }
+
+    // Invalidate user's collection cache after update
+    await this.invalidateUserCollectionCache(userId);
+
+    return { success: true, rating };
+  }
+
   async isInCollection(userId: number, mediaId: number, mediaType: 'anime' | 'manga') {
     return await this.prisma.executeWithRetry(async () => {
       let inCollection = false;
