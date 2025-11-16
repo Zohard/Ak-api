@@ -1965,7 +1965,7 @@ export class MangasService extends BaseContentService<
     // Get manga details for AniList search
     const manga = await this.prisma.akManga.findUnique({
       where: { idManga: mangaId },
-      select: { titre: true, titreOriginal: true },
+      select: { titre: true, titreOrig: true },
     });
 
     if (!manga) {
@@ -2001,7 +2001,7 @@ export class MangasService extends BaseContentService<
     let coverImagePath = bookData?.coverImage;
     try {
       // Search AniList using manga title (prefer original title, fallback to French)
-      const searchQuery = manga.titreOriginal || manga.titre;
+      const searchQuery = manga.titreOrig || manga.titre;
       const anilistResults = await this.aniListService.searchManga(searchQuery, 1);
 
       if (anilistResults && anilistResults.length > 0) {

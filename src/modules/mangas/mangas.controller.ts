@@ -24,6 +24,7 @@ import {
   ApiParam,
   ApiQuery,
   ApiConsumes,
+  ApiBody,
 } from '@nestjs/swagger';
 import { MangasService } from './mangas.service';
 import { CreateMangaDto } from './dto/create-manga.dto';
@@ -420,8 +421,8 @@ export class MangasController {
   }
 
   @Post(':id/volumes')
-  @UseGuards(AuthGuard)
-  @Roles('admin', 'moderator')
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'Create a new volume for a manga' })
   @ApiParam({ name: 'id', description: 'Manga ID' })
   @ApiResponse({ status: 201, description: 'Volume created' })
@@ -435,8 +436,8 @@ export class MangasController {
   }
 
   @Patch('volumes/:volumeId')
-  @UseGuards(AuthGuard)
-  @Roles('admin', 'moderator')
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'Update a volume' })
   @ApiParam({ name: 'volumeId', description: 'Volume ID' })
   @ApiResponse({ status: 200, description: 'Volume updated' })
@@ -449,8 +450,8 @@ export class MangasController {
   }
 
   @Delete('volumes/:volumeId')
-  @UseGuards(AuthGuard)
-  @Roles('admin', 'moderator')
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'Delete a volume' })
   @ApiParam({ name: 'volumeId', description: 'Volume ID' })
   @ApiResponse({ status: 200, description: 'Volume deleted' })
@@ -460,7 +461,8 @@ export class MangasController {
   }
 
   @Post(':id/volumes/scan')
-  @UseGuards(AuthGuard)
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'Add volume from ISBN scan' })
   @ApiParam({ name: 'id', description: 'Manga ID' })
   @ApiBody({
