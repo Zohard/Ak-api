@@ -195,6 +195,15 @@ export class JeuxVideoService {
             ordre: true,
           },
           orderBy: { ordre: 'asc' }
+        },
+        screenshots: {
+          select: {
+            id: true,
+            filename: true,
+            caption: true,
+            sortorder: true,
+          },
+          orderBy: { sortorder: 'asc' }
         }
       },
     });
