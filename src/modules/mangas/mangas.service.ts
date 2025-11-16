@@ -1958,7 +1958,7 @@ export class MangasService extends BaseContentService<
       return {
         volume: existingVolume,
         created: false,
-        message: 'Volume already exists',
+        message: 'Volume already exists with this ISBN',
       };
     }
 
@@ -1980,6 +1980,22 @@ export class MangasService extends BaseContentService<
     });
 
     const nextVolumeNumber = maxVolume ? maxVolume.volumeNumber + 1 : 1;
+
+    // Check if this manga+volume number combination already exists
+    const existingVolumeNumber = await this.prisma.mangaVolume.findFirst({
+      where: {
+        idManga: mangaId,
+        volumeNumber: nextVolumeNumber,
+      },
+    });
+
+    if (existingVolumeNumber) {
+      return {
+        volume: existingVolumeNumber,
+        created: false,
+        message: `Volume ${nextVolumeNumber} already exists for this manga`,
+      };
+    }
 
     // Try to fetch cover from AniList and upload to ImageKit
     let coverImagePath = bookData?.coverImage;
