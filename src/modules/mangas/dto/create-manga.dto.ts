@@ -7,6 +7,7 @@ import {
   Max,
   IsUrl,
   ValidateIf,
+  Allow,
 } from 'class-validator';
 
 export class CreateMangaDto {
@@ -34,13 +35,14 @@ export class CreateMangaDto {
   synopsis?: string;
 
   @ApiPropertyOptional({
-    description: "URL de l'image de couverture (empty string to clear)",
+    description: "URL de l'image de couverture (can be null or empty string to clear)",
     example: 'https://example.com/image.jpg',
     nullable: true,
+    type: 'string',
   })
-  @IsOptional()
-  @ValidateIf((o) => o.image && o.image.trim() !== '')
-  @IsUrl()
+  @Allow()
+  @ValidateIf((o) => o.image && typeof o.image === 'string' && o.image.trim() !== '')
+  @IsUrl({}, { message: 'Image must be a valid URL' })
   image?: string | null;
 
   @ApiPropertyOptional({
