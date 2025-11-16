@@ -508,6 +508,10 @@ export class MangasService extends BaseContentService<
         if (anilistManga) {
           const anilistData = this.aniListService.mapToCreateMangaDto(anilistManga);
 
+          // Normalize existing manga image (treat empty string as null)
+          const existingImage = manga.image?.trim() || null;
+          const updateImage = updateData.image?.trim() || null;
+
           // Only apply AniList data for fields that are empty in both existing manga and updateData
           // Preserve existing titre and image if they're already set
           updateData = {
@@ -524,7 +528,7 @@ export class MangasService extends BaseContentService<
 
           // Handle image separately - only import if not already set
           // If image needs to be imported, it will be uploaded to ImageKit later
-          if (!updateData.image && !manga.image && anilistData.image) {
+          if (!updateImage && !existingImage && anilistData.image) {
             // Store the AniList image URL temporarily - will be uploaded to ImageKit below
             updateData.image = anilistData.image;
           }
