@@ -507,9 +507,16 @@ export class MangasService extends BaseContentService<
         const anilistManga = await this.aniListService.getMangaById(anilistId);
         if (anilistManga) {
           const anilistData = this.aniListService.mapToCreateMangaDto(anilistManga);
+
+          // Only apply AniList data for fields that are empty in both existing manga and updateData
+          // Preserve existing titre and image if they're already set
           updateData = {
             ...anilistData,
             ...updateData,
+            // Don't overwrite titre if it's already set in the existing manga
+            titre: updateData.titre || manga.titre || anilistData.titre,
+            // Don't overwrite image if it's already set in the existing manga
+            image: updateData.image || manga.image || anilistData.image,
             commentaire: JSON.stringify({
               ...(anilistData.commentaire ? JSON.parse(anilistData.commentaire) : {}),
               anilistId,
