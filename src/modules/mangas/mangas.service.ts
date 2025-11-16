@@ -1172,6 +1172,16 @@ export class MangasService extends BaseContentService<
 
       console.log('ISBN lookup - Found', mangaResults.length, 'local manga matches');
 
+      // Check if this ISBN already has a volume registered
+      const existingVolume = await this.prisma.mangaVolume.findFirst({
+        where: { isbn },
+        select: {
+          idVolume: true,
+          idManga: true,
+          volumeNumber: true,
+        },
+      });
+
       // Fetch user's collection status for these mangas if userId is provided
       let userCollections: Map<number, { collectionType: number }> = new Map();
       if (userId && mangaResults.length > 0) {
@@ -1196,6 +1206,8 @@ export class MangasService extends BaseContentService<
         isbn: isbn,
         bookInfo: bookInfo, // Book metadata from Google Books or OpenLibrary (or null)
         bookSource: bookSource, // 'google', 'openlibrary', or 'none'
+        volumeAlreadyExists: !!existingVolume,
+        existingVolumeMangaId: existingVolume?.idManga || null,
         mangaResults: mangaResults.map(manga => ({
           id: manga.id_manga,
           title: manga.titre,
@@ -1210,6 +1222,7 @@ export class MangasService extends BaseContentService<
           rating: manga.moyennenotes,
           similarityScore: Math.round((manga.similarity_score || 0) * 100), // Convert to percentage
           userCollectionStatus: userCollections.get(manga.id_manga)?.collectionType || null,
+          hasVolumeRegistered: existingVolume?.idManga === manga.id_manga,
         })),
         message: this.buildResultMessage(bookSource, mangaResults.length),
       };
