@@ -100,6 +100,7 @@ export class JeuxVideoService {
               platform: {
                 select: {
                   name: true,
+                  shortName: true,
                   manufacturer: true,
                 }
               }
@@ -110,6 +111,7 @@ export class JeuxVideoService {
               genre: {
                 select: {
                   name: true,
+                  nameFr: true,
                   slug: true,
                 }
               }
@@ -165,6 +167,7 @@ export class JeuxVideoService {
               select: {
                 idPlatform: true,
                 name: true,
+                shortName: true,
                 manufacturer: true,
                 platformType: true,
               }
@@ -178,6 +181,7 @@ export class JeuxVideoService {
               select: {
                 idGenre: true,
                 name: true,
+                nameFr: true,
                 slug: true,
               }
             }
@@ -226,6 +230,7 @@ export class JeuxVideoService {
       select: {
         idPlatform: true,
         name: true,
+        shortName: true,
         manufacturer: true,
         generation: true,
         releaseYear: true,

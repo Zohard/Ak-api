@@ -376,6 +376,7 @@ model AkJeuxVideo {
 model AkGenre {
   idGenre       Int       @id @default(autoincrement()) @map("id_genre")
   name          String    @unique @db.VarChar(100)
+  nameFr        String?   @map("name_fr") @db.VarChar(100)
   slug          String    @unique @db.VarChar(100)
   sortOrder     Int       @default(0) @map("sort_order")
   createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamp
@@ -405,6 +406,7 @@ model AkJeuxVideoGenre {
 model AkPlatform {
   idPlatform    Int       @id @default(autoincrement()) @map("id_platform")
   name          String    @unique @db.VarChar(100)
+  shortName     String?   @map("short_name") @db.VarChar(20)
   manufacturer  String?   @db.VarChar(100)
   generation    String?   @db.VarChar(50)
   releaseYear   Int?      @map("release_year")
