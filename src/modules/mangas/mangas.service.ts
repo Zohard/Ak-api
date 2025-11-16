@@ -12,6 +12,7 @@ import { UpdateMangaDto } from './dto/update-manga.dto';
 import { MangaQueryDto } from './dto/manga-query.dto';
 import { RelatedContentItem, RelationsResponse } from '../shared/types/relations.types';
 import { ImageKitService } from '../media/imagekit.service';
+import { MediaService } from '../media/media.service';
 import { AniListService, AniListManga } from '../anilist/anilist.service';
 import { OpenLibraryService } from '../books/openlibrary.service';
 import { Prisma } from '@prisma/client';
@@ -29,6 +30,7 @@ export class MangasService extends BaseContentService<
     prisma: PrismaService,
     private readonly cacheService: CacheService,
     private readonly imageKitService: ImageKitService,
+    private readonly mediaService: MediaService,
     private readonly aniListService: AniListService,
     private readonly openLibraryService: OpenLibraryService,
   ) {
@@ -71,6 +73,27 @@ export class MangasService extends BaseContentService<
     return this.formatManga(manga);
   }
 
+  /**
+   * Upload external image URL to ImageKit
+   * Returns the full ImageKit URL if successful, or the original URL if it fails
+   */
+  private async uploadExternalImageToImageKit(imageUrl: string): Promise<string> {
+    // Only process external URLs (not already ImageKit URLs)
+    if (!imageUrl || !imageUrl.startsWith('http') || imageUrl.includes('imagekit.io')) {
+      return imageUrl;
+    }
+
+    try {
+      const result = await this.mediaService.uploadImageFromUrl(imageUrl, 'manga');
+      // Return the full ImageKit URL
+      return result.url;
+    } catch (error) {
+      console.warn('Failed to upload external image to ImageKit:', error.message);
+      // Return original URL as fallback
+      return imageUrl;
+    }
+  }
+
   async create(createMangaDto: CreateMangaDto, userId: number) {
     // Merge with AniList if anilistId provided
     let data: any = { ...createMangaDto };
@@ -96,6 +119,11 @@ export class MangasService extends BaseContentService<
     }
 
     delete (data as any).anilistId;
+
+    // Upload external image to ImageKit if present
+    if (data.image && data.image.startsWith('http')) {
+      data.image = await this.uploadExternalImageToImageKit(data.image);
+    }
 
     const manga = await this.prisma.akManga.create({
       data: {
@@ -495,6 +523,11 @@ export class MangasService extends BaseContentService<
     }
 
     delete (updateData as any).anilistId;
+
+    // Upload external image to ImageKit if present
+    if (updateData.image && updateData.image.startsWith('http')) {
+      updateData.image = await this.uploadExternalImageToImageKit(updateData.image);
+    }
 
     const updatedManga = await this.prisma.akManga.update({
       where: { idManga: id },
