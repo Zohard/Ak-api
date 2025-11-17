@@ -18,6 +18,7 @@ export class AdminGenresController {
       select: {
         idGenre: true,
         name: true,
+        nameFr: true,
         slug: true,
         sortOrder: true,
       }
