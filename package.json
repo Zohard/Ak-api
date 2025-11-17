@@ -6,6 +6,7 @@
   "private": true,
   "license": "UNLICENSED",
   "scripts": {
+    "postinstall": "npx prisma generate",
     "build": "npx prisma generate && nest build && node build-api.js",
     "build:vercel": "npx prisma generate && npm run build",
     "vercel-build": "npm run build:vercel",
