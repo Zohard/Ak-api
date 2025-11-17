@@ -81,6 +81,11 @@ export class CreateAdminJeuxVideoDto {
   @IsOptional()
   @IsInt()
   statut?: number;
+
+  @ApiPropertyOptional({ description: 'IGDB game ID for future data fetching' })
+  @IsOptional()
+  @IsInt()
+  igdbId?: number;
 }
 
 export class UpdateAdminJeuxVideoDto extends CreateAdminJeuxVideoDto {}
