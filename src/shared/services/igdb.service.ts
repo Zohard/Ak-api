@@ -14,6 +14,11 @@ interface IgdbGame {
     id: number;
     image_id: string;
   }>;
+  videos?: Array<{
+    id: number;
+    video_id: string;
+    name?: string;
+  }>;
   genres?: Array<{ id: number; name: string }>;
   platforms?: Array<{ id: number; name: string; abbreviation?: string }>;
   involved_companies?: Array<{
@@ -102,6 +107,7 @@ export class IgdbService {
           search "${query}";
           fields name, summary, first_release_date, cover.url, cover.image_id,
                  screenshots.image_id,
+                 videos.video_id, videos.name,
                  genres.name, platforms.name, platforms.abbreviation,
                  involved_companies.company.name, involved_companies.publisher, involved_companies.developer,
                  release_dates.date, release_dates.region, release_dates.platform;
@@ -137,6 +143,7 @@ export class IgdbService {
           where id = ${igdbId};
           fields name, summary, first_release_date, cover.url, cover.image_id,
                  screenshots.image_id,
+                 videos.video_id, videos.name,
                  genres.name, platforms.name, platforms.abbreviation,
                  involved_companies.company.name, involved_companies.publisher, involved_companies.developer,
                  release_dates.date, release_dates.region, release_dates.platform;

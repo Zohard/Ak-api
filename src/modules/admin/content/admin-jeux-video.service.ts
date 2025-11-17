@@ -443,6 +443,11 @@ export class AdminJeuxVideoService {
       await this.importScreenshots(created.idJeu, igdbId, igdbGame.screenshots);
     }
 
+    // Import trailers if available
+    if (igdbGame.videos && igdbGame.videos.length > 0) {
+      await this.importTrailers(created.idJeu, igdbGame.videos, created.titre);
+    }
+
     // Create platform associations
     if (platformIds.length > 0) {
       await this.prisma.akJeuxVideoPlatform.createMany({
@@ -867,6 +872,116 @@ export class AdminJeuxVideoService {
 
     if (importedCount > 0) {
       console.log(`Successfully imported ${importedCount} screenshot(s) for IGDB ID ${igdbId}`);
+    }
+
+    return importedCount;
+  }
+
+  /**
+   * Fetch and save trailers from IGDB for an existing game
+   */
+  async fetchAndSaveTrailers(idJeu: number, igdbId: number, username?: string) {
+    // Verify game exists
+    const game = await this.prisma.akJeuxVideo.findUnique({
+      where: { idJeu }
+    });
+
+    if (!game) {
+      throw new NotFoundException('Jeu vidéo introuvable');
+    }
+
+    // Fetch game data from IGDB
+    const igdbGame = await this.igdbService.getGameById(igdbId);
+    if (!igdbGame) {
+      throw new NotFoundException('Game not found on IGDB');
+    }
+
+    if (!igdbGame.videos || igdbGame.videos.length === 0) {
+      return {
+        message: 'No trailers found on IGDB for this game',
+        count: 0
+      };
+    }
+
+    const importedCount = await this.importTrailers(idJeu, igdbGame.videos, game.titre);
+
+    // Log the action
+    if (username) {
+      await this.adminLogging.addLog(
+        idJeu,
+        'jeu_video',
+        username,
+        `Import ${importedCount} trailer(s) depuis IGDB`
+      );
+    }
+
+    return {
+      message: `Successfully imported ${importedCount} trailer(s)`,
+      count: importedCount
+    };
+  }
+
+  /**
+   * Import trailers from IGDB video data
+   * IGDB provides YouTube video IDs - we convert them to full URLs
+   */
+  private async importTrailers(
+    idJeu: number,
+    videos: Array<{ id: number; video_id: string; name?: string }>,
+    gameTitle: string
+  ): Promise<number> {
+    let importedCount = 0;
+
+    // Get current max ordre
+    const maxOrdre = await this.prisma.akJeuxVideoTrailer.findFirst({
+      where: { idJeu },
+      orderBy: { ordre: 'desc' },
+      select: { ordre: true }
+    });
+
+    let ordre = maxOrdre?.ordre ? maxOrdre.ordre + 1 : 0;
+
+    // Limit to 10 trailers
+    for (const video of videos.slice(0, 10)) {
+      try {
+        // IGDB video_id is a YouTube video ID
+        const youtubeUrl = `https://www.youtube.com/watch?v=${video.video_id}`;
+
+        // Check if this trailer already exists (by URL)
+        const existingTrailer = await this.prisma.akJeuxVideoTrailer.findFirst({
+          where: {
+            idJeu,
+            url: youtubeUrl
+          }
+        });
+
+        if (existingTrailer) {
+          console.log(`Trailer ${video.video_id} already exists for game ${idJeu}, skipping`);
+          continue;
+        }
+
+        // Create trailer title - use IGDB name or default
+        const titre = video.name || `${gameTitle} - Trailer`;
+
+        await this.prisma.akJeuxVideoTrailer.create({
+          data: {
+            idJeu,
+            titre,
+            url: youtubeUrl,
+            platform: 'youtube',
+            langue: 'en', // Default to English
+            typeTrailer: 'Trailer',
+            ordre: ordre++,
+            statut: 1
+          }
+        });
+
+        importedCount++;
+        console.log(`Successfully imported trailer ${video.video_id} for game ${idJeu}`);
+      } catch (error) {
+        console.error(`Failed to import trailer ${video.video_id}:`, error);
+        continue;
+      }
     }
 
     return importedCount;
