@@ -85,6 +85,7 @@ export class CreateAdminJeuxVideoDto {
   @ApiPropertyOptional({ description: 'IGDB game ID for future data fetching' })
   @IsOptional()
   @IsInt()
+  @Type(() => Number)
   igdbId?: number;
 }
 
