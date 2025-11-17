@@ -408,6 +408,7 @@ export class AdminJeuxVideoService {
       nbClicsMonth: 0,
       lienForum: 0, // Note: camelCase for Prisma
       dateModification: Math.floor(Date.now() / 1000), // Unix timestamp
+      igdbId: igdbId, // Store IGDB ID for future updates
     };
 
     // Download and save cover image if available
