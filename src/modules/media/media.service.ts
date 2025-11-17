@@ -295,28 +295,66 @@ export class MediaService {
 
   async getMediaByRelatedId(relatedId: number, type: 'anime' | 'manga' | 'game') {
     const typeId = this.getTypeId(type);
+    let media: any[] = [];
 
-    const media = await this.prisma.$queryRaw`
-      SELECT
-        id_screen as id,
-        url_screen as filename,
-        upload_date
-      FROM ak_screenshots
-      WHERE id_titre = ${relatedId} AND type = ${typeId}
-      ORDER BY upload_date DESC
-    `;
+    // For games, query both the old ak_screenshots table AND the new ak_jeux_video_screenshots table
+    if (type === 'game') {
+      // Query old screenshots table
+      const oldScreenshots = await this.prisma.$queryRaw`
+        SELECT
+          id_screen as id,
+          url_screen as filename,
+          upload_date
+        FROM ak_screenshots
+        WHERE id_titre = ${relatedId} AND type = ${typeId}
+        ORDER BY upload_date DESC
+      `;
+
+      // Query new jeux video screenshots table
+      const newScreenshots = await this.prisma.akJeuxVideoScreenshot.findMany({
+        where: { jeuVideoId: relatedId },
+        select: {
+          id: true,
+          filename: true,
+          createdat: true,
+          sortorder: true,
+        },
+        orderBy: { sortorder: 'asc' }
+      });
+
+      // Combine both results, converting new screenshots to same format
+      media = [
+        ...oldScreenshots as any[],
+        ...newScreenshots.map(s => ({
+          id: s.id,
+          filename: s.filename,
+          upload_date: s.createdat,
+        }))
+      ];
+    } else {
+      // For anime and manga, use old table only
+      media = await this.prisma.$queryRaw`
+        SELECT
+          id_screen as id,
+          url_screen as filename,
+          upload_date
+        FROM ak_screenshots
+        WHERE id_titre = ${relatedId} AND type = ${typeId}
+        ORDER BY upload_date DESC
+      ` as any[];
+    }
 
     // Convert database results to use ImageKit URLs
     const processedMedia: any[] = [];
 
-    for (const item of media as any[]) {
+    for (const item of media) {
       try {
         let url: string;
 
         // Check if it's already an ImageKit URL
-        if (item.filename.startsWith('https://ik.imagekit.io/')) {
+        if (item.filename && item.filename.startsWith('https://ik.imagekit.io/')) {
           url = item.filename;
-        } else {
+        } else if (item.filename) {
           // Generate ImageKit URL from filename
           // Database stores: "screenshots/filename.jpg" or just "filename.jpg"
           // For screenshots, ensure they're in the screenshots subfolder
@@ -327,10 +365,25 @@ export class MediaService {
             imagePath = `screenshots/${imagePath}`;
           }
 
-          // ImageKit path should be: "/images/animes/screenshots/filename.jpg"
-          // Note: ImageKit's url() function expects path starting with /
-          const fullPath = `/images/${type}s/${imagePath}`;
+          // For games from ak_jeux_video_screenshots, they're already in images/games/screenshots/
+          // ImageKit path should be: "/images/games/screenshots/filename.jpg"
+          let fullPath: string;
+          if (type === 'game') {
+            // Check if filename already includes full path
+            if (imagePath.startsWith('images/')) {
+              fullPath = `/${imagePath}`;
+            } else {
+              fullPath = `/images/games/screenshots/${imagePath}`;
+            }
+          } else {
+            // For anime/manga: "/images/animes/screenshots/filename.jpg" or "/images/mangas/screenshots/filename.jpg"
+            fullPath = `/images/${type}s/${imagePath}`;
+          }
+
           url = this.imagekitService.getImageUrl(fullPath);
+        } else {
+          // Skip items without filename
+          continue;
         }
 
         processedMedia.push({
