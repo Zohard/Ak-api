@@ -18,6 +18,7 @@ export class AdminPlatformsController {
       select: {
         idPlatform: true,
         name: true,
+        shortName: true,
         manufacturer: true,
         generation: true,
         releaseYear: true,
