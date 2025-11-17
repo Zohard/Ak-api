@@ -34,6 +34,14 @@ export class GenresController {
   @ApiResponse({ status: 200, description: 'List of all genres' })
   async findAll() {
     const genres = await this.prisma.akGenre.findMany({
+      select: {
+        idGenre: true,
+        name: true,
+        nameFr: true,
+        slug: true,
+        sortOrder: true,
+        createdAt: true,
+      },
       orderBy: [
         { sortOrder: 'asc' },
         { name: 'asc' }
@@ -49,7 +57,15 @@ export class GenresController {
   @ApiResponse({ status: 404, description: 'Genre not found' })
   async findOne(@Param('id', ParseIntPipe) id: number) {
     const genre = await this.prisma.akGenre.findUnique({
-      where: { idGenre: id }
+      where: { idGenre: id },
+      select: {
+        idGenre: true,
+        name: true,
+        nameFr: true,
+        slug: true,
+        sortOrder: true,
+        createdAt: true,
+      },
     });
 
     if (!genre) {
