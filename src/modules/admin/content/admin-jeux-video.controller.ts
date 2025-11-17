@@ -83,6 +83,17 @@ export class AdminJeuxVideoController {
     return this.service.fetchFromIgdb(igdbId);
   }
 
+  @Post(':id/igdb/screenshots/:igdbId')
+  @ApiOperation({ summary: 'Récupérer et sauvegarder les screenshots depuis IGDB pour un jeu existant' })
+  fetchAndSaveScreenshots(
+    @Request() req,
+    @Param('id', ParseIntPipe) id: number,
+    @Param('igdbId', ParseIntPipe) igdbId: number
+  ) {
+    const username = req.user?.pseudo || req.user?.member_name || 'admin';
+    return this.service.fetchAndSaveScreenshots(id, igdbId, username);
+  }
+
   @Post('trailers')
   @ApiOperation({ summary: 'Ajouter une bande-annonce' })
   addTrailer(@Request() req, @Body() dto: CreateJeuVideoTrailerDto) {

@@ -440,46 +440,7 @@ export class AdminJeuxVideoService {
 
     // Download and save screenshots if available
     if (igdbGame.screenshots && igdbGame.screenshots.length > 0) {
-      let sortorder = 0;
-      for (const screenshot of igdbGame.screenshots.slice(0, 10)) { // Limit to first 10 screenshots
-        try {
-          const imageBuffer = await this.igdbService.downloadCoverImage(
-            screenshot.image_id,
-            'screenshot_med' // Medium size for balance between quality and file size
-          );
-
-          if (imageBuffer) {
-            // Upload to ImageKit
-            const filename = `igdb-${igdbId}-screenshot-${screenshot.id}-${Date.now()}.jpg`;
-            const uploadResult = await this.imagekitService.uploadImage(
-              imageBuffer,
-              filename,
-              'images/games/screenshots', // Screenshots folder
-              true // Replace if exists
-            );
-
-            if (uploadResult && uploadResult.name) {
-              // Save to database
-              await this.prisma.akJeuxVideoScreenshot.create({
-                data: {
-                  jeuVideoId: created.idJeu,
-                  filename: uploadResult.name,
-                  sortorder: sortorder++,
-                  createdat: new Date(),
-                }
-              });
-              console.log(`Successfully imported screenshot ${screenshot.id} for game ${created.idJeu}`);
-            }
-          }
-        } catch (error) {
-          console.error(`Failed to import screenshot ${screenshot.id} for IGDB ID ${igdbId}:`, error);
-          // Continue with other screenshots even if one fails
-        }
-      }
-
-      if (sortorder > 0) {
-        console.log(`Successfully imported ${sortorder} screenshot(s) for IGDB ID ${igdbId}`);
-      }
+      await this.importScreenshots(created.idJeu, igdbId, igdbGame.screenshots);
     }
 
     // Create platform associations
@@ -809,6 +770,106 @@ export class AdminJeuxVideoService {
     }
 
     return { message: 'Bande-annonce supprimée' };
+  }
+
+  /**
+   * Fetch and save screenshots from IGDB for an existing game
+   */
+  async fetchAndSaveScreenshots(idJeu: number, igdbId: number, username?: string) {
+    // Verify game exists
+    const game = await this.prisma.akJeuxVideo.findUnique({ where: { idJeu } });
+    if (!game) throw new NotFoundException('Jeu vidéo introuvable');
+
+    // Fetch game data from IGDB to get screenshots
+    const igdbGame = await this.igdbService.getGameById(igdbId);
+    if (!igdbGame) {
+      throw new NotFoundException('Game not found on IGDB');
+    }
+
+    if (!igdbGame.screenshots || igdbGame.screenshots.length === 0) {
+      return { message: 'No screenshots found on IGDB for this game', count: 0 };
+    }
+
+    // Import screenshots
+    const importedCount = await this.importScreenshots(idJeu, igdbId, igdbGame.screenshots);
+
+    // Log the action
+    if (username) {
+      await this.adminLogging.addLog(idJeu, 'jeu_video', username, `Import ${importedCount} screenshot(s) depuis IGDB`);
+    }
+
+    return {
+      message: `Successfully imported ${importedCount} screenshot(s)`,
+      count: importedCount
+    };
+  }
+
+  /**
+   * Import screenshots from IGDB for a game
+   * @private
+   */
+  private async importScreenshots(
+    idJeu: number,
+    igdbId: number,
+    screenshots: Array<{ id: number; image_id: string }>
+  ): Promise<number> {
+    let sortorder = 0;
+
+    // Get current max sortorder
+    const maxSortOrder = await this.prisma.akJeuxVideoScreenshot.findFirst({
+      where: { jeuVideoId: idJeu },
+      orderBy: { sortorder: 'desc' },
+      select: { sortorder: true }
+    });
+
+    if (maxSortOrder && maxSortOrder.sortorder !== null) {
+      sortorder = maxSortOrder.sortorder + 1;
+    }
+
+    let importedCount = 0;
+
+    for (const screenshot of screenshots.slice(0, 10)) { // Limit to first 10 screenshots
+      try {
+        const imageBuffer = await this.igdbService.downloadCoverImage(
+          screenshot.image_id,
+          'screenshot_med' // Medium size for balance between quality and file size
+        );
+
+        if (imageBuffer) {
+          // Upload to ImageKit
+          const filename = `igdb-${igdbId}-screenshot-${screenshot.id}-${Date.now()}.jpg`;
+          const uploadResult = await this.imagekitService.uploadImage(
+            imageBuffer,
+            filename,
+            'images/games/screenshots', // Screenshots folder
+            true // Replace if exists
+          );
+
+          if (uploadResult && uploadResult.name) {
+            // Save to database
+            await this.prisma.akJeuxVideoScreenshot.create({
+              data: {
+                jeuVideoId: idJeu,
+                filename: uploadResult.name,
+                sortorder: sortorder++,
+                createdat: new Date(),
+              }
+            });
+            importedCount++;
+            console.log(`Successfully imported screenshot ${screenshot.id} for game ${idJeu}`);
+          }
+        }
+      } catch (error) {
+        console.error(`Failed to import screenshot ${screenshot.id} for IGDB ID ${igdbId}:`, error);
+        // Continue with other screenshots even if one fails
+      }
+    }
+
+    if (importedCount > 0) {
+      console.log(`Successfully imported ${importedCount} screenshot(s) for IGDB ID ${igdbId}`);
+    }
+
+    return importedCount;
   }
 
   private slugify(text: string) {
