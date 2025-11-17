@@ -1,10 +1,14 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../shared/services/prisma.service';
+import { CacheService } from '../../shared/services/cache.service';
 import { JeuVideoQueryDto } from './dto/jeu-video-query.dto';
 
 @Injectable()
 export class JeuxVideoService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private cacheService: CacheService,
+  ) {}
 
   async findAll(query: JeuVideoQueryDto) {
     const {
@@ -225,6 +229,14 @@ export class JeuxVideoService {
   }
 
   async getPlatforms() {
+    // Try to get from cache
+    const cacheKey = 'jeux_video:platforms';
+    const cached = await this.cacheService.get(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
+    // Fetch from database
     const platforms = await this.prisma.akPlatform.findMany({
       orderBy: { sortOrder: 'asc' },
       select: {
@@ -239,7 +251,12 @@ export class JeuxVideoService {
       }
     });
 
-    return { platforms };
+    const result = { platforms };
+
+    // Cache for 1 hour (3600 seconds)
+    await this.cacheService.set(cacheKey, result, 3600);
+
+    return result;
   }
 
   async getRelationships(id: number) {
