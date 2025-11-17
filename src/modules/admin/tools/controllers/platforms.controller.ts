@@ -34,6 +34,17 @@ export class PlatformsController {
   @ApiResponse({ status: 200, description: 'List of all platforms' })
   async findAll() {
     const platforms = await this.prisma.akPlatform.findMany({
+      select: {
+        idPlatform: true,
+        name: true,
+        shortName: true,
+        manufacturer: true,
+        generation: true,
+        releaseYear: true,
+        platformType: true,
+        sortOrder: true,
+        createdAt: true,
+      },
       orderBy: [
         { sortOrder: 'asc' },
         { name: 'asc' }
@@ -49,7 +60,18 @@ export class PlatformsController {
   @ApiResponse({ status: 404, description: 'Platform not found' })
   async findOne(@Param('id', ParseIntPipe) id: number) {
     const platform = await this.prisma.akPlatform.findUnique({
-      where: { idPlatform: id }
+      where: { idPlatform: id },
+      select: {
+        idPlatform: true,
+        name: true,
+        shortName: true,
+        manufacturer: true,
+        generation: true,
+        releaseYear: true,
+        platformType: true,
+        sortOrder: true,
+        createdAt: true,
+      },
     });
 
     if (!platform) {
