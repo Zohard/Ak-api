@@ -545,6 +545,7 @@ export class AdminJeuxVideoService {
       dateSortieWorldwide: formatDate(releaseDates.worldwide),
       platformIds,
       genreIds,
+      igdbId: igdbId, // Include IGDB ID for storage
       // Note: Image is not included - preserves existing image in edit mode
     };
   }
