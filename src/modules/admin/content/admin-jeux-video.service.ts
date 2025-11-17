@@ -445,7 +445,7 @@ export class AdminJeuxVideoService {
 
     // Import trailers if available
     if (igdbGame.videos && igdbGame.videos.length > 0) {
-      await this.importTrailers(created.idJeu, igdbGame.videos, created.titre);
+      await this.importTrailers(created.idJeu, igdbGame.videos, created.titre || 'Game');
     }
 
     // Create platform associations
@@ -903,7 +903,7 @@ export class AdminJeuxVideoService {
       };
     }
 
-    const importedCount = await this.importTrailers(idJeu, igdbGame.videos, game.titre);
+    const importedCount = await this.importTrailers(idJeu, igdbGame.videos, game.titre || 'Game');
 
     // Log the action
     if (username) {
