@@ -73,6 +73,7 @@ model SmfMember {
   adminAuditLogs   AdminAuditLog[]
   animeCollections CollectionAnime[] @relation("UserAnimeCollection")
   mangaCollections CollectionManga[] @relation("UserMangaCollection")
+  jeuxVideoCollections CollectionJeuxVideo[] @relation("UserJeuxVideoCollection")
   synopsisSubmissions AkSynopsis[]   @relation("UserSynopsis")
   listesTop        AkListesTop[]
   sentMessages     SmfPersonalMessage[] @relation("SentMessages")
@@ -369,6 +370,7 @@ model AkJeuxVideo {
   genres            AkJeuxVideoGenre[]
   trailers          AkJeuxVideoTrailer[]
   screenshots       AkJeuxVideoScreenshot[]
+  collections       CollectionJeuxVideo[] @relation("UserJeuxVideoList")
 
   @@map("ak_jeux_video")
 }
@@ -792,6 +794,43 @@ model CollectionManga {
   @@index([idMembre, type])
   @@index([createdAt])
   @@map("collection_mangas")
+}
+
+model CollectionJeuxVideo {
+  idCollection       Int       @id @default(autoincrement()) @map("id_collection")
+  type               Int       @default(0)
+  idMembre           Int       @default(0) @map("id_membre")
+  idJeu              Int       @default(0) @map("id_jeu")
+  evaluation         Decimal   @map("evaluation") @db.Decimal(3, 1)
+  notes              String?   @db.Text
+  doublon            Int?      @default(0) @db.SmallInt
+  liked              Boolean?  @default(false)
+  mastered           Boolean?  @default(false)
+  platformPlayed     String?   @map("platform_played") @db.VarChar(255)
+  physicalPlatform   String?   @map("physical_platform") @db.VarChar(255)
+  startedDate        DateTime? @map("started_date") @db.Date
+  finishedDate       DateTime? @map("finished_date") @db.Date
+  logTitle           String?   @default("Log") @map("log_title") @db.VarChar(100)
+  isReplay           Boolean?  @default(false) @map("is_replay")
+  timePlayedHours    Int?      @default(0) @map("time_played_hours")
+  timePlayedMinutes  Int?      @default(0) @map("time_played_minutes")
+  useSessionsTime    Boolean?  @default(false) @map("use_sessions_time")
+  ownershipType      String?   @map("ownership_type") @db.VarChar(50)
+  storefront         String?   @db.VarChar(100)
+  containsSpoilers   Boolean?  @default(false) @map("contains_spoilers")
+  dateCreated        DateTime? @default(now()) @map("date_created") @db.Timestamp
+  dateModified       DateTime? @default(now()) @map("date_modified") @db.Timestamp
+
+  // Relations
+  user               SmfMember     @relation("UserJeuxVideoCollection", fields: [idMembre], references: [idMember], onDelete: Cascade)
+  jeuxVideo          AkJeuxVideo   @relation("UserJeuxVideoList", fields: [idJeu], references: [idJeu], onDelete: Cascade)
+
+  @@index([idMembre])
+  @@index([idJeu])
+  @@index([idMembre, idJeu])
+  @@index([idMembre, type])
+  @@index([dateCreated])
+  @@map("collection_jeuxvideo")
 }
 
 // Synopsis submissions
