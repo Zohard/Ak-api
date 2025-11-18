@@ -23,6 +23,8 @@ import { CreateCollectionDto } from './dto/create-collection.dto';
 import { CollectionQueryDto } from './dto/collection-query.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { ImportMalDto } from './dto/import-mal.dto';
+import { AddJeuxVideoToCollectionDto } from './dto/add-jeuxvideo-to-collection.dto';
+import { UpdateJeuxVideoCollectionDto } from './dto/update-jeuxvideo-collection.dto';
 import type { Response } from 'express';
 
 @ApiTags('collections')
@@ -414,5 +416,80 @@ export class CollectionsController {
   ) {
     const currentUserId = req.user?.id;
     return this.collectionsService.getRatingsDistribution(userId, type, 'manga', currentUserId);
+  }
+
+  // Video Game Collection Endpoints
+  @Post('users/:userId/jeuxvideo/:type')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Add a video game to user collection' })
+  @ApiParam({ name: 'userId', type: 'number', description: 'User ID' })
+  @ApiParam({ name: 'type', type: 'number', description: '1=Terminé, 2=En cours, 3=Planifié, 4=Abandonné, 5=En pause' })
+  @ApiResponse({ status: 201, description: 'Game added to collection successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden - not your collection' })
+  @ApiResponse({ status: 404, description: 'Game not found' })
+  @ApiResponse({ status: 409, description: 'Game already in this collection type' })
+  addJeuxVideoToCollection(
+    @Param('userId', ParseIntPipe) userId: number,
+    @Param('type', ParseIntPipe) type: number,
+    @Body() dto: AddJeuxVideoToCollectionDto,
+    @Request() req,
+  ) {
+    const currentUserId = req.user?.id_member;
+    return this.collectionsService.addJeuxVideoToCollection(userId, type, dto, currentUserId);
+  }
+
+  @Patch('users/:userId/jeuxvideo/entry/:collectionId')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Update a video game collection entry' })
+  @ApiParam({ name: 'userId', type: 'number', description: 'User ID' })
+  @ApiParam({ name: 'collectionId', type: 'number', description: 'Collection entry ID' })
+  @ApiResponse({ status: 200, description: 'Collection entry updated successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden - not your collection' })
+  @ApiResponse({ status: 404, description: 'Collection entry not found' })
+  updateJeuxVideoInCollection(
+    @Param('userId', ParseIntPipe) userId: number,
+    @Param('collectionId', ParseIntPipe) collectionId: number,
+    @Body() dto: UpdateJeuxVideoCollectionDto,
+    @Request() req,
+  ) {
+    const currentUserId = req.user?.id_member;
+    return this.collectionsService.updateJeuxVideoInCollection(userId, collectionId, dto, currentUserId);
+  }
+
+  @Delete('users/:userId/jeuxvideo/entry/:collectionId')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Remove a video game from collection' })
+  @ApiParam({ name: 'userId', type: 'number', description: 'User ID' })
+  @ApiParam({ name: 'collectionId', type: 'number', description: 'Collection entry ID' })
+  @ApiResponse({ status: 200, description: 'Game removed from collection successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden - not your collection' })
+  @ApiResponse({ status: 404, description: 'Collection entry not found' })
+  removeJeuxVideoFromCollection(
+    @Param('userId', ParseIntPipe) userId: number,
+    @Param('collectionId', ParseIntPipe) collectionId: number,
+    @Request() req,
+  ) {
+    const currentUserId = req.user?.id_member;
+    return this.collectionsService.removeJeuxVideoFromCollection(userId, collectionId, currentUserId);
+  }
+
+  @Get('users/:userId/jeuxvideo')
+  @ApiOperation({ summary: 'Get user video game collection' })
+  @ApiParam({ name: 'userId', type: 'number', description: 'User ID' })
+  @ApiQuery({ name: 'type', required: false, type: 'number', description: 'Collection type filter (1-5)' })
+  @ApiResponse({ status: 200, description: 'Video game collection retrieved successfully' })
+  getJeuxVideoCollection(
+    @Param('userId', ParseIntPipe) userId: number,
+    @Query('type', new ParseIntPipe({ optional: true })) type: number | undefined,
+    @Request() req,
+  ) {
+    const currentUserId = req.user?.id_member;
+    return this.collectionsService.getJeuxVideoCollection(userId, type, currentUserId);
   }
 }

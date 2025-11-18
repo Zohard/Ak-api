@@ -3,6 +3,8 @@ import { PrismaService } from '../../shared/services/prisma.service';
 import { CacheService } from '../../shared/services/cache.service';
 import { AddAnimeToCollectionDto } from './dto/add-anime-to-collection.dto';
 import { AddMangaToCollectionDto } from './dto/add-manga-to-collection.dto';
+import { AddJeuxVideoToCollectionDto } from './dto/add-jeuxvideo-to-collection.dto';
+import { UpdateJeuxVideoCollectionDto } from './dto/update-jeuxvideo-collection.dto';
 import { AddToCollectionDto } from './dto/add-to-collection.dto';
 import { CreateCollectionDto } from './dto/create-collection.dto';
 import { CollectionQueryDto } from './dto/collection-query.dto';
@@ -2263,5 +2265,178 @@ export class CollectionsService {
       // Log error but don't throw to avoid breaking the main operation
       console.error('Cache invalidation error for user', userId, error);
     }
+  }
+
+  // Video Game Collection Methods
+  async addJeuxVideoToCollection(userId: number, type: number, dto: AddJeuxVideoToCollectionDto, currentUserId: number) {
+    // Check authorization
+    if (userId !== currentUserId) {
+      throw new ForbiddenException('You can only modify your own collection');
+    }
+
+    // Check if game exists
+    const game = await this.prisma.akJeuxVideo.findUnique({
+      where: { idJeu: dto.gameId }
+    });
+    if (!game) {
+      throw new NotFoundException('Game not found');
+    }
+
+    // Check for existing entry
+    const existing = await this.prisma.collectionJeuxVideo.findFirst({
+      where: {
+        idMembre: userId,
+        idJeu: dto.gameId,
+        type
+      }
+    });
+
+    if (existing) {
+      throw new ConflictException('Game already in this collection type');
+    }
+
+    // Create collection entry
+    const collection = await this.prisma.collectionJeuxVideo.create({
+      data: {
+        idMembre: userId,
+        idJeu: dto.gameId,
+        type,
+        evaluation: dto.rating || 0,
+        notes: dto.notes,
+        platformPlayed: dto.platformPlayed,
+        physicalPlatform: dto.physicalPlatform,
+        startedDate: dto.startedDate ? new Date(dto.startedDate) : null,
+        finishedDate: dto.finishedDate ? new Date(dto.finishedDate) : null,
+        liked: dto.liked ?? false,
+        mastered: dto.mastered ?? false,
+        isReplay: dto.isReplay ?? false,
+        logTitle: dto.logTitle || 'Log',
+        timePlayedHours: dto.timePlayedHours || 0,
+        timePlayedMinutes: dto.timePlayedMinutes || 0,
+        ownershipType: dto.ownershipType,
+        storefront: dto.storefront,
+        containsSpoilers: dto.containsSpoilers ?? false,
+      },
+      include: {
+        jeuxVideo: true
+      }
+    });
+
+    // Invalidate cache
+    await this.invalidateUserCollectionCache(userId);
+
+    return collection;
+  }
+
+  async updateJeuxVideoInCollection(userId: number, collectionId: number, dto: UpdateJeuxVideoCollectionDto, currentUserId: number) {
+    // Check authorization
+    if (userId !== currentUserId) {
+      throw new ForbiddenException('You can only modify your own collection');
+    }
+
+    // Check if entry exists and belongs to user
+    const existing = await this.prisma.collectionJeuxVideo.findUnique({
+      where: { idCollection: collectionId }
+    });
+
+    if (!existing) {
+      throw new NotFoundException('Collection entry not found');
+    }
+
+    if (existing.idMembre !== userId) {
+      throw new ForbiddenException('This collection entry does not belong to you');
+    }
+
+    // Update
+    const updated = await this.prisma.collectionJeuxVideo.update({
+      where: { idCollection: collectionId },
+      data: {
+        ...(dto.type !== undefined && { type: dto.type }),
+        ...(dto.rating !== undefined && { evaluation: dto.rating }),
+        ...(dto.notes !== undefined && { notes: dto.notes }),
+        ...(dto.platformPlayed !== undefined && { platformPlayed: dto.platformPlayed }),
+        ...(dto.physicalPlatform !== undefined && { physicalPlatform: dto.physicalPlatform }),
+        ...(dto.startedDate !== undefined && { startedDate: dto.startedDate ? new Date(dto.startedDate) : null }),
+        ...(dto.finishedDate !== undefined && { finishedDate: dto.finishedDate ? new Date(dto.finishedDate) : null }),
+        ...(dto.liked !== undefined && { liked: dto.liked }),
+        ...(dto.mastered !== undefined && { mastered: dto.mastered }),
+        ...(dto.isReplay !== undefined && { isReplay: dto.isReplay }),
+        ...(dto.logTitle !== undefined && { logTitle: dto.logTitle }),
+        ...(dto.timePlayedHours !== undefined && { timePlayedHours: dto.timePlayedHours }),
+        ...(dto.timePlayedMinutes !== undefined && { timePlayedMinutes: dto.timePlayedMinutes }),
+        ...(dto.ownershipType !== undefined && { ownershipType: dto.ownershipType }),
+        ...(dto.storefront !== undefined && { storefront: dto.storefront }),
+        ...(dto.containsSpoilers !== undefined && { containsSpoilers: dto.containsSpoilers }),
+        dateModified: new Date()
+      },
+      include: {
+        jeuxVideo: true
+      }
+    });
+
+    // Invalidate cache
+    await this.invalidateUserCollectionCache(userId);
+
+    return updated;
+  }
+
+  async removeJeuxVideoFromCollection(userId: number, collectionId: number, currentUserId: number) {
+    // Check authorization
+    if (userId !== currentUserId) {
+      throw new ForbiddenException('You can only modify your own collection');
+    }
+
+    // Check if entry exists and belongs to user
+    const existing = await this.prisma.collectionJeuxVideo.findUnique({
+      where: { idCollection: collectionId }
+    });
+
+    if (!existing) {
+      throw new NotFoundException('Collection entry not found');
+    }
+
+    if (existing.idMembre !== userId) {
+      throw new ForbiddenException('This collection entry does not belong to you');
+    }
+
+    // Delete
+    await this.prisma.collectionJeuxVideo.delete({
+      where: { idCollection: collectionId }
+    });
+
+    // Invalidate cache
+    await this.invalidateUserCollectionCache(userId);
+
+    return { message: 'Game removed from collection' };
+  }
+
+  async getJeuxVideoCollection(userId: number, type?: number, currentUserId?: number) {
+    const where: any = { idMembre: userId };
+    if (type !== undefined) {
+      where.type = type;
+    }
+
+    const collection = await this.prisma.collectionJeuxVideo.findMany({
+      where,
+      include: {
+        jeuxVideo: {
+          include: {
+            platforms: {
+              include: {
+                platform: true
+              }
+            },
+            genres: {
+              include: {
+                genre: true
+              }
+            }
+          }
+        }
+      },
+      orderBy: { dateCreated: 'desc' }
+    });
+
+    return collection;
   }
 }
