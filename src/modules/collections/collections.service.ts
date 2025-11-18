@@ -727,7 +727,7 @@ export class CollectionsService {
     return { success: true, rating };
   }
 
-  async isInCollection(userId: number, mediaId: number, mediaType: 'anime' | 'manga') {
+  async isInCollection(userId: number, mediaId: number, mediaType: 'anime' | 'manga' | 'jeu-video') {
     return await this.prisma.executeWithRetry(async () => {
       let inCollection = false;
       let collections: any[] = [];
@@ -745,13 +745,27 @@ export class CollectionsService {
           },
         });
         inCollection = collections.length > 0;
-      } else {
+      } else if (mediaType === 'manga') {
         collections = await this.prisma.collectionManga.findMany({
           where: {
             idMembre: userId,
             idManga: mediaId,
           },
           select: {
+            type: true,
+            evaluation: true,
+            notes: true,
+          },
+        });
+        inCollection = collections.length > 0;
+      } else if (mediaType === 'jeu-video') {
+        collections = await this.prisma.collectionJeuxVideo.findMany({
+          where: {
+            idMembre: userId,
+            idJeu: mediaId,
+          },
+          select: {
+            idCollection: true,
             type: true,
             evaluation: true,
             notes: true,
@@ -767,6 +781,7 @@ export class CollectionsService {
           name: this.getCollectionNameByTypeId(c.type),
           rating: c.evaluation,
           notes: c.notes,
+          collectionId: c.idCollection || undefined,
         })),
       };
     });

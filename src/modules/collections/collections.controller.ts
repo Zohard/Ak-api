@@ -145,10 +145,10 @@ export class CollectionsController {
   @Get('check/:mediaType/:mediaId')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Vérifier si un anime/manga est dans mes collections' })
+  @ApiOperation({ summary: 'Vérifier si un anime/manga/jeu vidéo est dans mes collections' })
   @ApiParam({
     name: 'mediaType',
-    enum: ['anime', 'manga'],
+    enum: ['anime', 'manga', 'jeu-video'],
     description: 'Type de média',
   })
   @ApiParam({
@@ -158,7 +158,7 @@ export class CollectionsController {
   })
   @ApiResponse({ status: 200, description: 'Statut de présence dans les collections' })
   async checkInCollection(
-    @Param('mediaType') mediaType: 'anime' | 'manga',
+    @Param('mediaType') mediaType: 'anime' | 'manga' | 'jeu-video',
     @Param('mediaId', ParseIntPipe) mediaId: number,
     @Request() req,
   ) {
