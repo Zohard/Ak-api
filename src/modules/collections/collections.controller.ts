@@ -436,7 +436,7 @@ export class CollectionsController {
     @Body() dto: AddJeuxVideoToCollectionDto,
     @Request() req,
   ) {
-    const currentUserId = req.user?.id_member;
+    const currentUserId = req.user?.id;
     return this.collectionsService.addJeuxVideoToCollection(userId, type, dto, currentUserId);
   }
 
@@ -456,7 +456,7 @@ export class CollectionsController {
     @Body() dto: UpdateJeuxVideoCollectionDto,
     @Request() req,
   ) {
-    const currentUserId = req.user?.id_member;
+    const currentUserId = req.user?.id;
     return this.collectionsService.updateJeuxVideoInCollection(userId, collectionId, dto, currentUserId);
   }
 
@@ -475,7 +475,7 @@ export class CollectionsController {
     @Param('collectionId', ParseIntPipe) collectionId: number,
     @Request() req,
   ) {
-    const currentUserId = req.user?.id_member;
+    const currentUserId = req.user?.id;
     return this.collectionsService.removeJeuxVideoFromCollection(userId, collectionId, currentUserId);
   }
 
@@ -489,7 +489,7 @@ export class CollectionsController {
     @Query('type', new ParseIntPipe({ optional: true })) type: number | undefined,
     @Request() req,
   ) {
-    const currentUserId = req.user?.id_member;
+    const currentUserId = req.user?.id;
     return this.collectionsService.getJeuxVideoCollection(userId, type, currentUserId);
   }
 }
