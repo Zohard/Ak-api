@@ -770,8 +770,8 @@ export class CollectionsService {
             evaluation: true,
             notes: true,
             platformPlayed: true,
-            dateDebut: true,
-            dateFin: true,
+            startedDate: true,
+            finishedDate: true,
           },
         });
         inCollection = collections.length > 0;
@@ -786,8 +786,8 @@ export class CollectionsService {
           notes: c.notes,
           collectionId: c.idCollection || undefined,
           platformPlayed: c.platformPlayed || undefined,
-          startedDate: c.dateDebut || undefined,
-          finishedDate: c.dateFin || undefined,
+          startedDate: c.startedDate || undefined,
+          finishedDate: c.finishedDate || undefined,
         })),
       };
     });
