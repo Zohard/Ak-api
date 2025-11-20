@@ -769,6 +769,9 @@ export class CollectionsService {
             type: true,
             evaluation: true,
             notes: true,
+            platformeJouee: true,
+            dateDebut: true,
+            dateFin: true,
           },
         });
         inCollection = collections.length > 0;
@@ -782,6 +785,9 @@ export class CollectionsService {
           rating: c.evaluation,
           notes: c.notes,
           collectionId: c.idCollection || undefined,
+          platformPlayed: c.platformeJouee || undefined,
+          startedDate: c.dateDebut || undefined,
+          finishedDate: c.dateFin || undefined,
         })),
       };
     });
