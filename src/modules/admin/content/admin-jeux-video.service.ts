@@ -487,9 +487,10 @@ export class AdminJeuxVideoService {
   }
 
   /**
-   * Fetch game data from IGDB for form update (without creating database entry or uploading images)
+   * Fetch game data from IGDB for form update (without creating database entry)
+   * Downloads and uploads cover image if not already present
    */
-  async fetchFromIgdb(igdbId: number) {
+  async fetchFromIgdb(igdbId: number, currentImage?: string | null) {
     // Fetch full game data from IGDB
     const igdbGame = await this.igdbService.getGameById(igdbId);
 
@@ -533,7 +534,35 @@ export class AdminJeuxVideoService {
       }
     }
 
-    // Return formatted data for form update (without images)
+    // Download and upload cover image if current image is null or empty
+    let imageName: string | null = currentImage || null;
+
+    if ((!currentImage || currentImage.trim() === '') && igdbGame.cover?.image_id) {
+      try {
+        const imageBuffer = await this.igdbService.downloadCoverImage(igdbGame.cover.image_id);
+        if (imageBuffer) {
+          // Upload to ImageKit
+          const filename = `igdb-${igdbId}-${Date.now()}.jpg`;
+          const uploadResult = await this.imagekitService.uploadImage(
+            imageBuffer,
+            filename,
+            'images/games', // Upload to images/games folder
+            true // Replace existing if same name
+          );
+
+          if (uploadResult && uploadResult.name) {
+            // Store just the filename (not the full URL)
+            imageName = uploadResult.name;
+            console.log(`Successfully uploaded cover image for IGDB ID ${igdbId}: ${uploadResult.name}`);
+          }
+        }
+      } catch (error) {
+        console.error(`Failed to upload cover image for IGDB ID ${igdbId}:`, error);
+        // Continue without image if upload fails
+      }
+    }
+
+    // Return formatted data for form update
     return {
       titre: igdbGame.name,
       description: translatedSummary,
@@ -546,7 +575,7 @@ export class AdminJeuxVideoService {
       platformIds,
       genreIds,
       igdbId: igdbId, // Include IGDB ID for storage
-      // Note: Image is not included - preserves existing image in edit mode
+      image: imageName, // Include image if downloaded/uploaded or existing
     };
   }
 
