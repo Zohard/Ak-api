@@ -79,8 +79,11 @@ export class AdminJeuxVideoController {
 
   @Get('igdb/fetch/:igdbId')
   @ApiOperation({ summary: 'Récupérer les données IGDB sans créer d\'entrée (pour mise à jour de formulaire)' })
-  fetchFromIgdb(@Param('igdbId', ParseIntPipe) igdbId: number) {
-    return this.service.fetchFromIgdb(igdbId);
+  fetchFromIgdb(
+    @Param('igdbId', ParseIntPipe) igdbId: number,
+    @Query('currentImage') currentImage?: string,
+  ) {
+    return this.service.fetchFromIgdb(igdbId, currentImage || null);
   }
 
   @Post(':id/igdb/screenshots/:igdbId')
