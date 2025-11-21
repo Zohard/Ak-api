@@ -375,6 +375,13 @@ export class AdminJeuxVideoService {
     const releaseDates = this.mapIgdbReleaseDates(igdbGame.release_dates || []);
     console.log('Mapped release dates:', releaseDates);
 
+    // Fallback: If no regional dates found but first_release_date is available,
+    // use it as the worldwide release date
+    if (!releaseDates.japon && !releaseDates.usa && !releaseDates.europe && !releaseDates.worldwide && igdbGame.first_release_date) {
+      releaseDates.worldwide = new Date(igdbGame.first_release_date * 1000);
+      console.log('No regional dates found. Using first_release_date as worldwide:', releaseDates.worldwide);
+    }
+
     // Translate summary to French if available
     let translatedSummary: string | null = null;
     if (igdbGame.summary) {
@@ -514,6 +521,13 @@ export class AdminJeuxVideoService {
 
     // Map regional release dates
     const releaseDates = this.mapIgdbReleaseDates(igdbGame.release_dates || []);
+
+    // Fallback: If no regional dates found but first_release_date is available,
+    // use it as the worldwide release date
+    if (!releaseDates.japon && !releaseDates.usa && !releaseDates.europe && !releaseDates.worldwide && igdbGame.first_release_date) {
+      releaseDates.worldwide = new Date(igdbGame.first_release_date * 1000);
+      console.log('No regional dates found. Using first_release_date as worldwide:', releaseDates.worldwide);
+    }
 
     // Helper function to format Date to YYYY-MM-DD for HTML date inputs
     const formatDate = (date: Date | null): string | null => {
