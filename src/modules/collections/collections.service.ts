@@ -1384,7 +1384,7 @@ export class CollectionsService {
       addedAt: item.createdAt?.toISOString() || new Date().toISOString(),
       type: item.type,
       notes: item.notes,
-      rating: item.evaluation > 0 ? item.evaluation : null,
+      rating: Number(item.evaluation) > 0 ? Number(item.evaluation) : null,
       anime: {
         id: item.anime.idAnime,
         titre: item.anime.titre,
@@ -1490,7 +1490,7 @@ export class CollectionsService {
       animeId: collectionItem.idAnime,
       addedAt: collectionItem.createdAt?.toISOString() || new Date().toISOString(),
       notes: collectionItem.notes,
-      rating: collectionItem.evaluation > 0 ? collectionItem.evaluation : null,
+      rating: Number(collectionItem.evaluation) > 0 ? Number(collectionItem.evaluation) : null,
       anime: {
         id: collectionItem.anime.idAnime,
         titre: collectionItem.anime.titre,
@@ -1598,7 +1598,7 @@ export class CollectionsService {
       addedAt: item.createdAt?.toISOString() || new Date().toISOString(),
       type: item.type,
       notes: item.notes,
-      rating: item.evaluation > 0 ? item.evaluation : null,
+      rating: Number(item.evaluation) > 0 ? Number(item.evaluation) : null,
       manga: {
         id: item.manga.idManga,
         titre: item.manga.titre,
@@ -1806,7 +1806,7 @@ export class CollectionsService {
         _count: { evaluation: true },
       });
       for (const r of rows) {
-        const val = r.evaluation ?? 0;
+        const val = Number(r.evaluation ?? 0);
         if (val <= 0) unrated += r._count.evaluation;
         else if (val >= 1 && val <= 10) buckets[val] = (buckets[val] || 0) + r._count.evaluation;
       }
@@ -1817,7 +1817,7 @@ export class CollectionsService {
         _count: { evaluation: true },
       });
       for (const r of rows) {
-        const val = r.evaluation ?? 0;
+        const val = Number(r.evaluation ?? 0);
         if (val <= 0) unrated += r._count.evaluation;
         else if (val >= 1 && val <= 10) buckets[val] = (buckets[val] || 0) + r._count.evaluation;
       }
@@ -2060,7 +2060,7 @@ export class CollectionsService {
 
       const itemsXml = entries.map((e) => {
         const status = this.toMalStatus(e.type, 'anime');
-        const score10 = (e.evaluation ?? 0) * 2; // 0-5 -> 0-10
+        const score10 = Number(e.evaluation ?? 0) * 2; // 0-5 -> 0-10
         const epCount = e.anime?.nbEp ?? 0;
         const seriesType = this.mapFormatToMalType(e.anime?.format);
         return [
@@ -2116,7 +2116,7 @@ export class CollectionsService {
 
     const itemsXml = entries.map((e) => {
       const status = this.toMalStatus(e.type, 'manga');
-      const score10 = (e.evaluation ?? 0) * 2; // 0-5 -> 0-10
+      const score10 = Number(e.evaluation ?? 0) * 2; // 0-5 -> 0-10
       const volCount = e.manga?.nbVol ?? 0;
       return [
         '  <manga>',
