@@ -665,40 +665,135 @@ export class AdminJeuxVideoService {
    * Map IGDB platforms to database platform IDs
    */
   private async mapIgdbPlatforms(igdbPlatforms: Array<{ id: number; name: string; abbreviation?: string }>): Promise<number[]> {
+    // Map IGDB platform names to your database names
+    // Format: 'IGDB Name': 'Your DB Name'
     const platformMap: Record<string, string> = {
+      // PC
       'PC (Microsoft Windows)': 'PC',
+      'Mac': 'Mac',
+      'Linux': 'Linux',
+      // PlayStation
       'PlayStation 5': 'PlayStation 5',
       'PlayStation 4': 'PlayStation 4',
-      'Xbox Series X|S': 'Xbox Series X|S',
-      'Nintendo Switch': 'Nintendo Switch',
       'PlayStation 3': 'PlayStation 3',
+      'PlayStation 2': 'PlayStation 2',
+      'PlayStation': 'PlayStation',
+      'PlayStation Vita': 'PlayStation Vita',
+      'PlayStation Portable': 'PSP',
+      // Xbox
+      'Xbox Series X|S': 'Xbox Series X|S',
+      'Xbox One': 'Xbox One',
       'Xbox 360': 'Xbox 360',
+      'Xbox': 'Xbox',
+      // Nintendo - Home Consoles
+      'Nintendo Switch': 'Nintendo Switch',
       'Wii U': 'Wii U',
+      'Wii': 'Wii',
+      'Nintendo GameCube': 'GameCube',
+      'Nintendo 64': 'Nintendo 64',
+      'Super Nintendo Entertainment System (SNES)': 'Super Nintendo',
+      'Nintendo Entertainment System (NES)': 'NES',
+      // Nintendo - Handhelds
+      'Nintendo 3DS': 'Nintendo 3DS',
+      'Nintendo DS': 'Nintendo DS',
+      'Nintendo DSi': 'Nintendo DS',
+      'Game Boy Advance': 'Game Boy Advance',
+      'Game Boy Color': 'Game Boy Color',
+      'Game Boy': 'Game Boy',
+      // Sega
+      'Sega Dreamcast': 'Dreamcast',
+      'Sega Saturn': 'Saturn',
+      'Sega Mega Drive/Genesis': 'Mega Drive',
+      'Sega Game Gear': 'Game Gear',
+      // Mobile
+      'iOS': 'iOS',
+      'Android': 'Android',
+      // Other
+      'Arcade': 'Arcade',
+    };
+
+    // Also map common abbreviations to your DB names
+    const abbreviationMap: Record<string, string> = {
+      'PS5': 'PlayStation 5',
+      'PS4': 'PlayStation 4',
+      'PS3': 'PlayStation 3',
+      'PS2': 'PlayStation 2',
+      'PS1': 'PlayStation',
+      'PSP': 'PSP',
+      'PSV': 'PlayStation Vita',
+      'PSVITA': 'PlayStation Vita',
+      'XSX': 'Xbox Series X|S',
+      'XONE': 'Xbox One',
+      'X360': 'Xbox 360',
+      'NSW': 'Nintendo Switch',
+      'WIIU': 'Wii U',
+      'GCN': 'GameCube',
+      'NGC': 'GameCube',
+      'N64': 'Nintendo 64',
+      'SNES': 'Super Nintendo',
+      'NES': 'NES',
+      '3DS': 'Nintendo 3DS',
+      'NDS': 'Nintendo DS',
+      'DS': 'Nintendo DS',
+      'GBA': 'Game Boy Advance',
+      'GBC': 'Game Boy Color',
+      'GB': 'Game Boy',
+      'DC': 'Dreamcast',
+      'SAT': 'Saturn',
+      'GEN': 'Mega Drive',
+      'MD': 'Mega Drive',
+      'GG': 'Game Gear',
     };
 
     const platformIds: number[] = [];
 
     for (const igdbPlatform of igdbPlatforms) {
-      const mappedName = platformMap[igdbPlatform.name] || igdbPlatform.abbreviation || igdbPlatform.name;
+      // First try the direct name mapping
+      let targetName = platformMap[igdbPlatform.name];
 
-      // Try to find existing platform
+      // If not found, try the abbreviation mapping
+      if (!targetName && igdbPlatform.abbreviation) {
+        targetName = abbreviationMap[igdbPlatform.abbreviation.toUpperCase()];
+      }
+
+      // Fallback to abbreviation or original name
+      if (!targetName) {
+        targetName = igdbPlatform.abbreviation || igdbPlatform.name;
+      }
+
+      // Try to find existing platform by name
       let platform = await this.prisma.akPlatform.findFirst({
-        where: { name: { equals: mappedName, mode: 'insensitive' } }
+        where: { name: { equals: targetName, mode: 'insensitive' } }
       });
+
+      // Also try to find by shortName if not found
+      if (!platform) {
+        platform = await this.prisma.akPlatform.findFirst({
+          where: { shortName: { equals: targetName, mode: 'insensitive' } }
+        });
+      }
+
+      // Also try to find by the original IGDB name (in case it already exists)
+      if (!platform) {
+        platform = await this.prisma.akPlatform.findFirst({
+          where: { name: { equals: igdbPlatform.name, mode: 'insensitive' } }
+        });
+      }
 
       // Create if doesn't exist
       if (!platform) {
         try {
           platform = await this.prisma.akPlatform.create({
             data: {
-              name: mappedName,
+              name: targetName,
+              shortName: igdbPlatform.abbreviation || null,
             }
           });
         } catch (error) {
           // If creation failed due to unique constraint (race condition), try to find again
           if (error.code === 'P2002') {
             platform = await this.prisma.akPlatform.findFirst({
-              where: { name: { equals: mappedName, mode: 'insensitive' } }
+              where: { name: { equals: targetName, mode: 'insensitive' } }
             });
           }
 
