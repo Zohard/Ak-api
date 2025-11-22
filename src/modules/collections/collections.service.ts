@@ -215,8 +215,8 @@ export class CollectionsService {
     const { mediaId, mediaType, type, rating, notes } = addToCollectionDto;
     const collectionType = this.getCollectionTypeFromName(type);
 
-    // Normalize rating to 0-5 integer
-    const normalizedRating = Math.max(0, Math.min(5, Math.round((rating ?? 0))));
+    // Normalize rating to 0-5 range (supports 0.5 increments for half-stars)
+    const normalizedRating = Math.max(0, Math.min(5, rating ?? 0));
 
     try {
       if (mediaType === 'anime') {

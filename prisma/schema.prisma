@@ -747,7 +747,7 @@ model CollectionAnime {
   type             Int       @default(0)
   idMembre         Int       @default(0) @map("id_membre")
   idAnime          Int       @default(0) @map("id_anime")
-  evaluation       Int       @map("evaluation") @db.SmallInt
+  evaluation       Decimal   @map("evaluation") @db.Decimal(3, 1)
   notes            String?   @db.Text
   doublon          Int?      @default(0) @db.SmallInt
 
@@ -774,7 +774,7 @@ model CollectionManga {
   type             Int       @default(0)
   idMembre         Int       @default(0) @map("id_membre")
   idManga          Int       @default(0) @map("id_manga")
-  evaluation       Int       @map("evaluation") @db.SmallInt
+  evaluation       Decimal   @map("evaluation") @db.Decimal(3, 1)
   notes            String?   @db.Text
   doublon          Int?      @default(0) @db.SmallInt
 
