@@ -188,9 +188,9 @@ export class EventsService {
           m.titre as manga_titre, m.image as manga_image,
           g.titre as game_titre, g.image as game_image
         FROM ak_event_nominees n
-        LEFT JOIN ak_animes a ON n.anime_id = a."idAnime"
-        LEFT JOIN ak_mangas m ON n.manga_id = m."idManga"
-        LEFT JOIN ak_jeux_video g ON n.game_id = g.id
+        LEFT JOIN ak_animes a ON n.anime_id = a.id_anime
+        LEFT JOIN ak_mangas m ON n.manga_id = m.id_manga
+        LEFT JOIN ak_jeux_video g ON n.game_id = g.id_jeu
         WHERE n.category_id = ${category.id}
         ORDER BY n.position ASC, n.id ASC
       `;
