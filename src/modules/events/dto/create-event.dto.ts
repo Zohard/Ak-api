@@ -103,6 +103,11 @@ export class CreateEventDto {
   @IsString()
   image?: string;
 
+  @ApiPropertyOptional({ description: 'Année pour filtrer les nominés' })
+  @IsOptional()
+  @IsNumber()
+  year?: number;
+
   @ApiPropertyOptional({ description: 'Type de média', enum: MediaType, default: MediaType.MIXED })
   @IsOptional()
   @IsEnum(MediaType)
