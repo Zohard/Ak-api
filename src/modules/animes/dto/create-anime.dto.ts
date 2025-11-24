@@ -62,6 +62,14 @@ export class CreateAnimeDto {
   annee?: number;
 
   @ApiPropertyOptional({
+    description: 'Date de diffusion (format YYYY-MM-DD)',
+    example: '2013-04-07',
+  })
+  @IsOptional()
+  @IsString()
+  dateDiffusion?: string;
+
+  @ApiPropertyOptional({
     description: "Synopsis de l'anime",
     example: "Dans un monde où l'humanité vit retranchée...",
   })

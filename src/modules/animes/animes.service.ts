@@ -101,6 +101,11 @@ export class AnimesService extends BaseContentService<
     delete data.titreOrign;
     delete data.anilistId; // Remove anilistId from data before saving
 
+    // Convert dateDiffusion string to Date object if provided
+    if (data.dateDiffusion && typeof data.dateDiffusion === 'string') {
+      data.dateDiffusion = new Date(data.dateDiffusion);
+    }
+
     const anime = await this.prisma.akAnime.create({
       data: {
         ...data,
@@ -508,6 +513,11 @@ export class AnimesService extends BaseContentService<
     }
     delete updateData.titreOrign;
     delete updateData.anilistId; // Remove anilistId from data before saving
+
+    // Convert dateDiffusion string to Date object if provided
+    if (updateData.dateDiffusion && typeof updateData.dateDiffusion === 'string') {
+      updateData.dateDiffusion = new Date(updateData.dateDiffusion);
+    }
 
     const updatedAnime = await this.prisma.akAnime.update({
       where: { idAnime: id },
@@ -1474,7 +1484,7 @@ export class AnimesService extends BaseContentService<
   }
 
   private formatAnime(anime: any, season?: any, tags?: any[]) {
-    const { idAnime, dateAjout, image, lienForum, businessRelations, studio: dbStudio, ...otherFields } = anime;
+    const { idAnime, dateAjout, image, lienForum, businessRelations, studio: dbStudio, dateDiffusion, ...otherFields } = anime;
 
     // Find studio ID and name from business relations
     let idStudio = null;
@@ -1492,6 +1502,15 @@ export class AnimesService extends BaseContentService<
       }
     }
 
+    // Format dateDiffusion as YYYY-MM-DD string for frontend
+    let formattedDateDiffusion: string | null = null;
+    if (dateDiffusion) {
+      const date = dateDiffusion instanceof Date ? dateDiffusion : new Date(dateDiffusion);
+      if (!isNaN(date.getTime())) {
+        formattedDateDiffusion = date.toISOString().split('T')[0];
+      }
+    }
+
     return {
       id: idAnime,
       addedDate: dateAjout?.toISOString(),
@@ -1502,6 +1521,7 @@ export class AnimesService extends BaseContentService<
       autresTitres: otherFields.titresAlternatifs || null,
       season: season || null,
       tags: tags || [],
+      dateDiffusion: formattedDateDiffusion,
       ...otherFields,
     };
   }

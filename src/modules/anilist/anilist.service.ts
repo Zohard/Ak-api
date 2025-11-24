@@ -452,6 +452,7 @@ export class AniListService {
         .filter((title, index, arr) => arr.indexOf(title) === index)
         .join('\n'),
       annee: anilistAnime.seasonYear || anilistAnime.startDate?.year,
+      dateDiffusion: this.formatDate(anilistAnime.startDate),
       image: anilistAnime.coverImage?.large || anilistAnime.coverImage?.medium,
       nbEp: anilistAnime.episodes,
       studio: studios,
@@ -910,5 +911,16 @@ export class AniListService {
     };
 
     return formatMap[anilistFormat] || 'Série TV';
+  }
+
+  private formatDate(date?: { year?: number; month?: number; day?: number }): string | null {
+    if (!date?.year) return null;
+
+    // Build date string in YYYY-MM-DD format for PostgreSQL DATE type
+    const year = date.year;
+    const month = date.month ? String(date.month).padStart(2, '0') : '01';
+    const day = date.day ? String(date.day).padStart(2, '0') : '01';
+
+    return `${year}-${month}-${day}`;
   }
 }

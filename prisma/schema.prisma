@@ -156,6 +156,7 @@ model AkAnime {
   titreFr      String?   @map("titre_fr") @db.Text
   titresAlternatifs String? @map("titres_alternatifs") @db.Text
   annee        Int?
+  dateDiffusion DateTime? @map("date_diffusion") @db.Date
   nbEp         Int?      @map("nb_ep")
   nbEpduree    String?   @map("nb_epduree") @db.VarChar(255)
   image        String?   @db.VarChar(255)
