@@ -18,6 +18,7 @@ export class JeuxVideoService {
       plateforme,
       editeur,
       annee,
+      year,
       genre,
       sortBy = 'dateAjout',
       sortOrder = 'desc',
@@ -47,9 +48,9 @@ export class JeuxVideoService {
       where.editeur = { contains: editeur, mode: 'insensitive' };
     }
 
-    // Year filter
-    if (annee) {
-      where.annee = annee;
+    // Year filter - accept both annee and year parameters (year is an alias)
+    if (annee || year) {
+      where.annee = annee || year;
     }
 
     // Genre filter

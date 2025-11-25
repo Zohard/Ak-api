@@ -60,6 +60,14 @@ export class MangaQueryDto {
   annee?: string;
 
   @ApiPropertyOptional({
+    description: 'Filtrer par année (alias de annee)',
+    example: '1997',
+  })
+  @IsOptional()
+  @IsString()
+  year?: string;
+
+  @ApiPropertyOptional({
     description: 'Filtrer par statut (0 = en attente, 1 = validé, 2 = refusé)',
     example: 1,
     minimum: 0,

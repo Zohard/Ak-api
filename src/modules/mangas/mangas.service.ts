@@ -157,6 +157,7 @@ export class MangasService extends BaseContentService<
       search,
       auteur,
       annee,
+      year,
       statut,
       genre,
       sortBy = 'dateAjout',
@@ -196,8 +197,9 @@ export class MangasService extends BaseContentService<
       };
     }
 
-    if (annee) {
-      where.annee = annee;
+    // Accept both annee and year parameters (year is an alias)
+    if (annee || year) {
+      where.annee = annee || year;
     }
 
     if (statut !== undefined) {

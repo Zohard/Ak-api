@@ -150,6 +150,7 @@ export class AnimesService extends BaseContentService<
       search,
       studio,
       annee,
+      year,
       statut,
       ficheComplete,
       format,
@@ -195,8 +196,9 @@ export class AnimesService extends BaseContentService<
       };
     }
 
-    if (annee) {
-      where.annee = annee;
+    // Accept both annee and year parameters (year is an alias)
+    if (annee || year) {
+      where.annee = annee || year;
     }
 
     if (statut !== undefined) {

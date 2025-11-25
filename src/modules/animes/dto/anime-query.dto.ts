@@ -62,6 +62,16 @@ export class AnimeQueryDto {
   annee?: number;
 
   @ApiPropertyOptional({
+    description: 'Filtrer par année (alias de annee)',
+    example: 2023,
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(1900)
+  year?: number;
+
+  @ApiPropertyOptional({
     description: 'Filtrer par statut (0 = en attente, 1 = validé, 2 = refusé)',
     example: 1,
   })

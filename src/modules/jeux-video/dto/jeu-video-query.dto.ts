@@ -70,6 +70,16 @@ export class JeuVideoQueryDto {
   annee?: number;
 
   @ApiPropertyOptional({
+    description: 'Filtrer par année (alias de annee)',
+    example: 2023,
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(1970)
+  year?: number;
+
+  @ApiPropertyOptional({
     description: 'Filtrer par genre (plusieurs genres séparés par des virgules)',
     example: 'Action,Aventure',
   })
