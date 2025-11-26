@@ -49,7 +49,8 @@ export class EventsController {
   @ApiResponse({ status: 200, description: 'Détails de l\'événement' })
   async findOne(@Param('idOrSlug') idOrSlug: string, @Request() req) {
     const userId = req.user?.id;
-    return this.eventsService.findOne(idOrSlug, userId);
+    const isAdmin = req.user?.id_rang === 6; // Check if user is admin
+    return this.eventsService.findOne(idOrSlug, userId, isAdmin);
   }
 
   // ============ USER ENDPOINTS (authenticated) ============

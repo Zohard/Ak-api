@@ -152,7 +152,7 @@ export class EventsService {
   }
 
   // Get single event by ID or slug
-  async findOne(idOrSlug: number | string, userId?: number) {
+  async findOne(idOrSlug: number | string, userId?: number, isAdmin?: boolean) {
     const isId = typeof idOrSlug === 'number' || !isNaN(Number(idOrSlug));
 
     let event: any;
@@ -204,6 +204,22 @@ export class EventsService {
           WHERE category_id = ${category.id} AND user_id = ${userId}
         `;
         category.userVote = userVote?.nominee_id || null;
+      }
+
+      // For admin, get voter details for each category
+      if (isAdmin) {
+        const voters = await this.prisma.$queryRaw<any[]>`
+          SELECT
+            v.user_id,
+            v.nominee_id,
+            u.pseudo as username,
+            v.voted_at
+          FROM ak_event_votes v
+          JOIN ak_utilisateurs u ON v.user_id = u.id_utilisateur
+          WHERE v.category_id = ${category.id}
+          ORDER BY v.voted_at DESC
+        `;
+        category.voters = voters;
       }
 
       category.nominees = nominees;
