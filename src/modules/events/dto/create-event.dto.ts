@@ -108,6 +108,11 @@ export class CreateEventDto {
   @IsNumber()
   year?: number;
 
+  @ApiPropertyOptional({ description: 'ID du sujet de forum associé' })
+  @IsOptional()
+  @IsNumber()
+  topicId?: number;
+
   @ApiPropertyOptional({ description: 'Type de média', enum: MediaType, default: MediaType.MIXED })
   @IsOptional()
   @IsEnum(MediaType)
