@@ -212,10 +212,10 @@ export class EventsService {
           SELECT
             v.user_id,
             v.nominee_id,
-            u.pseudo as username,
+            u.member_name as username,
             v.voted_at
           FROM ak_event_votes v
-          JOIN ak_utilisateurs u ON v.user_id = u.id_utilisateur
+          JOIN smf_members u ON v.user_id = u.id_member
           WHERE v.category_id = ${category.id}
           ORDER BY v.voted_at DESC
         `;
