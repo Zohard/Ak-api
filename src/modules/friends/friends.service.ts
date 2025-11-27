@@ -814,8 +814,8 @@ export class FriendsService {
         contentId: r.id_jeu,
         contentTitle: r.titre,
         contentImage: r.image,
-        rating: r.evaluation / 2,
-        actionText: `a attribué ${r.evaluation / 2}/5 au jeu ${r.titre}`
+        rating: r.evaluation,
+        actionText: `a attribué ${r.evaluation}/5 au jeu ${r.titre}`
       })));
     }
 
