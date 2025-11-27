@@ -2312,36 +2312,61 @@ export class CollectionsService {
       }
     });
 
-    if (existing) {
-      throw new ConflictException('Game already in this collection type');
-    }
+    let collection;
 
-    // Create collection entry
-    const collection = await this.prisma.collectionJeuxVideo.create({
-      data: {
-        idMembre: userId,
-        idJeu: dto.gameId,
-        type,
-        evaluation: dto.rating || 0,
-        notes: dto.notes,
-        platformPlayed: dto.platformPlayed,
-        physicalPlatform: dto.physicalPlatform,
-        startedDate: dto.startedDate ? new Date(dto.startedDate) : null,
-        finishedDate: dto.finishedDate ? new Date(dto.finishedDate) : null,
-        liked: dto.liked ?? false,
-        mastered: dto.mastered ?? false,
-        isReplay: dto.isReplay ?? false,
-        logTitle: dto.logTitle || 'Log',
-        timePlayedHours: dto.timePlayedHours || 0,
-        timePlayedMinutes: dto.timePlayedMinutes || 0,
-        ownershipType: dto.ownershipType,
-        storefront: dto.storefront,
-        containsSpoilers: dto.containsSpoilers ?? false,
-      },
-      include: {
-        jeuxVideo: true
-      }
-    });
+    if (existing) {
+      // Update existing entry
+      collection = await this.prisma.collectionJeuxVideo.update({
+        where: { idCollection: existing.idCollection },
+        data: {
+          evaluation: dto.rating || 0,
+          notes: dto.notes,
+          platformPlayed: dto.platformPlayed,
+          physicalPlatform: dto.physicalPlatform,
+          startedDate: dto.startedDate ? new Date(dto.startedDate) : null,
+          finishedDate: dto.finishedDate ? new Date(dto.finishedDate) : null,
+          liked: dto.liked ?? false,
+          mastered: dto.mastered ?? false,
+          isReplay: dto.isReplay ?? false,
+          logTitle: dto.logTitle || 'Log',
+          timePlayedHours: dto.timePlayedHours || 0,
+          timePlayedMinutes: dto.timePlayedMinutes || 0,
+          ownershipType: dto.ownershipType,
+          storefront: dto.storefront,
+          containsSpoilers: dto.containsSpoilers ?? false,
+        },
+        include: {
+          jeuxVideo: true
+        }
+      });
+    } else {
+      // Create new collection entry
+      collection = await this.prisma.collectionJeuxVideo.create({
+        data: {
+          idMembre: userId,
+          idJeu: dto.gameId,
+          type,
+          evaluation: dto.rating || 0,
+          notes: dto.notes,
+          platformPlayed: dto.platformPlayed,
+          physicalPlatform: dto.physicalPlatform,
+          startedDate: dto.startedDate ? new Date(dto.startedDate) : null,
+          finishedDate: dto.finishedDate ? new Date(dto.finishedDate) : null,
+          liked: dto.liked ?? false,
+          mastered: dto.mastered ?? false,
+          isReplay: dto.isReplay ?? false,
+          logTitle: dto.logTitle || 'Log',
+          timePlayedHours: dto.timePlayedHours || 0,
+          timePlayedMinutes: dto.timePlayedMinutes || 0,
+          ownershipType: dto.ownershipType,
+          storefront: dto.storefront,
+          containsSpoilers: dto.containsSpoilers ?? false,
+        },
+        include: {
+          jeuxVideo: true
+        }
+      });
+    }
 
     // Invalidate cache
     await this.invalidateUserCollectionCache(userId);
