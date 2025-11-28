@@ -260,6 +260,76 @@ export class JeuxVideoService {
     return result;
   }
 
+  async autocomplete(query: string, exclude?: string, limit = 10) {
+    if (!query || query.length < 2) {
+      return { data: [] };
+    }
+
+    const where: any = {
+      titre: { contains: query, mode: 'insensitive' },
+      statut: 1,
+    };
+
+    if (exclude) {
+      const excludeIds = exclude
+        .split(',')
+        .map((id) => parseInt(id))
+        .filter((id) => !isNaN(id));
+
+      if (excludeIds.length > 0) {
+        where.idJeu = { notIn: excludeIds };
+      }
+    }
+
+    // Fetch more items than needed to allow for better ranking
+    const results = await this.prisma.akJeuxVideo.findMany({
+      where,
+      take: limit * 3, // Fetch 3x to have more candidates for ranking
+      orderBy: { titre: 'asc' },
+      select: {
+        idJeu: true,
+        titre: true,
+        niceUrl: true,
+        image: true,
+        annee: true,
+        moyenneNotes: true,
+      },
+    });
+
+    // Rank results by match quality
+    const queryLower = query.toLowerCase();
+    const rankedResults = results
+      .map((item) => {
+        const titreLower = item.titre.toLowerCase();
+        let rank = 3; // Default: contains
+
+        if (titreLower === queryLower) {
+          rank = 1; // Exact match
+        } else if (titreLower.startsWith(queryLower)) {
+          rank = 2; // Starts with
+        }
+
+        return { ...item, _rank: rank };
+      })
+      .sort((a, b) => {
+        // Sort by rank first, then alphabetically
+        if (a._rank !== b._rank) {
+          return a._rank - b._rank;
+        }
+        return a.titre.localeCompare(b.titre);
+      })
+      .slice(0, limit) // Take only the requested limit
+      .map(({ _rank, ...item }) => item); // Remove the rank field
+
+    // Map idJeu to id for frontend consistency
+    const mappedResults = rankedResults.map(item => ({
+      ...item,
+      id: item.idJeu,
+    }));
+
+    return { data: mappedResults };
+  }
+
   async getRelationships(id: number) {
     const sourceKey = `jeu${id}`;
 

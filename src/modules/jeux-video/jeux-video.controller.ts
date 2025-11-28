@@ -15,6 +15,18 @@ export class JeuxVideoController {
     return this.jeuxVideoService.findAll(query);
   }
 
+  @Get('autocomplete')
+  @ApiOperation({ summary: 'Recherche autocomplete pour jeux vidéo' })
+  @ApiResponse({ status: 200, description: "Résultats de l'autocomplete" })
+  async autocomplete(
+    @Query('q') query: string,
+    @Query('exclude') exclude?: string,
+    @Query('limit') limit?: string,
+  ) {
+    const parsedLimit = limit ? parseInt(limit) : 10;
+    return this.jeuxVideoService.autocomplete(query, exclude, parsedLimit);
+  }
+
   @Get('platforms')
   @ApiOperation({ summary: 'Liste des plateformes disponibles' })
   @ApiResponse({ status: 200, description: 'Liste des plateformes' })

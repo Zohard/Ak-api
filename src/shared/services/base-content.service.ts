@@ -126,15 +126,41 @@ export abstract class BaseContentService<T, CreateDto, UpdateDto, QueryDto> {
 
     const selectFields = this.getAutocompleteSelectFields();
 
+    // Fetch more items than needed to allow for better ranking
     const items = await this.model.findMany({
       where,
       select: selectFields,
       orderBy: { titre: 'asc' },
-      take: limit,
+      take: limit * 3, // Fetch 3x to have more candidates for ranking
     });
 
+    // Rank results by match quality
+    const queryLower = query.toLowerCase();
+    const rankedItems = items
+      .map((item: any) => {
+        const titreLower = item.titre.toLowerCase();
+        let rank = 3; // Default: contains
+
+        if (titreLower === queryLower) {
+          rank = 1; // Exact match
+        } else if (titreLower.startsWith(queryLower)) {
+          rank = 2; // Starts with
+        }
+
+        return { ...item, _rank: rank };
+      })
+      .sort((a, b) => {
+        // Sort by rank first, then alphabetically
+        if (a._rank !== b._rank) {
+          return a._rank - b._rank;
+        }
+        return a.titre.localeCompare(b.titre);
+      })
+      .slice(0, limit) // Take only the requested limit
+      .map(({ _rank, ...item }) => item); // Remove the rank field
+
     return {
-      data: items.map(this.formatAutocompleteItem.bind(this)),
+      data: rankedItems.map(this.formatAutocompleteItem.bind(this)),
     };
   }
 
