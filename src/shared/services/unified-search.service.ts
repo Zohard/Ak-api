@@ -107,9 +107,9 @@ export class UnifiedSearchService {
 
     const results = await Promise.all(promises);
 
-    let animeResults = [];
-    let mangaResults = [];
-    let jeuVideoResults = [];
+    let animeResults: any[] = [];
+    let mangaResults: any[] = [];
+    let jeuVideoResults: any[] = [];
 
     if (type === 'all') {
       animeResults = results[0] || [];
@@ -187,7 +187,7 @@ export class UnifiedSearchService {
         where: { idManga: basedOnId },
       });
     } else if (type === 'jeu_video') {
-      baseItem = await this.prisma.akJeuxVideo.findUnique({
+      baseItem = await this.prisma.akJeuxVideo.findFirst({
         where: { idJeuVideo: basedOnId },
       });
     }
@@ -399,7 +399,7 @@ export class UnifiedSearchService {
             orderBy: { moyenneNotes: 'desc' },
           })
         );
-        suggestions.push(...animeTitles.map((a) => a.titre));
+        suggestions.push(...animeTitles.map((a) => a.titre).filter((t): t is string => t !== null));
       }
 
       if (type === 'all' || type === 'manga') {
@@ -412,7 +412,7 @@ export class UnifiedSearchService {
           take: itemsPerType,
           orderBy: { moyenneNotes: 'desc' },
         });
-        suggestions.push(...mangaTitles.map((m) => m.titre));
+        suggestions.push(...mangaTitles.map((m) => m.titre).filter((t): t is string => t !== null));
       }
 
       if (type === 'all' || type === 'jeu_video') {
@@ -425,7 +425,7 @@ export class UnifiedSearchService {
           take: itemsPerType,
           orderBy: { moyenneNotes: 'desc' },
         });
-        suggestions.push(...jeuTitles.map((j) => j.titre));
+        suggestions.push(...jeuTitles.map((j) => j.titre).filter((t): t is string => t !== null));
       }
     } catch (error) {
       console.warn('Failed to get autocomplete suggestions:', error.message);
@@ -445,12 +445,12 @@ export class UnifiedSearchService {
   ): Promise<Array<{ query: string; count: number }>> {
     try {
       const popular = await this.prisma.$queryRaw`
-        SELECT query, COUNT(*) as count
-        FROM search_analytics 
-        WHERE timestamp >= NOW() - INTERVAL '30 days'
-        GROUP BY query
-        ORDER BY count DESC
-        LIMIT ${limit}
+          SELECT query, COUNT(*) as count
+          FROM search_analytics
+          WHERE timestamp >= NOW() - INTERVAL '30 days'
+          GROUP BY query
+          ORDER BY count DESC
+              LIMIT ${limit}
       `;
 
       return (popular as any[]).map((p) => ({
@@ -472,12 +472,12 @@ export class UnifiedSearchService {
   }> {
     try {
       const stats = await this.prisma.$queryRaw`
-        SELECT 
-          COUNT(*) as total_searches,
-          COUNT(DISTINCT query) as unique_queries,
-          AVG(search_time) as avg_search_time
-        FROM search_analytics 
-        WHERE timestamp >= NOW() - INTERVAL '30 days'
+          SELECT
+              COUNT(*) as total_searches,
+              COUNT(DISTINCT query) as unique_queries,
+              AVG(search_time) as avg_search_time
+          FROM search_analytics
+          WHERE timestamp >= NOW() - INTERVAL '30 days'
       `;
 
       const topSearches = await this.getPopularSearches(5);
