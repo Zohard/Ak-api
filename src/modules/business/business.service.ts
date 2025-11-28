@@ -5,6 +5,7 @@ import { UpdateBusinessDto } from './dto/update-business.dto';
 import { BusinessQueryDto } from './dto/business-query.dto';
 import { BusinessSearchDto } from './dto/business-search.dto';
 import { ImageKitService } from '../media/imagekit.service';
+import axios from 'axios';
 
 @Injectable()
 export class BusinessService {
@@ -328,6 +329,56 @@ export class BusinessService {
         relationDetails: relation?.precisions
       };
     });
+  }
+
+  async uploadImageFromUrl(imageUrl: string) {
+    try {
+      // Download the image from the URL
+      const response = await axios.get(imageUrl, {
+        responseType: 'arraybuffer',
+        timeout: 30000, // 30 second timeout
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        },
+      });
+
+      if (!response.data) {
+        throw new BadRequestException('Failed to download image from URL');
+      }
+
+      // Detect image type from Content-Type header
+      const contentType = response.headers['content-type'] || 'image/jpeg';
+      const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif'];
+
+      if (!validTypes.includes(contentType)) {
+        throw new BadRequestException(
+          `Invalid image type: ${contentType}. Only JPEG, PNG, WebP, and GIF are allowed.`,
+        );
+      }
+
+      // Generate filename
+      const extension = contentType.split('/')[1]?.replace('jpeg', 'jpg') || 'jpg';
+      const filename = `business_${Date.now()}_${Math.random().toString(36).substring(7)}.${extension}`;
+
+      // Upload to ImageKit
+      const folder = '/images/business';
+      const uploadResult = await this.imageKitService.uploadImage(
+        Buffer.from(response.data),
+        filename,
+        folder,
+      );
+
+      return {
+        filename: uploadResult.name,
+        url: uploadResult.url,
+        imagekitFileId: uploadResult.fileId,
+      };
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        throw new BadRequestException(`Failed to download image: ${error.message}`);
+      }
+      throw error;
+    }
   }
 
   private formatBusiness(business: any) {

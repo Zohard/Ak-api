@@ -300,7 +300,7 @@ export class JeuxVideoService {
     const queryLower = query.toLowerCase();
     const rankedResults = results
       .map((item) => {
-        const titreLower = item.titre.toLowerCase();
+        const titreLower = (item.titre || '').toLowerCase();
         let rank = 3; // Default: contains
 
         if (titreLower === queryLower) {
@@ -316,7 +316,7 @@ export class JeuxVideoService {
         if (a._rank !== b._rank) {
           return a._rank - b._rank;
         }
-        return a.titre.localeCompare(b.titre);
+        return (a.titre || '').localeCompare(b.titre || '');
       })
       .slice(0, limit) // Take only the requested limit
       .map(({ _rank, ...item }) => item); // Remove the rank field

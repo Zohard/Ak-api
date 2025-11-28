@@ -257,6 +257,22 @@ export class BusinessController {
     return { message: 'Image uploaded', url: result.url, business: updated };
   }
 
+  @Post('upload-image-from-url')
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Upload business image from URL to ImageKit (Admin only)' })
+  @ApiResponse({ status: 200, description: 'Image uploaded from URL' })
+  @ApiResponse({ status: 400, description: 'Invalid URL or upload failed' })
+  async uploadImageFromUrl(
+    @Body('imageUrl') imageUrl: string,
+  ) {
+    if (!imageUrl || !imageUrl.trim()) {
+      throw new BadRequestException('Image URL is required');
+    }
+
+    return this.businessService.uploadImageFromUrl(imageUrl);
+  }
+
   @Get('anilist/staff/search')
   @ApiOperation({
     summary: 'Search staff on AniList by name',
