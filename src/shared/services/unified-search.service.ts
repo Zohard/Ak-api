@@ -188,7 +188,7 @@ export class UnifiedSearchService {
       });
     } else if (type === 'jeu_video') {
       baseItem = await this.prisma.akJeuxVideo.findFirst({
-        where: { idJeuVideo: basedOnId },
+        where: { idJeu: basedOnId },
       });
     }
 
@@ -356,7 +356,7 @@ export class UnifiedSearchService {
 
   private formatJeuVideoResult(jeu: any): SearchResult {
     return {
-      id: jeu.idJeuVideo,
+      id: jeu.idJeu,
       title: jeu.titre,
       type: 'jeu_video',
       year: jeu.annee,
