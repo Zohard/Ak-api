@@ -5,18 +5,20 @@ import { CacheService } from './cache.service';
 export interface SearchResult {
   id: number;
   title: string;
-  type: 'anime' | 'manga';
+  type: 'anime' | 'manga' | 'jeu_video';
   year?: number;
   image?: string;
   author?: string;
   studio?: string;
   rating?: number;
   synopsis?: string;
+  plateforme?: string;
+  editeur?: string;
 }
 
 export interface UnifiedSearchQuery {
   query: string;
-  type?: 'anime' | 'manga' | 'all';
+  type?: 'anime' | 'manga' | 'jeu_video' | 'all';
   limit?: number;
   minRating?: number;
   yearFrom?: number;
@@ -26,6 +28,8 @@ export interface UnifiedSearchQuery {
   sortOrder?: 'asc' | 'desc';
   tags?: string[];
   status?: 'ongoing' | 'completed' | 'all';
+  plateforme?: string;
+  editeur?: string;
 }
 
 @Injectable()
@@ -38,7 +42,7 @@ export class UnifiedSearchService {
   async search(searchQuery: UnifiedSearchQuery): Promise<{
     results: SearchResult[];
     total: number;
-    breakdown: { animes: number; mangas: number };
+    breakdown: { animes: number; mangas: number; jeuxVideo: number };
     searchTime: number;
     suggestions?: string[];
   }> {
@@ -46,7 +50,7 @@ export class UnifiedSearchService {
 
     // Create cache key from search parameters
     const cacheKey = this.createSearchCacheKey(searchQuery);
-    
+
     // Try to get from cache first
     const cached = await this.cacheService.getSearchResult(cacheKey, 'unified');
     if (cached) {
@@ -68,6 +72,8 @@ export class UnifiedSearchService {
       sortOrder = 'desc',
       tags,
       status,
+      plateforme,
+      editeur,
     } = searchQuery;
 
     const searchConditions = this.buildSearchConditions(
@@ -87,16 +93,41 @@ export class UnifiedSearchService {
       promises.push(this.searchMangas(searchConditions, limit));
     }
 
+    if (type === 'all' || type === 'jeu_video') {
+      const jeuVideoConditions = this.buildJeuVideoSearchConditions(
+        query,
+        minRating,
+        yearFrom,
+        yearTo,
+        plateforme,
+        editeur,
+      );
+      promises.push(this.searchJeuxVideo(jeuVideoConditions, limit));
+    }
+
     const results = await Promise.all(promises);
 
-    const animeResults = type === 'manga' ? [] : results[0] || [];
-    const mangaResults =
-      type === 'anime' ? [] : results[type === 'all' ? 1 : 0] || [];
+    let animeResults = [];
+    let mangaResults = [];
+    let jeuVideoResults = [];
+
+    if (type === 'all') {
+      animeResults = results[0] || [];
+      mangaResults = results[1] || [];
+      jeuVideoResults = results[2] || [];
+    } else if (type === 'anime') {
+      animeResults = results[0] || [];
+    } else if (type === 'manga') {
+      mangaResults = results[0] || [];
+    } else if (type === 'jeu_video') {
+      jeuVideoResults = results[0] || [];
+    }
 
     // Enhanced result formatting
     const combinedResults = [
       ...animeResults.map((anime) => this.formatAnimeResult(anime)),
       ...mangaResults.map((manga) => this.formatMangaResult(manga)),
+      ...jeuVideoResults.map((jeu) => this.formatJeuVideoResult(jeu)),
     ];
 
     // Apply sorting based on sortBy parameter
@@ -108,6 +139,10 @@ export class UnifiedSearchService {
     } else if (sortBy === 'title') {
       sortedResults = combinedResults.sort((a, b) =>
         a.title.localeCompare(b.title),
+      );
+    } else if (sortBy === 'date') {
+      sortedResults = combinedResults.sort(
+        (a, b) => (b.year || 0) - (a.year || 0),
       );
     }
 
@@ -124,6 +159,7 @@ export class UnifiedSearchService {
       breakdown: {
         animes: animeResults.length,
         mangas: mangaResults.length,
+        jeuxVideo: jeuVideoResults.length,
       },
       searchTime,
     };
@@ -136,18 +172,25 @@ export class UnifiedSearchService {
 
   async getRecommendations(
     basedOnId: number,
-    type: 'anime' | 'manga',
+    type: 'anime' | 'manga' | 'jeu_video',
     limit = 10,
   ): Promise<SearchResult[]> {
     // Get the base item to understand its characteristics
-    const baseItem =
-      type === 'anime'
-        ? await this.prisma.akAnime.findUnique({
-            where: { idAnime: basedOnId },
-          })
-        : await this.prisma.akManga.findUnique({
-            where: { idManga: basedOnId },
-          });
+    let baseItem;
+
+    if (type === 'anime') {
+      baseItem = await this.prisma.akAnime.findUnique({
+        where: { idAnime: basedOnId },
+      });
+    } else if (type === 'manga') {
+      baseItem = await this.prisma.akManga.findUnique({
+        where: { idManga: basedOnId },
+      });
+    } else if (type === 'jeu_video') {
+      baseItem = await this.prisma.akJeuxVideo.findUnique({
+        where: { idJeuVideo: basedOnId },
+      });
+    }
 
     if (!baseItem) {
       return [];
@@ -158,7 +201,7 @@ export class UnifiedSearchService {
   }
 
   private async getTopRated(
-    type: 'anime' | 'manga',
+    type: 'anime' | 'manga' | 'jeu_video',
     limit: number,
   ): Promise<SearchResult[]> {
     if (type === 'anime') {
@@ -170,7 +213,7 @@ export class UnifiedSearchService {
         })
       );
       return animes.map(this.formatAnimeResult.bind(this));
-    } else {
+    } else if (type === 'manga') {
       const mangas = await this.prisma.executeWithRetry(() =>
         this.prisma.akManga.findMany({
           where: { statut: 1 },
@@ -179,6 +222,15 @@ export class UnifiedSearchService {
         })
       );
       return mangas.map(this.formatMangaResult.bind(this));
+    } else {
+      const jeux = await this.prisma.executeWithRetry(() =>
+        this.prisma.akJeuxVideo.findMany({
+          where: { statut: 1 },
+          orderBy: { dateAjout: 'desc' },
+          take: limit,
+        })
+      );
+      return jeux.map(this.formatJeuVideoResult.bind(this));
     }
   }
 
@@ -209,12 +261,49 @@ export class UnifiedSearchService {
     return conditions;
   }
 
+  private buildJeuVideoSearchConditions(
+    query: string,
+    minRating: number,
+    yearFrom?: number,
+    yearTo?: number,
+    plateforme?: string,
+    editeur?: string,
+  ) {
+    const conditions: any = {
+      statut: 1,
+      OR: [
+        { titre: { contains: query, mode: 'insensitive' } },
+        { description: { contains: query, mode: 'insensitive' } },
+      ],
+    };
+
+    if (minRating > 0) {
+      conditions.moyenneNotes = { gte: minRating };
+    }
+
+    if (yearFrom || yearTo) {
+      conditions.annee = {};
+      if (yearFrom) conditions.annee.gte = yearFrom;
+      if (yearTo) conditions.annee.lte = yearTo;
+    }
+
+    if (plateforme) {
+      conditions.plateforme = { contains: plateforme, mode: 'insensitive' };
+    }
+
+    if (editeur) {
+      conditions.editeur = { contains: editeur, mode: 'insensitive' };
+    }
+
+    return conditions;
+  }
+
   private async searchAnimes(conditions: any, limit: number) {
     return this.prisma.executeWithRetry(() =>
       this.prisma.akAnime.findMany({
         where: conditions,
         orderBy: [{ dateAjout: 'desc' }],
-        take: Math.ceil(limit / 2), // Split limit between animes and mangas
+        take: Math.ceil(limit / 3), // Split limit between types
       })
     );
   }
@@ -223,16 +312,16 @@ export class UnifiedSearchService {
     return this.prisma.akManga.findMany({
       where: conditions,
       orderBy: [{ dateAjout: 'desc' }],
-      take: Math.ceil(limit / 2), // Split limit between animes and mangas
+      take: Math.ceil(limit / 3), // Split limit between types
     });
   }
 
-  private async countAnimes(conditions: any): Promise<number> {
-    return this.prisma.akAnime.count({ where: conditions });
-  }
-
-  private async countMangas(conditions: any): Promise<number> {
-    return this.prisma.akManga.count({ where: conditions });
+  private async searchJeuxVideo(conditions: any, limit: number) {
+    return this.prisma.akJeuxVideo.findMany({
+      where: conditions,
+      orderBy: [{ dateAjout: 'desc' }],
+      take: Math.ceil(limit / 3), // Split limit between types
+    });
   }
 
   private formatAnimeResult(anime: any): SearchResult {
@@ -265,94 +354,26 @@ export class UnifiedSearchService {
     };
   }
 
-  private buildOrderBy(
-    sortBy: string,
-    sortOrder: string,
-    type: 'anime' | 'manga',
-  ) {
-    const direction = sortOrder === 'asc' ? 'asc' : 'desc';
-
-    switch (sortBy) {
-      case 'rating':
-        return { moyenneNotes: direction };
-      case 'date':
-        return { dateAjout: direction };
-      case 'title':
-        return { titre: direction };
-      case 'relevance':
-      default:
-        return { dateAjout: 'desc' }; // Default to most recent
-    }
-  }
-
-  private applySorting(
-    results: SearchResult[],
-    sortBy: string,
-    sortOrder: string,
-  ): SearchResult[] {
-    const direction = sortOrder === 'asc' ? 1 : -1;
-
-    switch (sortBy) {
-      case 'rating':
-        return results.sort(
-          (a, b) => ((b.rating || 0) - (a.rating || 0)) * direction,
-        );
-      case 'title':
-        return results.sort(
-          (a, b) => a.title.localeCompare(b.title) * direction,
-        );
-      case 'year':
-        return results.sort(
-          (a, b) => ((b.year || 0) - (a.year || 0)) * direction,
-        );
-      case 'relevance':
-      default:
-        return results; // Already sorted by database query
-    }
-  }
-
-  private async logSearchQuery(searchQuery: UnifiedSearchQuery): Promise<void> {
-    try {
-      // Log search queries for analytics
-      await this.prisma.$executeRaw`
-        INSERT INTO search_analytics (query, type, filters, timestamp)
-        VALUES (${searchQuery.query}, ${searchQuery.type || 'all'}, ${JSON.stringify(searchQuery)}, NOW())
-      `;
-    } catch (error) {
-      // Fail silently for analytics
-      console.warn('Failed to log search query:', error.message);
-    }
-  }
-
-  private async generateSuggestions(
-    query: string,
-    type?: string,
-  ): Promise<string[]> {
-    try {
-      // Simple suggestion system based on similar titles
-      const suggestions = await this.prisma.$queryRaw`
-        SELECT DISTINCT titre
-        FROM (
-          SELECT titre FROM ak_animes WHERE titre ILIKE ${'%' + query + '%'} AND statut = 1
-          UNION ALL
-          SELECT titre FROM ak_mangas WHERE titre ILIKE ${'%' + query + '%'} AND statut = 1
-        ) as combined
-        WHERE titre != ${query}
-        ORDER BY titre
-        LIMIT 5
-      `;
-
-      return (suggestions as any[]).map((s) => s.titre);
-    } catch (error) {
-      console.warn('Failed to generate suggestions:', error.message);
-      return [];
-    }
+  private formatJeuVideoResult(jeu: any): SearchResult {
+    return {
+      id: jeu.idJeuVideo,
+      title: jeu.titre,
+      type: 'jeu_video',
+      year: jeu.annee,
+      image: jeu.image,
+      plateforme: jeu.plateforme,
+      editeur: jeu.editeur,
+      rating: jeu.moyenneNotes,
+      synopsis:
+        jeu.description?.substring(0, 200) +
+        (jeu.description?.length > 200 ? '...' : ''),
+    };
   }
 
   // Enhanced autocomplete method
   async getAutocomplete(
     query: string,
-    type: 'anime' | 'manga' | 'all' = 'all',
+    type: 'anime' | 'manga' | 'jeu_video' | 'all' = 'all',
     limit = 10,
   ): Promise<string[]> {
     // Try cache first
@@ -363,6 +384,7 @@ export class UnifiedSearchService {
     }
 
     const suggestions: string[] = [];
+    const itemsPerType = type === 'all' ? Math.ceil(limit / 3) : limit;
 
     try {
       if (type === 'all' || type === 'anime') {
@@ -373,7 +395,7 @@ export class UnifiedSearchService {
               statut: 1,
             },
             select: { titre: true },
-            take: Math.ceil(limit / (type === 'all' ? 2 : 1)),
+            take: itemsPerType,
             orderBy: { moyenneNotes: 'desc' },
           })
         );
@@ -387,17 +409,30 @@ export class UnifiedSearchService {
             statut: 1,
           },
           select: { titre: true },
-          take: Math.ceil(limit / (type === 'all' ? 2 : 1)),
+          take: itemsPerType,
           orderBy: { moyenneNotes: 'desc' },
         });
         suggestions.push(...mangaTitles.map((m) => m.titre));
+      }
+
+      if (type === 'all' || type === 'jeu_video') {
+        const jeuTitles = await this.prisma.akJeuxVideo.findMany({
+          where: {
+            titre: { contains: query, mode: 'insensitive' },
+            statut: 1,
+          },
+          select: { titre: true },
+          take: itemsPerType,
+          orderBy: { moyenneNotes: 'desc' },
+        });
+        suggestions.push(...jeuTitles.map((j) => j.titre));
       }
     } catch (error) {
       console.warn('Failed to get autocomplete suggestions:', error.message);
     }
 
     const result = suggestions.slice(0, limit);
-    
+
     // Cache autocomplete results for 5 minutes
     await this.cacheService.set(cacheKey, result, 300);
 
@@ -480,8 +515,10 @@ export class UnifiedSearchService {
       sortOrder = 'desc',
       tags = [],
       status = 'all',
+      plateforme = '',
+      editeur = '',
     } = searchQuery;
 
-    return `search_${query}_${type}_${limit}_${minRating}_${yearFrom}_${yearTo}_${genre}_${sortBy}_${sortOrder}_${tags.join(',')}_${status}`;
+    return `search_${query}_${type}_${limit}_${minRating}_${yearFrom}_${yearTo}_${genre}_${sortBy}_${sortOrder}_${tags.join(',')}_${status}_${plateforme}_${editeur}`;
   }
 }

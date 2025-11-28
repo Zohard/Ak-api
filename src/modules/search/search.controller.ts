@@ -24,7 +24,7 @@ export class SearchController {
   constructor(private readonly searchService: UnifiedSearchService) {}
 
   @Get()
-  @ApiOperation({ summary: 'Recherche unifiée dans animes et mangas' })
+  @ApiOperation({ summary: 'Recherche unifiée dans animes, mangas et jeux vidéo' })
   @ApiQuery({
     name: 'q',
     required: true,
@@ -35,7 +35,7 @@ export class SearchController {
     name: 'type',
     required: false,
     description: 'Type de contenu',
-    enum: ['anime', 'manga', 'all'],
+    enum: ['anime', 'manga', 'jeu_video', 'all'],
     example: 'all',
   })
   @ApiQuery({
@@ -85,9 +85,21 @@ export class SearchController {
   @ApiQuery({
     name: 'status',
     required: false,
-    description: 'Statut du contenu',
+    description: 'Statut du contenu (anime/manga)',
     enum: ['ongoing', 'completed', 'all'],
     example: 'all',
+  })
+  @ApiQuery({
+    name: 'plateforme',
+    required: false,
+    description: 'Plateforme de jeu (pour jeux vidéo)',
+    example: 'Nintendo Switch',
+  })
+  @ApiQuery({
+    name: 'editeur',
+    required: false,
+    description: 'Éditeur de jeu (pour jeux vidéo)',
+    example: 'Nintendo',
   })
   @ApiResponse({
     status: 200,
@@ -95,7 +107,7 @@ export class SearchController {
   })
   async unifiedSearch(
     @Query('q') query: string,
-    @Query('type') type?: 'anime' | 'manga' | 'all',
+    @Query('type') type?: 'anime' | 'manga' | 'jeu_video' | 'all',
     @Query('limit') limit?: string,
     @Query('minRating') minRating?: string,
     @Query('yearFrom') yearFrom?: string,
@@ -104,6 +116,8 @@ export class SearchController {
     @Query('sortBy') sortBy?: 'relevance' | 'rating' | 'date' | 'title',
     @Query('sortOrder') sortOrder?: 'asc' | 'desc',
     @Query('status') status?: 'ongoing' | 'completed' | 'all',
+    @Query('plateforme') plateforme?: string,
+    @Query('editeur') editeur?: string,
   ) {
     const searchQuery = {
       query,
@@ -116,17 +130,19 @@ export class SearchController {
       sortBy: sortBy || 'relevance',
       sortOrder: sortOrder || 'desc',
       status: status || 'all',
+      plateforme,
+      editeur,
     };
 
     return this.searchService.search(searchQuery);
   }
 
   @Get('recommendations/:type/:id')
-  @ApiOperation({ summary: 'Recommandations basées sur un anime ou manga' })
+  @ApiOperation({ summary: 'Recommandations basées sur un anime, manga ou jeu vidéo' })
   @ApiParam({
     name: 'type',
     description: 'Type de contenu',
-    enum: ['anime', 'manga'],
+    enum: ['anime', 'manga', 'jeu_video'],
     example: 'anime',
   })
   @ApiParam({
@@ -143,7 +159,7 @@ export class SearchController {
   })
   @ApiResponse({ status: 200, description: 'Recommandations personnalisées' })
   async getRecommendations(
-    @Param('type') type: 'anime' | 'manga',
+    @Param('type') type: 'anime' | 'manga' | 'jeu_video',
     @Param('id', ParseIntPipe) id: number,
     @Query('limit') limit?: string,
   ) {
@@ -163,7 +179,7 @@ export class SearchController {
     name: 'type',
     required: false,
     description: 'Type de contenu',
-    enum: ['anime', 'manga', 'all'],
+    enum: ['anime', 'manga', 'jeu_video', 'all'],
     example: 'all',
   })
   @ApiQuery({
@@ -175,7 +191,7 @@ export class SearchController {
   @ApiResponse({ status: 200, description: "Suggestions d'autocomplétion" })
   async getAutocomplete(
     @Query('q') query: string,
-    @Query('type') type?: 'anime' | 'manga' | 'all',
+    @Query('type') type?: 'anime' | 'manga' | 'jeu_video' | 'all',
     @Query('limit') limit?: string,
   ) {
     const parsedLimit = limit ? parseInt(limit) : 10;
