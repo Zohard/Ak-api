@@ -1,12 +1,18 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../../shared/services/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
+import { EventsService } from '../events/events.service';
 
 @Injectable()
 export class EventsJobService {
   private readonly logger = new Logger(EventsJobService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notificationsService: NotificationsService,
+    private readonly eventsService: EventsService,
+  ) {}
 
   /**
    * Hourly job: Update event statuses based on voting dates
@@ -101,12 +107,66 @@ export class EventsJobService {
         `Daily maintenance: ${eventsStartingToday.length} events starting, ${eventsEndingToday.length} events ending today`
       );
 
-      // TODO: Send notifications to subscribed users
+      // Send notifications to subscribed users for events starting today
+      let notificationsSent = 0;
+      for (const event of eventsStartingToday) {
+        try {
+          const subscribers = await this.eventsService.getEventSubscribers(event.id, 'start');
+          this.logger.log(`Sending voting started notifications for event ${event.id} to ${subscribers.length} users`);
+
+          for (const userId of subscribers) {
+            await this.notificationsService.sendNotification({
+              userId,
+              type: 'event_voting_started',
+              title: event.title,
+              message: `Les votes sont maintenant ouverts pour "${event.title}". Votez pour vos favoris !`,
+              data: {
+                eventId: event.id,
+                eventSlug: event.slug,
+                votingEnd: event.voting_end,
+              },
+              priority: 'high',
+            });
+            notificationsSent++;
+          }
+        } catch (error) {
+          this.logger.error(`Failed to send notifications for event ${event.id}:`, error);
+        }
+      }
+
+      // Send notifications to subscribed users for events ending today
+      for (const event of eventsEndingToday) {
+        try {
+          const subscribers = await this.eventsService.getEventSubscribers(event.id, 'end');
+          this.logger.log(`Sending voting ended notifications for event ${event.id} to ${subscribers.length} users`);
+
+          for (const userId of subscribers) {
+            await this.notificationsService.sendNotification({
+              userId,
+              type: 'event_voting_ended',
+              title: event.title,
+              message: `Les votes sont terminés pour "${event.title}". Les résultats seront bientôt disponibles.`,
+              data: {
+                eventId: event.id,
+                eventSlug: event.slug,
+                resultsVisible: event.results_visible,
+              },
+              priority: 'medium',
+            });
+            notificationsSent++;
+          }
+        } catch (error) {
+          this.logger.error(`Failed to send notifications for event ${event.id}:`, error);
+        }
+      }
+
+      this.logger.log(`Daily maintenance complete: Sent ${notificationsSent} notifications`);
 
       return {
         success: true,
         eventsStartingToday: eventsStartingToday.length,
         eventsEndingToday: eventsEndingToday.length,
+        notificationsSent,
       };
     } catch (error) {
       this.logger.error('Daily event maintenance failed', error);

@@ -83,6 +83,8 @@ export class SendNotificationDto {
       'marketing',
       'friend_request',
       'friend_accepted',
+      'event_voting_started',
+      'event_voting_ended',
     ],
     example: 'new_review',
   })
@@ -95,6 +97,8 @@ export class SendNotificationDto {
     'marketing',
     'friend_request',
     'friend_accepted',
+    'event_voting_started',
+    'event_voting_ended',
   ])
   type:
     | 'new_review'
@@ -104,7 +108,9 @@ export class SendNotificationDto {
     | 'security_alert'
     | 'marketing'
     | 'friend_request'
-    | 'friend_accepted';
+    | 'friend_accepted'
+    | 'event_voting_started'
+    | 'event_voting_ended';
 
   @ApiProperty({
     description: 'Notification title',

@@ -463,4 +463,68 @@ export class EventsService {
     await this.prisma.$queryRaw`DELETE FROM ak_event_nominees WHERE id = ${nomineeId}`;
     return { success: true };
   }
+
+  // ============ EVENT SUBSCRIPTIONS ============
+
+  // Subscribe to event notifications
+  async subscribeToEvent(eventId: number, userId: number, notifyStart = true, notifyEnd = true) {
+    // Check if event exists
+    await this.findOne(eventId);
+
+    // Create or update subscription
+    await this.prisma.$executeRaw`
+      INSERT INTO ak_event_subscriptions (user_id, event_id, notify_start, notify_end, created_at)
+      VALUES (${userId}, ${eventId}, ${notifyStart}, ${notifyEnd}, NOW())
+      ON CONFLICT (user_id, event_id)
+      DO UPDATE SET
+        notify_start = ${notifyStart},
+        notify_end = ${notifyEnd}
+    `;
+
+    return {
+      success: true,
+      message: 'Abonné aux notifications de l\'événement',
+    };
+  }
+
+  // Unsubscribe from event notifications
+  async unsubscribeFromEvent(eventId: number, userId: number) {
+    await this.prisma.$executeRaw`
+      DELETE FROM ak_event_subscriptions
+      WHERE user_id = ${userId} AND event_id = ${eventId}
+    `;
+
+    return {
+      success: true,
+      message: 'Désabonné des notifications de l\'événement',
+    };
+  }
+
+  // Check if user is subscribed to event
+  async checkSubscription(eventId: number, userId: number) {
+    const [subscription] = await this.prisma.$queryRaw<any[]>`
+      SELECT notify_start, notify_end, created_at
+      FROM ak_event_subscriptions
+      WHERE user_id = ${userId} AND event_id = ${eventId}
+    `;
+
+    return {
+      subscribed: !!subscription,
+      notifyStart: subscription?.notify_start || false,
+      notifyEnd: subscription?.notify_end || false,
+    };
+  }
+
+  // Get all subscribed users for an event
+  async getEventSubscribers(eventId: number, notificationType: 'start' | 'end') {
+    const notifyColumn = notificationType === 'start' ? 'notify_start' : 'notify_end';
+
+    const subscribers = await this.prisma.$queryRawUnsafe<any[]>(`
+      SELECT user_id
+      FROM ak_event_subscriptions
+      WHERE event_id = ${eventId} AND ${notifyColumn} = true
+    `);
+
+    return subscribers.map((s) => s.user_id);
+  }
 }

@@ -30,7 +30,9 @@ export interface NotificationData {
     | 'security_alert'
     | 'marketing'
     | 'friend_request'
-    | 'friend_accepted';
+    | 'friend_accepted'
+    | 'event_voting_started'
+    | 'event_voting_ended';
   title: string;
   message: string;
   data?: any;
@@ -333,6 +335,9 @@ export class NotificationsService {
       case 'friend_request':
       case 'friend_accepted':
         return true; // Always send friend notifications
+      case 'event_voting_started':
+      case 'event_voting_ended':
+        return true; // Always send event notifications if user is subscribed
       default:
         return false;
     }
@@ -464,6 +469,31 @@ export class NotificationsService {
             <a href="${baseUrl}/review/${data.data?.reviewSlug || data.data?.reviewId}" style="background-color: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Voir votre critique</a>
           `,
           text: `${data.data?.likerName || 'Quelqu\'un'} ${data.data?.reactionLabel || 'a réagi à votre critique'} pour ${data.title}. ${data.message}`,
+        };
+
+      case 'event_voting_started':
+        return {
+          subject: `🎉 Les votes sont ouverts - ${data.title}`,
+          html: `
+            <h2>🎉 Les votes sont maintenant ouverts !</h2>
+            <p>L'événement <strong>${data.title}</strong> a commencé et vous pouvez maintenant voter pour vos favoris.</p>
+            <p>${data.message}</p>
+            ${data.data?.votingEnd ? `<p><em>Les votes se terminent le ${new Date(data.data.votingEnd).toLocaleDateString('fr-FR', { year: 'numeric', month: 'long', day: 'numeric' })}</em></p>` : ''}
+            <a href="${baseUrl}/events/${data.data?.eventSlug || data.data?.eventId}" style="background-color: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Voter maintenant</a>
+          `,
+          text: `Les votes sont ouverts pour ${data.title}. ${data.message}`,
+        };
+
+      case 'event_voting_ended':
+        return {
+          subject: `📊 Les résultats sont disponibles - ${data.title}`,
+          html: `
+            <h2>📊 Les votes sont terminés !</h2>
+            <p>L'événement <strong>${data.title}</strong> est maintenant terminé et les résultats ${data.data?.resultsVisible ? 'sont disponibles' : 'seront bientôt disponibles'}.</p>
+            <p>${data.message}</p>
+            <a href="${baseUrl}/events/${data.data?.eventSlug || data.data?.eventId}" style="background-color: #28a745; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Voir ${data.data?.resultsVisible ? 'les résultats' : 'l\'événement'}</a>
+          `,
+          text: `Les votes sont terminés pour ${data.title}. ${data.message}`,
         };
 
       default:

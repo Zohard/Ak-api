@@ -84,6 +84,38 @@ export class EventsController {
     return this.eventsService.getUserVotes(eventId, req.user.id);
   }
 
+  // ============ EVENT SUBSCRIPTIONS ============
+
+  @Post(':eventId/subscribe')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'S\'abonner aux notifications d\'un événement' })
+  @ApiParam({ name: 'eventId', description: 'ID de l\'événement' })
+  @ApiResponse({ status: 201, description: 'Abonné aux notifications' })
+  async subscribe(@Param('eventId', ParseIntPipe) eventId: number, @Request() req) {
+    return this.eventsService.subscribeToEvent(eventId, req.user.id);
+  }
+
+  @Delete(':eventId/unsubscribe')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Se désabonner des notifications d\'un événement' })
+  @ApiParam({ name: 'eventId', description: 'ID de l\'événement' })
+  @ApiResponse({ status: 200, description: 'Désabonné des notifications' })
+  async unsubscribe(@Param('eventId', ParseIntPipe) eventId: number, @Request() req) {
+    return this.eventsService.unsubscribeFromEvent(eventId, req.user.id);
+  }
+
+  @Get(':eventId/subscription')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Vérifier son abonnement aux notifications' })
+  @ApiParam({ name: 'eventId', description: 'ID de l\'événement' })
+  @ApiResponse({ status: 200, description: 'Statut de l\'abonnement' })
+  async checkSubscription(@Param('eventId', ParseIntPipe) eventId: number, @Request() req) {
+    return this.eventsService.checkSubscription(eventId, req.user.id);
+  }
+
   // ============ ADMIN ENDPOINTS ============
 
   @Get('admin/all')
