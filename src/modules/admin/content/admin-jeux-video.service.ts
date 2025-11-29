@@ -518,7 +518,7 @@ export class AdminJeuxVideoService {
    */
   private async importCompaniesFromIgdb(
     idJeu: number,
-    involvedCompanies: Array<{ company: { id: number; name: string }; publisher: boolean; developer: boolean }>
+    involvedCompanies: Array<{ company: { id: number; name: string; logo?: { id: number; image_id: string } }; publisher: boolean; developer: boolean }>
   ) {
     for (const ic of involvedCompanies) {
       if (!ic.company?.name) continue;
@@ -541,17 +541,73 @@ export class AdminJeuxVideoService {
         });
 
         if (!business) {
+          // Prepare business data
+          const businessData: any = {
+            denomination: ic.company.name,
+            type: 'Studio',
+            niceUrl: this.slugify(ic.company.name),
+            statut: 1,
+            dateModification: Math.floor(Date.now() / 1000)
+          };
+
+          // Download and upload company logo if available
+          if (ic.company.logo?.image_id) {
+            try {
+              const imageBuffer = await this.igdbService.downloadCoverImage(ic.company.logo.image_id, 'cover_small');
+              if (imageBuffer) {
+                // Upload to ImageKit in business folder
+                const filename = `igdb-company-${ic.company.id}-${Date.now()}.jpg`;
+                const uploadResult = await this.imagekitService.uploadImage(
+                  imageBuffer,
+                  filename,
+                  'images/business', // Upload to images/business folder
+                  true
+                );
+
+                if (uploadResult && uploadResult.name) {
+                  businessData.image = uploadResult.name;
+                  console.log(`Successfully uploaded logo for company ${ic.company.name}: ${uploadResult.name}`);
+                }
+              }
+            } catch (error) {
+              console.error(`Failed to upload logo for company ${ic.company.name}:`, error);
+              // Continue without image if upload fails
+            }
+          }
+
           // Create new business entity
           business = await this.prisma.akBusiness.create({
-            data: {
-              denomination: ic.company.name,
-              type: 'Studio',
-              niceUrl: this.slugify(ic.company.name),
-              statut: 1,
-              dateModification: Math.floor(Date.now() / 1000)
-            }
+            data: businessData
           });
           console.log(`Created new business entity: ${ic.company.name}`);
+        } else if (!business.image && ic.company.logo?.image_id) {
+          // Business exists but has no image - update it with logo from IGDB
+          try {
+            const imageBuffer = await this.igdbService.downloadCoverImage(ic.company.logo.image_id, 'cover_small');
+            if (imageBuffer) {
+              const filename = `igdb-company-${ic.company.id}-${Date.now()}.jpg`;
+              const uploadResult = await this.imagekitService.uploadImage(
+                imageBuffer,
+                filename,
+                'images/business',
+                true
+              );
+
+              if (uploadResult && uploadResult.name) {
+                business = await this.prisma.akBusiness.update({
+                  where: { idBusiness: business.idBusiness },
+                  data: {
+                    image: uploadResult.name,
+                    dateModification: Math.floor(Date.now() / 1000)
+                  }
+                });
+                console.log(`Updated existing business with logo: ${ic.company.name} -> ${uploadResult.name}`);
+              }
+            }
+          } catch (error) {
+            console.error(`Failed to update logo for existing company ${ic.company.name}:`, error);
+            // Continue without updating image
+          }
         }
 
         // Create business relation for each role

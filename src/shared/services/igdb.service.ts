@@ -25,6 +25,10 @@ interface IgdbGame {
     company: {
       id: number;
       name: string;
+      logo?: {
+        id: number;
+        image_id: string;
+      };
     };
     publisher: boolean;
     developer: boolean;
@@ -109,7 +113,7 @@ export class IgdbService {
                  screenshots.image_id,
                  videos.video_id, videos.name,
                  genres.name, platforms.name, platforms.abbreviation,
-                 involved_companies.company.name, involved_companies.publisher, involved_companies.developer,
+                 involved_companies.company.name, involved_companies.company.logo.image_id, involved_companies.publisher, involved_companies.developer,
                  release_dates.date, release_dates.region, release_dates.platform;
           limit ${limit};
         `,
@@ -145,7 +149,7 @@ export class IgdbService {
                  screenshots.image_id,
                  videos.video_id, videos.name,
                  genres.name, platforms.name, platforms.abbreviation,
-                 involved_companies.company.name, involved_companies.publisher, involved_companies.developer,
+                 involved_companies.company.name, involved_companies.company.logo.image_id, involved_companies.publisher, involved_companies.developer,
                  release_dates.date, release_dates.region, release_dates.platform;
           limit 1;
         `,
