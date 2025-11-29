@@ -11,13 +11,13 @@ export class UploadMediaDto {
   file: Express.Multer.File;
 
   @ApiProperty({
-    enum: ['anime', 'manga', 'avatar', 'cover'],
+    enum: ['anime', 'manga', 'avatar', 'cover', 'game', 'business'],
     description: 'Type of media content',
     example: 'anime',
   })
   @IsString()
-  @IsIn(['anime', 'manga', 'avatar', 'cover'])
-  type: 'anime' | 'manga' | 'avatar' | 'cover';
+  @IsIn(['anime', 'manga', 'avatar', 'cover', 'game', 'business'])
+  type: 'anime' | 'manga' | 'avatar' | 'cover' | 'game' | 'business';
 
   @ApiProperty({
     description: 'Related content ID (anime, manga, etc.)',
@@ -42,11 +42,11 @@ export class BulkUploadDto {
   files: Express.Multer.File[];
 
   @ApiProperty({
-    enum: ['anime', 'manga', 'avatar', 'cover'],
+    enum: ['anime', 'manga', 'avatar', 'cover', 'game', 'business'],
     description: 'Type of media content for all files',
     example: 'anime',
   })
   @IsString()
-  @IsIn(['anime', 'manga', 'avatar', 'cover'])
-  type: 'anime' | 'manga' | 'avatar' | 'cover';
+  @IsIn(['anime', 'manga', 'avatar', 'cover', 'game', 'business'])
+  type: 'anime' | 'manga' | 'avatar' | 'cover' | 'game' | 'business';
 }

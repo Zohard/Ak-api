@@ -900,7 +900,7 @@ export class FriendsService {
         LEFT JOIN ak_jeux_video jv ON c.id_jeu = jv.id_jeu
         WHERE c.id_membre IN (${Prisma.join(friendIds)})
           AND c.date_critique IS NOT NULL
-          AND c.statut = 1
+          AND c.statut = 0
         ORDER BY c.date_critique DESC
         LIMIT ${limit + 100}
       `;

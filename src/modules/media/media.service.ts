@@ -28,7 +28,7 @@ export class MediaService {
 
   async uploadImage(
     file: Express.Multer.File,
-    type: 'anime' | 'manga' | 'avatar' | 'cover' | 'game',
+    type: 'anime' | 'manga' | 'avatar' | 'cover' | 'game' | 'business',
     relatedId?: number,
     isScreenshot?: boolean,
   ) {
@@ -59,8 +59,15 @@ export class MediaService {
 
       // Upload to ImageKit
       // For screenshots, upload to screenshots/ subfolder
-      // Handle special case for 'game' type (pluralizes to 'games' not 'games')
-      const typeFolder = type === 'game' ? 'games' : `${type}s`;
+      // Handle special cases for folder names
+      let typeFolder: string;
+      if (type === 'game') {
+        typeFolder = 'games';
+      } else if (type === 'business') {
+        typeFolder = 'business';
+      } else {
+        typeFolder = `${type}s`;
+      }
       const folderPath = isScreenshot
         ? `images/${typeFolder}/screenshots`
         : `images/${typeFolder}`;
@@ -138,7 +145,7 @@ export class MediaService {
 
   async uploadImageFromUrl(
     imageUrl: string,
-    type: 'anime' | 'manga' | 'avatar' | 'cover' | 'game',
+    type: 'anime' | 'manga' | 'avatar' | 'cover' | 'game' | 'business',
     relatedId?: number,
   ) {
     try {
@@ -171,7 +178,14 @@ export class MediaService {
       const processedImage = await this.processImage(Buffer.from(response.data), type);
 
       // Upload to ImageKit
-      const typeFolder = type === 'game' ? 'games' : `${type}s`;
+      let typeFolder: string;
+      if (type === 'game') {
+        typeFolder = 'games';
+      } else if (type === 'business') {
+        typeFolder = 'business';
+      } else {
+        typeFolder = `${type}s`;
+      }
       const folderPath = `images/${typeFolder}`;
 
       const uploadResult = await this.imagekitService.uploadImage(
@@ -427,6 +441,8 @@ export class MediaService {
       cover: { width: 400, height: 600 },
       anime: { width: 800, height: 600 },
       manga: { width: 400, height: 600 },
+      game: { width: 800, height: 600 },
+      business: { width: 400, height: 400 },
     };
 
     const constraints = sizeConstraints[type] || sizeConstraints.anime;
@@ -454,6 +470,7 @@ export class MediaService {
       avatar: 3,
       cover: 4,
       game: 5,
+      business: 6,
     };
     return typeMap[type] || 1;
   }
@@ -465,6 +482,7 @@ export class MediaService {
       3: 'avatar',
       4: 'cover',
       5: 'game',
+      6: 'business',
     };
     return typeMap[typeId] || 'anime';
   }
