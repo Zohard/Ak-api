@@ -1193,13 +1193,12 @@ export class AdminJeuxVideoService {
 
     // Log the action
     if (username) {
-      await this.adminLogging.log({
+      await this.adminLogging.addLog(
+        idJeu,
+        'jeu_video',
         username,
-        action: 'ADD_JEU_VIDEO_BUSINESS',
-        details: `Added business relation: ${business.denomination} (${type}) to jeu ${jeu.titre}`,
-        relatedId: idJeu,
-        relatedType: 'jeu_video'
-      });
+        `Ajout relation business: ${business.denomination} (${type})`
+      );
     }
 
     return relation;
@@ -1224,13 +1223,12 @@ export class AdminJeuxVideoService {
 
     // Log the action
     if (username) {
-      await this.adminLogging.log({
+      await this.adminLogging.addLog(
+        relation.idJeu,
+        'jeu_video',
         username,
-        action: 'REMOVE_JEU_VIDEO_BUSINESS',
-        details: `Removed business relation: ${relation.business.denomination} from jeu ${relation.jeuVideo.titre}`,
-        relatedId: relation.idJeu,
-        relatedType: 'jeu_video'
-      });
+        `Suppression relation business: ${relation.business.denomination}`
+      );
     }
 
     return { success: true };
