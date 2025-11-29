@@ -142,6 +142,21 @@ export class AdminJeuxVideoService {
             statut: true,
           },
           orderBy: { ordre: 'asc' }
+        },
+        businessRelations: {
+          select: {
+            idRelation: true,
+            idBusiness: true,
+            type: true,
+            business: {
+              select: {
+                idBusiness: true,
+                denomination: true,
+                type: true,
+                image: true,
+              }
+            }
+          }
         }
       }
     });
@@ -1125,6 +1140,100 @@ export class AdminJeuxVideoService {
     }
 
     return importedCount;
+  }
+
+  async addBusinessRelation(idJeu: number, idBusiness: number, type: string, username?: string) {
+    // Check if jeu exists
+    const jeu = await this.prisma.akJeuxVideo.findUnique({
+      where: { idJeu }
+    });
+    if (!jeu) {
+      throw new NotFoundException('Jeu vidéo introuvable');
+    }
+
+    // Check if business exists
+    const business = await this.prisma.akBusiness.findUnique({
+      where: { idBusiness }
+    });
+    if (!business) {
+      throw new NotFoundException('Entité business introuvable');
+    }
+
+    // Check if relation already exists
+    const existing = await this.prisma.akBusinessToJeux.findFirst({
+      where: {
+        idJeu,
+        idBusiness,
+        type
+      }
+    });
+
+    if (existing) {
+      throw new Error('Cette relation existe déjà');
+    }
+
+    // Create the relation
+    const relation = await this.prisma.akBusinessToJeux.create({
+      data: {
+        idJeu,
+        idBusiness,
+        type
+      },
+      include: {
+        business: {
+          select: {
+            idBusiness: true,
+            denomination: true,
+            type: true,
+            image: true,
+          }
+        }
+      }
+    });
+
+    // Log the action
+    if (username) {
+      await this.adminLogging.log({
+        username,
+        action: 'ADD_JEU_VIDEO_BUSINESS',
+        details: `Added business relation: ${business.denomination} (${type}) to jeu ${jeu.titre}`,
+        relatedId: idJeu,
+        relatedType: 'jeu_video'
+      });
+    }
+
+    return relation;
+  }
+
+  async removeBusinessRelation(idRelation: number, username?: string) {
+    const relation = await this.prisma.akBusinessToJeux.findUnique({
+      where: { idRelation },
+      include: {
+        business: true,
+        jeuVideo: true
+      }
+    });
+
+    if (!relation) {
+      throw new NotFoundException('Relation introuvable');
+    }
+
+    await this.prisma.akBusinessToJeux.delete({
+      where: { idRelation }
+    });
+
+    // Log the action
+    if (username) {
+      await this.adminLogging.log({
+        username,
+        action: 'REMOVE_JEU_VIDEO_BUSINESS',
+        details: `Removed business relation: ${relation.business.denomination} from jeu ${relation.jeuVideo.titre}`,
+        relatedId: relation.idJeu,
+        relatedType: 'jeu_video'
+      });
+    }
+
+    return { success: true };
   }
 
   private slugify(text: string) {

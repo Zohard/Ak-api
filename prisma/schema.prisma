@@ -326,6 +326,7 @@ model AkBusiness {
   // Relations
   animeRelations        AkBusinessToAnime[] @relation("BusinessToAnime")
   mangaRelations        AkBusinessToManga[] @relation("BusinessToManga")
+  jeuxVideoRelations    AkBusinessToJeux[]  @relation("BusinessToJeux")
 
   @@map("ak_business")
 }
@@ -372,6 +373,7 @@ model AkJeuxVideo {
   trailers          AkJeuxVideoTrailer[]
   screenshots       AkJeuxVideoScreenshot[]
   collections       CollectionJeuxVideo[] @relation("UserJeuxVideoList")
+  businessRelations AkBusinessToJeux[]
 
   @@map("ak_jeux_video")
 }
@@ -507,6 +509,20 @@ model AkBusinessToManga {
   business    AkBusiness? @relation("BusinessToManga", fields: [idBusiness], references: [idBusiness], onDelete: Cascade)
 
   @@map("ak_business_to_mangas")
+}
+
+// Business to Jeux Video Relations
+model AkBusinessToJeux {
+  idRelation  Int         @id @default(autoincrement()) @map("id_relation")
+  idJeu       Int         @map("id_jeu")
+  idBusiness  Int         @map("id_business")
+  type        String?     @db.VarChar(100)
+
+  // Relations
+  jeuVideo    AkJeuxVideo @relation(fields: [idJeu], references: [idJeu], onDelete: Cascade)
+  business    AkBusiness  @relation("BusinessToJeux", fields: [idBusiness], references: [idBusiness], onDelete: Cascade)
+
+  @@map("ak_business_to_jeux")
 }
 
 // User Lists/Tops

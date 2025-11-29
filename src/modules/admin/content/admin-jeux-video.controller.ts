@@ -135,4 +135,25 @@ export class AdminJeuxVideoController {
     const username = req.user?.pseudo || req.user?.member_name || 'admin';
     return this.service.removeTrailer(trailerId, username);
   }
+
+  @Post(':id/business')
+  @ApiOperation({ summary: 'Ajouter une relation business (staff/studio/etc.)' })
+  addBusinessRelation(
+    @Request() req,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: { idBusiness: number; type: string }
+  ) {
+    const username = req.user?.pseudo || req.user?.member_name || 'admin';
+    return this.service.addBusinessRelation(id, body.idBusiness, body.type, username);
+  }
+
+  @Delete(':id/business/:relationId')
+  @ApiOperation({ summary: 'Supprimer une relation business' })
+  removeBusinessRelation(
+    @Request() req,
+    @Param('relationId', ParseIntPipe) relationId: number
+  ) {
+    const username = req.user?.pseudo || req.user?.member_name || 'admin';
+    return this.service.removeBusinessRelation(relationId, username);
+  }
 }
