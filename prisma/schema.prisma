@@ -1135,3 +1135,16 @@ model SmfLogOnline {
   @@map("smf_log_online")
 }
 
+// Tags
+model AkTag {
+  idTag       Int       @id @default(autoincrement()) @map("id_tag")
+  tagName     String    @map("tag_name") @db.VarChar(255)
+  tagNiceUrl  String?   @map("tag_nice_url") @db.VarChar(255)
+  description String?   @db.Text
+  categorie   String?   @db.VarChar(100)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamp
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamp
+
+  @@map("ak_tags")
+}
+
