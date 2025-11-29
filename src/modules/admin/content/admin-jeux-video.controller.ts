@@ -156,4 +156,15 @@ export class AdminJeuxVideoController {
     const username = req.user?.pseudo || req.user?.member_name || 'admin';
     return this.service.removeBusinessRelation(relationId, username);
   }
+
+  @Post(':id/igdb/staff/:igdbId')
+  @ApiOperation({ summary: 'Importer le staff depuis IGDB pour un jeu existant' })
+  importStaffFromIgdb(
+    @Request() req,
+    @Param('id', ParseIntPipe) id: number,
+    @Param('igdbId', ParseIntPipe) igdbId: number
+  ) {
+    const username = req.user?.pseudo || req.user?.member_name || 'admin';
+    return this.service.importStaffFromIgdb(id, igdbId, username);
+  }
 }

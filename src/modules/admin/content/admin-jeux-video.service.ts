@@ -494,6 +494,11 @@ export class AdminJeuxVideoService {
       });
     }
 
+    // Import companies as business relations (developers, publishers, etc.)
+    if (igdbGame.involved_companies && igdbGame.involved_companies.length > 0) {
+      await this.importCompaniesFromIgdb(created.idJeu, igdbGame.involved_companies);
+    }
+
     // Log the creation
     if (username) {
       await this.adminLogging.addLog(created.idJeu, 'jeu_video', username, `Import IGDB (ID: ${igdbId})`);
@@ -506,6 +511,76 @@ export class AdminJeuxVideoService {
       platformIds,
       genreIds,
     };
+  }
+
+  /**
+   * Import companies from IGDB as business relations
+   */
+  private async importCompaniesFromIgdb(
+    idJeu: number,
+    involvedCompanies: Array<{ company: { id: number; name: string }; publisher: boolean; developer: boolean }>
+  ) {
+    for (const ic of involvedCompanies) {
+      if (!ic.company?.name) continue;
+
+      try {
+        // Determine role(s)
+        const roles: string[] = [];
+        if (ic.developer) roles.push('Développeur');
+        if (ic.publisher) roles.push('Éditeur');
+        if (roles.length === 0) roles.push('Autre'); // Fallback for supporting companies
+
+        // Find or create business entity
+        let business = await this.prisma.akBusiness.findFirst({
+          where: {
+            denomination: {
+              equals: ic.company.name,
+              mode: 'insensitive'
+            }
+          }
+        });
+
+        if (!business) {
+          // Create new business entity
+          business = await this.prisma.akBusiness.create({
+            data: {
+              denomination: ic.company.name,
+              type: 'Studio',
+              niceUrl: this.slugify(ic.company.name),
+              statut: 1,
+              dateModification: Math.floor(Date.now() / 1000)
+            }
+          });
+          console.log(`Created new business entity: ${ic.company.name}`);
+        }
+
+        // Create business relation for each role
+        for (const role of roles) {
+          // Check if relation already exists
+          const existingRelation = await this.prisma.akBusinessToJeux.findFirst({
+            where: {
+              idJeu,
+              idBusiness: business.idBusiness,
+              type: role
+            }
+          });
+
+          if (!existingRelation) {
+            await this.prisma.akBusinessToJeux.create({
+              data: {
+                idJeu,
+                idBusiness: business.idBusiness,
+                type: role
+              }
+            });
+            console.log(`Created business relation: ${ic.company.name} - ${role}`);
+          }
+        }
+      } catch (error) {
+        console.error(`Failed to import company ${ic.company.name}:`, error);
+        // Continue with next company
+      }
+    }
   }
 
   /**
@@ -1232,6 +1307,47 @@ export class AdminJeuxVideoService {
     }
 
     return { success: true };
+  }
+
+  /**
+   * Import staff from IGDB for an existing game
+   */
+  async importStaffFromIgdb(idJeu: number, igdbId: number, username?: string) {
+    // Verify game exists
+    const game = await this.prisma.akJeuxVideo.findUnique({
+      where: { idJeu }
+    });
+
+    if (!game) {
+      throw new NotFoundException('Jeu vidéo introuvable');
+    }
+
+    // Fetch data from IGDB
+    const igdbGame = await this.igdbService.getGameById(igdbId);
+
+    if (!igdbGame) {
+      throw new NotFoundException('Game not found on IGDB');
+    }
+
+    // Import companies
+    if (igdbGame.involved_companies && igdbGame.involved_companies.length > 0) {
+      await this.importCompaniesFromIgdb(idJeu, igdbGame.involved_companies);
+    }
+
+    // Log the action
+    if (username) {
+      await this.adminLogging.addLog(
+        idJeu,
+        'jeu_video',
+        username,
+        `Import staff IGDB (${igdbGame.involved_companies?.length || 0} companies)`
+      );
+    }
+
+    return {
+      success: true,
+      imported: igdbGame.involved_companies?.length || 0
+    };
   }
 
   private slugify(text: string) {
