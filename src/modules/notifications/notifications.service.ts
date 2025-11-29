@@ -194,31 +194,54 @@ export class NotificationsService {
   ) {
     const offset = (page - 1) * limit;
 
-    const whereClause = unreadOnly
-      ? `WHERE user_id = ${userId} AND read_at IS NULL`
-      : `WHERE user_id = ${userId}`;
+    let notifications;
+    let countResult;
 
-    const notifications = await this.prisma.$queryRaw`
-      SELECT 
-        id,
-        type,
-        title,
-        message,
-        data,
-        priority,
-        read_at,
-        created_at
-      FROM user_notifications 
-      ${whereClause}
-      ORDER BY created_at DESC
-      LIMIT ${limit} OFFSET ${offset}
-    `;
+    if (unreadOnly) {
+      notifications = await this.prisma.$queryRaw`
+        SELECT
+          id,
+          type,
+          title,
+          message,
+          data,
+          priority,
+          read_at,
+          created_at
+        FROM user_notifications
+        WHERE user_id = ${userId} AND read_at IS NULL
+        ORDER BY created_at DESC
+        LIMIT ${limit} OFFSET ${offset}
+      `;
 
-    const countResult = await this.prisma.$queryRaw`
-      SELECT COUNT(*) as total
-      FROM user_notifications 
-      ${whereClause}
-    `;
+      countResult = await this.prisma.$queryRaw`
+        SELECT COUNT(*) as total
+        FROM user_notifications
+        WHERE user_id = ${userId} AND read_at IS NULL
+      `;
+    } else {
+      notifications = await this.prisma.$queryRaw`
+        SELECT
+          id,
+          type,
+          title,
+          message,
+          data,
+          priority,
+          read_at,
+          created_at
+        FROM user_notifications
+        WHERE user_id = ${userId}
+        ORDER BY created_at DESC
+        LIMIT ${limit} OFFSET ${offset}
+      `;
+
+      countResult = await this.prisma.$queryRaw`
+        SELECT COUNT(*) as total
+        FROM user_notifications
+        WHERE user_id = ${userId}
+      `;
+    }
 
     const total = Number((countResult as any[])[0]?.total || 0);
 
