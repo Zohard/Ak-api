@@ -122,7 +122,7 @@ export class ReviewsService {
     return this.formatReview(review);
   }
 
-  async findAll(query: ReviewQueryDto) {
+  async findAll(query: ReviewQueryDto, skipDefaultStatusFilter = false) {
     const {
       page = 1,
       limit = 20,
