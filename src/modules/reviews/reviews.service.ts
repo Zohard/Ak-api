@@ -178,11 +178,13 @@ export class ReviewsService {
     }
 
     // Default to showing only published reviews (statut: 0) unless explicitly specified
+    // Skip default filter for admin requests when skipDefaultStatusFilter is true
     if (statut !== undefined) {
       where.statut = statut;
-    } else {
-      where.statut = 0; // Only show published reviews by default
+    } else if (!skipDefaultStatusFilter) {
+      where.statut = 0; // Only show published reviews by default (for public API)
     }
+    // If skipDefaultStatusFilter is true and statut is undefined, don't filter by status (show all)
 
     if (minNotation) {
       where.notation = { gte: minNotation };
@@ -1328,7 +1330,7 @@ export class ReviewsService {
       newStatus = 0; // Published
       causeSuppr = null;
     } else if (moderateDto.action === 'reject') {
-      newStatus = 1; // Rejected
+      newStatus = 2; // Rejected by moderation
       causeSuppr = moderateDto.reason || 'Contenu non conforme aux règles de la communauté';
     }
 
@@ -1404,7 +1406,7 @@ export class ReviewsService {
           throw new Error('Review not found');
         }
 
-        const newStatus = action === 'approve' ? 0 : 1;
+        const newStatus = action === 'approve' ? 0 : 2; // 0=published, 1=draft, 2=rejected
         const causeSuppr: string | null = action === 'reject'
           ? (reason || 'Contenu non conforme aux règles de la communauté')
           : null;
@@ -1457,17 +1459,17 @@ export class ReviewsService {
   }
 
   async getStats(): Promise<any> {
-    const [total, published, pending, rejected] = await Promise.all([
+    const [total, published, draft, rejected] = await Promise.all([
       this.prisma.akCritique.count(),
-      this.prisma.akCritique.count({ where: { statut: 0 } }),
-      this.prisma.akCritique.count({ where: { statut: 2 } }), // If you use status 2 for pending
-      this.prisma.akCritique.count({ where: { statut: 1 } }),
+      this.prisma.akCritique.count({ where: { statut: 0 } }), // Published
+      this.prisma.akCritique.count({ where: { statut: 1 } }), // Draft
+      this.prisma.akCritique.count({ where: { statut: 2 } }), // Rejected by moderation
     ]);
 
     return {
       total,
       published,
-      pending,
+      pending: draft, // For compatibility with frontend expecting "pending"
       rejected,
     };
   }

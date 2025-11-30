@@ -32,11 +32,12 @@ export class AdminReviewsController {
   constructor(private readonly reviewsService: ReviewsService) {}
 
   @Get()
-  @ApiOperation({ summary: 'Get all reviews (including rejected)' })
+  @ApiOperation({ summary: 'Get all reviews (including drafts and rejected)' })
   @ApiResponse({ status: 200, description: 'Reviews retrieved successfully' })
   findAll(@Query() query: ReviewQueryDto) {
-    // Remove default statut filter to see all reviews
-    return this.reviewsService.findAll({ ...query, statut: undefined });
+    // For admin: show all reviews regardless of status unless a specific status is requested
+    // Pass skipDefaultStatusFilter=true to bypass the default statut=0 filter
+    return this.reviewsService.findAll(query, true);
   }
 
   @Get('stats')
@@ -56,7 +57,7 @@ export class AdminReviewsController {
     description: 'Rejected reviews retrieved successfully',
   })
   getRejected(@Query() query: ReviewQueryDto) {
-    query.statut = 1; // Status 1 = rejected
+    query.statut = 2; // Status 2 = rejected by moderation
     return this.reviewsService.findAll(query);
   }
 
