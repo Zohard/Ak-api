@@ -1138,8 +1138,8 @@ model SmfLogOnline {
 // Tags
 model AkTag {
   idTag       Int     @id @default(autoincrement()) @map("id_tag")
-  tagNiceUrl  String? @map("tag_nice_url") @db.VarChar(100)
   tagName     String? @map("tag_name") @db.VarChar(100)
+  tagNiceUrl  String? @map("tag_nice_url") @db.VarChar(100)
   description String? @db.Text
   categorie   String? @db.VarChar(100)
 
