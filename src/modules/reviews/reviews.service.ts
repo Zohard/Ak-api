@@ -1322,7 +1322,7 @@ export class ReviewsService {
     }
 
     let newStatus = 0;
-    let causeSuppr = null;
+    let causeSuppr: string | null = null;
 
     if (moderateDto.action === 'approve') {
       newStatus = 0; // Published
@@ -1344,7 +1344,7 @@ export class ReviewsService {
     await this.invalidateReviewCache(id, review.idAnime, review.idManga, review.idMembre);
 
     // Send email notification for rejection
-    if (moderateDto.action === 'reject' && review.membre?.emailAddress) {
+    if (moderateDto.action === 'reject' && review.membre?.emailAddress && causeSuppr) {
       try {
         const contentTitle = review.anime?.titre || review.manga?.titre || 'votre contenu';
         await this.emailService.sendReviewRejectionEmail(
@@ -1405,7 +1405,7 @@ export class ReviewsService {
         }
 
         const newStatus = action === 'approve' ? 0 : 1;
-        const causeSuppr = action === 'reject'
+        const causeSuppr: string | null = action === 'reject'
           ? (reason || 'Contenu non conforme aux règles de la communauté')
           : null;
 
@@ -1418,7 +1418,7 @@ export class ReviewsService {
         });
 
         // Send email for rejection
-        if (action === 'reject' && review.membre?.emailAddress) {
+        if (action === 'reject' && review.membre?.emailAddress && causeSuppr) {
           try {
             const contentTitle = review.anime?.titre || review.manga?.titre || 'votre contenu';
             await this.emailService.sendReviewRejectionEmail(
