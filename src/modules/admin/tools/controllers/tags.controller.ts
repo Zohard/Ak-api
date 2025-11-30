@@ -40,7 +40,6 @@ export class TagsController {
         tagNiceUrl: true,
         description: true,
         categorie: true,
-        createdAt: true,
       },
       orderBy: [
         { categorie: 'asc' },
@@ -64,7 +63,6 @@ export class TagsController {
         tagNiceUrl: true,
         description: true,
         categorie: true,
-        createdAt: true,
       },
     });
 
