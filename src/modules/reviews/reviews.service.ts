@@ -8,9 +8,11 @@ import { PrismaService } from '../../shared/services/prisma.service';
 import { CacheService } from '../../shared/services/cache.service';
 import { PopularityService } from '../../shared/services/popularity.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { EmailService } from '../../shared/services/email.service';
 import { CreateReviewDto } from './dto/create-review.dto';
 import { UpdateReviewDto } from './dto/update-review.dto';
 import { ReviewQueryDto } from './dto/review-query.dto';
+import { ModerateReviewDto } from './dto/moderate-review.dto';
 
 @Injectable()
 export class ReviewsService {
@@ -19,6 +21,7 @@ export class ReviewsService {
     private readonly cacheService: CacheService,
     private readonly popularityService: PopularityService,
     private readonly notificationsService: NotificationsService,
+    private readonly emailService: EmailService,
   ) {}
 
   async create(createReviewDto: CreateReviewDto, userId: number) {
@@ -1253,7 +1256,7 @@ export class ReviewsService {
   // Cache invalidation methods
   async invalidateReviewCache(reviewId: number, animeId?: number, mangaId?: number, userId?: number): Promise<void> {
     await this.cacheService.del(`review:${reviewId}`);
-    
+
     // Invalidate user review check cache
     if (userId) {
       if (animeId) {
@@ -1263,7 +1266,7 @@ export class ReviewsService {
         await this.cacheService.del(`user_review:${userId}:manga:${mangaId}`);
       }
     }
-    
+
     // Invalidate related content caches
     if (animeId) {
       await this.cacheService.invalidateAnime(animeId);
@@ -1271,8 +1274,201 @@ export class ReviewsService {
     if (mangaId) {
       await this.cacheService.invalidateManga(mangaId);
     }
-    
+
     // Invalidate top reviews cache
     await this.cacheService.delByPattern('top_reviews:*');
+  }
+
+  /**
+   * Admin moderation methods
+   */
+  async moderate(
+    id: number,
+    moderateDto: ModerateReviewDto,
+    userId: number,
+    isAdmin: boolean,
+  ): Promise<any> {
+    if (!isAdmin) {
+      throw new ForbiddenException('Only administrators can moderate reviews');
+    }
+
+    const review = await this.prisma.akCritique.findUnique({
+      where: { idCritique: id },
+      include: {
+        membre: {
+          select: {
+            idMember: true,
+            memberName: true,
+            emailAddress: true,
+          },
+        },
+        anime: {
+          select: {
+            idAnime: true,
+            titre: true,
+          },
+        },
+        manga: {
+          select: {
+            idManga: true,
+            titre: true,
+          },
+        },
+      },
+    });
+
+    if (!review) {
+      throw new NotFoundException('Review not found');
+    }
+
+    let newStatus = 0;
+    let causeSuppr = null;
+
+    if (moderateDto.action === 'approve') {
+      newStatus = 0; // Published
+      causeSuppr = null;
+    } else if (moderateDto.action === 'reject') {
+      newStatus = 1; // Rejected
+      causeSuppr = moderateDto.reason || 'Contenu non conforme aux règles de la communauté';
+    }
+
+    await this.prisma.akCritique.update({
+      where: { idCritique: id },
+      data: {
+        statut: newStatus,
+        causeSuppr,
+      },
+    });
+
+    // Invalidate review cache
+    await this.invalidateReviewCache(id, review.idAnime, review.idManga, review.idMembre);
+
+    // Send email notification for rejection
+    if (moderateDto.action === 'reject' && review.membre?.emailAddress) {
+      try {
+        const contentTitle = review.anime?.titre || review.manga?.titre || 'votre contenu';
+        await this.emailService.sendReviewRejectionEmail(
+          review.membre.emailAddress,
+          review.membre.memberName,
+          review.titre || contentTitle,
+          causeSuppr,
+          contentTitle,
+        );
+      } catch (error) {
+        console.error('Failed to send rejection email:', error);
+        // Don't throw - we don't want to fail the moderation if email fails
+      }
+    }
+
+    return {
+      message: `Review ${moderateDto.action}ed successfully`,
+      review: {
+        id: review.idCritique,
+        statut: newStatus,
+        causeSuppr,
+      },
+    };
+  }
+
+  async bulkModerate(
+    reviewIds: number[],
+    action: string,
+    reason?: string,
+  ): Promise<any> {
+    const results = await Promise.allSettled(
+      reviewIds.map(async (id) => {
+        const review = await this.prisma.akCritique.findUnique({
+          where: { idCritique: id },
+          include: {
+            membre: {
+              select: {
+                idMember: true,
+                memberName: true,
+                emailAddress: true,
+              },
+            },
+            anime: {
+              select: {
+                titre: true,
+              },
+            },
+            manga: {
+              select: {
+                titre: true,
+              },
+            },
+          },
+        });
+
+        if (!review) {
+          throw new Error('Review not found');
+        }
+
+        const newStatus = action === 'approve' ? 0 : 1;
+        const causeSuppr = action === 'reject'
+          ? (reason || 'Contenu non conforme aux règles de la communauté')
+          : null;
+
+        await this.prisma.akCritique.update({
+          where: { idCritique: id },
+          data: {
+            statut: newStatus,
+            causeSuppr,
+          },
+        });
+
+        // Send email for rejection
+        if (action === 'reject' && review.membre?.emailAddress) {
+          try {
+            const contentTitle = review.anime?.titre || review.manga?.titre || 'votre contenu';
+            await this.emailService.sendReviewRejectionEmail(
+              review.membre.emailAddress,
+              review.membre.memberName,
+              review.titre || contentTitle,
+              causeSuppr,
+              contentTitle,
+            );
+          } catch (error) {
+            console.error('Failed to send rejection email:', error);
+          }
+        }
+
+        return { id, success: true };
+      })
+    );
+
+    const successful = results.filter(r => r.status === 'fulfilled').length;
+    const failed = results.filter(r => r.status === 'rejected').length;
+
+    // Invalidate all top reviews cache
+    await this.cacheService.delByPattern('top_reviews:*');
+    await this.cacheService.delByPattern('reviews:*');
+
+    return {
+      message: `Bulk moderation completed. ${successful} successful, ${failed} failed.`,
+      successful,
+      failed,
+      results: results.map((r, i) => ({
+        id: reviewIds[i],
+        success: r.status === 'fulfilled',
+        error: r.status === 'rejected' ? r.reason : null,
+      })),
+    };
+  }
+
+  async getStats(): Promise<any> {
+    const [total, published, pending, rejected] = await Promise.all([
+      this.prisma.akCritique.count(),
+      this.prisma.akCritique.count({ where: { statut: 0 } }),
+      this.prisma.akCritique.count({ where: { statut: 2 } }), // If you use status 2 for pending
+      this.prisma.akCritique.count({ where: { statut: 1 } }),
+    ]);
+
+    return {
+      total,
+      published,
+      pending,
+      rejected,
+    };
   }
 }

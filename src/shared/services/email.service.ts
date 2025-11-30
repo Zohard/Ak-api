@@ -81,6 +81,31 @@ export class EmailService {
     }
   }
 
+  async sendReviewRejectionEmail(
+    recipientEmail: string,
+    recipientUsername: string,
+    reviewTitle: string,
+    reason: string,
+    contentTitle: string,
+  ): Promise<void> {
+    const reviewsUrl = `${this.configService.get('FRONTEND_URL')}/profil/critiques`;
+
+    const mailOptions = {
+      from: this.configService.get<string>('MAILTRAP_FROM'),
+      to: recipientEmail,
+      subject: `Votre critique a été rejetée - Anime-Kun`,
+      html: this.getReviewRejectionTemplate(recipientUsername, reviewTitle, reason, contentTitle, reviewsUrl),
+    };
+
+    try {
+      await this.transporter.sendMail(mailOptions);
+      console.log(`Review rejection email sent to ${recipientEmail}`);
+    } catch (error) {
+      console.error('Error sending review rejection email:', error);
+      // Don't throw - we don't want to fail the moderation if email fails
+    }
+  }
+
   private getEmailVerificationTemplate(username: string, verificationUrl: string): string {
     return `
       <!DOCTYPE html>
@@ -373,6 +398,116 @@ export class EmailService {
           </p>
 
           <div class="footer">
+            <p>Cet email a été envoyé automatiquement, merci de ne pas y répondre.</p>
+            <p><strong>L'équipe Anime-Kun</strong></p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+  }
+
+  private getReviewRejectionTemplate(
+    recipientUsername: string,
+    reviewTitle: string,
+    reason: string,
+    contentTitle: string,
+    reviewsUrl: string,
+  ): string {
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <title>Critique rejetée</title>
+        <style>
+          body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+          }
+          .header {
+            background-color: #dc2626;
+            color: white;
+            padding: 20px;
+            text-align: center;
+            border-radius: 8px 8px 0 0;
+          }
+          .content {
+            background-color: #f8fafc;
+            padding: 30px;
+            border-radius: 0 0 8px 8px;
+          }
+          .button {
+            display: inline-block;
+            background-color: #2563eb;
+            color: white;
+            padding: 12px 24px;
+            text-decoration: none;
+            border-radius: 6px;
+            margin: 20px 0;
+          }
+          .warning {
+            background-color: #fef2f2;
+            border: 2px solid #dc2626;
+            padding: 15px;
+            border-radius: 6px;
+            margin: 20px 0;
+          }
+          .reason-box {
+            background-color: #fff7ed;
+            border-left: 4px solid #f59e0b;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 20px 0;
+          }
+          .footer {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #e5e7eb;
+            font-size: 14px;
+            color: #6b7280;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1>🎌 Anime-Kun</h1>
+          <h2>Modération de critique</h2>
+        </div>
+        <div class="content">
+          <p>Bonjour <strong>${recipientUsername}</strong>,</p>
+
+          <div class="warning">
+            <strong>⚠️ Votre critique a été rejetée</strong>
+            <p style="margin: 10px 0 0 0;">Votre critique "${reviewTitle}" concernant "${contentTitle}" n'a pas été approuvée par notre équipe de modération.</p>
+          </div>
+
+          <div class="reason-box">
+            <strong>📋 Raison du rejet :</strong>
+            <p style="margin: 10px 0 0 0; color: #1f2937;">${reason}</p>
+          </div>
+
+          <p>Nous vous invitons à :</p>
+          <ul>
+            <li>Prendre connaissance de nos règles communautaires</li>
+            <li>Modifier votre critique pour qu'elle soit conforme</li>
+            <li>Soumettre une nouvelle critique respectant nos standards</li>
+          </ul>
+
+          <div style="text-align: center;">
+            <a href="${reviewsUrl}" class="button">Voir mes critiques</a>
+          </div>
+
+          <p style="text-align: center; color: #6b7280; font-size: 14px;">
+            Ou copiez ce lien : <a href="${reviewsUrl}">${reviewsUrl}</a>
+          </p>
+
+          <div class="footer">
+            <p>Si vous avez des questions concernant cette décision, n'hésitez pas à contacter notre équipe de modération.</p>
             <p>Cet email a été envoyé automatiquement, merci de ne pas y répondre.</p>
             <p><strong>L'équipe Anime-Kun</strong></p>
           </div>
