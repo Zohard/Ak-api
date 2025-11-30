@@ -331,6 +331,57 @@ export class BusinessService {
     });
   }
 
+  async getRelatedGames(businessId: number) {
+    // Get video game IDs related to this business
+    const relations = await this.prisma.$queryRaw<Array<{ id_jeu: number; type: string }>>`
+      SELECT id_jeu, type
+      FROM ak_business_to_jeux
+      WHERE id_business = ${businessId}
+    `;
+
+    if (!relations || relations.length === 0) {
+      return [];
+    }
+
+    const gameIds = relations.map(r => r.id_jeu);
+
+    // Fetch game details
+    const games = await this.prisma.$queryRaw<any[]>`
+      SELECT
+        id_jeu,
+        nice_url,
+        titre,
+        annee,
+        image,
+        plateforme,
+        moyenne_notes,
+        nb_reviews,
+        statut
+      FROM ak_jeux_video
+      WHERE id_jeu = ANY(${gameIds}::int[])
+        AND statut = 1
+      ORDER BY titre
+    `;
+
+    // Combine game data with relation info
+    return games.map(game => {
+      const relation = relations.find(r => r.id_jeu === game.id_jeu);
+      return {
+        id: game.id_jeu,
+        idJeu: game.id_jeu,
+        niceUrl: game.nice_url,
+        titre: game.titre,
+        annee: game.annee,
+        image: game.image,
+        plateforme: game.plateforme,
+        moyenneNotes: game.moyenne_notes,
+        nbReviews: game.nb_reviews,
+        statut: game.statut,
+        relationType: relation?.type
+      };
+    });
+  }
+
   async uploadImageFromUrl(imageUrl: string) {
     try {
       // Download the image from the URL

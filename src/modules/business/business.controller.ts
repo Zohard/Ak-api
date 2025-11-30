@@ -182,6 +182,22 @@ export class BusinessController {
     return this.businessService.getRelatedMangas(id);
   }
 
+  @Get(':id/jeux-video')
+  @ApiOperation({
+    summary: 'Récupérer les jeux vidéo liés à une entité business',
+    description: "Récupère tous les jeux vidéo associés à une entité business (développeur, éditeur, etc.)",
+  })
+  @ApiParam({
+    name: 'id',
+    description: "ID de l'entité business",
+    type: 'number',
+  })
+  @ApiResponse({ status: 200, description: "Liste des jeux vidéo liés" })
+  @ApiResponse({ status: 404, description: 'Entité business introuvable' })
+  async getRelatedGames(@Param('id', ParseIntPipe) id: number) {
+    return this.businessService.getRelatedGames(id);
+  }
+
   @Patch(':id')
   @UseGuards(JwtAuthGuard, AdminGuard)
   @ApiBearerAuth()
