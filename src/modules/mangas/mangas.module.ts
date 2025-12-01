@@ -1,5 +1,7 @@
 import { Module } from '@nestjs/common';
+import { HttpModule } from '@nestjs/axios';
 import { MangasService } from './mangas.service';
+import { GoogleBooksService } from './google-books.service';
 import { MangasController } from './mangas.controller';
 import { PrismaService } from '../../shared/services/prisma.service';
 import { CacheService } from '../../shared/services/cache.service';
@@ -8,9 +10,17 @@ import { AniListModule } from '../anilist/anilist.module';
 import { BooksModule } from '../books/books.module';
 
 @Module({
-  imports: [MediaModule, AniListModule, BooksModule],
+  imports: [
+    HttpModule.register({
+      timeout: 10000,
+      maxRedirects: 5,
+    }),
+    MediaModule,
+    AniListModule,
+    BooksModule,
+  ],
   controllers: [MangasController],
-  providers: [MangasService, PrismaService, CacheService],
+  providers: [MangasService, GoogleBooksService, PrismaService, CacheService],
   exports: [MangasService],
 })
 export class MangasModule {}

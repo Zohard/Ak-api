@@ -27,6 +27,7 @@ import {
   ApiBody,
 } from '@nestjs/swagger';
 import { MangasService } from './mangas.service';
+import { GoogleBooksService } from './google-books.service';
 import { CreateMangaDto } from './dto/create-manga.dto';
 import { UpdateMangaDto } from './dto/update-manga.dto';
 import { MangaQueryDto } from './dto/manga-query.dto';
@@ -42,6 +43,7 @@ export class MangasController {
   constructor(
     private readonly mangasService: MangasService,
     private readonly imageKitService: ImageKitService,
+    private readonly googleBooksService: GoogleBooksService,
   ) {}
 
   @Get()
@@ -221,6 +223,21 @@ export class MangasController {
   ) {
     const parsedLimit = limit ? parseInt(limit) : 200;
     return this.mangasService.getMangasByDateRange(startDate, endDate, parsedLimit);
+  }
+
+  @Get('googlebooks/month/:year/:month')
+  @ApiOperation({ summary: 'Récupérer dernières parutions manga en France via Google Books par mois' })
+  @ApiParam({ name: 'year', description: 'Année', example: 2024 })
+  @ApiParam({ name: 'month', description: 'Mois (1-12)', example: 1 })
+  @ApiQuery({ name: 'maxResults', required: false, description: 'Nombre maximum de résultats', example: 40 })
+  @ApiResponse({ status: 200, description: 'Mangas trouvés sur Google Books' })
+  async getMangasByGoogleBooks(
+    @Param('year', ParseIntPipe) year: number,
+    @Param('month', ParseIntPipe) month: number,
+    @Query('maxResults') maxResults?: string,
+  ) {
+    const parsedMaxResults = maxResults ? parseInt(maxResults) : 40;
+    return this.googleBooksService.searchMangaByMonth(year, month, parsedMaxResults);
   }
 
   @Get('isbn/lookup')
