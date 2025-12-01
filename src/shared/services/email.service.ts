@@ -88,7 +88,7 @@ export class EmailService {
     reason: string,
     contentTitle: string,
   ): Promise<void> {
-    const reviewsUrl = `${this.configService.get('FRONTEND_URL')}/profil/critiques`;
+    const reviewsUrl = `${this.configService.get('FRONTEND_URL')}/profile#critiques`;
 
     const mailOptions = {
       from: this.configService.get<string>('MAILTRAP_FROM'),
@@ -137,11 +137,12 @@ export class EmailService {
           .button {
             display: inline-block;
             background-color: #2563eb;
-            color: white;
+            color: white !important;
             padding: 12px 24px;
             text-decoration: none;
             border-radius: 6px;
             margin: 20px 0;
+            font-weight: 600;
           }
           .info {
             background-color: #dbeafe;
@@ -236,11 +237,12 @@ export class EmailService {
           .button {
             display: inline-block;
             background-color: #2563eb;
-            color: white;
+            color: white !important;
             padding: 12px 24px;
             text-decoration: none;
             border-radius: 6px;
             margin: 20px 0;
+            font-weight: 600;
           }
           .warning {
             background-color: #fef3c7;
@@ -444,11 +446,12 @@ export class EmailService {
           .button {
             display: inline-block;
             background-color: #2563eb;
-            color: white;
+            color: white !important;
             padding: 12px 24px;
             text-decoration: none;
             border-radius: 6px;
             margin: 20px 0;
+            font-weight: 600;
           }
           .warning {
             background-color: #fef2f2;
