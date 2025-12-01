@@ -47,7 +47,7 @@ export class MediaController {
   @ApiBearerAuth()
   async uploadImage(
     @UploadedFile() file: Express.Multer.File,
-    @Body('type') type: 'anime' | 'manga' | 'avatar' | 'cover' | 'game',
+    @Body('type') type: 'anime' | 'manga' | 'avatar' | 'cover' | 'game' | 'business',
     @Body('relatedId') relatedId?: string,
     @Body('isScreenshot') isScreenshot?: string,
     @CurrentUser() user?: any,
@@ -60,10 +60,10 @@ export class MediaController {
       throw new BadRequestException('Media type is required');
     }
 
-    const validTypes = ['anime', 'manga', 'avatar', 'cover', 'game'];
+    const validTypes = ['anime', 'manga', 'avatar', 'cover', 'game', 'business'];
     if (!validTypes.includes(type)) {
       throw new BadRequestException(
-        'Invalid media type. Must be one of: anime, manga, avatar, cover, game',
+        'Invalid media type. Must be one of: anime, manga, avatar, cover, game, business',
       );
     }
 
@@ -107,7 +107,7 @@ export class MediaController {
   @ApiBearerAuth()
   async bulkUpload(
     @UploadedFile() files: Express.Multer.File | Express.Multer.File[],
-    @Body('type') type: 'anime' | 'manga' | 'avatar' | 'cover',
+    @Body('type') type: 'anime' | 'manga' | 'avatar' | 'cover' | 'game' | 'business',
     @CurrentUser() user: any,
   ) {
     const fileArray = Array.isArray(files) ? files : files ? [files] : [];
@@ -151,15 +151,15 @@ export class MediaController {
   @ApiBearerAuth()
   async uploadImageFromUrl(
     @Body('imageUrl') imageUrl: string,
-    @Body('type') type: 'anime' | 'manga' | 'avatar' | 'cover' | 'game',
+    @Body('type') type: 'anime' | 'manga' | 'avatar' | 'cover' | 'game' | 'business',
     @Body('relatedId') relatedId?: number,
   ) {
     if (!imageUrl || !imageUrl.trim()) {
       throw new BadRequestException('Image URL is required');
     }
 
-    if (!['anime', 'manga', 'avatar', 'cover', 'game'].includes(type)) {
-      throw new BadRequestException('Invalid type. Must be anime, manga, avatar, cover, or game');
+    if (!['anime', 'manga', 'avatar', 'cover', 'game', 'business'].includes(type)) {
+      throw new BadRequestException('Invalid type. Must be anime, manga, avatar, cover, game, or business');
     }
 
     return this.mediaService.uploadImageFromUrl(imageUrl, type, relatedId);
