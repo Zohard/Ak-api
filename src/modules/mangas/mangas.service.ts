@@ -1040,11 +1040,26 @@ export class MangasService extends BaseContentService<
   }>) {
     const comparisons = await Promise.all(
       booknodeMangas.map(async (booknodeManga) => {
+        // Extract base manga title by removing volume/tome information
+        // Patterns to remove: ", Tome X", ", tome X", ", Volume X", ", vol. X", etc.
+        const baseTitre = booknodeManga.titre
+          .replace(/,\s*Tome\s+\d+.*$/i, '')
+          .replace(/,\s*Volume\s+\d+.*$/i, '')
+          .replace(/,\s*Vol\.?\s+\d+.*$/i, '')
+          .replace(/,\s*T\.?\s*\d+.*$/i, '')
+          .trim();
+
         // Build comprehensive search conditions to check all title fields
         const orConditions: any[] = [];
 
-        // Check against main title
-        if (booknodeManga.titre) {
+        // Check against base title (without volume number)
+        if (baseTitre) {
+          orConditions.push({ titre: { equals: baseTitre, mode: Prisma.QueryMode.insensitive } });
+          orConditions.push({ titresAlternatifs: { contains: baseTitre, mode: Prisma.QueryMode.insensitive } });
+        }
+
+        // Also check against original title with volume (in case it's stored that way)
+        if (booknodeManga.titre !== baseTitre) {
           orConditions.push({ titre: { equals: booknodeManga.titre, mode: Prisma.QueryMode.insensitive } });
           orConditions.push({ titresAlternatifs: { contains: booknodeManga.titre, mode: Prisma.QueryMode.insensitive } });
         }
@@ -1065,6 +1080,7 @@ export class MangasService extends BaseContentService<
 
         return {
           titre: booknodeManga.titre,
+          baseTitre, // Include base title for debugging
           auteur: booknodeManga.auteur,
           releaseDate: booknodeManga.releaseDate,
           imageUrl: booknodeManga.imageUrl,
