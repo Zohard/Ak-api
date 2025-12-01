@@ -259,7 +259,7 @@ model AkManga {
   lienForum            Int?      @default(0) @map("lienforum")
   statut               Int       @default(0)
   ficheComplete        Int?      @default(0) @map("fiche_complete") @db.SmallInt
-  dateAjout            DateTime? @map("date_ajout") @db.Timestamptz
+  dateAjout            DateTime  @default(now()) @map("date_ajout") @db.Timestamptz
   dateModification     Int?      @map("date_modification")
   latestCache          Int?      @map("latest_cache")
   classementPopularite Int?      @map("classement_popularite")

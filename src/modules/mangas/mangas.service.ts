@@ -971,13 +971,13 @@ export class MangasService extends BaseContentService<
 
           // Check against native/original title
           if (anilistManga.title.native) {
-            orConditions.push({ titreOriginal: { equals: anilistManga.title.native, mode: Prisma.QueryMode.insensitive } });
+            orConditions.push({ titreOrig: { equals: anilistManga.title.native, mode: Prisma.QueryMode.insensitive } });
             orConditions.push({ titresAlternatifs: { contains: anilistManga.title.native, mode: Prisma.QueryMode.insensitive } });
           }
 
           // Check against English/French title
           if (anilistManga.title.english) {
-            orConditions.push({ titreFrancais: { equals: anilistManga.title.english, mode: Prisma.QueryMode.insensitive } });
+            orConditions.push({ titreFr: { equals: anilistManga.title.english, mode: Prisma.QueryMode.insensitive } });
             orConditions.push({ titresAlternatifs: { contains: anilistManga.title.english, mode: Prisma.QueryMode.insensitive } });
           }
 
@@ -995,8 +995,8 @@ export class MangasService extends BaseContentService<
             select: {
               idManga: true,
               titre: true,
-              titreOriginal: true,
-              titreFrancais: true,
+              titreOrig: true,
+              titreFr: true,
               titresAlternatifs: true,
             },
           });
