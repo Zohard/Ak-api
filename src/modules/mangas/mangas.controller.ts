@@ -208,6 +208,21 @@ export class MangasController {
     return this.mangasService.searchAniList(query, parsedLimit);
   }
 
+  @Get('anilist/daterange/:startDate/:endDate')
+  @ApiOperation({ summary: 'Récupérer mangas par période de temps depuis AniList' })
+  @ApiParam({ name: 'startDate', description: 'Date de début (YYYY-MM-DD)', example: '2024-01-01' })
+  @ApiParam({ name: 'endDate', description: 'Date de fin (YYYY-MM-DD)', example: '2024-04-30' })
+  @ApiQuery({ name: 'limit', required: false, description: 'Nombre maximum de résultats', example: 200 })
+  @ApiResponse({ status: 200, description: 'Mangas de la période spécifiée avec comparaison à la base de données' })
+  async getMangasByDateRange(
+    @Param('startDate') startDate: string,
+    @Param('endDate') endDate: string,
+    @Query('limit') limit?: string,
+  ) {
+    const parsedLimit = limit ? parseInt(limit) : 200;
+    return this.mangasService.getMangasByDateRange(startDate, endDate, parsedLimit);
+  }
+
   @Get('isbn/lookup')
   @UseGuards(OptionalJwtAuthGuard)
   @ApiOperation({ summary: 'Lookup manga by ISBN barcode' })

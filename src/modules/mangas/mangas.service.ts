@@ -946,6 +946,87 @@ export class MangasService extends BaseContentService<
     }
   }
 
+  async getMangasByDateRange(startDate: string, endDate: string, limit = 200) {
+    try {
+      const cacheKey = `anilist_manga_daterange:${startDate}:${endDate}:${limit}`;
+      const cached = await this.cacheService.get(cacheKey);
+      if (cached) return cached;
+
+      // Fetch mangas from AniList by date range
+      const anilistMangas = await this.aniListService.getMangasByDateRange(startDate, endDate, limit);
+
+      // Check which mangas exist in our database
+      const comparisons = await Promise.all(
+        anilistMangas.map(async (anilistManga: AniListManga) => {
+          const primaryTitle = anilistManga.title.romaji || anilistManga.title.english || anilistManga.title.native;
+
+          // Build comprehensive search conditions to check all title fields
+          const orConditions: any[] = [];
+
+          // Check against primary title
+          if (primaryTitle) {
+            orConditions.push({ titre: { equals: primaryTitle, mode: Prisma.QueryMode.insensitive } });
+            orConditions.push({ titresAlternatifs: { contains: primaryTitle, mode: Prisma.QueryMode.insensitive } });
+          }
+
+          // Check against native/original title
+          if (anilistManga.title.native) {
+            orConditions.push({ titreOriginal: { equals: anilistManga.title.native, mode: Prisma.QueryMode.insensitive } });
+            orConditions.push({ titresAlternatifs: { contains: anilistManga.title.native, mode: Prisma.QueryMode.insensitive } });
+          }
+
+          // Check against English/French title
+          if (anilistManga.title.english) {
+            orConditions.push({ titreFrancais: { equals: anilistManga.title.english, mode: Prisma.QueryMode.insensitive } });
+            orConditions.push({ titresAlternatifs: { contains: anilistManga.title.english, mode: Prisma.QueryMode.insensitive } });
+          }
+
+          // Check against romaji title if different from primary
+          if (anilistManga.title.romaji && anilistManga.title.romaji !== primaryTitle) {
+            orConditions.push({ titre: { equals: anilistManga.title.romaji, mode: Prisma.QueryMode.insensitive } });
+            orConditions.push({ titresAlternatifs: { contains: anilistManga.title.romaji, mode: Prisma.QueryMode.insensitive } });
+          }
+
+          // Search for existing manga
+          const existing = await this.prisma.akManga.findFirst({
+            where: {
+              OR: orConditions,
+            },
+            select: {
+              idManga: true,
+              titre: true,
+              titreOriginal: true,
+              titreFrancais: true,
+              titresAlternatifs: true,
+            },
+          });
+
+          return {
+            titre: primaryTitle,
+            exists: !!existing,
+            existingMangaId: existing?.idManga || null,
+            anilistData: anilistManga,
+            scrapedData: this.aniListService.mapToCreateMangaDto(anilistManga),
+          };
+        }),
+      );
+
+      const result = {
+        comparisons,
+        total: comparisons.length,
+        dateRange: { startDate, endDate },
+        source: 'AniList',
+      };
+
+      // Cache for 2 hours
+      await this.cacheService.set(cacheKey, result, 7200);
+      return result;
+    } catch (error: any) {
+      console.error('Error fetching mangas by date range from AniList:', error.message);
+      throw new Error('Failed to fetch mangas by date range from AniList');
+    }
+  }
+
   async lookupByIsbn(isbn: string, userId?: number) {
     try {
       let bookInfo: any = null;

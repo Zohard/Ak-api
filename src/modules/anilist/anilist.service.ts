@@ -923,4 +923,88 @@ export class AniListService {
 
     return `${year}-${month}-${day}`;
   }
+
+  async getMangasByDateRange(startDate: string, endDate: string, limit = 50): Promise<AniListManga[]> {
+    const maxPerPage = 50; // AniList API limit
+    const totalPages = Math.ceil(limit / maxPerPage);
+    const allManga: AniListManga[] = [];
+
+    for (let page = 1; page <= totalPages; page++) {
+      const remainingItems = limit - allManga.length;
+      const currentPageSize = Math.min(maxPerPage, remainingItems);
+
+      if (currentPageSize <= 0) break;
+
+      const pageManga = await this.getMangasPage(startDate, endDate, page, currentPageSize);
+      allManga.push(...pageManga);
+
+      // If we got fewer results than requested, we've reached the end
+      if (pageManga.length < currentPageSize) break;
+    }
+
+    return allManga.slice(0, limit);
+  }
+
+  private async getMangasPage(startDate: string, endDate: string, page: number, perPage: number): Promise<AniListManga[]> {
+    const graphqlQuery = `
+      query ($startDateGreater: FuzzyDateInt, $startDateLesser: FuzzyDateInt, $page: Int, $perPage: Int) {
+        Page(page: $page, perPage: $perPage) {
+          media(
+            startDate_greater: $startDateGreater,
+            startDate_lesser: $startDateLesser,
+            type: MANGA,
+            sort: [POPULARITY_DESC]
+          ) {
+            id
+            title { romaji english native }
+            description
+            startDate { year month day }
+            endDate { year month day }
+            coverImage { large medium }
+            bannerImage
+            genres
+            chapters
+            volumes
+            staff(perPage: 30) {
+              edges {
+                id
+                role
+                node { id name { full } primaryOccupations }
+              }
+            }
+            externalLinks { id type site url }
+            averageScore
+            meanScore
+            siteUrl
+          }
+        }
+      }
+    `;
+
+    try {
+      // Convert YYYY-MM-DD to fuzzy date format (YYYYMMDD as integer)
+      const startFuzzy = parseInt(startDate.replace(/-/g, ''));
+      const endFuzzy = parseInt(endDate.replace(/-/g, ''));
+
+      const response = await this.httpClient.post('', {
+        query: graphqlQuery,
+        variables: {
+          startDateGreater: startFuzzy,
+          startDateLesser: endFuzzy,
+          page: page,
+          perPage: perPage,
+        },
+      });
+
+      if (response.data.errors) {
+        this.logger.error('AniList API returned errors:', response.data.errors);
+        throw new Error('Failed to get manga by date range from AniList');
+      }
+
+      return response.data.data.Page.media;
+    } catch (error: any) {
+      this.logger.error('Error fetching manga by date range from AniList:', error.message);
+      throw new Error('Failed to connect to AniList API');
+    }
+  }
 }
