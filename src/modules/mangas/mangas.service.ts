@@ -1027,6 +1027,61 @@ export class MangasService extends BaseContentService<
     }
   }
 
+  /**
+   * Compare booknode manga releases with database
+   * Check if manga exists based on title and alternative titles
+   */
+  async compareBooknodeMangasWithDatabase(booknodeMangas: Array<{
+    titre: string;
+    auteur: string;
+    releaseDate: string;
+    imageUrl: string;
+    booknodeUrl: string;
+  }>) {
+    const comparisons = await Promise.all(
+      booknodeMangas.map(async (booknodeManga) => {
+        // Build comprehensive search conditions to check all title fields
+        const orConditions: any[] = [];
+
+        // Check against main title
+        if (booknodeManga.titre) {
+          orConditions.push({ titre: { equals: booknodeManga.titre, mode: Prisma.QueryMode.insensitive } });
+          orConditions.push({ titresAlternatifs: { contains: booknodeManga.titre, mode: Prisma.QueryMode.insensitive } });
+        }
+
+        // Search for existing manga
+        const existing = await this.prisma.akManga.findFirst({
+          where: {
+            OR: orConditions,
+          },
+          select: {
+            idManga: true,
+            titre: true,
+            titreOrig: true,
+            titreFr: true,
+            titresAlternatifs: true,
+          },
+        });
+
+        return {
+          titre: booknodeManga.titre,
+          auteur: booknodeManga.auteur,
+          releaseDate: booknodeManga.releaseDate,
+          imageUrl: booknodeManga.imageUrl,
+          booknodeUrl: booknodeManga.booknodeUrl,
+          exists: !!existing,
+          existingMangaId: existing?.idManga || null,
+        };
+      }),
+    );
+
+    return {
+      comparisons,
+      total: comparisons.length,
+      source: 'Booknode',
+    };
+  }
+
   async lookupByIsbn(isbn: string, userId?: number) {
     try {
       let bookInfo: any = null;

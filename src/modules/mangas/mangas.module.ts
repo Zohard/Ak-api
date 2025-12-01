@@ -8,6 +8,7 @@ import { CacheService } from '../../shared/services/cache.service';
 import { MediaModule } from '../media/media.module';
 import { AniListModule } from '../anilist/anilist.module';
 import { BooksModule } from '../books/books.module';
+import { ScrapeModule } from '../scrape/scrape.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { BooksModule } from '../books/books.module';
     MediaModule,
     AniListModule,
     BooksModule,
+    ScrapeModule,
   ],
   controllers: [MangasController],
   providers: [MangasService, GoogleBooksService, PrismaService, CacheService],

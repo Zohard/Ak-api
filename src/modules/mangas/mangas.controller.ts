@@ -36,6 +36,7 @@ import { OptionalJwtAuthGuard } from '../../common/guards/optional-jwt-auth.guar
 import { AdminGuard } from '../../common/guards/admin.guard';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ImageKitService } from '../media/imagekit.service';
+import { ScrapeService } from '../scrape/scrape.service';
 
 @ApiTags('Mangas')
 @Controller('mangas')
@@ -44,6 +45,7 @@ export class MangasController {
     private readonly mangasService: MangasService,
     private readonly imageKitService: ImageKitService,
     private readonly googleBooksService: GoogleBooksService,
+    private readonly scrapeService: ScrapeService,
   ) {}
 
   @Get()
@@ -257,6 +259,22 @@ export class MangasController {
     const parsedMaxResults = maxResults ? parseInt(maxResults) : 40;
     const language = lang || 'fr';
     return this.googleBooksService.searchMangaByMonth(year, month, parsedMaxResults, language);
+  }
+
+  @Get('booknode/month/:year/:month')
+  @ApiOperation({ summary: 'Récupérer les parutions manga depuis booknode.com par mois avec comparaison à la base de données' })
+  @ApiParam({ name: 'year', description: 'Année', example: 2026 })
+  @ApiParam({ name: 'month', description: 'Mois (1-12)', example: 5 })
+  @ApiResponse({ status: 200, description: 'Mangas trouvés sur booknode.com avec statut d\'existence dans la base' })
+  async getMangasByBooknode(
+    @Param('year', ParseIntPipe) year: number,
+    @Param('month', ParseIntPipe) month: number,
+  ) {
+    // Scrape booknode.com
+    const booknodeMangas = await this.scrapeService.scrapeBooknodeManga(year, month);
+
+    // Compare with database
+    return this.mangasService.compareBooknodeMangasWithDatabase(booknodeMangas);
   }
 
   @Get('isbn/lookup')

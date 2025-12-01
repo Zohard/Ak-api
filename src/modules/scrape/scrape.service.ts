@@ -698,4 +698,72 @@ export class ScrapeService {
 
     return this.mergeInfo(mal, nj);
   }
+
+  /**
+   * Scrape manga releases from booknode.com for a specific year and month
+   * @param year The year (e.g. 2026)
+   * @param month The month (1-12)
+   * @returns Array of manga releases
+   */
+  async scrapeBooknodeManga(year: number, month: number) {
+    // Format: dates_de_sortie-YYYY-MM
+    const monthStr = month.toString().padStart(2, '0');
+    const url = `https://booknode.com/dates_de_sortie-${year}-${monthStr}/manga#calendarzone`;
+
+    const $ = await this.fetchHtml(url);
+    const mangas: Array<{
+      titre: string;
+      auteur: string;
+      releaseDate: string;
+      imageUrl: string;
+      booknodeUrl: string;
+    }> = [];
+
+    // Extract manga from .oneofthebook divs
+    $('.oneofthebook').each((_, element) => {
+      const $element = $(element);
+
+      // Extract title and booknode URL
+      const titleLink = $element.find('a.main_a.addable_elem').first();
+      const titre = titleLink.attr('title')?.replace(/^Voir la page du livre\s+/i, '').trim() || titleLink.text().trim();
+      const booknodeUrl = titleLink.attr('href') || '';
+
+      // Extract author
+      const auteurLink = $element.find('a.auteur').first();
+      const auteur = auteurLink.attr('title')?.replace(/^Voir la page de l'auteur\s+/i, '').trim() || auteurLink.text().trim();
+
+      // Extract release date
+      const releaseDateSpan = $element.find('span').filter((_, el) => {
+        const text = $(el).text();
+        return text.includes('Sortie le');
+      }).first();
+      const releaseDate = releaseDateSpan.text().replace('Sortie le', '').trim();
+
+      // Extract image URL
+      const img = $element.find('img.main_img').first();
+      const imageUrl = img.attr('data-src') || img.attr('src') || '';
+
+      // Only add if we have at least a title
+      if (titre && titre.length > 0) {
+        mangas.push({
+          titre,
+          auteur,
+          releaseDate,
+          imageUrl,
+          booknodeUrl: booknodeUrl.startsWith('http') ? booknodeUrl : `https://booknode.com${booknodeUrl}`
+        });
+      }
+    });
+
+    // Remove duplicates based on title and author
+    const uniqueMangas = new Map();
+    mangas.forEach(manga => {
+      const key = `${manga.titre.toLowerCase()}|${manga.auteur.toLowerCase()}`;
+      if (!uniqueMangas.has(key)) {
+        uniqueMangas.set(key, manga);
+      }
+    });
+
+    return Array.from(uniqueMangas.values());
+  }
 }
