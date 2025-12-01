@@ -766,4 +766,84 @@ export class ScrapeService {
 
     return Array.from(uniqueMangas.values());
   }
+
+  /**
+   * Scrape detailed manga information from a booknode.com book page
+   * @param url The booknode book URL
+   * @returns Detailed manga information
+   */
+  async scrapeBooknodeMangaDetails(url: string) {
+    const $ = await this.fetchHtml(url);
+
+    // Extract title
+    const titre = $('h1').first().text().trim();
+
+    // Extract authors and illustrators
+    const auteurs: Array<{ name: string; role: string }> = [];
+    $('.main-bloc-right h4').filter((_, el) => $(el).text().includes('Auteur')).first().parent().find('ul li').each((_, li) => {
+      const $li = $(li);
+      const nameLink = $li.find('a').first();
+      const name = nameLink.find('span').text().trim();
+      const roleSmall = $li.find('small').text().trim();
+
+      if (name && roleSmall) {
+        auteurs.push({
+          name,
+          role: roleSmall.replace(/[()]/g, '') // Remove parentheses
+        });
+      }
+    });
+
+    // Extract cover image
+    const coverImg = $('.main-cover.physical-cover img').first();
+    const coverUrl = coverImg.attr('src') || coverImg.attr('data-src') || '';
+
+    // Extract themes
+    const themes: string[] = [];
+    $('h4').filter((_, el) => $(el).text().includes('Thèmes')).first().parent().find('a').each((_, a) => {
+      const theme = $(a).text().trim();
+      if (theme) themes.push(theme);
+    });
+
+    // Extract editors
+    const editeurs: Array<{ name: string; collection?: string }> = [];
+    $('.panel-info.panel-index h3').filter((_, el) => $(el).text().includes('Editeurs')).first().parent().find('.list-group-item').each((_, li) => {
+      const $li = $(li);
+      const editorName = $li.find('> a').first().text().trim();
+      const collectionName = $li.find('ul li a').first().text().trim();
+
+      if (editorName) {
+        editeurs.push({
+          name: editorName,
+          collection: collectionName || undefined
+        });
+      }
+    });
+
+    // Extract serie information
+    let serie = '';
+    $('.main-bloc-right h4').filter((_, el) => $(el).text().includes('Série')).first().parent().find('a').each((_, a) => {
+      serie = $(a).text().trim().replace(/\s*\(\d+\s+livres?\)\s*/i, '');
+    });
+
+    // Extract description
+    let description = '';
+    $('.frontbook-description .actual-text').each((_, el) => {
+      const text = $(el).text().trim();
+      // Remove "Résumé" title if present
+      description = text.replace(/^Résumé\s*/i, '').trim();
+    });
+
+    return {
+      source: 'booknode',
+      url,
+      titre,
+      auteurs,
+      coverUrl,
+      themes,
+      editeurs,
+      serie,
+      description
+    };
+  }
 }
