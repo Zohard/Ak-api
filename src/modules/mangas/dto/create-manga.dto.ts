@@ -96,4 +96,44 @@ export class CreateMangaDto {
   @IsOptional()
   @IsString()
   titreFr?: string;
+
+  @ApiPropertyOptional({
+    description: 'Pays d\'origine',
+    example: 'Japon',
+  })
+  @IsOptional()
+  @IsString()
+  origine?: string;
+
+  @ApiPropertyOptional({
+    description: 'Titre original dans le pays d\'origine',
+    example: 'ワンピース',
+  })
+  @IsOptional()
+  @IsString()
+  titreOrig?: string;
+
+  @ApiPropertyOptional({
+    description: 'Titres alternatifs (un par ligne)',
+    example: 'ワンピース\nWan Pīsu',
+  })
+  @IsOptional()
+  @IsString()
+  titresAlternatifs?: string;
+
+  @ApiPropertyOptional({
+    description: 'Code ISBN-13 (pour artbooks et one-shots)',
+    example: '978-4-08-870460-6',
+  })
+  @IsOptional()
+  @IsString()
+  isbn?: string;
+
+  @ApiPropertyOptional({
+    description: 'Commentaire public sur la fiche (BBCode autorisé)',
+    example: 'La série compte 105+ volumes en cours de publication',
+  })
+  @IsOptional()
+  @IsString()
+  precisions?: string;
 }
