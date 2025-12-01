@@ -39,12 +39,168 @@ export class GoogleBooksService {
   constructor(private readonly httpService: HttpService) {}
 
   /**
-   * Search manga releases in France by month
+   * Check if a book is likely a real manga based on various criteria
+   */
+  private isLikelyManga(item: any, language: 'fr' | 'en' = 'fr'): boolean {
+    const volumeInfo = item.volumeInfo;
+    const publisher = volumeInfo.publisher || '';
+    const title = volumeInfo.title || '';
+    const categories = (volumeInfo.categories || []).join(' ').toLowerCase();
+
+    if (language === 'fr') {
+      // Common French manga publishers
+      const frenchMangaPublishers = [
+        'Glénat',
+        'Pika',
+        'Kana',
+        'Kurokawa',
+        'Ki-oon',
+        'Delcourt',
+        'Akata',
+        'Casterman',
+        'Doki-Doki',
+        'Komikku',
+        'Panini',
+        'Soleil',
+        'Mangetsu',
+        'Isan Manga',
+        'Taifu Comics',
+        'Vega',
+        'Black Box',
+        'Ankama',
+      ];
+
+      // Check if publisher is a known French manga publisher
+      if (frenchMangaPublishers.some(pub => publisher.includes(pub))) {
+        return true;
+      }
+
+      // If categories explicitly mention comics/manga in French context
+      if (categories.includes('bandes dessinées') || categories.includes('comics')) {
+        return true;
+      }
+
+      // If it has "Tome" or "Vol" in title (French manga pattern)
+      if (/tome\s*\d+|vol\.?\s*\d+|t\d+/i.test(title)) {
+        return true;
+      }
+    } else {
+      // English/International manga publishers
+      const englishMangaPublishers = [
+        'VIZ Media',
+        'Viz',
+        'Kodansha',
+        'Seven Seas',
+        'Yen Press',
+        'Dark Horse',
+        'Vertical',
+        'Tokyopop',
+        'Del Rey',
+        'Square Enix',
+        'Digital Manga',
+        'One Peace Books',
+        'J-Novel Club',
+        'Denpa',
+        'Ablaze',
+        'Ghost Ship',
+        'Airship',
+      ];
+
+      // Check if publisher is a known English manga publisher
+      if (englishMangaPublishers.some(pub => publisher.toLowerCase().includes(pub.toLowerCase()))) {
+        return true;
+      }
+
+      // If it has "Vol" or "Volume" in title (English manga pattern)
+      if (/vol\.?\s*\d+|volume\s*\d+/i.test(title)) {
+        return true;
+      }
+
+      // Check for manga-related categories
+      if (categories.includes('manga') || categories.includes('graphic novels')) {
+        return true;
+      }
+    }
+
+    // Exclude obvious non-manga (common to both languages)
+    const nonMangaPublishers = ['Harper', 'HarperCollins', 'Scholastic', 'Random House', 'Penguin'];
+    if (nonMangaPublishers.some(pub => publisher.includes(pub))) {
+      return false;
+    }
+
+    // Exclude if title contains common non-manga patterns
+    const nonMangaPatterns = ['Warriors', 'Warrior Cats', 'Survivors', 'Diary of a Wimpy Kid'];
+    if (nonMangaPatterns.some(pattern => title.includes(pattern))) {
+      return false;
+    }
+
+    // Default to true if we can't determine (user can filter later)
+    return true;
+  }
+
+  /**
+   * Search manga releases by year
+   * @param year Year (e.g., 2024)
+   * @param maxResults Maximum number of results (default 200)
+   * @param language Language filter: 'fr' for French, 'en' for English/International
+   */
+  async searchMangaByYear(year: number, maxResults = 200, language: 'fr' | 'en' = 'fr') {
+    this.logger.log(`Searching Google Books for manga: year ${year} (lang: ${language}, maxResults: ${maxResults})`);
+
+    const allMangas: any[] = [];
+
+    // Search month by month for better coverage
+    for (let month = 1; month <= 12; month++) {
+      try {
+        const monthResults = await this.searchMangaByMonth(year, month, Math.ceil(maxResults / 12), language);
+        allMangas.push(...monthResults.mangas);
+        this.logger.log(`Month ${month}: Found ${monthResults.mangas.length} mangas`);
+      } catch (error) {
+        this.logger.error(`Error searching month ${month}:`, error.message);
+      }
+    }
+
+    // Remove duplicates based on ISBN or title
+    const uniqueMangas = this.removeDuplicates(allMangas);
+
+    this.logger.log(`Total unique mangas found for ${year}: ${uniqueMangas.length}`);
+
+    return {
+      mangas: uniqueMangas,
+      totalItems: uniqueMangas.length,
+      year,
+      language,
+    };
+  }
+
+  /**
+   * Remove duplicate manga entries
+   */
+  private removeDuplicates(mangas: any[]): any[] {
+    const seen = new Set<string>();
+    const unique: any[] = [];
+
+    for (const manga of mangas) {
+      // Use ISBN-13 as primary identifier, fallback to title
+      const identifier = manga.isbn13 || manga.isbn10 || manga.title.toLowerCase();
+
+      if (!seen.has(identifier)) {
+        seen.add(identifier);
+        unique.push(manga);
+      }
+    }
+
+    return unique;
+  }
+
+  /**
+   * Search manga releases by month
    * @param year Year (e.g., 2024)
    * @param month Month (1-12)
    * @param maxResults Maximum number of results (default 40)
+   * @param language Language filter: 'fr' for French, 'en' for English/International
    */
-  async searchMangaByMonth(year: number, month: number, maxResults = 40) {
+  async searchMangaByMonth(year: number, month: number, maxResults = 40, language: 'fr' | 'en' = 'fr') {
     try {
       // Format dates for the search query
       const startDate = `${year}-${String(month).padStart(2, '0')}-01`;
@@ -52,18 +208,18 @@ export class GoogleBooksService {
       const endDate = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
 
       // Broader Google Books query to get more results
-      // Just search for manga in French, don't restrict to first volumes
+      // Just search for manga in the specified language
       const query = `subject:manga`;
 
       const params = {
         q: query,
-        langRestrict: 'fr', // French language
+        langRestrict: language, // 'fr' or 'en'
         printType: 'books',
         orderBy: 'newest',
         maxResults: Math.min(maxResults, 40), // Google Books API limit
       };
 
-      this.logger.log(`Searching Google Books for manga: ${year}-${month} (maxResults: ${maxResults})`);
+      this.logger.log(`Searching Google Books for manga: ${year}-${month} (lang: ${language}, maxResults: ${maxResults})`);
 
       // Fetch multiple pages if maxResults > 40
       const allItems: GoogleBooksVolume[] = [];
@@ -99,6 +255,7 @@ export class GoogleBooksService {
 
       // Filter and transform results
       const mangas = allItems
+        .filter((item) => this.isLikelyManga(item, language)) // Filter out non-manga first with language context
         .map((item) => this.transformGoogleBooksItem(item))
         .filter((manga) => {
           // Additional filtering to ensure it's a manga and has valid data
@@ -145,6 +302,7 @@ export class GoogleBooksService {
         totalItems: allItems.length,
         filteredCount: mangas.length,
         query,
+        language,
         dateRange: {
           start: startDate,
           end: endDate,

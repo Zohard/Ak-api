@@ -225,19 +225,38 @@ export class MangasController {
     return this.mangasService.getMangasByDateRange(startDate, endDate, parsedLimit);
   }
 
+  @Get('googlebooks/year/:year')
+  @ApiOperation({ summary: 'Récupérer toutes les parutions manga via Google Books pour une année' })
+  @ApiParam({ name: 'year', description: 'Année', example: 2024 })
+  @ApiQuery({ name: 'maxResults', required: false, description: 'Nombre maximum de résultats', example: 200 })
+  @ApiQuery({ name: 'lang', required: false, description: 'Langue (fr=Français, en=Anglais/International)', example: 'fr', enum: ['fr', 'en'] })
+  @ApiResponse({ status: 200, description: 'Mangas trouvés sur Google Books pour l\'année' })
+  async getMangasByGoogleBooksYear(
+    @Param('year', ParseIntPipe) year: number,
+    @Query('maxResults') maxResults?: string,
+    @Query('lang') lang?: 'fr' | 'en',
+  ) {
+    const parsedMaxResults = maxResults ? parseInt(maxResults) : 200;
+    const language = lang || 'fr';
+    return this.googleBooksService.searchMangaByYear(year, parsedMaxResults, language);
+  }
+
   @Get('googlebooks/month/:year/:month')
-  @ApiOperation({ summary: 'Récupérer dernières parutions manga en France via Google Books par mois' })
+  @ApiOperation({ summary: 'Récupérer dernières parutions manga via Google Books par mois' })
   @ApiParam({ name: 'year', description: 'Année', example: 2024 })
   @ApiParam({ name: 'month', description: 'Mois (1-12)', example: 1 })
   @ApiQuery({ name: 'maxResults', required: false, description: 'Nombre maximum de résultats', example: 40 })
+  @ApiQuery({ name: 'lang', required: false, description: 'Langue (fr=Français, en=Anglais/International)', example: 'fr', enum: ['fr', 'en'] })
   @ApiResponse({ status: 200, description: 'Mangas trouvés sur Google Books' })
   async getMangasByGoogleBooks(
     @Param('year', ParseIntPipe) year: number,
     @Param('month', ParseIntPipe) month: number,
     @Query('maxResults') maxResults?: string,
+    @Query('lang') lang?: 'fr' | 'en',
   ) {
     const parsedMaxResults = maxResults ? parseInt(maxResults) : 40;
-    return this.googleBooksService.searchMangaByMonth(year, month, parsedMaxResults);
+    const language = lang || 'fr';
+    return this.googleBooksService.searchMangaByMonth(year, month, parsedMaxResults, language);
   }
 
   @Get('isbn/lookup')
