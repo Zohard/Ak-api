@@ -51,11 +51,9 @@ export class GoogleBooksService {
       const lastDay = new Date(year, month, 0).getDate();
       const endDate = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
 
-      // Google Books query:
-      // - subject:manga = manga category
-      // - intitle:"Tome 1" OR intitle:"Vol. 1" OR intitle:"Volume 1" = first volume
-      // - inpublisher:france = French publishers (may not work perfectly)
-      const query = `subject:manga (intitle:"Tome 1" OR intitle:"Vol 1" OR intitle:"Volume 1" OR intitle:"T01" OR intitle:"Vol.1")`;
+      // Broader Google Books query to get more results
+      // Just search for manga in French, don't restrict to first volumes
+      const query = `subject:manga`;
 
       const params = {
         q: query,
@@ -63,20 +61,44 @@ export class GoogleBooksService {
         printType: 'books',
         orderBy: 'newest',
         maxResults: Math.min(maxResults, 40), // Google Books API limit
-        // Filter by publish date range (not always accurate)
-        // Using a broader search since date filtering is not perfect
       };
 
-      this.logger.log(`Searching Google Books for manga: ${year}-${month}`);
+      this.logger.log(`Searching Google Books for manga: ${year}-${month} (maxResults: ${maxResults})`);
 
-      const response = await firstValueFrom(
-        this.httpService.get<GoogleBooksResponse>(this.GOOGLE_BOOKS_API_URL, { params }),
-      );
+      // Fetch multiple pages if maxResults > 40
+      const allItems: GoogleBooksVolume[] = [];
+      const requestsNeeded = Math.ceil(maxResults / 40);
 
-      const items = response.data.items || [];
+      for (let i = 0; i < requestsNeeded; i++) {
+        const startIndex = i * 40;
+        const currentMaxResults = Math.min(40, maxResults - startIndex);
+
+        if (currentMaxResults <= 0) break;
+
+        try {
+          const response = await firstValueFrom(
+            this.httpService.get<GoogleBooksResponse>(this.GOOGLE_BOOKS_API_URL, {
+              params: { ...params, startIndex, maxResults: currentMaxResults }
+            }),
+          );
+
+          const items = response.data.items || [];
+          allItems.push(...items);
+
+          this.logger.log(`Fetched ${items.length} items (page ${i + 1}/${requestsNeeded})`);
+
+          // If we got fewer items than requested, no point in continuing
+          if (items.length < currentMaxResults) break;
+        } catch (error) {
+          this.logger.error(`Error fetching page ${i + 1}: ${error.message}`);
+          break;
+        }
+      }
+
+      this.logger.log(`Total items fetched from Google Books: ${allItems.length}`);
 
       // Filter and transform results
-      const mangas = items
+      const mangas = allItems
         .map((item) => this.transformGoogleBooksItem(item))
         .filter((manga) => {
           // Additional filtering to ensure it's a manga and has valid data
@@ -84,25 +106,49 @@ export class GoogleBooksService {
 
           // Check if published date is in the requested month
           if (manga.publishedDate) {
-            const pubDate = new Date(manga.publishedDate);
-            const pubYear = pubDate.getFullYear();
-            const pubMonth = pubDate.getMonth() + 1;
+            // Handle different date formats from Google Books
+            const dateStr = manga.publishedDate;
 
-            // Only include if it matches the requested month/year
-            if (pubYear !== year || pubMonth !== month) {
-              return false;
+            // Try to parse the date
+            // Google Books returns dates in various formats: "2024", "2024-01", "2024-01-15"
+            if (dateStr.startsWith(`${year}-${String(month).padStart(2, '0')}`)) {
+              return true;
             }
+
+            // Try full date parsing
+            const pubDate = new Date(dateStr);
+            if (!isNaN(pubDate.getTime())) {
+              const pubYear = pubDate.getFullYear();
+              const pubMonth = pubDate.getMonth() + 1;
+
+              if (pubYear === year && pubMonth === month) {
+                return true;
+              }
+            }
+
+            // If we only have year, don't filter it out completely
+            if (dateStr === `${year}`) {
+              return true;
+            }
+
+            return false;
           }
 
+          // Keep items without publication date for manual review
           return true;
         });
 
-      this.logger.log(`Found ${mangas.length} mangas for ${year}-${month}`);
+      this.logger.log(`Found ${mangas.length} mangas matching ${year}-${month} criteria`);
 
       return {
         mangas,
-        totalItems: response.data.totalItems,
+        totalItems: allItems.length,
+        filteredCount: mangas.length,
         query,
+        dateRange: {
+          start: startDate,
+          end: endDate,
+        },
       };
     } catch (error) {
       this.logger.error(`Error searching Google Books: ${error.message}`, error.stack);
