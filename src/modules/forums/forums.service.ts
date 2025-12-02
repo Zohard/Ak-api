@@ -52,12 +52,23 @@ export class ForumsService {
       );
 
       // Fetch all last messages in a single query (HUGE performance improvement!)
+      // Only select the fields we actually need (better performance)
       const lastMessages = allLastMsgIds.length > 0 ? await this.prisma.smfMessage.findMany({
         where: { idMsg: { in: allLastMsgIds } },
-        include: {
+        select: {
+          idMsg: true,
+          subject: true,
+          posterName: true,
+          posterTime: true,
+          idTopic: true,
           topic: {
-            include: {
-              firstMessage: true
+            select: {
+              numReplies: true,
+              firstMessage: {
+                select: {
+                  subject: true
+                }
+              }
             }
           }
         }
