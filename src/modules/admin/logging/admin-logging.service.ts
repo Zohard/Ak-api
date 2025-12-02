@@ -154,7 +154,7 @@ export class AdminLoggingService {
             `;
             if (anime && anime.length > 0) {
               title = anime[0].titre;
-              status = anime[0].statut === 1 ? '' : 'en attente';
+              status = anime[0].statut === 1 ? '' : anime[0].statut === 0 ? 'bloqué' : 'en attente';
             }
           } else if (log.manga > 0) {
             contentType = 'manga';
@@ -165,7 +165,7 @@ export class AdminLoggingService {
             `;
             if (manga && manga.length > 0) {
               title = manga[0].titre;
-              status = manga[0].statut === 1 ? '' : 'en attente';
+              status = manga[0].statut === 1 ? '' : manga[0].statut === 0 ? 'bloqué' : 'en attente';
             }
           } else if (log.business > 0) {
             contentType = 'business';
@@ -186,7 +186,7 @@ export class AdminLoggingService {
             `;
             if (game && game.length > 0) {
               title = game[0].titre;
-              status = game[0].statut === 1 ? '' : 'en attente';
+              status = game[0].statut === 1 ? '' : game[0].statut === 0 ? 'bloqué' : 'en attente';
             }
           }
 
