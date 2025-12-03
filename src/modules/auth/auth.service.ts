@@ -485,6 +485,12 @@ export class AuthService {
 
   async logout(refreshToken: string) {
     try {
+      // Skip if no refresh token provided
+      if (!refreshToken) {
+        this.metricsService.trackAuthAttempt('logout', 'success', 'local');
+        return { message: 'Logged out successfully' };
+      }
+
       // Revoke the refresh token
       const result = await this.prisma.akRefreshToken.updateMany({
         where: {
@@ -503,8 +509,10 @@ export class AuthService {
 
       return { message: 'Logged out successfully' };
     } catch (error) {
+      // Log error but don't fail - client will clear auth anyway
       this.metricsService.trackAuthAttempt('logout', 'failure', 'local');
-      throw new BadRequestException('Logout failed');
+      console.warn('Logout error (non-critical):', error);
+      return { message: 'Logged out successfully' };
     }
   }
 
