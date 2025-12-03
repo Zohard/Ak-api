@@ -1029,7 +1029,7 @@ export class MangasService extends BaseContentService<
 
   /**
    * Compare booknode manga releases with database
-   * Check if manga exists based on title and alternative titles
+   * Check if manga exists based on title and alternative titles (including Jikan data)
    */
   async compareBooknodeMangasWithDatabase(booknodeMangas: Array<{
     titre: string;
@@ -1055,6 +1055,8 @@ export class MangasService extends BaseContentService<
         // Check against base title (without volume number)
         if (baseTitre) {
           orConditions.push({ titre: { equals: baseTitre, mode: Prisma.QueryMode.insensitive } });
+          orConditions.push({ titreOrig: { equals: baseTitre, mode: Prisma.QueryMode.insensitive } });
+          orConditions.push({ titreFr: { equals: baseTitre, mode: Prisma.QueryMode.insensitive } });
           orConditions.push({ titresAlternatifs: { contains: baseTitre, mode: Prisma.QueryMode.insensitive } });
         }
 
@@ -1062,6 +1064,45 @@ export class MangasService extends BaseContentService<
         if (booknodeManga.titre !== baseTitre) {
           orConditions.push({ titre: { equals: booknodeManga.titre, mode: Prisma.QueryMode.insensitive } });
           orConditions.push({ titresAlternatifs: { contains: booknodeManga.titre, mode: Prisma.QueryMode.insensitive } });
+        }
+
+        // Try to fetch Jikan data to get Japanese and English titles
+        try {
+          const jikanUrl = new URL('https://api.jikan.moe/v4/manga');
+          jikanUrl.searchParams.set('q', baseTitre);
+          jikanUrl.searchParams.set('limit', '3');
+
+          const jikanResponse = await fetch(jikanUrl.toString());
+          if (jikanResponse.ok) {
+            const jikanData = await jikanResponse.json();
+            if (jikanData?.data && jikanData.data.length > 0) {
+              // Get the first result (or best match)
+              const jikanManga = jikanData.data.find((item: any) => item.type === 'Manga') || jikanData.data[0];
+
+              // Add Japanese title to search
+              if (jikanManga.title_japanese) {
+                orConditions.push({ titre: { equals: jikanManga.title_japanese, mode: Prisma.QueryMode.insensitive } });
+                orConditions.push({ titreOrig: { equals: jikanManga.title_japanese, mode: Prisma.QueryMode.insensitive } });
+                orConditions.push({ titresAlternatifs: { contains: jikanManga.title_japanese, mode: Prisma.QueryMode.insensitive } });
+              }
+
+              // Add English title to search
+              if (jikanManga.title_english) {
+                orConditions.push({ titre: { equals: jikanManga.title_english, mode: Prisma.QueryMode.insensitive } });
+                orConditions.push({ titreFr: { equals: jikanManga.title_english, mode: Prisma.QueryMode.insensitive } });
+                orConditions.push({ titresAlternatifs: { contains: jikanManga.title_english, mode: Prisma.QueryMode.insensitive } });
+              }
+
+              // Add Romaji title to search
+              if (jikanManga.title) {
+                orConditions.push({ titre: { equals: jikanManga.title, mode: Prisma.QueryMode.insensitive } });
+                orConditions.push({ titresAlternatifs: { contains: jikanManga.title, mode: Prisma.QueryMode.insensitive } });
+              }
+            }
+          }
+        } catch (jikanErr) {
+          // Continue without Jikan data if it fails
+          console.warn(`Failed to fetch Jikan data for "${baseTitre}":`, jikanErr.message);
         }
 
         // Search for existing manga

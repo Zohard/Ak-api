@@ -290,6 +290,37 @@ export class MangasController {
     return this.scrapeService.scrapeBooknodeMangaDetails(url);
   }
 
+  @Get('jikan/search')
+  @ApiOperation({ summary: 'Rechercher un manga via Jikan API (MyAnimeList)' })
+  @ApiQuery({ name: 'q', required: true, description: 'Titre du manga à rechercher' })
+  @ApiQuery({ name: 'limit', required: false, description: 'Nombre de résultats max', example: 5 })
+  @ApiResponse({ status: 200, description: 'Résultats de recherche depuis Jikan API' })
+  async searchJikanManga(
+    @Query('q') query: string,
+    @Query('limit') limit?: string,
+  ) {
+    if (!query) {
+      throw new BadRequestException('Query parameter is required');
+    }
+
+    try {
+      const url = new URL('https://api.jikan.moe/v4/manga');
+      url.searchParams.set('q', query);
+      if (limit) {
+        url.searchParams.set('limit', limit);
+      }
+
+      const response = await fetch(url.toString());
+      if (!response.ok) {
+        throw new BadRequestException(`Jikan API error: ${response.statusText}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      throw new BadRequestException(`Failed to fetch from Jikan API: ${error.message}`);
+    }
+  }
+
   @Get('isbn/lookup')
   @UseGuards(OptionalJwtAuthGuard)
   @ApiOperation({ summary: 'Lookup manga by ISBN barcode' })
