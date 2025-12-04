@@ -97,22 +97,33 @@ export class SourcesExternesService {
     // Normalize title for better matching: remove extra spaces, special chars
     const normalizedTitle = title.trim();
 
+    console.log(`[Title Matching Debug] Original title: "${title}"`);
+
     // Create variations of the title for better matching
     const titleVariations = [
       normalizedTitle,
       normalizedTitle.replace(/\s+/g, ' '), // Normalize spaces
       normalizedTitle.replace(/[^\w\s]/g, ''), // Remove special chars
       normalizedTitle.replace(/[^\w\s]/g, ' ').replace(/\s+/g, ' '), // Remove special chars and normalize spaces
-      normalizedTitle.replace(/2nd/gi, 'Season 2'), // Handle season variations
+
+      // Season variations
+      normalizedTitle.replace(/2nd\s+Season/gi, 'Season 2'),
+      normalizedTitle.replace(/2nd\s+Season/gi, '2nd'),
+      normalizedTitle.replace(/2nd\s+Season/gi, '2'),
+      normalizedTitle.replace(/Season\s*2/gi, '2nd Season'),
       normalizedTitle.replace(/Season\s*2/gi, '2nd'),
-      normalizedTitle.replace(/2nd/gi, '2'),
       normalizedTitle.replace(/Season\s*2/gi, '2'),
+      normalizedTitle.replace(/2nd/gi, 'Season 2'),
+      normalizedTitle.replace(/2nd/gi, '2'),
+
       normalizedTitle.replace(/:\s*/g, ' '), // Replace colons with spaces
       normalizedTitle.replace(/\s*-\s*/g, ' '), // Replace dashes with spaces
     ];
 
     // Remove duplicates from variations
     const uniqueVariations = [...new Set(titleVariations)];
+
+    console.log(`[Title Matching Debug] Generated ${uniqueVariations.length} variations:`, uniqueVariations.slice(0, 5));
 
     // Search for anime in database using multiple fields with flexible matching
     const existingAnime = await this.prisma.akAnime.findFirst({
@@ -138,6 +149,17 @@ export class SourcesExternesService {
         titresAlternatifs: true,
       },
     });
+
+    if (existingAnime) {
+      console.log(`[Title Matching Debug] MATCH FOUND for "${title}":`, {
+        id: existingAnime.idAnime,
+        titre: existingAnime.titre,
+        titreOrig: existingAnime.titreOrig,
+        titreFr: existingAnime.titreFr,
+      });
+    } else {
+      console.log(`[Title Matching Debug] NO MATCH for "${title}"`);
+    }
 
     const comparison: SourcesExternesAnimeComparisonDto = {
       titre: title,
