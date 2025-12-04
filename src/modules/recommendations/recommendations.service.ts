@@ -7,7 +7,7 @@ interface TagWeight {
   weight: number;
 }
 
-interface RecommendationItem {
+export interface RecommendationItem {
   id: number;
   title: string;
   titleFr?: string;
@@ -21,7 +21,7 @@ interface RecommendationItem {
   matchingTags: string[];
 }
 
-interface RecommendationsResponse {
+export interface RecommendationsResponse {
   recommendations: RecommendationItem[];
   userTopTags: { tag: string; weight: number }[];
   totalAnalyzed: number;
@@ -158,8 +158,8 @@ export class RecommendationsService {
       // Extract tags from business relations (genres, studios, etc.)
       if (item.anime?.businessRelations) {
         for (const relation of item.anime.businessRelations) {
-          if (relation.business?.nomBusiness) {
-            const tagName = relation.business.nomBusiness.toLowerCase().trim();
+          if (relation.business?.denomination) {
+            const tagName = relation.business.denomination.toLowerCase().trim();
             tagWeightMap.set(tagName, (tagWeightMap.get(tagName) || 0) + weight);
           }
         }
@@ -186,8 +186,8 @@ export class RecommendationsService {
       // Extract tags from business relations
       if (item.manga?.businessRelations) {
         for (const relation of item.manga.businessRelations) {
-          if (relation.business?.nomBusiness) {
-            const tagName = relation.business.nomBusiness.toLowerCase().trim();
+          if (relation.business?.denomination) {
+            const tagName = relation.business.denomination.toLowerCase().trim();
             tagWeightMap.set(tagName, (tagWeightMap.get(tagName) || 0) + weight);
           }
         }
@@ -268,7 +268,7 @@ export class RecommendationsService {
         businessRelations: {
           some: {
             business: {
-              nomBusiness: {
+              denomination: {
                 in: topTags.map(t => t.charAt(0).toUpperCase() + t.slice(1)),
                 mode: 'insensitive',
               },
@@ -291,13 +291,15 @@ export class RecommendationsService {
       let tagScore = 0;
 
       // Calculate tag matching score
-      for (const relation of anime.businessRelations || []) {
-        const businessName = relation.business?.nomBusiness?.toLowerCase().trim();
-        if (businessName) {
-          const tagWeight = tagWeights.find(tw => tw.tagName === businessName);
-          if (tagWeight) {
-            matchingTags.push(businessName);
-            tagScore += tagWeight.weight;
+      if (anime.businessRelations) {
+        for (const relation of anime.businessRelations) {
+          const businessName = relation.business?.denomination?.toLowerCase().trim();
+          if (businessName) {
+            const tagWeight = tagWeights.find(tw => tw.tagName === businessName);
+            if (tagWeight) {
+              matchingTags.push(businessName);
+              tagScore += tagWeight.weight;
+            }
           }
         }
       }
@@ -349,7 +351,7 @@ export class RecommendationsService {
             businessRelations: {
               some: {
                 business: {
-                  nomBusiness: {
+                  denomination: {
                     in: topTags.map(t => t.charAt(0).toUpperCase() + t.slice(1)),
                     mode: 'insensitive',
                   },
@@ -390,13 +392,15 @@ export class RecommendationsService {
       }
 
       // Match tags from business relations
-      for (const relation of manga.businessRelations || []) {
-        const businessName = relation.business?.nomBusiness?.toLowerCase().trim();
-        if (businessName) {
-          const tagWeight = tagWeights.find(tw => tw.tagName === businessName);
-          if (tagWeight && !matchingTags.includes(businessName)) {
-            matchingTags.push(businessName);
-            tagScore += tagWeight.weight;
+      if (manga.businessRelations) {
+        for (const relation of manga.businessRelations) {
+          const businessName = relation.business?.denomination?.toLowerCase().trim();
+          if (businessName) {
+            const tagWeight = tagWeights.find(tw => tw.tagName === businessName);
+            if (tagWeight && !matchingTags.includes(businessName)) {
+              matchingTags.push(businessName);
+              tagScore += tagWeight.weight;
+            }
           }
         }
       }
@@ -416,7 +420,7 @@ export class RecommendationsService {
         averageRating: avgRating,
         reviewCount,
         synopsis: manga.synopsis || undefined,
-        year: manga.annee || undefined,
+        year: manga.annee ? parseInt(manga.annee) : undefined,
         type: 'manga' as const,
         score,
         matchingTags,
@@ -430,7 +434,7 @@ export class RecommendationsService {
     ];
 
     for (const pattern of patterns) {
-      await this.cacheService.deletePattern(pattern);
+      await this.cacheService.delByPattern(pattern);
     }
   }
 }
