@@ -120,13 +120,13 @@ export class SourcesExternesService {
         OR: [
           // Exact matches with any title variation on all title fields
           ...uniqueVariations.flatMap(variation => [
-            { titre: { equals: variation, mode: 'insensitive' } },
-            { titreOrig: { equals: variation, mode: 'insensitive' } },
-            { titreFr: { equals: variation, mode: 'insensitive' } },
+            { titre: { equals: variation, mode: 'insensitive' as const } },
+            { titreOrig: { equals: variation, mode: 'insensitive' as const } },
+            { titreFr: { equals: variation, mode: 'insensitive' as const } },
           ]),
           // Contains matches for alternative titles (handles comma-separated lists)
           ...uniqueVariations.map(variation => ({
-            titresAlternatifs: { contains: variation, mode: 'insensitive' }
+            titresAlternatifs: { contains: variation, mode: 'insensitive' as const }
           })),
         ],
       },
