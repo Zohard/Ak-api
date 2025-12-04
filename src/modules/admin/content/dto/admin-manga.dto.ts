@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsInt, IsNotEmpty, IsOptional, IsString, Min, Max, IsIn } from 'class-validator';
-import { Type } from 'class-transformer';
+import { Type, Transform } from 'class-transformer';
 
 export class CreateAdminMangaDto {
   @ApiProperty({ description: 'Titre du manga' })
@@ -51,6 +51,11 @@ export class CreateAdminMangaDto {
 
   @ApiPropertyOptional()
   @IsOptional()
+  @Transform(({ value }) => {
+    // Convert number to string, or keep string as is
+    if (value === null || value === undefined) return value;
+    return String(value);
+  })
   @IsString()
   nbVolumes?: string;
 

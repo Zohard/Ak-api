@@ -9,6 +9,7 @@ import {
   ValidateIf,
   Allow,
 } from 'class-validator';
+import { Transform } from 'class-transformer';
 
 export class CreateMangaDto {
   @ApiProperty({
@@ -66,6 +67,11 @@ export class CreateMangaDto {
     example: '105',
   })
   @IsOptional()
+  @Transform(({ value }) => {
+    // Convert number to string, or keep string as is
+    if (value === null || value === undefined) return value;
+    return String(value);
+  })
   @IsString()
   nbVolumes?: string;
 
