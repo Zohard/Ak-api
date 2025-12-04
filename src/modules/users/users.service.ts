@@ -19,16 +19,10 @@ export class UsersService {
     const { page, limit, search, sortBy, sortOrder } = query;
     const skip = ((page || 1) - 1) * (limit || 20);
 
-    // Build where clause for search
-    const where = search
+    // Build where clause for search - only search by memberName (username)
+    const where = search && search.trim()
       ? {
-        OR: [
-          { memberName: { startsWith: search, mode: 'insensitive' as const } },
-          { realName: { startsWith: search, mode: 'insensitive' as const } },
-          {
-            emailAddress: { startsWith: search, mode: 'insensitive' as const },
-          },
-        ],
+        memberName: { startsWith: search.trim(), mode: 'insensitive' as const }
       }
       : {};
 
