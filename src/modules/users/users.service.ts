@@ -22,14 +22,14 @@ export class UsersService {
     // Build where clause for search
     const where = search
       ? {
-          OR: [
-            { memberName: { contains: search, mode: 'insensitive' as const } },
-            { realName: { contains: search, mode: 'insensitive' as const } },
-            {
-              emailAddress: { contains: search, mode: 'insensitive' as const },
-            },
-          ],
-        }
+        OR: [
+          { memberName: { startsWith: search, mode: 'insensitive' as const } },
+          { realName: { startsWith: search, mode: 'insensitive' as const } },
+          {
+            emailAddress: { startsWith: search, mode: 'insensitive' as const },
+          },
+        ],
+      }
       : {};
 
     // Build order by clause
