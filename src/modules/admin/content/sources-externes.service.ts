@@ -94,14 +94,40 @@ export class SourcesExternesService {
   }
 
   private async compareAnimeWithDatabase(title: string): Promise<SourcesExternesAnimeComparisonDto> {
-    // Search for anime in database using multiple fields
+    // Normalize title for better matching: remove extra spaces, special chars
+    const normalizedTitle = title.trim();
+
+    // Create variations of the title for better matching
+    const titleVariations = [
+      normalizedTitle,
+      normalizedTitle.replace(/\s+/g, ' '), // Normalize spaces
+      normalizedTitle.replace(/[^\w\s]/g, ''), // Remove special chars
+      normalizedTitle.replace(/[^\w\s]/g, ' ').replace(/\s+/g, ' '), // Remove special chars and normalize spaces
+      normalizedTitle.replace(/2nd/gi, 'Season 2'), // Handle season variations
+      normalizedTitle.replace(/Season\s*2/gi, '2nd'),
+      normalizedTitle.replace(/2nd/gi, '2'),
+      normalizedTitle.replace(/Season\s*2/gi, '2'),
+      normalizedTitle.replace(/:\s*/g, ' '), // Replace colons with spaces
+      normalizedTitle.replace(/\s*-\s*/g, ' '), // Replace dashes with spaces
+    ];
+
+    // Remove duplicates from variations
+    const uniqueVariations = [...new Set(titleVariations)];
+
+    // Search for anime in database using multiple fields with flexible matching
     const existingAnime = await this.prisma.akAnime.findFirst({
       where: {
         OR: [
-          { titre: { equals: title, mode: 'insensitive' } },
-          { titreOrig: { equals: title, mode: 'insensitive' } },
-          { titreFr: { equals: title, mode: 'insensitive' } },
-          { titresAlternatifs: { contains: title, mode: 'insensitive' } },
+          // Exact matches with any title variation on all title fields
+          ...uniqueVariations.flatMap(variation => [
+            { titre: { equals: variation, mode: 'insensitive' } },
+            { titreOrig: { equals: variation, mode: 'insensitive' } },
+            { titreFr: { equals: variation, mode: 'insensitive' } },
+          ]),
+          // Contains matches for alternative titles (handles comma-separated lists)
+          ...uniqueVariations.map(variation => ({
+            titresAlternatifs: { contains: variation, mode: 'insensitive' }
+          })),
         ],
       },
       select: {
