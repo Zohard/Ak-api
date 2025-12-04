@@ -50,6 +50,8 @@ export class AdminAnimesService {
       where.OR = [
         { titre: { contains: search, mode: 'insensitive' } },
         { titreOrig: { contains: search, mode: 'insensitive' } },
+        { titreFr: { contains: search, mode: 'insensitive' } },
+        { titresAlternatifs: { contains: search, mode: 'insensitive' } },
       ];
     }
     if (annee) where.annee = annee;

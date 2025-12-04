@@ -20,7 +20,14 @@ export class AdminMangasService {
     const { page = 1, limit = 20, search, annee, ficheComplete, statut } = query;
     const skip = (page - 1) * limit;
     const where: any = {};
-    if (search) where.titre = { contains: search, mode: 'insensitive' };
+    if (search) {
+      where.OR = [
+        { titre: { contains: search, mode: 'insensitive' } },
+        { titreOrig: { contains: search, mode: 'insensitive' } },
+        { titreFr: { contains: search, mode: 'insensitive' } },
+        { titresAlternatifs: { contains: search, mode: 'insensitive' } },
+      ];
+    }
     if (annee) where.annee = annee;
     if (ficheComplete !== undefined) where.ficheComplete = ficheComplete;
     if (statut !== undefined) where.statut = statut;
