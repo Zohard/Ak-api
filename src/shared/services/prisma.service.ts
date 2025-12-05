@@ -20,18 +20,19 @@ export class PrismaService
         const isSupabase = u.hostname.includes('supabase.com');
         const isPooler = u.hostname.includes('pooler');
 
-        if (isSupabase && isPooler) {
+        // Apply optimizations for any pooler endpoint (Supabase or Neon)
+        if (isSupabase && isPooler || u.hostname.includes('neon.tech') && isPooler) {
           const params = u.searchParams;
-          // Ensure TLS is enabled on Vercel/Supabase
+          // Ensure TLS is enabled
           if (!params.has('sslmode')) params.set('sslmode', 'require');
           // Tell Prisma we are behind pgBouncer (disables prepared statements)
           if (!params.has('pgbouncer')) params.set('pgbouncer', 'true');
-          // Optimize connections for serverless with conservative limits
-          if (!params.has('connection_limit')) params.set('connection_limit', '10');
+          // Optimize connections for serverless - VERY conservative for Neon
+          if (!params.has('connection_limit')) params.set('connection_limit', '5');
           // Reduce pool wait time for faster failures
-          if (!params.has('pool_timeout')) params.set('pool_timeout', '8');
+          if (!params.has('pool_timeout')) params.set('pool_timeout', '5');
           // Add connect timeout for faster failures
-          if (!params.has('connect_timeout')) params.set('connect_timeout', '5');
+          if (!params.has('connect_timeout')) params.set('connect_timeout', '10');
 
           u.search = params.toString();
           effectiveUrl = u.toString();
