@@ -14,12 +14,6 @@
       "destination": "/api/index"
     }
   ],
-  "crons": [
-    {
-      "path": "/api/health/warmup",
-      "schedule": "*/5 * * * *"
-    }
-  ],
   "env": {
     "NODE_ENV": "production"
   },
