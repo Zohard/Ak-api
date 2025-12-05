@@ -5,8 +5,7 @@
   "functions": {
     "api/index.ts": {
       "maxDuration": 30,
-      "memory": 1024,
-      "regions": ["cdg1"]
+      "memory": 1024
     }
   },
   "rewrites": [
