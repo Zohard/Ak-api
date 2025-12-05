@@ -376,6 +376,7 @@ model AkJeuxVideo {
   screenshots       AkJeuxVideoScreenshot[]
   collections       CollectionJeuxVideo[] @relation("UserJeuxVideoList")
   businessRelations AkBusinessToJeux[]
+  reviews           AkCritique[]
 
   @@map("ak_jeux_video")
 }
@@ -581,10 +582,12 @@ model AkCritique {
   membre       SmfMember? @relation(fields: [idMembre], references: [idMember], onDelete: Cascade)
   anime        AkAnime?  @relation(fields: [idAnime], references: [idAnime], onDelete: Cascade)
   manga        AkManga?  @relation(fields: [idManga], references: [idManga], onDelete: Cascade)
+  jeuxVideo    AkJeuxVideo? @relation(fields: [idJeu], references: [idJeu], onDelete: Cascade)
 
   @@index([idMembre])
   @@index([idAnime])
   @@index([idManga])
+  @@index([idJeu])
   @@index([statut])
   @@index([dateCritique])
   @@map("ak_critique")

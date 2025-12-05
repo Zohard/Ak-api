@@ -91,7 +91,7 @@ export class ReviewsController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Vérifier si l\'utilisateur a déjà une critique pour ce contenu' })
-  @ApiParam({ name: 'type', description: 'Type de contenu (anime ou manga)', enum: ['anime', 'manga'] })
+  @ApiParam({ name: 'type', description: 'Type de contenu (anime, manga ou jeu vidéo)', enum: ['anime', 'manga', 'game'] })
   @ApiParam({ name: 'id', description: 'ID du contenu', type: 'number' })
   @ApiResponse({ 
     status: 200, 
@@ -109,7 +109,7 @@ export class ReviewsController {
     }
   })
   async checkUserReview(
-    @Param('type') type: 'anime' | 'manga',
+    @Param('type') type: 'anime' | 'manga' | 'game',
     @Param('id', ParseIntPipe) contentId: number,
     @Request() req
   ) {

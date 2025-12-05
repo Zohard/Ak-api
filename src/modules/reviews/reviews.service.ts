@@ -25,16 +25,22 @@ export class ReviewsService {
   ) {}
 
   async create(createReviewDto: CreateReviewDto, userId: number) {
-    const { idAnime, idManga, ...reviewData } = createReviewDto;
+    const { idAnime, idManga, idJeu, ...reviewData } = createReviewDto;
 
-    // Validate that either anime or manga is specified, but not both
-    if ((!idAnime && !idManga) || (idAnime && idManga)) {
+    // Validate that exactly one content type is specified
+    const contentCount = [idAnime, idManga, idJeu].filter(Boolean).length;
+    if (contentCount === 0) {
       throw new BadRequestException(
-        'Vous devez spécifier soit un anime soit un manga, mais pas les deux',
+        'Vous devez spécifier un anime, un manga ou un jeu vidéo',
+      );
+    }
+    if (contentCount > 1) {
+      throw new BadRequestException(
+        'Vous ne pouvez spécifier qu\'un seul type de contenu (anime, manga ou jeu vidéo)',
       );
     }
 
-    // Check if anime/manga exists
+    // Check if anime/manga/game exists
     if (idAnime) {
       const anime = await this.prisma.akAnime.findUnique({
         where: { idAnime },
@@ -53,12 +59,22 @@ export class ReviewsService {
       }
     }
 
-    // Check if user already has a review for this anime/manga
+    if (idJeu) {
+      const game = await this.prisma.akJeuxVideo.findUnique({
+        where: { idJeu },
+      });
+      if (!game) {
+        throw new NotFoundException('Jeu vidéo introuvable');
+      }
+    }
+
+    // Check if user already has a review for this content
     const existingReview = await this.prisma.akCritique.findFirst({
       where: {
         idMembre: userId,
         ...(idAnime && { idAnime }),
         ...(idManga && { idManga }),
+        ...(idJeu && { idJeu }),
       },
     });
 
@@ -74,6 +90,7 @@ export class ReviewsService {
         idMembre: userId,
         idAnime,
         idManga,
+        idJeu,
         dateCritique: new Date(),
       } as any,
       include: {
@@ -98,6 +115,15 @@ export class ReviewsService {
           ? {
               select: {
                 idManga: true,
+                titre: true,
+                image: true,
+              },
+            }
+          : false,
+        jeuxVideo: idJeu
+          ? {
+              select: {
+                idJeu: true,
                 titre: true,
                 image: true,
               },
@@ -659,20 +685,33 @@ export class ReviewsService {
     return { count: total };
   }
 
-  async checkUserReview(userId: number, type: 'anime' | 'manga', contentId: number) {
+  async checkUserReview(userId: number, type: 'anime' | 'manga' | 'game', contentId: number) {
     // Create cache key for user's review check
     const cacheKey = `user_review:${userId}:${type}:${contentId}`;
-    
+
     // Try to get from cache first
     //const cached = await this.cacheService.get(cacheKey);
     //if (cached !== null) {
       //return cached;
     //}
 
-    const whereCondition = {
+    let whereCondition: any = {
       idMembre: userId,
-      ...(type === 'anime' ? { idAnime: contentId, idManga: 0 } : { idManga: contentId, idAnime: 0 }),
     };
+
+    if (type === 'anime') {
+      whereCondition.idAnime = contentId;
+      whereCondition.idManga = 0;
+      whereCondition.idJeu = 0;
+    } else if (type === 'manga') {
+      whereCondition.idManga = contentId;
+      whereCondition.idAnime = 0;
+      whereCondition.idJeu = 0;
+    } else if (type === 'game') {
+      whereCondition.idJeu = contentId;
+      whereCondition.idAnime = 0;
+      whereCondition.idManga = 0;
+    }
 
     const existingReview = await this.prisma.akCritique.findFirst({
       where: whereCondition,

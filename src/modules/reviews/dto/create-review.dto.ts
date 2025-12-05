@@ -42,24 +42,34 @@ export class CreateReviewDto {
   notation: number;
 
   @ApiPropertyOptional({
-    description: "ID de l'anime (requis si pas de mangaId)",
+    description: "ID de l'anime (requis si pas de mangaId ou jeuxVideoId)",
     example: 1,
   })
   @IsOptional()
   @IsInt()
   @Type(() => Number)
-  @ValidateIf((o) => !o.idManga)
+  @ValidateIf((o) => !o.idManga && !o.idJeu)
   idAnime?: number;
 
   @ApiPropertyOptional({
-    description: "ID du manga (requis si pas d'animeId)",
+    description: "ID du manga (requis si pas d'animeId ou jeuxVideoId)",
     example: 1,
   })
   @IsOptional()
   @IsInt()
   @Type(() => Number)
-  @ValidateIf((o) => !o.idAnime)
+  @ValidateIf((o) => !o.idAnime && !o.idJeu)
   idManga?: number;
+
+  @ApiPropertyOptional({
+    description: "ID du jeu vidéo (requis si pas d'animeId ou mangaId)",
+    example: 1,
+  })
+  @IsOptional()
+  @IsInt()
+  @Type(() => Number)
+  @ValidateIf((o) => !o.idAnime && !o.idManga)
+  idJeu?: number;
 
   @ApiPropertyOptional({
     description: 'Afficher avec des illustrations/screenshots (0 ou 1)',
