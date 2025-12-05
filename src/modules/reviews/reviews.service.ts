@@ -302,32 +302,30 @@ export class ReviewsService {
     return result;
   }
 
-  async findOne(id: number) {
-    // Try to get from cache first
+  async findOne(id: number, requestingUserId?: number) {
+    // Try to get from cache first (only for public/published reviews)
     const cached = await this.cacheService.get(`review:${id}`);
-    if (cached) {
+    if (cached && !requestingUserId) {
       return cached;
     }
 
-    const review = await this.prisma.akCritique.findFirst({
-      where: {
-        idCritique: id,
-        statut: 0, // Only show published reviews
-      },
-        include: {
-          membre: {
-            select: {
-              idMember: true,
-              memberName: true,
-              avatar: true,
-              realName: true,
-              _count: {
-                select: {
-                  reviews: true
-                }
-              },
+    // First, fetch the review to check ownership
+    const review = await this.prisma.akCritique.findUnique({
+      where: { idCritique: id },
+      include: {
+        membre: {
+          select: {
+            idMember: true,
+            memberName: true,
+            avatar: true,
+            realName: true,
+            _count: {
+              select: {
+                reviews: true
+              }
             },
           },
+        },
         anime: {
           select: {
             idAnime: true,
@@ -349,6 +347,14 @@ export class ReviewsService {
     });
 
     if (!review) {
+      throw new NotFoundException('Critique introuvable');
+    }
+
+    // Allow access if:
+    // 1. Review is published (statut: 0), OR
+    // 2. Requesting user is the author (can see their own moderated reviews)
+    const isAuthor = requestingUserId && review.idMembre === requestingUserId;
+    if (review.statut !== 0 && !isAuthor) {
       throw new NotFoundException('Critique introuvable');
     }
 
@@ -384,11 +390,10 @@ export class ReviewsService {
     return formattedReview;
   }
 
-  async findBySlug(slug: string) {
+  async findBySlug(slug: string, requestingUserId?: number) {
     const review = await this.prisma.akCritique.findFirst({
       where: {
         niceUrl: slug,
-        statut: 0, // Only show published reviews
       },
       include: {
         membre: {
@@ -421,6 +426,14 @@ export class ReviewsService {
     });
 
     if (!review) {
+      throw new NotFoundException('Critique introuvable');
+    }
+
+    // Allow access if:
+    // 1. Review is published (statut: 0), OR
+    // 2. Requesting user is the author (can see their own moderated reviews)
+    const isAuthor = requestingUserId && review.idMembre === requestingUserId;
+    if (review.statut !== 0 && !isAuthor) {
       throw new NotFoundException('Critique introuvable');
     }
 

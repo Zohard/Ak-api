@@ -134,8 +134,9 @@ export class ReviewsController {
   @ApiParam({ name: 'id', description: 'ID de la critique', type: 'number' })
   @ApiResponse({ status: 200, description: 'Détails de la critique' })
   @ApiResponse({ status: 404, description: 'Critique introuvable' })
-  async findOne(@Param('id', ParseIntPipe) id: number) {
-    return this.reviewsService.findOne(id);
+  async findOne(@Param('id', ParseIntPipe) id: number, @Request() req?) {
+    const requestingUserId = req?.user?.id;
+    return this.reviewsService.findOne(id, requestingUserId);
   }
 
   @Get('slug/:slug')
@@ -143,8 +144,9 @@ export class ReviewsController {
   @ApiParam({ name: 'slug', description: 'Slug de la critique', type: 'string' })
   @ApiResponse({ status: 200, description: 'Détails de la critique' })
   @ApiResponse({ status: 404, description: 'Critique introuvable' })
-  async findBySlug(@Param('slug') slug: string) {
-    return this.reviewsService.findBySlug(slug);
+  async findBySlug(@Param('slug') slug: string, @Request() req?) {
+    const requestingUserId = req?.user?.id;
+    return this.reviewsService.findBySlug(slug, requestingUserId);
   }
 
   @Patch(':id')
