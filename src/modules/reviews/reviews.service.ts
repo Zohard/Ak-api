@@ -841,6 +841,7 @@ export class ReviewsService {
       idMembre,
       idAnime,
       idManga,
+      idJeu,
       critique,
       acceptImages,
       membre,
@@ -874,8 +875,12 @@ export class ReviewsService {
     return {
       id: idCritique,
       userId: idMembre,
-      animeId: idAnime,
-      mangaId: idManga,
+      idAnime: idAnime || 0,
+      idManga: idManga || 0,
+      idJeu: idJeu || 0,
+      // Legacy fields for backward compatibility
+      animeId: idAnime || 0,
+      mangaId: idManga || 0,
       reviewDate,
       critique,
       acceptImages,
