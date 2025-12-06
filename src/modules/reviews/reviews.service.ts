@@ -325,6 +325,14 @@ export class ReviewsService {
               image: true,
             },
           },
+          jeuxVideo: {
+            select: {
+              idJeu: true,
+              titre: true,
+              image: true,
+              annee: true,
+            },
+          },
         },
       }),
       this.prisma.akCritique.count({ where }),
