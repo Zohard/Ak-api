@@ -256,12 +256,28 @@ export class ReviewsService {
       if (!idManga) {
         where.idManga = 0;
       }
+      if (!idJeu) {
+        where.idJeu = 0;
+      }
     } else if (type === 'manga') {
       if (!idManga) {
         where.idManga = { gt: 0 };
       }
       if (!idAnime) {
         where.idAnime = 0;
+      }
+      if (!idJeu) {
+        where.idJeu = 0;
+      }
+    } else if (type === 'game') {
+      if (!idJeu) {
+        where.idJeu = { gt: 0 };
+      }
+      if (!idAnime) {
+        where.idAnime = 0;
+      }
+      if (!idManga) {
+        where.idManga = 0;
       }
     }
 
@@ -597,7 +613,7 @@ export class ReviewsService {
     return { message: 'Critique supprimée avec succès' };
   }
 
-  async getTopReviews(limit = 10, type?: 'anime' | 'manga' | 'both') {
+  async getTopReviews(limit = 10, type?: 'anime' | 'manga' | 'game' | 'both') {
     // Try to get from cache first
     const cacheKey = `top_reviews:${type || 'both'}:${limit}`;
     const cached = await this.cacheService.get(cacheKey);
@@ -614,9 +630,15 @@ export class ReviewsService {
     if (type === 'anime') {
       where.idAnime = { gt: 0 };
       where.idManga = 0;
+      where.idJeu = 0;
     } else if (type === 'manga') {
       where.idManga = { gt: 0 };
       where.idAnime = 0;
+      where.idJeu = 0;
+    } else if (type === 'game') {
+      where.idJeu = { gt: 0 };
+      where.idAnime = 0;
+      where.idManga = 0;
     }
 
     const reviews = await this.prisma.akCritique.findMany({

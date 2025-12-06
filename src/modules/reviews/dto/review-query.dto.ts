@@ -127,11 +127,11 @@ export class ReviewQueryDto {
   @ApiPropertyOptional({
     description: 'Type de critique',
     example: 'anime',
-    enum: ['anime', 'manga', 'both'],
+    enum: ['anime', 'manga', 'game', 'both'],
   })
   @IsOptional()
-  @IsIn(['anime', 'manga', 'both'])
-  type?: 'anime' | 'manga' | 'both';
+  @IsIn(['anime', 'manga', 'game', 'both'])
+  type?: 'anime' | 'manga' | 'game' | 'both';
 
   @ApiPropertyOptional({
     description: 'Période de filtrage',
