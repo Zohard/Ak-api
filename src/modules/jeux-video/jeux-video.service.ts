@@ -229,6 +229,153 @@ export class JeuxVideoService {
     };
   }
 
+  async getSimilarGames(id: number, limit: number = 6) {
+    // First check if game exists
+    const game = await this.prisma.akJeuxVideo.findUnique({
+      where: { idJeu: id, statut: 1 },
+      select: {
+        idJeu: true,
+        titre: true,
+        developpeur: true,
+        editeur: true,
+        annee: true,
+      },
+    });
+
+    if (!game) {
+      throw new NotFoundException('Jeu vidéo introuvable');
+    }
+
+    // Optimized query using UNION strategy for better performance
+    // Prioritize shared content (genres), then developer/publisher, then year
+    const similarGames = await this.prisma.$queryRaw`
+      WITH results AS (
+        -- Priority 1: Shared genres (highest relevance - same themes/genres)
+        (SELECT
+          j.id_jeu as "idJeu",
+          j.titre,
+          j.image,
+          j.annee,
+          j.editeur,
+          j.developpeur,
+          j.moyennenotes as "moyenneNotes",
+          j.nb_reviews as "nbReviews",
+          j.nice_url as "niceUrl",
+          5 as similarity_score
+        FROM ak_jeux_video j
+        INNER JOIN ak_jeux_video_genres jg ON jg.id_jeu = j.id_jeu
+        WHERE jg.id_genre IN (
+          SELECT jg2.id_genre
+          FROM ak_jeux_video_genres jg2
+          WHERE jg2.id_jeu = ${id}
+          LIMIT 10
+        )
+        AND j.id_jeu != ${id}
+        AND j.statut = 1
+        ORDER BY j.moyennenotes DESC NULLS LAST
+        LIMIT ${limit * 2})
+
+        UNION ALL
+
+        -- Priority 2: Same developer
+        (SELECT
+          j.id_jeu as "idJeu",
+          j.titre,
+          j.image,
+          j.annee,
+          j.editeur,
+          j.developpeur,
+          j.moyennenotes as "moyenneNotes",
+          j.nb_reviews as "nbReviews",
+          j.nice_url as "niceUrl",
+          4 as similarity_score
+        FROM ak_jeux_video j
+        WHERE j.developpeur = ${game.developpeur}
+          AND j.id_jeu != ${id}
+          AND j.statut = 1
+          AND j.developpeur IS NOT NULL
+          AND j.developpeur != ''
+        ORDER BY j.moyennenotes DESC NULLS LAST
+        LIMIT ${limit * 2})
+
+        UNION ALL
+
+        -- Priority 3: Same publisher
+        (SELECT
+          j.id_jeu as "idJeu",
+          j.titre,
+          j.image,
+          j.annee,
+          j.editeur,
+          j.developpeur,
+          j.moyennenotes as "moyenneNotes",
+          j.nb_reviews as "nbReviews",
+          j.nice_url as "niceUrl",
+          3 as similarity_score
+        FROM ak_jeux_video j
+        WHERE j.editeur = ${game.editeur}
+          AND j.id_jeu != ${id}
+          AND j.statut = 1
+          AND j.editeur IS NOT NULL
+          AND j.editeur != ''
+        ORDER BY j.moyennenotes DESC NULLS LAST
+        LIMIT ${limit * 2})
+
+        UNION ALL
+
+        -- Priority 4: Similar year (within 2 years)
+        (SELECT
+          j.id_jeu as "idJeu",
+          j.titre,
+          j.image,
+          j.annee,
+          j.editeur,
+          j.developpeur,
+          j.moyennenotes as "moyenneNotes",
+          j.nb_reviews as "nbReviews",
+          j.nice_url as "niceUrl",
+          2 as similarity_score
+        FROM ak_jeux_video j
+        WHERE ABS(j.annee - ${game.annee || 0}) <= 2
+          AND j.id_jeu != ${id}
+          AND j.statut = 1
+        ORDER BY j.moyennenotes DESC NULLS LAST
+        LIMIT ${limit * 2})
+      )
+      SELECT DISTINCT ON ("idJeu")
+        "idJeu",
+        titre,
+        image,
+        annee,
+        editeur,
+        developpeur,
+        "moyenneNotes",
+        "nbReviews",
+        "niceUrl",
+        MAX(similarity_score) as similarity_score
+      FROM results
+      GROUP BY "idJeu", titre, image, annee, editeur, developpeur, "moyenneNotes", "nbReviews", "niceUrl"
+      ORDER BY "idJeu", similarity_score DESC, "moyenneNotes" DESC NULLS LAST
+      LIMIT ${limit}
+    ` as any[];
+
+    return {
+      game_id: id,
+      similar: similarGames.map((g: any) => ({
+        id: g.idJeu,
+        idJeu: g.idJeu,
+        titre: g.titre,
+        image: g.image,
+        annee: g.annee,
+        editeur: g.editeur,
+        developpeur: g.developpeur,
+        moyenneNotes: g.moyenneNotes,
+        nbReviews: g.nbReviews,
+        niceUrl: g.niceUrl,
+      })),
+    };
+  }
+
   async getPlatforms() {
     // Try to get from cache
     const cacheKey = 'jeux_video:platforms';

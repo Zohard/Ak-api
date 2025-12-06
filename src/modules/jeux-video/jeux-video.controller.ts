@@ -50,4 +50,17 @@ export class JeuxVideoController {
   async getRelationships(@Param('id', ParseIntPipe) id: number) {
     return this.jeuxVideoService.getRelationships(id);
   }
+
+  @Get(':id/similar')
+  @ApiOperation({ summary: 'Get similar video games' })
+  @ApiParam({ name: 'id', description: 'ID du jeu vidéo' })
+  @ApiResponse({ status: 200, description: 'Similar games retrieved successfully' })
+  @ApiResponse({ status: 404, description: 'Jeu vidéo introuvable' })
+  async getSimilarGames(
+    @Param('id', ParseIntPipe) id: number,
+    @Query('limit') limit?: string,
+  ) {
+    const parsedLimit = limit ? parseInt(limit) : 6;
+    return this.jeuxVideoService.getSimilarGames(id, parsedLimit);
+  }
 }
