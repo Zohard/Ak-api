@@ -155,6 +155,7 @@ export class ReviewsService {
       search,
       idAnime,
       idManga,
+      idJeu,
       idMembre,
       pseudo,
       statut,
@@ -191,6 +192,10 @@ export class ReviewsService {
 
     if (idManga) {
       where.idManga = idManga;
+    }
+
+    if (idJeu) {
+      where.idJeu = idJeu;
     }
 
     if (idMembre) {

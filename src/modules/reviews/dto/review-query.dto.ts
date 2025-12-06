@@ -54,6 +54,15 @@ export class ReviewQueryDto {
   idManga?: number;
 
   @ApiPropertyOptional({
+    description: 'Filtrer par ID de jeu',
+    example: 1,
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  idJeu?: number;
+
+  @ApiPropertyOptional({
     description: 'Filtrer par ID de membre',
     example: 1,
   })
