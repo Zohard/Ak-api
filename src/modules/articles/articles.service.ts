@@ -443,9 +443,16 @@ export class ArticlesService {
       return cached;
     }
 
+    // WordPress stores slugs with URL-encoded special characters (e.g., %e2%99%aa for ♪)
+    // We need to encode the slug to match what's in the database
+    const encodedSlug = encodeURIComponent(niceUrl).toLowerCase();
+
     const post = await this.prisma.wpPost.findFirst({
       where: {
-        postName: niceUrl,
+        OR: [
+          { postName: niceUrl },           // Try exact match first
+          { postName: encodedSlug },       // Try encoded version
+        ],
         postType: 'post',
         postStatus: 'publish'
       },
