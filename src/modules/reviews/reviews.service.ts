@@ -668,6 +668,14 @@ export class ReviewsService {
             image: true,
           },
         },
+        jeuxVideo: {
+          select: {
+            idJeu: true,
+            titre: true,
+            image: true,
+            annee: true,
+          },
+        },
       },
     });
 
@@ -707,6 +715,14 @@ export class ReviewsService {
             idManga: true,
             titre: true,
             image: true,
+          },
+        },
+        jeuxVideo: {
+          select: {
+            idJeu: true,
+            titre: true,
+            image: true,
+            annee: true,
           },
         },
       },
