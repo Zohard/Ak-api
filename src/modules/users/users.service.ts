@@ -1251,7 +1251,15 @@ export class UsersService {
     };
   }
 
-  async getPublicUserReviews(pseudo: string, limit: number = 10) {
+  async getPublicUserReviews(pseudo: string, options: {
+    limit?: number;
+    page?: number;
+    type?: 'anime' | 'manga' | 'game' | 'all';
+    sort?: 'recent' | 'rating_desc' | 'rating_asc' | 'views';
+    search?: string;
+  } = {}) {
+    const { limit = 12, page = 1, type = 'all', sort = 'recent', search = '' } = options;
+
     const user = await this.prisma.smfMember.findFirst({
       where: {
         OR: [
@@ -1266,39 +1274,129 @@ export class UsersService {
       throw new NotFoundException('Utilisateur introuvable');
     }
 
-    // Get only published reviews (statut = 0)
-    const reviews = await this.prisma.$queryRaw`
+    // Calculate offset for pagination
+    const offset = (page - 1) * limit;
+
+    // Build WHERE clause for type filter
+    let typeFilter = '';
+    if (type === 'anime') {
+      typeFilter = 'AND c.id_anime IS NOT NULL AND c.id_anime > 0';
+    } else if (type === 'manga') {
+      typeFilter = 'AND c.id_manga IS NOT NULL AND c.id_manga > 0';
+    } else if (type === 'game') {
+      typeFilter = 'AND c.id_jeu IS NOT NULL AND c.id_jeu > 0';
+    }
+
+    // Build search filter
+    const searchFilter = search
+      ? `AND (c.titre ILIKE '%${search}%' OR c.critique ILIKE '%${search}%' OR COALESCE(a.titre, m.titre, g.titre) ILIKE '%${search}%')`
+      : '';
+
+    // Build ORDER BY clause
+    let orderBy = 'c.date_critique DESC';
+    switch (sort) {
+      case 'rating_desc':
+        orderBy = 'c.notation DESC, c.date_critique DESC';
+        break;
+      case 'rating_asc':
+        orderBy = 'c.notation ASC, c.date_critique DESC';
+        break;
+      case 'views':
+        orderBy = 'c.nb_clics DESC, c.date_critique DESC';
+        break;
+    }
+
+    // Get total count for pagination
+    const countQuery = `
+      SELECT COUNT(*) as count
+      FROM ak_critique c
+      LEFT JOIN ak_animes a ON c.id_anime = a.id_anime
+      LEFT JOIN ak_mangas m ON c.id_manga = m.id_manga
+      LEFT JOIN ak_jeux_video g ON c.id_jeu = g.id_jeu
+      WHERE c.id_membre = ${user.idMember} AND c.statut = 0
+      ${typeFilter}
+      ${searchFilter}
+    `;
+
+    const countResult = await this.prisma.$queryRawUnsafe<[{ count: bigint }]>(countQuery);
+    const total = Number(countResult[0]?.count || 0);
+
+    // Get reviews with all metadata including games
+    const reviewsQuery = `
       SELECT
+        c.id_critique as "idCritique",
         c.id_critique as id,
         c.titre,
         c.critique,
         c.notation,
-        c.date_critique as reviewDate,
+        c.date_critique as "dateCritique",
         c.statut,
-        c.id_anime as animeId,
-        c.id_manga as mangaId,
-        c.nb_clics as nbClics,
-        COALESCE(a.titre, m.titre) as mediaTitle,
-        COALESCE(a.image, m.image) as mediaImage,
-        COALESCE(a.nice_url, m.nice_url) as mediaNiceUrl,
-        CASE WHEN c.id_anime IS NOT NULL THEN 'anime' ELSE 'manga' END as mediaType
+        c.nice_url as "niceUrl",
+        c.id_anime as "idAnime",
+        c.id_manga as "idManga",
+        c.id_jeu as "idJeu",
+        c.nb_clics as "nbClics",
+        a.titre as "animeTitle",
+        a.image as "animeImage",
+        a.nice_url as "animeNiceUrl",
+        m.titre as "mangaTitle",
+        m.image as "mangaImage",
+        m.nice_url as "mangaNiceUrl",
+        g.titre as "gameTitle",
+        g.image as "gameImage",
+        g.nice_url as "gameNiceUrl",
+        CASE
+          WHEN c.id_jeu IS NOT NULL AND c.id_jeu > 0 THEN 'game'
+          WHEN c.id_manga IS NOT NULL AND c.id_manga > 0 THEN 'manga'
+          WHEN c.id_anime IS NOT NULL AND c.id_anime > 0 THEN 'anime'
+          ELSE NULL
+        END as "mediaType"
       FROM ak_critique c
       LEFT JOIN ak_animes a ON c.id_anime = a.id_anime
       LEFT JOIN ak_mangas m ON c.id_manga = m.id_manga
+      LEFT JOIN ak_jeux_video g ON c.id_jeu = g.id_jeu
       WHERE c.id_membre = ${user.idMember} AND c.statut = 0
-      ORDER BY c.date_critique DESC
+      ${typeFilter}
+      ${searchFilter}
+      ORDER BY ${orderBy}
       LIMIT ${limit}
+      OFFSET ${offset}
     `;
+
+    const reviews = await this.prisma.$queryRawUnsafe(reviewsQuery);
 
     return {
       reviews: (reviews as any[]).map(review => ({
         ...review,
+        // Add media objects for compatibility
+        anime: review.idAnime ? {
+          idAnime: review.idAnime,
+          titre: review.animeTitle,
+          image: review.animeImage,
+          niceUrl: review.animeNiceUrl
+        } : null,
+        manga: review.idManga ? {
+          idManga: review.idManga,
+          titre: review.mangaTitle,
+          image: review.mangaImage,
+          niceUrl: review.mangaNiceUrl
+        } : null,
+        jeuxVideo: review.idJeu ? {
+          idJeu: review.idJeu,
+          titre: review.gameTitle,
+          image: review.gameImage,
+          niceUrl: review.gameNiceUrl
+        } : null,
         membre: {
           id: user.idMember,
           pseudo: user.realName || user.memberName,
           avatar: user.avatar
         }
-      }))
+      })),
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit)
     };
   }
 

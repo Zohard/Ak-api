@@ -346,8 +346,18 @@ export class UsersController {
   async getPublicUserReviews(
     @Param('pseudo') pseudo: string,
     @Query('limit') limit?: number,
+    @Query('page') page?: number,
+    @Query('type') type?: 'anime' | 'manga' | 'game' | 'all',
+    @Query('sort') sort?: 'recent' | 'rating_desc' | 'rating_asc' | 'views',
+    @Query('search') search?: string,
   ) {
-    return this.usersService.getPublicUserReviews(pseudo, limit || 10);
+    return this.usersService.getPublicUserReviews(pseudo, {
+      limit: limit || 12,
+      page: page || 1,
+      type: type || 'all',
+      sort: sort || 'recent',
+      search: search || ''
+    });
   }
 
   @Get('public/:pseudo/activity')
