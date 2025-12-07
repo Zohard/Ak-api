@@ -744,35 +744,40 @@ export class FriendsService {
         titre: string;
         image: string;
       }>>`
-        SELECT
-          ual.id, ual.user_id, ual.anime_id, ual.rating, ual.updatedat,
-          m.real_name, m.avatar,
-          a.titre, a.image
-        FROM ak_user_anime_list ual
-        JOIN smf_members m ON ual.user_id = m.id_member
-        JOIN ak_animes a ON ual.anime_id = a.id_anime
-        WHERE ual.user_id IN (${Prisma.join(friendIds)})
-          AND ual.rating IS NOT NULL
-          AND ual.rating > 0
-          AND ual.updatedat IS NOT NULL
-        ORDER BY ual.updatedat DESC
-        LIMIT ${limit + 100}
-      `;
+    SELECT
+      ual.id, ual.user_id, ual.anime_id, ual.rating, ual.updatedat,
+      m.real_name, m.avatar,
+      a.titre, a.image
+    FROM ak_user_anime_list ual
+    JOIN smf_members m ON ual.user_id = m.id_member
+    JOIN ak_animes a ON ual.anime_id = a.id_anime
+    WHERE ual.user_id IN (${Prisma.join(friendIds)})
+      AND ual.rating IS NOT NULL
+      AND ual.rating > 0
+      AND ual.updatedat IS NOT NULL
+    ORDER BY ual.updatedat DESC
+    LIMIT ${limit + 100}
+  `;
 
-      activities.push(...animeRatings.map(r => ({
-        id: `anime-rating-${r.id}`,
-        type: 'rating',
-        userId: r.user_id,
-        userName: r.real_name,
-        userAvatar: r.avatar || '../img/noavatar.png',
-        createdAt: r.updatedat,
-        contentType: 'anime',
-        contentId: r.anime_id,
-        contentTitle: r.titre,
-        contentImage: r.image,
-        rating: r.rating,
-        actionText: `a attribué ${r.rating}/10 à la série ${r.titre}`
-      })));
+      activities.push(...animeRatings.map(r => {
+        // Convert from base-5 to base-10 for display consistency
+        const displayRating = (r.rating * 2);
+
+        return {
+          id: `anime-rating-${r.id}`,
+          type: 'rating',
+          userId: r.user_id,
+          userName: r.real_name,
+          userAvatar: r.avatar || '../img/noavatar.png',
+          createdAt: r.updatedat,
+          contentType: 'anime',
+          contentId: r.anime_id,
+          contentTitle: r.titre,
+          contentImage: r.image,
+          rating: displayRating,
+          actionText: `a attribué ${displayRating}/10 à la série ${r.titre}`
+        };
+      }));
     }
 
     // Fetch game ratings
@@ -831,36 +836,41 @@ export class FriendsService {
         avatar: string;
         titre: string;
         image: string;
-      }>>`
-        SELECT
-          cm.id_collection, cm.id_membre, cm.id_manga, cm.evaluation, cm.updated_at,
-          m.real_name, m.avatar,
-          mg.titre, mg.image
-        FROM collection_mangas cm
-        JOIN smf_members m ON cm.id_membre = m.id_member
-        JOIN ak_mangas mg ON cm.id_manga = mg.id_manga
-        WHERE cm.id_membre IN (${Prisma.join(friendIds)})
-          AND cm.evaluation IS NOT NULL
-          AND cm.evaluation > 0
-          AND cm.updated_at IS NOT NULL
-        ORDER BY cm.updated_at DESC
-        LIMIT ${limit + 100}
-      `;
+      }>`
+    SELECT
+      cm.id_collection, cm.id_membre, cm.id_manga, cm.evaluation, cm.updated_at,
+      m.real_name, m.avatar,
+      mg.titre, mg.image
+    FROM collection_mangas cm
+    JOIN smf_members m ON cm.id_membre = m.id_member
+    JOIN ak_mangas mg ON cm.id_manga = mg.id_manga
+    WHERE cm.id_membre IN (${Prisma.join(friendIds)})
+      AND cm.evaluation IS NOT NULL
+      AND cm.evaluation > 0
+      AND cm.updated_at IS NOT NULL
+    ORDER BY cm.updated_at DESC
+    LIMIT ${limit + 100}
+  `;
 
-      activities.push(...mangaRatings.map(r => ({
-        id: `manga-rating-${r.id_collection}`,
-        type: 'rating',
-        userId: r.id_membre,
-        userName: r.real_name,
-        userAvatar: r.avatar || '../img/noavatar.png',
-        createdAt: r.updated_at,
-        contentType: 'manga',
-        contentId: r.id_manga,
-        contentTitle: r.titre,
-        contentImage: r.image,
-        rating: r.evaluation,
-        actionText: `a attribué ${r.evaluation}/10 au manga ${r.titre}`
-      })));
+      activities.push(...mangaRatings.map(r => {
+        // Convert from base-5 to base-10 for display
+        const displayRating = (r.evaluation * 2);
+
+        return {
+          id: `manga-rating-${r.id_collection}`,
+          type: 'rating',
+          userId: r.id_membre,
+          userName: r.real_name,
+          userAvatar: r.avatar || '../img/noavatar.png',
+          createdAt: r.updated_at,
+          contentType: 'manga',
+          contentId: r.id_manga,
+          contentTitle: r.titre,
+          contentImage: r.image,
+          rating: displayRating,
+          actionText: `a attribué ${displayRating}/10 au manga ${r.titre}`
+        };
+      }));
     }
 
     // Fetch reviews
