@@ -147,6 +147,7 @@ export class MediaService {
     imageUrl: string,
     type: 'anime' | 'manga' | 'avatar' | 'cover' | 'game' | 'business',
     relatedId?: number,
+    saveAsScreenshot: boolean = false,
   ) {
     try {
       // Download the image from the URL
@@ -194,8 +195,8 @@ export class MediaService {
         folderPath
       );
 
-      // Save to database if relatedId provided
-      if (relatedId) {
+      // Save to database as screenshot ONLY if explicitly requested
+      if (relatedId && saveAsScreenshot) {
         try {
           const result = await this.prisma.$queryRaw`
             INSERT INTO ak_screenshots (url_screen, id_titre, type, upload_date)
@@ -230,7 +231,7 @@ export class MediaService {
         }
       }
 
-      // No relatedId - just return upload result
+      // No screenshot save - just return upload result
       return {
         filename: uploadResult.name,
         size: processedImage.length,
