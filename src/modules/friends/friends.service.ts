@@ -781,6 +781,7 @@ export class FriendsService {
     }
 
     // Fetch game ratings
+    // Fetch game ratings
     if (typeFilter === 'all' || typeFilter === 'rating') {
       const gameRatings = await this.prisma.$queryRaw<Array<{
         id_collection: number;
@@ -793,35 +794,40 @@ export class FriendsService {
         titre: string;
         image: string;
       }>>`
-        SELECT
-          cj.id_collection, cj.id_membre, cj.id_jeu, cj.evaluation, cj.date_modified,
-          m.real_name, m.avatar,
-          jv.titre, jv.image
-        FROM collection_jeuxvideo cj
-        JOIN smf_members m ON cj.id_membre = m.id_member
-        JOIN ak_jeux_video jv ON cj.id_jeu = jv.id_jeu
-        WHERE cj.id_membre IN (${Prisma.join(friendIds)})
-          AND cj.evaluation IS NOT NULL
-          AND cj.evaluation > 0
-          AND cj.date_modified IS NOT NULL
-        ORDER BY cj.date_modified DESC
-        LIMIT ${limit + 100}
-      `;
+    SELECT
+      cj.id_collection, cj.id_membre, cj.id_jeu, cj.evaluation, cj.date_modified,
+      m.real_name, m.avatar,
+      jv.titre, jv.image
+    FROM collection_jeuxvideo cj
+    JOIN smf_members m ON cj.id_membre = m.id_member
+    JOIN ak_jeux_video jv ON cj.id_jeu = jv.id_jeu
+    WHERE cj.id_membre IN (${Prisma.join(friendIds)})
+      AND cj.evaluation IS NOT NULL
+      AND cj.evaluation > 0
+      AND cj.date_modified IS NOT NULL
+    ORDER BY cj.date_modified DESC
+    LIMIT ${limit + 100}
+  `;
 
-      activities.push(...gameRatings.map(r => ({
-        id: `game-rating-${r.id_collection}`,
-        type: 'rating',
-        userId: r.id_membre,
-        userName: r.real_name,
-        userAvatar: r.avatar || '../img/noavatar.png',
-        createdAt: r.date_modified,
-        contentType: 'game',
-        contentId: r.id_jeu,
-        contentTitle: r.titre,
-        contentImage: r.image,
-        rating: r.evaluation,
-        actionText: `a attribué ${r.evaluation}/5 au jeu ${r.titre}`
-      })));
+      activities.push(...gameRatings.map(r => {
+        // Convert from base-5 to base-10 for display consistency
+        const displayRating = (r.evaluation * 2);
+
+        return {
+          id: `game-rating-${r.id_collection}`,
+          type: 'rating',
+          userId: r.id_membre,
+          userName: r.real_name,
+          userAvatar: r.avatar || '../img/noavatar.png',
+          createdAt: r.date_modified,
+          contentType: 'game',
+          contentId: r.id_jeu,
+          contentTitle: r.titre,
+          contentImage: r.image,
+          rating: displayRating,
+          actionText: `a attribué ${displayRating}/10 au jeu ${r.titre}`
+        };
+      }));
     }
 
     // Fetch manga ratings
