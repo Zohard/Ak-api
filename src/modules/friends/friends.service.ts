@@ -836,7 +836,7 @@ export class FriendsService {
         avatar: string;
         titre: string;
         image: string;
-      }>`
+      }>>`
     SELECT
       cm.id_collection, cm.id_membre, cm.id_manga, cm.evaluation, cm.updated_at,
       m.real_name, m.avatar,
