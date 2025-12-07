@@ -434,18 +434,23 @@ export class ArticlesService {
     return result;
   }
 
-  async getByNiceUrl(niceUrl: string, includeContent: boolean = true) {
-    console.log('ArticlesService.getByNiceUrl called with:', niceUrl);
-
-    // Check cache first
-    const cached = await this.cacheService.getArticleBySlug(niceUrl);
-    if (cached) {
-      return cached;
+  async getByNiceUrl(niceUrl: string, includeContent: boolean = true, isAdmin: boolean = false) {
+    // Skip cache for admins viewing drafts
+    if (!isAdmin) {
+      const cached = await this.cacheService.getArticleBySlug(niceUrl);
+      if (cached) {
+        return cached;
+      }
     }
 
     // WordPress stores slugs with URL-encoded special characters (e.g., %e2%99%aa for ♪)
     // We need to encode the slug to match what's in the database
     const encodedSlug = encodeURIComponent(niceUrl).toLowerCase();
+
+    // Build the post status filter based on admin access
+    const postStatusFilter = isAdmin
+      ? { in: ['publish', 'draft'] }  // Admins can see both published and draft
+      : 'publish';                     // Non-admins only see published
 
     const post = await this.prisma.wpPost.findFirst({
       where: {
@@ -454,7 +459,7 @@ export class ArticlesService {
           { postName: encodedSlug },       // Try encoded version
         ],
         postType: 'post',
-        postStatus: 'publish'
+        postStatus: postStatusFilter
       },
       include: {
         wpAuthor: {
@@ -503,13 +508,17 @@ export class ArticlesService {
       throw new NotFoundException('Article not found');
     }
 
-    // Increment view count
-    await this.incrementViewCount(Number(post.ID));
+    // Only increment view count for published articles
+    if (post.postStatus === 'publish') {
+      await this.incrementViewCount(Number(post.ID));
+    }
 
     const result = this.transformPost(post, includeContent);
-    
-    // Cache the result for 30 minutes
-    await this.cacheService.setArticleBySlug(niceUrl, result, 1800);
+
+    // Only cache published articles
+    if (post.postStatus === 'publish') {
+      await this.cacheService.setArticleBySlug(niceUrl, result, 1800);
+    }
 
     return result;
   }

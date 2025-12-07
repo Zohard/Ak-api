@@ -123,10 +123,10 @@ export class ArticlesController {
   @ApiOperation({ summary: 'Get article by URL slug' })
   @ApiResponse({ status: 200, description: 'Article retrieved successfully' })
   @ApiResponse({ status: 404, description: 'Article not found' })
-  findBySlug(@Param('niceUrl') niceUrl: string) {
+  findBySlug(@Param('niceUrl') niceUrl: string, @Request() req) {
     // Decode the URL parameter to handle special characters like ♪, é, etc.
     const decodedNiceUrl = decodeURIComponent(niceUrl);
-    return this.articlesService.getByNiceUrl(decodedNiceUrl);
+    return this.articlesService.getByNiceUrl(decodedNiceUrl, true, req.user.isAdmin);
   }
 
   @Patch(':id')
