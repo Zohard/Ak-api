@@ -126,7 +126,10 @@ export class ArticlesController {
   findBySlug(@Param('niceUrl') niceUrl: string, @Request() req) {
     // Decode the URL parameter to handle special characters like ♪, é, etc.
     const decodedNiceUrl = decodeURIComponent(niceUrl);
-    return this.articlesService.getByNiceUrl(decodedNiceUrl, true, req.user.isAdmin);
+
+    const isAdmin = req.user?.isAdmin === true || false;
+
+    return this.articlesService.getByNiceUrl(decodedNiceUrl, true, isAdmin);
   }
 
   @Patch(':id')
