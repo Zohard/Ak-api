@@ -599,6 +599,9 @@ export class ArticlesService {
   }
 
   async create(articleData: CreateArticleDto, authorId: number): Promise<any> {
+    // Ensure the SMF user exists in wp_users table for authorship
+    await this.ensureWpUserExists(authorId);
+
     // Generate nice URL if not provided
     const postName =
       articleData.niceUrl || this.generateNiceUrl(articleData.titre);
@@ -1441,6 +1444,51 @@ export class ArticlesService {
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-+|-+$/g, '');
+  }
+
+  /**
+   * Ensures that an SMF user exists in the wp_users table
+   * This is necessary because articles use wp_users for authorship
+   * but authentication uses smf_member table
+   */
+  private async ensureWpUserExists(smfUserId: number): Promise<void> {
+    // Check if user already exists in wp_users with this ID
+    const existingWpUser = await this.prisma.wpUser.findUnique({
+      where: { ID: BigInt(smfUserId) },
+    });
+
+    if (existingWpUser) {
+      // User already exists, no action needed
+      return;
+    }
+
+    // Get the SMF user data
+    const smfUser = await this.prisma.smfMember.findUnique({
+      where: { idMember: smfUserId },
+    });
+
+    if (!smfUser) {
+      throw new NotFoundException(`User with ID ${smfUserId} not found`);
+    }
+
+    // Create wp_user entry with the same ID as SMF user
+    const now = new Date();
+    await this.prisma.wpUser.create({
+      data: {
+        ID: BigInt(smfUserId),
+        userLogin: smfUser.memberName,
+        userPass: '', // Password is managed by SMF, not WordPress
+        userNicename: smfUser.memberName.toLowerCase().replace(/[^a-z0-9-]/g, '-'),
+        userEmail: smfUser.emailAddress,
+        userUrl: '',
+        userRegistered: now,
+        userActivationKey: '',
+        userStatus: 0,
+        displayName: smfUser.realName || smfUser.memberName,
+      },
+    });
+
+    console.log(`Created wp_user entry for SMF user ${smfUserId} (${smfUser.memberName})`);
   }
 
   private async validateCategories(categoryIds: number[]): Promise<void> {
