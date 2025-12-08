@@ -194,10 +194,10 @@ export class MediaController {
   @ApiResponse({ status: 200, description: 'Media list retrieved' })
   async getMediaByContentId(
     @Param('relatedId', ParseIntPipe) relatedId: number,
-    @Query('type') type: 'anime' | 'manga' | 'jeu-video' = 'anime',
+    @Query('type') type: 'anime' | 'manga' | 'game' | 'jeu-video' = 'anime',
   ) {
-    if (!['anime', 'manga', 'jeu-video'].includes(type)) {
-      throw new BadRequestException('Type must be anime, manga, or jeu-video');
+    if (!['anime', 'manga', 'game', 'jeu-video'].includes(type)) {
+      throw new BadRequestException('Type must be anime, manga, or game/jeu-video');
     }
 
     // Map 'jeu-video' to 'game' for internal use
