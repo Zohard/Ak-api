@@ -137,20 +137,20 @@ export class SeasonsService {
       const animes = await this.prisma.$queryRawUnsafe(`
         SELECT
           "id_anime" as id,
-          "id_anime",
-          "nice_url",
+          "id_anime" as "idAnime",
+          "nice_url" as "niceUrl",
           "titre",
-          "titre_orig",
+          "titre_orig" as "titreOrig",
           "annee",
-          "nb_ep",
+          "nb_ep" as "nbEp",
           "image",
           "studio",
           "synopsis",
           "statut",
           "realisateur",
-          "nb_reviews",
-          "moyennenotes",
-          "date_ajout",
+          "nb_reviews" as "nbReviews",
+          "moyennenotes" as "moyenneNotes",
+          "date_ajout" as "dateAjout",
           "format"
         FROM ak_animes
         WHERE "id_anime" IN (${placeholders})
