@@ -716,6 +716,7 @@ export class ReviewsService {
             idAnime: true,
             titre: true,
             image: true,
+            niceUrl: true,
           },
         },
         manga: {
@@ -723,6 +724,7 @@ export class ReviewsService {
             idManga: true,
             titre: true,
             image: true,
+            niceUrl: true,
           },
         },
         jeuxVideo: {
@@ -731,6 +733,7 @@ export class ReviewsService {
             titre: true,
             image: true,
             annee: true,
+            niceUrl: true,
           },
         },
       },
