@@ -536,22 +536,25 @@ export class UsersService {
       SELECT
         'review' as type,
         EXTRACT(EPOCH FROM c.date_critique) as date,
-        COALESCE(a.titre, m.titre) as title,
+        COALESCE(a.titre, m.titre, jv.titre) as title,
         c.id_critique as id,
         c.nice_url as "reviewSlug",
         CASE
           WHEN c.id_anime IS NOT NULL THEN CONCAT(a.nice_url, '-', a.id_anime)
           WHEN c.id_manga IS NOT NULL THEN CONCAT(m.nice_url, '-', m.id_manga)
+          WHEN c.id_jeu_video IS NOT NULL THEN CONCAT(jv.nice_url, '-', jv.id_jeu_video)
           ELSE NULL
         END as "niceUrl",
         CASE
           WHEN c.id_anime IS NOT NULL THEN 'anime'
           WHEN c.id_manga IS NOT NULL THEN 'manga'
+          WHEN c.id_jeu_video IS NOT NULL THEN 'jeu_video'
           ELSE NULL
         END as "mediaType"
       FROM ak_critique c
       LEFT JOIN ak_animes a ON c.id_anime = a.id_anime
       LEFT JOIN ak_mangas m ON c.id_manga = m.id_manga
+      LEFT JOIN ak_jeux_video jv ON c.id_jeu_video = jv.id_jeu_video
       WHERE c.id_membre = ${id}
       ORDER BY c.date_critique DESC
       LIMIT ${limit}
