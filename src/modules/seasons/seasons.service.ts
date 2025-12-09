@@ -158,10 +158,11 @@ export class SeasonsService {
         ORDER BY "titre"
       `, ...animeIds);
 
-      // Add format field if missing (default to 'Série TV')
+      // Add format field if missing (default to 'Série TV') and deduplicate studios
       const result = (animes as any[]).map((anime: any) => ({
         ...anime,
-        format: anime.format || 'Série TV'
+        format: anime.format || 'Série TV',
+        studio: this.deduplicateStudios(anime.studio)
       }));
 
       // Cache for 30 minutes (1800 seconds) - season animes are frequently accessed for homepage
@@ -201,6 +202,25 @@ export class SeasonsService {
       } catch {}
     }
     return { animes: animeIds }
+  }
+
+  /**
+   * Deduplicate studio names in comma-separated string
+   * Example: "Gekkou, Gekkou" -> "Gekkou"
+   * Example: "Zero-G, Liber, Zero-G" -> "Zero-G, Liber"
+   */
+  private deduplicateStudios(studio: string | null): string | null {
+    if (!studio) return null;
+
+    const studios = studio
+      .split(',')
+      .map(s => s.trim())
+      .filter(s => s.length > 0);
+
+    // Remove duplicates while preserving order
+    const uniqueStudios = [...new Set(studios)];
+
+    return uniqueStudios.join(', ');
   }
 
   // Admin: add an anime to a season (in json_data)
