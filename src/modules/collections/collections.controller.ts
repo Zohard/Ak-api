@@ -483,13 +483,17 @@ export class CollectionsController {
   @ApiOperation({ summary: 'Get user video game collection' })
   @ApiParam({ name: 'userId', type: 'number', description: 'User ID' })
   @ApiQuery({ name: 'type', required: false, type: 'number', description: 'Collection type filter (1-5)' })
+  @ApiQuery({ name: 'page', required: false, type: 'number', description: 'Page number (default: 1)' })
+  @ApiQuery({ name: 'limit', required: false, type: 'number', description: 'Items per page (default: 20)' })
   @ApiResponse({ status: 200, description: 'Video game collection retrieved successfully' })
   getJeuxVideoCollection(
     @Param('userId', ParseIntPipe) userId: number,
     @Query('type', new ParseIntPipe({ optional: true })) type: number | undefined,
+    @Query('page', new ParseIntPipe({ optional: true })) page: number | undefined,
+    @Query('limit', new ParseIntPipe({ optional: true })) limit: number | undefined,
     @Request() req,
   ) {
     const currentUserId = req.user?.id;
-    return this.collectionsService.getJeuxVideoCollection(userId, type, currentUserId);
+    return this.collectionsService.getJeuxVideoCollection(userId, type, currentUserId, page, limit);
   }
 }

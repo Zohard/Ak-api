@@ -2456,33 +2456,49 @@ export class CollectionsService {
     return { message: 'Game removed from collection' };
   }
 
-  async getJeuxVideoCollection(userId: number, type?: number, currentUserId?: number) {
+  async getJeuxVideoCollection(userId: number, type?: number, currentUserId?: number, page: number = 1, limit: number = 20) {
     const where: any = { idMembre: userId };
     if (type !== undefined) {
       where.type = type;
     }
 
-    const collection = await this.prisma.collectionJeuxVideo.findMany({
-      where,
-      include: {
-        jeuxVideo: {
-          include: {
-            platforms: {
-              include: {
-                platform: true
-              }
-            },
-            genres: {
-              include: {
-                genre: true
+    const skip = (page - 1) * limit;
+
+    // Get total count and paginated data in parallel
+    const [collection, totalCount] = await Promise.all([
+      this.prisma.collectionJeuxVideo.findMany({
+        where,
+        skip,
+        take: limit,
+        include: {
+          jeuxVideo: {
+            include: {
+              platforms: {
+                include: {
+                  platform: true
+                }
+              },
+              genres: {
+                include: {
+                  genre: true
+                }
               }
             }
           }
-        }
-      },
-      orderBy: { dateCreated: 'desc' }
-    });
+        },
+        orderBy: { dateCreated: 'desc' }
+      }),
+      this.prisma.collectionJeuxVideo.count({ where })
+    ]);
 
-    return collection;
+    return {
+      data: collection,
+      meta: {
+        totalCount,
+        page,
+        limit,
+        hasMore: skip + collection.length < totalCount
+      }
+    };
   }
 }
