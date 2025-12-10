@@ -1048,22 +1048,22 @@ export class UsersService {
     const orderBy = (() => {
       switch (sortBy) {
         case 'rating':
-          return 'jv.moyennenotes DESC, jv.id_jeu_video DESC';
+          return 'jv.moyennenotes DESC, jv.id_jeu DESC';
         case 'popularity':
-          return 'jv.nombre_notes DESC, jv.id_jeu_video DESC';
+          return 'jv.nombre_notes DESC, jv.id_jeu DESC';
         case 'date':
-          return 'jv.annee DESC, jv.id_jeu_video DESC';
+          return 'jv.annee DESC, jv.id_jeu DESC';
         case 'title':
           return 'jv.titre ASC';
         default:
-          return 'jv.moyennenotes DESC, jv.nombre_notes DESC, jv.id_jeu_video DESC';
+          return 'jv.moyennenotes DESC, jv.nombre_notes DESC, jv.id_jeu DESC';
       }
     })();
 
     // Get popular games that user hasn't reviewed or added to collection
     const games = await this.prisma.$queryRawUnsafe(`
       SELECT
-        jv.id_jeu_video as id,
+        jv.id_jeu as id,
         jv.titre,
         jv.image,
         'game' as type,
@@ -1075,7 +1075,7 @@ export class UsersService {
         jv.editeur
       FROM ak_jeux_video jv
       WHERE jv.statut = 1
-        AND jv.id_jeu_video NOT IN (
+        AND jv.id_jeu NOT IN (
           SELECT id_jeu_video FROM ak_critique WHERE id_membre = ${id} AND id_jeu_video IS NOT NULL
         )
       ORDER BY ${orderBy}
