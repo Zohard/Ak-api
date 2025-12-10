@@ -5,16 +5,73 @@ type ScrapeSource = 'mal' | 'nautiljon' | 'auto';
 
 @Injectable()
 export class ScrapeService {
-  private async fetchHtml(url: string) {
-    const res = await fetch(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; AK-Scraper/1.0)'
-      }
-    });
-    if (!res.ok) throw new BadRequestException(`Fetch failed ${res.status}`);
-    const html = await res.text();
-    return load(html);
+  // Add these at the top of your ScrapeService class:
+private requestCache = new Map<string, { data: any; timestamp: number }>();
+private readonly CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+private lastRequestTime = 0;
+private readonly MIN_REQUEST_DELAY = 1000; // 1 second between requests
+
+// Replace your fetchHtml method with this improved version:
+private async fetchHtml(url: string) {
+  // Check cache first
+  const cached = this.requestCache.get(url);
+  if (cached && Date.now() - cached.timestamp < this.CACHE_TTL) {
+    return load(cached.data);
   }
+
+  // Rate limiting
+  const now = Date.now();
+  const timeSinceLastRequest = now - this.lastRequestTime;
+  if (timeSinceLastRequest < this.MIN_REQUEST_DELAY) {
+    await new Promise(resolve => setTimeout(resolve, this.MIN_REQUEST_DELAY - timeSinceLastRequest));
+  }
+  this.lastRequestTime = Date.now();
+
+  // Fetch with timeout and retries
+  let lastError;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000);
+
+      const res = await fetch(url, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'Accept-Language': 'fr-FR,fr;q=0.9',
+        },
+        signal: controller.signal
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!res.ok) {
+        if (res.status === 429 && attempt < 3) {
+          await new Promise(resolve => setTimeout(resolve, 3000 * attempt));
+          continue;
+        }
+        throw new BadRequestException(`Fetch failed ${res.status}`);
+      }
+
+      const html = await res.text();
+      
+      // Cache the result
+      this.requestCache.set(url, { data: html, timestamp: Date.now() });
+      
+      return load(html);
+
+    } catch (error) {
+      lastError = error;
+      if (error.name === 'AbortError' && attempt < 3) {
+        await new Promise(resolve => setTimeout(resolve, 2000 * attempt));
+        continue;
+      }
+      if (attempt === 3) break;
+    }
+  }
+
+  throw lastError || new BadRequestException('Failed to fetch after retries');
+}
 
   private formatMALName(name: string): string {
     // Transform "Last name, First name" to "First name Last name"
