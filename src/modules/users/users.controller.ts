@@ -310,6 +310,108 @@ export class UsersController {
     );
   }
 
+  @Get(':id/recommendations/anime')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: "Recommandations d'anime pour un utilisateur" })
+  @ApiParam({ name: 'id', description: "ID de l'utilisateur", type: 'number' })
+  @ApiQuery({ name: 'limit', required: false, description: 'Nombre de recommandations', example: 12 })
+  @ApiQuery({ name: 'page', required: false, description: 'Numéro de page', example: 1 })
+  @ApiQuery({ name: 'genre', required: false, description: 'Filtrer par genre (deprecated, use genres)' })
+  @ApiQuery({ name: 'genres', required: false, description: 'Filtrer par genres (séparés par virgule)' })
+  @ApiQuery({ name: 'sortBy', required: false, description: 'Trier par (rating, popularity, date, title)' })
+  @ApiQuery({ name: 'similarTo', required: false, description: 'ID du média similaire', type: 'number' })
+  @ApiQuery({ name: 'similarToType', required: false, description: 'Type du média similaire', enum: ['anime', 'manga'] })
+  @ApiQuery({ name: 'tags', required: false, description: 'Tags séparés par virgule pour inclure tous les tags' })
+  @ApiResponse({ status: 200, description: "Recommandations d'anime" })
+  @ApiResponse({ status: 404, description: 'Utilisateur introuvable' })
+  async getUserAnimeRecommendations(
+    @Param('id', ParseIntPipe) id: number,
+    @Query('limit') limit?: number,
+    @Query('page') page?: number,
+    @Query('genre') genre?: string,
+    @Query('genres') genres?: string,
+    @Query('sortBy') sortBy?: string,
+    @Query('similarTo') similarTo?: number,
+    @Query('similarToType') similarToType?: 'anime' | 'manga',
+    @Query('tags') tags?: string,
+  ) {
+    const genresParam = genres || genre;
+    return this.usersService.getUserAnimeRecommendations(
+      id,
+      limit || 12,
+      page || 1,
+      genresParam,
+      sortBy,
+      similarTo,
+      similarToType,
+      tags
+    );
+  }
+
+  @Get(':id/recommendations/manga')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: "Recommandations de manga pour un utilisateur" })
+  @ApiParam({ name: 'id', description: "ID de l'utilisateur", type: 'number' })
+  @ApiQuery({ name: 'limit', required: false, description: 'Nombre de recommandations', example: 12 })
+  @ApiQuery({ name: 'page', required: false, description: 'Numéro de page', example: 1 })
+  @ApiQuery({ name: 'genre', required: false, description: 'Filtrer par genre (deprecated, use genres)' })
+  @ApiQuery({ name: 'genres', required: false, description: 'Filtrer par genres (séparés par virgule)' })
+  @ApiQuery({ name: 'sortBy', required: false, description: 'Trier par (rating, popularity, date, title)' })
+  @ApiQuery({ name: 'similarTo', required: false, description: 'ID du média similaire', type: 'number' })
+  @ApiQuery({ name: 'similarToType', required: false, description: 'Type du média similaire', enum: ['anime', 'manga'] })
+  @ApiQuery({ name: 'tags', required: false, description: 'Tags séparés par virgule pour inclure tous les tags' })
+  @ApiResponse({ status: 200, description: "Recommandations de manga" })
+  @ApiResponse({ status: 404, description: 'Utilisateur introuvable' })
+  async getUserMangaRecommendations(
+    @Param('id', ParseIntPipe) id: number,
+    @Query('limit') limit?: number,
+    @Query('page') page?: number,
+    @Query('genre') genre?: string,
+    @Query('genres') genres?: string,
+    @Query('sortBy') sortBy?: string,
+    @Query('similarTo') similarTo?: number,
+    @Query('similarToType') similarToType?: 'anime' | 'manga',
+    @Query('tags') tags?: string,
+  ) {
+    const genresParam = genres || genre;
+    return this.usersService.getUserMangaRecommendations(
+      id,
+      limit || 12,
+      page || 1,
+      genresParam,
+      sortBy,
+      similarTo,
+      similarToType,
+      tags
+    );
+  }
+
+  @Get(':id/recommendations/games')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: "Recommandations de jeux vidéo pour un utilisateur" })
+  @ApiParam({ name: 'id', description: "ID de l'utilisateur", type: 'number' })
+  @ApiQuery({ name: 'limit', required: false, description: 'Nombre de recommandations', example: 12 })
+  @ApiQuery({ name: 'page', required: false, description: 'Numéro de page', example: 1 })
+  @ApiQuery({ name: 'sortBy', required: false, description: 'Trier par (rating, popularity, date, title)' })
+  @ApiResponse({ status: 200, description: "Recommandations de jeux vidéo" })
+  @ApiResponse({ status: 404, description: 'Utilisateur introuvable' })
+  async getUserGameRecommendations(
+    @Param('id', ParseIntPipe) id: number,
+    @Query('limit') limit?: number,
+    @Query('page') page?: number,
+    @Query('sortBy') sortBy?: string,
+  ) {
+    return this.usersService.getUserGameRecommendations(
+      id,
+      limit || 12,
+      page || 1,
+      sortBy
+    );
+  }
+
   // Public endpoints (no authentication required)
   @Get('by-username/:username')
   @ApiOperation({ summary: 'Récupérer un utilisateur par username (memberName ou realName)' })

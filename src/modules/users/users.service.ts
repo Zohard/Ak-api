@@ -967,6 +967,127 @@ export class UsersService {
     };
   }
 
+  async getUserAnimeRecommendations(
+    id: number,
+    limit: number = 12,
+    page: number = 1,
+    genre?: string,
+    sortBy?: string,
+    similarTo?: number,
+    similarToType?: 'anime' | 'manga',
+    tags?: string
+  ) {
+    // Call the main recommendations method and filter for anime only
+    const result = await this.getUserRecommendations(
+      id,
+      limit * 2, // Get more to ensure we have enough after filtering
+      page,
+      genre,
+      sortBy,
+      similarTo,
+      similarToType,
+      tags
+    );
+
+    const animeOnly = result.items.filter((item: any) => item.type === 'anime').slice(0, limit);
+
+    return {
+      items: animeOnly,
+      pagination: { page, limit }
+    };
+  }
+
+  async getUserMangaRecommendations(
+    id: number,
+    limit: number = 12,
+    page: number = 1,
+    genre?: string,
+    sortBy?: string,
+    similarTo?: number,
+    similarToType?: 'anime' | 'manga',
+    tags?: string
+  ) {
+    // Call the main recommendations method and filter for manga only
+    const result = await this.getUserRecommendations(
+      id,
+      limit * 2, // Get more to ensure we have enough after filtering
+      page,
+      genre,
+      sortBy,
+      similarTo,
+      similarToType,
+      tags
+    );
+
+    const mangaOnly = result.items.filter((item: any) => item.type === 'manga').slice(0, limit);
+
+    return {
+      items: mangaOnly,
+      pagination: { page, limit }
+    };
+  }
+
+  async getUserGameRecommendations(
+    id: number,
+    limit: number = 12,
+    page: number = 1,
+    sortBy?: string
+  ) {
+    const user = await this.prisma.smfMember.findUnique({
+      where: { idMember: id },
+      select: { idMember: true },
+    });
+
+    if (!user) {
+      throw new NotFoundException('Utilisateur introuvable');
+    }
+
+    const offset = (page - 1) * limit;
+
+    // Build ORDER BY clause
+    const orderBy = (() => {
+      switch (sortBy) {
+        case 'rating':
+          return 'jv.moyennenotes DESC, jv.id_jeu_video DESC';
+        case 'popularity':
+          return 'jv.nombre_notes DESC, jv.id_jeu_video DESC';
+        case 'date':
+          return 'jv.annee DESC, jv.id_jeu_video DESC';
+        case 'title':
+          return 'jv.titre ASC';
+        default:
+          return 'jv.moyennenotes DESC, jv.nombre_notes DESC, jv.id_jeu_video DESC';
+      }
+    })();
+
+    // Get popular games that user hasn't reviewed or added to collection
+    const games = await this.prisma.$queryRawUnsafe(`
+      SELECT
+        jv.id_jeu_video as id,
+        jv.titre,
+        jv.image,
+        'game' as type,
+        jv.nice_url as "niceUrl",
+        jv.moyennenotes as "moyenneNotes",
+        jv.nombre_notes as "nombreNotes",
+        jv.annee,
+        jv.plateforme,
+        jv.editeur
+      FROM ak_jeux_video jv
+      WHERE jv.statut = 1
+        AND jv.id_jeu_video NOT IN (
+          SELECT id_jeu_video FROM ak_critique WHERE id_membre = ${id} AND id_jeu_video IS NOT NULL
+        )
+      ORDER BY ${orderBy}
+      LIMIT ${limit} OFFSET ${offset}
+    `);
+
+    return {
+      items: games,
+      pagination: { page, limit }
+    };
+  }
+
   // Public methods (no authentication required)
   async findPublicByPseudo(pseudo: string) {
     const user = await this.prisma.smfMember.findFirst({
