@@ -23,5 +23,5 @@ COPY . .
 # Expose port
 EXPOSE 3003
 
-# Run in development mode (NestJS will compile on the fly)
-CMD ["npm", "run", "start:dev"]
+# Run without watch mode (less logging, still compiles TypeScript)
+CMD ["npm", "run", "start:prod:dev"]
