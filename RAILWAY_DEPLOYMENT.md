@@ -10,7 +10,12 @@
 ### 1. Railway Project Setup
 1. Create a new project in Railway
 2. Connect your GitHub repository: `anime-kun-nestjs-v2`
-3. Railway will automatically detect the Dockerfile and `railway.toml`
+3. Railway will automatically detect `nixpacks.toml` and `railway.toml`
+
+**IMPORTANT**: Railway is now configured to use Nixpacks builder which will:
+- Install dependencies with `npm ci --include=dev`
+- Run `npm run build:railway` (Prisma generate + NestJS build)
+- Start with `node dist/main.js`
 
 ### 2. Environment Variables
 In Railway, add these environment variables:

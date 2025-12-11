@@ -8,6 +8,7 @@
   "scripts": {
     "postinstall": "npx prisma generate",
     "build": "npx prisma generate && nest build && node build-api.js",
+    "build:railway": "npx prisma generate && nest build",
     "build:vercel": "npx prisma generate && npm run build",
     "vercel-build": "npm run build:vercel",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
