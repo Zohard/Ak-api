@@ -7,7 +7,7 @@
   "license": "UNLICENSED",
   "scripts": {
     "postinstall": "npx prisma generate",
-    "build": "npx prisma generate && nest build && node build-api.js",
+    "build": "npx prisma generate && nest build && node build.js",
     "build:railway": "npx prisma generate && npx tsc",
     "build:vercel": "npx prisma generate && npm run build",
     "vercel-build": "npm run build:vercel",
