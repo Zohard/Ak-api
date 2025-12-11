@@ -1,4 +1,4 @@
-# Dockerfile for Railway using ts-node (no build step needed)
+# Dockerfile for Railway - run in dev mode
 FROM node:20-alpine
 
 # Install build dependencies
@@ -20,5 +20,5 @@ COPY . .
 # Expose port
 EXPOSE 3003
 
-# Run with ts-node (no build needed)
-CMD ["npm", "run", "start:ts"]
+# Run in development mode (NestJS will compile on the fly)
+CMD ["npm", "run", "start:dev"]

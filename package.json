@@ -8,7 +8,7 @@
   "scripts": {
     "postinstall": "npx prisma generate",
     "build": "npx prisma generate && nest build && node build-api.js",
-    "build:railway": "npx prisma generate && nest build",
+    "build:railway": "npx prisma generate && npx tsc",
     "build:vercel": "npx prisma generate && npm run build",
     "vercel-build": "npm run build:vercel",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
@@ -20,7 +20,7 @@
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
     "start:prod": "node dist/main",
-    "start:ts": "ts-node -r tsconfig-paths/register src/main.ts",
+    "start:ts": "node --max-old-space-size=1024 -r ts-node/register -r tsconfig-paths/register src/main.ts",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
     "test": "jest",
     "test:watch": "jest --watch",
