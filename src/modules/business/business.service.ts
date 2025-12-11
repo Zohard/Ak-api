@@ -45,10 +45,20 @@ export class BusinessService {
     }
 
     if (search) {
-      where.denomination = {
-        contains: search,
-        mode: 'insensitive',
-      };
+      where.OR = [
+        {
+          denomination: {
+            contains: search,
+            mode: 'insensitive',
+          },
+        },
+        {
+          autresDenominations: {
+            contains: search,
+            mode: 'insensitive',
+          },
+        },
+      ];
     }
 
     if (type) {
@@ -168,10 +178,20 @@ export class BusinessService {
     const businesses = await this.prisma.akBusiness.findMany({
       where: {
         statut: 1,
-        denomination: {
-          contains: q.trim(),
-          mode: 'insensitive',
-        },
+        OR: [
+          {
+            denomination: {
+              contains: q.trim(),
+              mode: 'insensitive',
+            },
+          },
+          {
+            autresDenominations: {
+              contains: q.trim(),
+              mode: 'insensitive',
+            },
+          },
+        ],
       },
       select: {
         idBusiness: true,

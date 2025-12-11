@@ -1554,6 +1554,43 @@ export class AnimesService extends BaseContentService<
     await this.cacheService.invalidateAnime(id);
     // Also invalidate related caches
     await this.cacheService.invalidateSearchCache();
+
+    // Invalidate cache of all related animes (when image changes, related pages must refresh)
+    try {
+      // Get relations where this anime is source or target
+      const relations = await this.prisma.$queryRaw<Array<{ id_fiche_depart: string; id_anime: number; id_manga: number }>>`
+        SELECT id_fiche_depart, id_anime, id_manga
+        FROM ak_fiche_to_fiche
+        WHERE id_fiche_depart = ${`anime${id}`} OR id_anime = ${id}
+      `;
+
+      // Collect all related anime IDs
+      const relatedAnimeIds = new Set<number>();
+
+      for (const relation of relations) {
+        // Case 1: This anime is source - check if target is an anime
+        if (relation.id_fiche_depart === `anime${id}` && relation.id_anime && relation.id_anime > 0) {
+          relatedAnimeIds.add(relation.id_anime);
+        }
+        // Case 2: This anime is target - check if source is an anime
+        else if (relation.id_anime === id) {
+          const ficheMatch = relation.id_fiche_depart?.match(/^anime(\d+)$/);
+          if (ficheMatch) {
+            relatedAnimeIds.add(parseInt(ficheMatch[1]));
+          }
+        }
+      }
+
+      // Invalidate cache for each related anime
+      if (relatedAnimeIds.size > 0) {
+        await Promise.all(
+          Array.from(relatedAnimeIds).map(relatedId => this.cacheService.invalidateAnime(relatedId))
+        );
+        console.log(`Invalidated cache for ${relatedAnimeIds.size} related animes of anime ${id}`);
+      }
+    } catch (error) {
+      console.error(`Failed to invalidate related animes cache for anime ${id}:`, error);
+    }
   }
 
   // ===== Trailer Management =====
