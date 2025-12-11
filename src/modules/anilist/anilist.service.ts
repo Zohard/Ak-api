@@ -175,7 +175,7 @@ export class AniListService {
   constructor(private readonly configService: ConfigService) {
     this.httpClient = axios.create({
       baseURL: this.baseUrl,
-      timeout: 10000,
+      timeout: 60000, // Increased to 60 seconds for seasonal imports
       headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
@@ -492,8 +492,15 @@ export class AniListService {
       const pageAnime = await this.getAnimesPage(season, year, page, currentPageSize);
       allAnime.push(...pageAnime);
 
+      this.logger.log(`Fetched page ${page}/${totalPages} - ${pageAnime.length} animes (total: ${allAnime.length}/${limit})`);
+
       // If we got fewer results than requested, we've reached the end
       if (pageAnime.length < currentPageSize) break;
+
+      // Add delay between requests to avoid rate limiting (except for last page)
+      if (page < totalPages && allAnime.length < limit) {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
     }
 
     return allAnime.slice(0, limit);
@@ -539,7 +546,7 @@ export class AniListService {
                 isAnimationStudio
               }
             }
-            staff(perPage: 20) {
+            staff(perPage: 10) {
               edges {
                 id
                 role
@@ -552,7 +559,7 @@ export class AniListService {
                 }
               }
             }
-            characters(perPage: 20, sort: [ROLE, RELEVANCE, ID]) {
+            characters(perPage: 10, sort: [ROLE, RELEVANCE, ID]) {
               edges {
                 id
                 role

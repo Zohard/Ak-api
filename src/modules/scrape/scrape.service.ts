@@ -1,21 +1,51 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { load } from 'cheerio';
+import { PrismaService } from '../../shared/services/prisma.service';
 
 type ScrapeSource = 'mal' | 'nautiljon' | 'auto';
 
 @Injectable()
 export class ScrapeService {
+  constructor(private prisma: PrismaService) {}
+
   // Add these at the top of your ScrapeService class:
 private requestCache = new Map<string, { data: any; timestamp: number }>();
-private readonly CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+private readonly CACHE_TTL = 10 * 60 * 1000; // 10 minutes (increased from 5)
 private lastRequestTime = 0;
 private readonly MIN_REQUEST_DELAY = 1000; // 1 second between requests
 
+/**
+ * Clear old cache entries to prevent memory leaks
+ * Call this periodically or when cache gets too large
+ */
+private clearOldCache() {
+  const now = Date.now();
+  const keysToDelete: string[] = [];
+
+  this.requestCache.forEach((value, key) => {
+    if (now - value.timestamp > this.CACHE_TTL) {
+      keysToDelete.push(key);
+    }
+  });
+
+  keysToDelete.forEach(key => this.requestCache.delete(key));
+
+  if (keysToDelete.length > 0) {
+    console.log(`Cleared ${keysToDelete.length} old cache entries`);
+  }
+}
+
 // Replace your fetchHtml method with this improved version:
 private async fetchHtml(url: string) {
+  // Clear old cache entries periodically (every 100 requests)
+  if (this.requestCache.size > 100) {
+    this.clearOldCache();
+  }
+
   // Check cache first
   const cached = this.requestCache.get(url);
   if (cached && Date.now() - cached.timestamp < this.CACHE_TTL) {
+    console.log(`Using cached response for ${url}`);
     return load(cached.data);
   }
 
@@ -32,7 +62,8 @@ private async fetchHtml(url: string) {
   for (let attempt = 1; attempt <= 3; attempt++) {
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 15000);
+      // Increase timeout to 30 seconds for slower sites
+      const timeoutId = setTimeout(() => controller.abort(), 30000);
 
       const res = await fetch(url, {
         headers: {
@@ -47,7 +78,17 @@ private async fetchHtml(url: string) {
 
       if (!res.ok) {
         if (res.status === 429 && attempt < 3) {
-          await new Promise(resolve => setTimeout(resolve, 3000 * attempt));
+          // Exponential backoff for rate limiting: 3s, 6s, 9s
+          const delay = 3000 * attempt;
+          console.log(`Rate limited (429), retrying in ${delay}ms (attempt ${attempt}/3)`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+          continue;
+        }
+        if (res.status >= 500 && attempt < 3) {
+          // Server error, retry with exponential backoff
+          const delay = 2000 * Math.pow(2, attempt - 1); // 2s, 4s, 8s
+          console.log(`Server error (${res.status}), retrying in ${delay}ms (attempt ${attempt}/3)`);
+          await new Promise(resolve => setTimeout(resolve, delay));
           continue;
         }
         throw new BadRequestException(`Fetch failed ${res.status}`);
@@ -63,15 +104,116 @@ private async fetchHtml(url: string) {
     } catch (error) {
       lastError = error;
       if (error.name === 'AbortError' && attempt < 3) {
-        await new Promise(resolve => setTimeout(resolve, 2000 * attempt));
+        // Exponential backoff for timeouts: 2s, 4s, 8s
+        const delay = 2000 * Math.pow(2, attempt - 1);
+        console.log(`Request timeout, retrying in ${delay}ms (attempt ${attempt}/3)`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        continue;
+      }
+      // Network errors, DNS errors, etc
+      if ((error.code === 'ENOTFOUND' || error.code === 'ECONNREFUSED' || error.code === 'ETIMEDOUT') && attempt < 3) {
+        const delay = 2000 * Math.pow(2, attempt - 1);
+        console.log(`Network error (${error.code}), retrying in ${delay}ms (attempt ${attempt}/3)`);
+        await new Promise(resolve => setTimeout(resolve, delay));
         continue;
       }
       if (attempt === 3) break;
     }
   }
 
-  throw lastError || new BadRequestException('Failed to fetch after retries');
+  const errorMsg = lastError?.message || 'Failed to fetch after retries';
+  console.error(`Scraping failed for ${url}: ${errorMsg}`);
+  throw lastError || new BadRequestException(errorMsg);
 }
+
+  /**
+   * Check if an anime already exists in database by title
+   * Returns the existing anime if found, null otherwise
+   */
+  async checkAnimeExists(title: string) {
+    if (!title?.trim()) return null;
+
+    try {
+      const anime = await this.prisma.akAnime.findFirst({
+        where: {
+          OR: [
+            { titre: { equals: title, mode: 'insensitive' } },
+            { titreFr: { equals: title, mode: 'insensitive' } },
+            { titreOrig: { equals: title, mode: 'insensitive' } }
+          ]
+        },
+        select: {
+          idAnime: true,
+          titre: true,
+          titreFr: true,
+          titreOrig: true,
+          statut: true
+        }
+      });
+
+      return anime;
+    } catch (error) {
+      console.error('Error checking anime exists:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Check if a person (staff/character) already exists in database by name
+   * Returns the existing person if found, null otherwise
+   */
+  async checkPersonExists(name: string) {
+    if (!name?.trim()) return null;
+
+    try {
+      const person = await this.prisma.akBusiness.findFirst({
+        where: {
+          denomination: { equals: name, mode: 'insensitive' }
+        },
+        select: {
+          idBusiness: true,
+          denomination: true
+        }
+      });
+
+      return person;
+    } catch (error) {
+      console.error('Error checking person exists:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Batch check if multiple people exist in database
+   * Returns a Map of name -> existing person
+   */
+  async batchCheckPeopleExist(names: string[]): Promise<Map<string, any>> {
+    const results = new Map();
+
+    if (!names || names.length === 0) return results;
+
+    try {
+      const people = await this.prisma.akBusiness.findMany({
+        where: {
+          denomination: { in: names, mode: 'insensitive' }
+        },
+        select: {
+          idBusiness: true,
+          denomination: true
+        }
+      });
+
+      people.forEach(person => {
+        if (person.denomination) {
+          results.set(person.denomination.toLowerCase(), person);
+        }
+      });
+    } catch (error) {
+      console.error('Error batch checking people exist:', error);
+    }
+
+    return results;
+  }
 
   private formatMALName(name: string): string {
     // Transform "Last name, First name" to "First name Last name"
@@ -737,8 +879,27 @@ private async fetchHtml(url: string) {
     };
   }
 
-  async scrapeAnime(q: string, source: ScrapeSource = 'auto') {
+  /**
+   * Smart scrape that checks database first before scraping
+   * @param q Search query or URL
+   * @param source Source to scrape from
+   * @param forceRefresh Force refresh even if exists in DB
+   */
+  async scrapeAnime(q: string, source: ScrapeSource = 'auto', forceRefresh = false) {
     if (!q?.trim()) throw new BadRequestException('Missing query q');
+
+    // Check if anime already exists in database (unless forcing refresh)
+    if (!forceRefresh) {
+      const existing = await this.checkAnimeExists(q);
+      if (existing) {
+        console.log(`Anime "${q}" already exists in database (ID: ${existing.idAnime})`);
+        return {
+          existing: true,
+          anime: existing,
+          message: 'Anime already exists in database. Use forceRefresh=true to re-scrape.'
+        };
+      }
+    }
 
     let mal: any = null;
     let nj: any = null;
@@ -748,12 +909,39 @@ private async fetchHtml(url: string) {
     } else if (source === 'nautiljon') {
       nj = await this.scrapeNautiljon(q);
     } else {
-      try { mal = await this.scrapeMAL(q); } catch { /* ignore */ }
-      try { nj = await this.scrapeNautiljon(q); } catch { /* ignore */ }
+      // Scrape both sources with better error handling
+      const malPromise = this.scrapeMAL(q).catch(err => {
+        console.log(`MAL scraping failed: ${err.message}`);
+        return null;
+      });
+      const njPromise = this.scrapeNautiljon(q).catch(err => {
+        console.log(`Nautiljon scraping failed: ${err.message}`);
+        return null;
+      });
+
+      // Run both in parallel
+      [mal, nj] = await Promise.all([malPromise, njPromise]);
+
       if (!mal && !nj) throw new NotFoundException('No results from MAL or Nautiljon');
     }
 
-    return this.mergeInfo(mal, nj);
+    const result: any = this.mergeInfo(mal, nj);
+
+    // Batch check if staff/characters already exist
+    const allPeopleNames: string[] = [];
+    result.merged.staff.forEach((s: any) => s.name && allPeopleNames.push(s.name));
+    result.merged.characters.forEach((c: any) => {
+      if (c.name) allPeopleNames.push(c.name);
+      c.voice_actors?.forEach((va: any) => va.name && allPeopleNames.push(va.name));
+    });
+
+    if (allPeopleNames.length > 0) {
+      const existingPeople = await this.batchCheckPeopleExist(allPeopleNames);
+      result.existingPeople = Object.fromEntries(existingPeople);
+      console.log(`Found ${existingPeople.size} existing people out of ${allPeopleNames.length} total`);
+    }
+
+    return result;
   }
 
   /**
