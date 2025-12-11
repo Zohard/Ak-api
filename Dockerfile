@@ -16,13 +16,29 @@ COPY . .
 RUN npx prisma generate
 
 # Build the application (use railway build script to skip Vercel-specific build-api.js)
-RUN npm run build:railway
-
-# Verify build output
-RUN echo "=== Build completed, checking dist folder ===" && \
-    ls -la dist/ && \
-    echo "=== main.js exists: ===" && \
-    test -f dist/main.js && echo "✓ dist/main.js found" || echo "✗ dist/main.js NOT FOUND"
+RUN echo "=== Starting build ===" && \
+    echo "Current directory:" && pwd && \
+    echo "Files in current directory:" && ls -la && \
+    echo "Running: npm run build:railway" && \
+    npm run build:railway && \
+    echo "=== Build command finished ===" && \
+    echo "Current directory after build:" && pwd && \
+    echo "All files after build:" && ls -la && \
+    echo "Checking if dist exists:" && \
+    if [ -d "dist" ]; then \
+      echo "✓ dist folder exists" && \
+      echo "Contents of dist:" && \
+      ls -la dist/ && \
+      if [ -f "dist/main.js" ]; then \
+        echo "✓ dist/main.js FOUND"; \
+      else \
+        echo "✗ dist/main.js NOT FOUND in dist folder"; \
+      fi; \
+    else \
+      echo "✗ dist folder does NOT exist"; \
+      echo "Searching for main.js anywhere:"; \
+      find . -name "main.js" 2>/dev/null || echo "main.js not found anywhere"; \
+    fi
 
 # Production stage
 FROM node:20-alpine AS production
