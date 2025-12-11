@@ -15,8 +15,14 @@ COPY . .
 # Generate Prisma client
 RUN npx prisma generate
 
-# Build the application
-RUN npm run build
+# Build the application (use railway build script to skip Vercel-specific build-api.js)
+RUN npm run build:railway
+
+# Verify build output
+RUN echo "=== Build completed, checking dist folder ===" && \
+    ls -la dist/ && \
+    echo "=== main.js exists: ===" && \
+    test -f dist/main.js && echo "✓ dist/main.js found" || echo "✗ dist/main.js NOT FOUND"
 
 # Production stage
 FROM node:20-alpine AS production
@@ -32,6 +38,14 @@ WORKDIR /app
 COPY --from=builder --chown=nestjs:nodejs /app/dist ./dist
 COPY --from=builder --chown=nestjs:nodejs /app/package*.json ./
 COPY --from=builder --chown=nestjs:nodejs /app/prisma ./prisma
+
+# Verify files were copied from builder
+RUN echo "=== Verifying copied files in production stage ===" && \
+    ls -la && \
+    echo "=== Checking dist folder ===" && \
+    ls -la dist/ && \
+    echo "=== Checking if dist/main.js exists ===" && \
+    test -f dist/main.js && echo "✓ dist/main.js confirmed" || echo "✗ dist/main.js MISSING"
 
 # Install only production dependencies in final image
 RUN npm ci --omit=dev && npm cache clean --force
