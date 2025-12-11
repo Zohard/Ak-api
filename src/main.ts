@@ -60,7 +60,10 @@ async function bootstrap() {
   // Setup Swagger documentation
   setupSwagger(app);
 
-  const port = configService.get('PORT') || 3003;
+  const port = process.env.PORT || configService.get('PORT') || 3003;
+  console.log(`🔌 PORT from env: ${process.env.PORT}`);
+  console.log(`🔌 PORT from config: ${configService.get('PORT')}`);
+  console.log(`🔌 Using PORT: ${port}`);
   await app.listen(port, '0.0.0.0');
 
   // Graceful shutdown handling
