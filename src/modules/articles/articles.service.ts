@@ -303,11 +303,15 @@ export class ArticlesService {
         statut: post.postStatus === 'publish' ? 1 : 0,
         postStatus: post.postStatus,
         author: post.wpAuthor ? {
-          id: post.wpAuthor.ID,
+          ID: Number(post.wpAuthor.ID),
+          id: Number(post.wpAuthor.ID),
+          userLogin: post.wpAuthor.userLogin,
           username: post.wpAuthor.userLogin,
           displayName: post.wpAuthor.displayName,
         } : {
+          ID: null,
           id: null,
+          userLogin: 'Unknown',
           username: 'Unknown',
           displayName: 'Unknown',
         },

@@ -33,7 +33,7 @@ RUN ls -la dist/ && echo "Build successful!" && (ls -la dist/src/main.js)
 # RUN npm prune --production
 
 # Expose port
-EXPOSE 8080
+EXPOSE $PORT
 
 # Use npm script which knows the correct path
 CMD ["npm", "run", "start:prod"]
