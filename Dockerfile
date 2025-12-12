@@ -26,8 +26,8 @@ RUN npm run build
 # NOW set production environment (after build is done)
 ENV NODE_ENV=production
 
-# Verify build succeeded
-RUN ls -la dist/ && echo "Build successful!" && ls -la dist/main.js
+# Verify build succeeded - check where NestJS actually put main.js
+RUN ls -la dist/ && echo "Build successful!" && (ls -la dist/main.js || ls -la dist/src/main.js)
 
 # Remove dev dependencies to save space (optional, comment out if build fails)
 # RUN npm prune --production
@@ -35,5 +35,5 @@ RUN ls -la dist/ && echo "Build successful!" && ls -la dist/main.js
 # Expose port
 EXPOSE 3003
 
-# Run compiled production code directly
-CMD ["node", "dist/main.js"]
+# Use npm script which knows the correct path
+CMD ["npm", "run", "start:prod"]
