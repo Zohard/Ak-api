@@ -1,5 +1,5 @@
-# Dockerfile for Railway - run in dev mode with increased memory
-FROM node:20-alpine
+# Dockerfile for Railway - production build
+FROM node:20-alpine AS builder
 
 # Install build dependencies
 RUN apk add --no-cache python3 make g++
@@ -7,21 +7,46 @@ RUN apk add --no-cache python3 make g++
 # Set working directory
 WORKDIR /app
 
-# Set Node.js memory limit to 1GB
-ENV NODE_OPTIONS="--max-old-space-size=1024"
-
-# Copy package files and prisma schema BEFORE installing
+# Copy package files and prisma schema
 COPY package*.json ./
 COPY prisma ./prisma/
 
-# Now install dependencies (postinstall will run prisma generate)
+# Install ALL dependencies (including devDependencies for build)
 RUN npm ci
 
-# Copy all source code
+# Copy source code
 COPY . .
+
+# Build the application (generates Prisma client and compiles TypeScript)
+RUN npm run build
+
+# Production stage
+FROM node:20-alpine
+
+# Install runtime dependencies only
+RUN apk add --no-cache python3 make g++
+
+WORKDIR /app
+
+# Set Node.js memory limit to 1GB
+ENV NODE_OPTIONS="--max-old-space-size=1024"
+ENV NODE_ENV=production
+
+# Copy package files
+COPY package*.json ./
+COPY prisma ./prisma/
+
+# Install production dependencies only
+RUN npm ci --only=production
+
+# Copy built application from builder
+COPY --from=builder /app/dist ./dist
+
+# Generate Prisma client in production
+RUN npx prisma generate
 
 # Expose port
 EXPOSE 3003
 
-# Run without watch mode (less logging, still compiles TypeScript)
-CMD ["npm", "run", "start:prod:dev"]
+# Run compiled production code
+CMD ["npm", "run", "start:prod"]
