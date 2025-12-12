@@ -1,9 +1,20 @@
 import { Injectable } from '@nestjs/common';
 import ImageKit from 'imagekit';
 
+export type MediaType = 'anime' | 'manga' | 'jeu-video' | 'business' | 'article';
+
 @Injectable()
 export class ImageKitService {
   private imagekit: ImageKit;
+
+  // Folder structure for different media types
+  public static readonly FOLDERS = {
+    anime: 'images/animes',
+    manga: 'images/mangas',
+    'jeu-video': 'images/jeux-video',
+    business: 'images/business',
+    article: 'images/articles',
+  };
 
   constructor() {
     this.imagekit = new ImageKit({
@@ -11,6 +22,49 @@ export class ImageKitService {
       privateKey: process.env.IMAGEKIT_PRIVATE_KEY || '',
       urlEndpoint: 'https://ik.imagekit.io/akimages',
     });
+  }
+
+  /**
+   * Create a safe, SEO-friendly filename from title + timestamp
+   * @param title - The title of the media (e.g., anime name, manga name)
+   * @param mediaType - Type of media (anime, manga, jeu-video, business, article)
+   * @returns Sanitized filename without extension (extension added during upload)
+   * @example
+   * createSafeFileName('One Piece', 'anime') → 'one-piece-1702345678901'
+   * createSafeFileName('Naruto Shippūden', 'manga') → 'naruto-shippuden-1702345678902'
+   */
+  createSafeFileName(title: string, mediaType?: MediaType): string {
+    if (!title || title.trim().length === 0) {
+      // Fallback to media type + timestamp if title is empty
+      const prefix = mediaType || 'media';
+      return `${prefix}-${Date.now()}`;
+    }
+
+    // 1. Sanitize title: remove special characters, lowercase, replace spaces with hyphens
+    const sanitizedTitle = title
+      .toLowerCase()
+      .normalize('NFD') // Decompose accented characters (é → e + ´)
+      .replace(/[\u0300-\u036f]/g, '') // Remove diacritics (´ ` ^ etc.)
+      .replace(/[^a-z0-9\s-]/g, '') // Remove special chars (keep only letters, numbers, spaces, hyphens)
+      .trim()
+      .replace(/\s+/g, '-') // Replace spaces with hyphens
+      .replace(/-+/g, '-') // Replace multiple hyphens with single hyphen
+      .substring(0, 50); // Limit length to 50 chars for readability
+
+    // 2. Add timestamp for uniqueness
+    const timestamp = Date.now();
+
+    // 3. Combine them
+    return `${sanitizedTitle}-${timestamp}`;
+  }
+
+  /**
+   * Get the folder path for a specific media type
+   * @param mediaType - Type of media
+   * @returns Folder path in ImageKit
+   */
+  getFolderForMediaType(mediaType: MediaType): string {
+    return ImageKitService.FOLDERS[mediaType] || 'images';
   }
 
   getAuthenticationParameters() {

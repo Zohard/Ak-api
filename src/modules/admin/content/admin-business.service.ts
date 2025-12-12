@@ -114,23 +114,15 @@ export class AdminBusinessService {
         return { success: false, error: 'No image URL provided' };
       }
 
-      // Generate a clean filename from the business name
-      const cleanName = businessName
-        .toLowerCase()
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '')
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/(^-|-$)+/g, '')
-        .substring(0, 50);
-
-      const timestamp = Date.now();
-      const filename = `${cleanName}-${timestamp}`;
+      // Generate a clean filename using the ImageKit helper
+      const filename = this.imageKitService.createSafeFileName(businessName, 'business');
+      const folder = this.imageKitService.getFolderForMediaType('business');
 
       // Use ImageKit service to upload from URL
       const result = await this.imageKitService.uploadImageFromUrl(
         imageUrl,
         filename,
-        'images/business' // Store in business folder
+        folder
       );
 
       return {

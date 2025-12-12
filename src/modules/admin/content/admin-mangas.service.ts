@@ -173,23 +173,15 @@ export class AdminMangasService {
         return { success: false, error: 'No image URL provided' };
       }
 
-      // Generate a clean filename from the manga title
-      const cleanTitle = mangaTitle
-        .toLowerCase()
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '')
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/(^-|-$)+/g, '')
-        .substring(0, 50);
-
-      const timestamp = Date.now();
-      const filename = `${cleanTitle}-${timestamp}`;
+      // Generate a clean filename using the ImageKit helper
+      const filename = this.imageKitService.createSafeFileName(mangaTitle, 'manga');
+      const folder = this.imageKitService.getFolderForMediaType('manga');
 
       // Use ImageKit service to upload from URL
       const result = await this.imageKitService.uploadImageFromUrl(
         imageUrl,
         filename,
-        'images/mangas' // Store in mangas folder
+        folder
       );
 
       return {
