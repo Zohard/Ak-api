@@ -179,7 +179,8 @@ export class AnimesService extends BaseContentService<
       where.OR = [
         { titre: { contains: search, mode: 'insensitive' } },
         { titreOrig: { contains: search, mode: 'insensitive' } },
-        { synopsis: { contains: search, mode: 'insensitive' } },
+        { titreFr: { contains: search, mode: 'insensitive' } },
+        { titresAlternatifs: { contains: search, mode: 'insensitive' } },
       ];
     }
 
