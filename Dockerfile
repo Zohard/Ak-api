@@ -24,11 +24,18 @@ COPY . .
 # Build the application (generates Prisma client and compiles TypeScript)
 RUN npm run build
 
+# Verify build succeeded
+RUN ls -la dist/ && echo "Build successful!"
+
+# Copy and make startup script executable
+COPY start.sh ./
+RUN chmod +x start.sh
+
 # Remove dev dependencies to save space (optional, comment out if build fails)
 # RUN npm prune --production
 
 # Expose port
 EXPOSE 3003
 
-# Run compiled production code
-CMD ["npm", "run", "start:prod"]
+# Run with startup script for better error logging
+CMD ["./start.sh"]
