@@ -2,10 +2,7 @@
 builder = "DOCKERFILE"
 
 [deploy]
-# startCommand is ignored when using Dockerfile (CMD is used instead)
-# but keeping it here for documentation
-startCommand = "./start.sh"
 restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 10
 healthcheckPath = "/api/health"
-healthcheckTimeout = 300
+healthcheckTimeout = 100

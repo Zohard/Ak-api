@@ -27,11 +27,7 @@ RUN npm run build
 ENV NODE_ENV=production
 
 # Verify build succeeded
-RUN ls -la dist/ && echo "Build successful!"
-
-# Copy and make startup script executable
-COPY start.sh ./
-RUN chmod +x start.sh
+RUN ls -la dist/ && echo "Build successful!" && ls -la dist/main.js
 
 # Remove dev dependencies to save space (optional, comment out if build fails)
 # RUN npm prune --production
@@ -39,5 +35,5 @@ RUN chmod +x start.sh
 # Expose port
 EXPOSE 3003
 
-# Run with startup script for better error logging
-CMD ["./start.sh"]
+# Run compiled production code directly
+CMD ["node", "dist/main.js"]
