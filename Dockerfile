@@ -9,13 +9,12 @@ WORKDIR /app
 
 # Set Node.js memory limit to 1GB
 ENV NODE_OPTIONS="--max-old-space-size=1024"
-ENV NODE_ENV=production
 
 # Copy package files and prisma schema
 COPY package*.json ./
 COPY prisma ./prisma/
 
-# Install dependencies (postinstall will run prisma generate)
+# Install ALL dependencies including devDependencies (needed for build)
 RUN npm ci
 
 # Copy all source code
@@ -23,6 +22,9 @@ COPY . .
 
 # Build the application (generates Prisma client and compiles TypeScript)
 RUN npm run build
+
+# NOW set production environment (after build is done)
+ENV NODE_ENV=production
 
 # Verify build succeeded
 RUN ls -la dist/ && echo "Build successful!"
