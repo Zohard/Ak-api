@@ -729,63 +729,34 @@ export class CollectionsService {
 
   async isInCollection(userId: number, mediaId: number, mediaType: 'anime' | 'manga' | 'jeu-video') {
     return await this.prisma.executeWithRetry(async () => {
-      console.log(`🔍 [isInCollection] Checking - userId: ${userId}, mediaId: ${mediaId}, mediaType: ${mediaType}`);
+      console.log(`🔍 [isInCollection] Using RAW SQL - userId: ${userId}, mediaId: ${mediaId}, mediaType: ${mediaType}`);
       let inCollection = false;
       let collections: any[] = [];
 
       if (mediaType === 'anime') {
-        // Try raw SQL first to verify data exists
-        const rawResult = await this.prisma.$queryRaw<any[]>`
-          SELECT type, evaluation, notes
+        collections = await this.prisma.$queryRaw<any[]>`
+          SELECT type, evaluation, notes, NULL as id_collection
           FROM collection_animes
           WHERE id_membre = ${userId} AND id_anime = ${mediaId}
         `;
-        console.log(`🔍 [isInCollection] RAW SQL result - Found ${rawResult.length} rows:`, JSON.stringify(rawResult));
-
-        // Then try Prisma query
-        collections = await this.prisma.collectionAnime.findMany({
-          where: {
-            idMembre: userId,
-            idAnime: mediaId,
-          },
-          select: {
-            type: true,
-            evaluation: true,
-            notes: true,
-          },
-        });
         inCollection = collections.length > 0;
-        console.log(`🔍 [isInCollection] PRISMA query result - Found ${collections.length} collections:`, JSON.stringify(collections));
+        console.log(`🔍 [isInCollection] Anime RAW SQL - Found ${collections.length} rows:`, JSON.stringify(collections));
       } else if (mediaType === 'manga') {
-        collections = await this.prisma.collectionManga.findMany({
-          where: {
-            idMembre: userId,
-            idManga: mediaId,
-          },
-          select: {
-            type: true,
-            evaluation: true,
-            notes: true,
-          },
-        });
+        collections = await this.prisma.$queryRaw<any[]>`
+          SELECT type, evaluation, notes, NULL as id_collection
+          FROM collection_mangas
+          WHERE id_membre = ${userId} AND id_manga = ${mediaId}
+        `;
         inCollection = collections.length > 0;
+        console.log(`🔍 [isInCollection] Manga RAW SQL - Found ${collections.length} rows:`, JSON.stringify(collections));
       } else if (mediaType === 'jeu-video') {
-        collections = await this.prisma.collectionJeuxVideo.findMany({
-          where: {
-            idMembre: userId,
-            idJeu: mediaId,
-          },
-          select: {
-            idCollection: true,
-            type: true,
-            evaluation: true,
-            notes: true,
-            platformPlayed: true,
-            startedDate: true,
-            finishedDate: true,
-          },
-        });
+        collections = await this.prisma.$queryRaw<any[]>`
+          SELECT id_collection, type, evaluation, notes, platform_played, started_date, finished_date
+          FROM collection_jeuxvideo
+          WHERE id_membre = ${userId} AND id_jeu = ${mediaId}
+        `;
         inCollection = collections.length > 0;
+        console.log(`🔍 [isInCollection] Game RAW SQL - Found ${collections.length} rows:`, JSON.stringify(collections));
       }
 
       console.log(`🔍 [isInCollection] Final result - inCollection: ${inCollection}, count: ${collections.length}`);
@@ -797,10 +768,10 @@ export class CollectionsService {
           name: this.getCollectionNameByTypeId(c.type),
           rating: c.evaluation,
           notes: c.notes,
-          collectionId: c.idCollection || undefined,
-          platformPlayed: c.platformPlayed || undefined,
-          startedDate: c.startedDate || undefined,
-          finishedDate: c.finishedDate || undefined,
+          collectionId: c.id_collection || undefined,
+          platformPlayed: c.platform_played || undefined,
+          startedDate: c.started_date || undefined,
+          finishedDate: c.finished_date || undefined,
         })),
       };
     });
