@@ -229,6 +229,32 @@ export class JeuxVideoService {
     };
   }
 
+  async getGenres(id: number) {
+    const game = await this.prisma.akJeuxVideo.findUnique({
+      where: { idJeu: id, statut: 1 },
+      select: {
+        genres: {
+          select: {
+            genre: {
+              select: {
+                name: true,
+              }
+            }
+          }
+        }
+      }
+    });
+
+    if (!game) {
+      throw new NotFoundException('Jeu vidéo introuvable');
+    }
+
+    // Return genre names as an array of strings (similar to anime/manga tags)
+    return {
+      tags: game.genres.map(g => g.genre.name)
+    };
+  }
+
   async getSimilarGames(id: number, limit: number = 6) {
     // First check if game exists
     const game = await this.prisma.akJeuxVideo.findUnique({

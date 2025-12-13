@@ -1031,7 +1031,9 @@ export class UsersService {
     id: number,
     limit: number = 12,
     page: number = 1,
-    sortBy?: string
+    sortBy?: string,
+    similarTo?: number,
+    genres?: string
   ) {
     const user = await this.prisma.smfMember.findUnique({
       where: { idMember: id },
@@ -1050,15 +1052,101 @@ export class UsersService {
         case 'rating':
           return 'jv.moyennenotes DESC, jv.id_jeu DESC';
         case 'popularity':
-          return 'jv.nombre_notes DESC, jv.id_jeu DESC';
+          return 'jv.nb_reviews DESC, jv.id_jeu DESC';
         case 'date':
           return 'jv.annee DESC, jv.id_jeu DESC';
         case 'title':
           return 'jv.titre ASC';
         default:
-          return 'jv.moyennenotes DESC, jv.nombre_notes DESC, jv.id_jeu DESC';
+          return 'jv.moyennenotes DESC, jv.nb_reviews DESC, jv.id_jeu DESC';
       }
     })();
+
+    // If similarTo is provided, find similar games based on genres, studio, or title
+    if (similarTo) {
+      // Get the source game details
+      const sourceGame = await this.prisma.akJeuxVideo.findUnique({
+        where: { idJeu: similarTo },
+        select: {
+          idJeu: true,
+          titre: true,
+          editeur: true,
+          genres: {
+            select: {
+              genre: {
+                select: { name: true }
+              }
+            }
+          }
+        }
+      });
+
+      if (!sourceGame) {
+        throw new NotFoundException('Jeu source introuvable');
+      }
+
+      // Extract genre names from source game
+      const sourceGenres = sourceGame.genres.map(g => g.genre.name);
+
+      // Parse additional genres filter if provided
+      const genresList = genres ? genres.split(',').map(g => g.trim()) : [];
+      const allGenres = genresList.length > 0 ? genresList : sourceGenres;
+
+      // Build the similarity query
+      let query = `
+        SELECT DISTINCT
+          jv.id_jeu as id,
+          jv.titre,
+          jv.image,
+          'game' as type,
+          jv.nice_url as "niceUrl",
+          jv.moyennenotes as "moyenneNotes",
+          jv.nb_reviews as "nbReviews",
+          jv.annee,
+          jv.plateforme,
+          jv.editeur,
+          (
+            -- Calculate similarity score
+            (CASE WHEN jv.editeur = '${sourceGame.editeur?.replace(/'/g, "''")}' THEN 30 ELSE 0 END) +
+            (CASE WHEN jv.titre ILIKE '%${sourceGame.titre.split(' ')[0].replace(/'/g, "''")}%' THEN 20 ELSE 0 END) +
+            (
+              SELECT COUNT(*) * 10
+              FROM ak_jeux_video_genres jvg
+              INNER JOIN ak_genres g ON jvg.id_genre = g.id_genre
+              WHERE jvg.id_jeu = jv.id_jeu
+                AND g.name IN (${allGenres.map(g => `'${g.replace(/'/g, "''")}'`).join(',')})
+            )
+          ) as pertinence
+        FROM ak_jeux_video jv
+        WHERE jv.statut = 1
+          AND jv.id_jeu != ${similarTo}
+          AND jv.id_jeu NOT IN (
+            SELECT id_jeu_video FROM ak_critique WHERE id_membre = ${id} AND id_jeu_video IS NOT NULL
+          )
+          AND (
+            -- Match by studio
+            jv.editeur = '${sourceGame.editeur?.replace(/'/g, "''")}' OR
+            -- Match by similar title
+            jv.titre ILIKE '%${sourceGame.titre.split(' ')[0].replace(/'/g, "''")}%' OR
+            -- Match by genres
+            EXISTS (
+              SELECT 1 FROM ak_jeux_video_genres jvg
+              INNER JOIN ak_genres g ON jvg.id_genre = g.id_genre
+              WHERE jvg.id_jeu = jv.id_jeu
+                AND g.name IN (${allGenres.map(g => `'${g.replace(/'/g, "''")}'`).join(',')})
+            )
+          )
+        ORDER BY pertinence DESC, ${orderBy}
+        LIMIT ${limit} OFFSET ${offset}
+      `;
+
+      const games = await this.prisma.$queryRawUnsafe(query);
+
+      return {
+        items: games,
+        pagination: { page, limit }
+      };
+    }
 
     // Get popular games that user hasn't reviewed or added to collection
     const games = await this.prisma.$queryRawUnsafe(`
@@ -1069,7 +1157,7 @@ export class UsersService {
         'game' as type,
         jv.nice_url as "niceUrl",
         jv.moyennenotes as "moyenneNotes",
-        jv.nombre_notes as "nombreNotes",
+        jv.nb_reviews as "nbReviews",
         jv.annee,
         jv.plateforme,
         jv.editeur

@@ -43,6 +43,15 @@ export class JeuxVideoController {
     return this.jeuxVideoService.findOne(id);
   }
 
+  @Get(':id/genres')
+  @ApiOperation({ summary: 'Obtenir les genres d\'un jeu vidéo' })
+  @ApiParam({ name: 'id', description: 'ID du jeu vidéo' })
+  @ApiResponse({ status: 200, description: 'Genres du jeu vidéo' })
+  @ApiResponse({ status: 404, description: 'Jeu vidéo introuvable' })
+  async getGenres(@Param('id', ParseIntPipe) id: number) {
+    return this.jeuxVideoService.getGenres(id);
+  }
+
   @Get(':id/relationships')
   @ApiOperation({ summary: 'Get relationships for a video game' })
   @ApiParam({ name: 'id', description: 'ID du jeu vidéo' })

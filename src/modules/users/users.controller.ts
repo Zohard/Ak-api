@@ -396,6 +396,8 @@ export class UsersController {
   @ApiQuery({ name: 'limit', required: false, description: 'Nombre de recommandations', example: 12 })
   @ApiQuery({ name: 'page', required: false, description: 'Numéro de page', example: 1 })
   @ApiQuery({ name: 'sortBy', required: false, description: 'Trier par (rating, popularity, date, title)' })
+  @ApiQuery({ name: 'similarTo', required: false, description: 'ID du jeu similaire', type: 'number' })
+  @ApiQuery({ name: 'genres', required: false, description: 'Genres séparés par virgule' })
   @ApiResponse({ status: 200, description: "Recommandations de jeux vidéo" })
   @ApiResponse({ status: 404, description: 'Utilisateur introuvable' })
   async getUserGameRecommendations(
@@ -403,12 +405,16 @@ export class UsersController {
     @Query('limit') limit?: number,
     @Query('page') page?: number,
     @Query('sortBy') sortBy?: string,
+    @Query('similarTo') similarTo?: number,
+    @Query('genres') genres?: string,
   ) {
     return this.usersService.getUserGameRecommendations(
       id,
       limit || 12,
       page || 1,
-      sortBy
+      sortBy,
+      similarTo,
+      genres
     );
   }
 
