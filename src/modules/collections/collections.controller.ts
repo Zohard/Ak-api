@@ -162,6 +162,7 @@ export class CollectionsController {
     @Param('mediaId', ParseIntPipe) mediaId: number,
     @Request() req,
   ) {
+    console.log(`🔍 [checkInCollection] Controller received - user: ${JSON.stringify(req.user)}, mediaType: ${mediaType}, mediaId: ${mediaId}`);
     return this.collectionsService.isInCollection(
       req.user.id,
       mediaId,

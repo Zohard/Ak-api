@@ -729,6 +729,7 @@ export class CollectionsService {
 
   async isInCollection(userId: number, mediaId: number, mediaType: 'anime' | 'manga' | 'jeu-video') {
     return await this.prisma.executeWithRetry(async () => {
+      console.log(`🔍 [isInCollection] Checking - userId: ${userId}, mediaId: ${mediaId}, mediaType: ${mediaType}`);
       let inCollection = false;
       let collections: any[] = [];
 
@@ -745,6 +746,7 @@ export class CollectionsService {
           },
         });
         inCollection = collections.length > 0;
+        console.log(`🔍 [isInCollection] Anime query result - Found ${collections.length} collections:`, JSON.stringify(collections));
       } else if (mediaType === 'manga') {
         collections = await this.prisma.collectionManga.findMany({
           where: {
@@ -776,6 +778,8 @@ export class CollectionsService {
         });
         inCollection = collections.length > 0;
       }
+
+      console.log(`🔍 [isInCollection] Final result - inCollection: ${inCollection}, count: ${collections.length}`);
 
       return {
         inCollection,
