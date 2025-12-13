@@ -1121,7 +1121,7 @@ export class UsersService {
         WHERE jv.statut = 1
           AND jv.id_jeu != ${similarTo}
           AND jv.id_jeu NOT IN (
-            SELECT id_jeu_video FROM ak_critique WHERE id_membre = ${id} AND id_jeu_video IS NOT NULL
+            SELECT id_jeu FROM ak_critique WHERE id_membre = ${id} AND id_jeu IS NOT NULL AND id_jeu > 0
           )
           AND (
             -- Match by studio
@@ -1164,7 +1164,7 @@ export class UsersService {
       FROM ak_jeux_video jv
       WHERE jv.statut = 1
         AND jv.id_jeu NOT IN (
-          SELECT id_jeu_video FROM ak_critique WHERE id_membre = ${id} AND id_jeu_video IS NOT NULL
+          SELECT id_jeu FROM ak_critique WHERE id_membre = ${id} AND id_jeu IS NOT NULL AND id_jeu > 0
         )
       ORDER BY ${orderBy}
       LIMIT ${limit} OFFSET ${offset}

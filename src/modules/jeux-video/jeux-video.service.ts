@@ -425,12 +425,10 @@ export class JeuxVideoService {
       }
     });
 
-    const result = { platforms };
-
     // Cache for 1 hour (3600 seconds)
-    await this.cacheService.set(cacheKey, result, 3600);
+    await this.cacheService.set(cacheKey, platforms, 3600);
 
-    return result;
+    return platforms;
   }
 
   async autocomplete(query: string, exclude?: string, limit = 10) {
