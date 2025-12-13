@@ -734,6 +734,15 @@ export class CollectionsService {
       let collections: any[] = [];
 
       if (mediaType === 'anime') {
+        // Try raw SQL first to verify data exists
+        const rawResult = await this.prisma.$queryRaw<any[]>`
+          SELECT type, evaluation, notes
+          FROM collection_animes
+          WHERE id_membre = ${userId} AND id_anime = ${mediaId}
+        `;
+        console.log(`🔍 [isInCollection] RAW SQL result - Found ${rawResult.length} rows:`, JSON.stringify(rawResult));
+
+        // Then try Prisma query
         collections = await this.prisma.collectionAnime.findMany({
           where: {
             idMembre: userId,
@@ -746,7 +755,7 @@ export class CollectionsService {
           },
         });
         inCollection = collections.length > 0;
-        console.log(`🔍 [isInCollection] Anime query result - Found ${collections.length} collections:`, JSON.stringify(collections));
+        console.log(`🔍 [isInCollection] PRISMA query result - Found ${collections.length} collections:`, JSON.stringify(collections));
       } else if (mediaType === 'manga') {
         collections = await this.prisma.collectionManga.findMany({
           where: {
