@@ -1172,7 +1172,7 @@ export class UsersService {
       LIMIT ${limit} OFFSET ${offset};
     `;
 
-      const games = await this.prisma.$queryRawUnsafe(query);
+      const games = await this.prisma.$queryRawUnsafe<GameRecommendation[]>(query);
 
       // 🔁 Fallback if similarity finds nothing
       if (!games.length) {
@@ -1190,7 +1190,7 @@ export class UsersService {
      * DEFAULT / POPULAR GAME RECOMMENDATIONS
      * ============================================================
      */
-    const games = await this.prisma.$queryRawUnsafe(`
+    const games = await this.prisma.$queryRawUnsafe<any[]>(`
     SELECT
       jv.id_jeu AS id,
       jv.titre,
