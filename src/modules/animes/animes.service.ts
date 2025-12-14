@@ -493,17 +493,19 @@ export class AnimesService extends BaseContentService<
       }
     }
 
-    // If replacing image and previous image is an ImageKit URL, attempt deletion in IK
+    // If replacing or deleting image and previous image is an ImageKit URL, attempt deletion in IK
     try {
+      const isImageBeingRemoved = updateData.image === null || updateData.image === '';
+      const isImageBeingReplaced = typeof updateData.image === 'string' && updateData.image && updateData.image !== anime.image;
+
       if (
-        typeof updateData.image === 'string' &&
-        updateData.image &&
-        updateData.image !== anime.image &&
+        (isImageBeingRemoved || isImageBeingReplaced) &&
         typeof anime.image === 'string' &&
         anime.image &&
         /imagekit\.io/.test(anime.image)
       ) {
         await this.imageKitService.deleteImageByUrl(anime.image);
+        console.log(`Deleted ImageKit image: ${anime.image}`);
       }
     } catch (e) {
       // Non-blocking: log and continue update

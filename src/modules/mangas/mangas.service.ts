@@ -487,26 +487,29 @@ export class MangasService extends BaseContentService<
     }
 
     // If replacing image and previous image is an ImageKit URL, attempt deletion in IK
-    try {
-      if (
-        typeof updateMangaDto.image === 'string' &&
-        updateMangaDto.image &&
-        updateMangaDto.image !== manga.image &&
-        typeof manga.image === 'string' &&
-        manga.image &&
-        /imagekit\.io/.test(manga.image)
-      ) {
-        await this.imageKitService.deleteImageByUrl(manga.image);
-      }
-    } catch (e) {
-      console.warn('Failed to delete previous ImageKit image (manga):', (e as Error).message);
-    }
-
     let updateData: any = { ...updateMangaDto };
 
     // Normalize empty string to null for image field
     if (updateData.image === '') {
       updateData.image = null;
+    }
+
+    // If replacing or deleting image and previous image is an ImageKit URL, attempt deletion in IK
+    try {
+      const isImageBeingRemoved = updateData.image === null || updateData.image === '';
+      const isImageBeingReplaced = typeof updateData.image === 'string' && updateData.image && updateData.image !== manga.image;
+
+      if (
+        (isImageBeingRemoved || isImageBeingReplaced) &&
+        typeof manga.image === 'string' &&
+        manga.image &&
+        /imagekit\.io/.test(manga.image)
+      ) {
+        await this.imageKitService.deleteImageByUrl(manga.image);
+        console.log(`Deleted ImageKit image (manga): ${manga.image}`);
+      }
+    } catch (e) {
+      console.warn('Failed to delete previous ImageKit image (manga):', (e as Error).message);
     }
 
     const updatedManga = await this.prisma.akManga.update({
