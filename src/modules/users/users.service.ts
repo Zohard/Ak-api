@@ -1123,6 +1123,9 @@ export class UsersService {
           AND jv.id_jeu NOT IN (
             SELECT id_jeu FROM ak_critique WHERE id_membre = ${id} AND id_jeu IS NOT NULL AND id_jeu > 0
           )
+          AND jv.id_jeu NOT IN (
+            SELECT id_jeu FROM collection_jeuxvideo WHERE id_membre = ${id}
+          )
           AND (
             -- Match by studio
             jv.editeur = '${sourceGame.editeur?.replace(/'/g, "''")}' OR
@@ -1165,6 +1168,9 @@ export class UsersService {
       WHERE jv.statut = 1
         AND jv.id_jeu NOT IN (
           SELECT id_jeu FROM ak_critique WHERE id_membre = ${id} AND id_jeu IS NOT NULL AND id_jeu > 0
+        )
+        AND jv.id_jeu NOT IN (
+          SELECT id_jeu FROM collection_jeuxvideo WHERE id_membre = ${id}
         )
       ORDER BY ${orderBy}
       LIMIT ${limit} OFFSET ${offset}
