@@ -425,8 +425,6 @@ export class RecommendationsService {
         synopsis: manga.synopsis || undefined,
         year: manga.annee ? parseInt(manga.annee) : undefined,
         nbVolumes: manga.nbVolumes || undefined,
-        nbChapitres: manga.nbChapitres || undefined,
-        format: manga.format || undefined,
         type: 'manga' as const,
         score,
         matchingTags,
