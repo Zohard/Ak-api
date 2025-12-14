@@ -1050,15 +1050,16 @@ export class UsersService {
     const orderBy = (() => {
       switch (sortBy) {
         case 'rating':
-          return 'jv.moyennenotes DESC, jv.id_jeu DESC';
+          return 'jv.moyennenotes DESC, jv.nb_clics DESC, jv.id_jeu DESC';
         case 'popularity':
-          return 'jv.nb_reviews DESC, jv.id_jeu DESC';
+          return 'jv.nb_clics DESC, jv.nb_reviews DESC, jv.id_jeu DESC';
         case 'date':
           return 'jv.annee DESC, jv.id_jeu DESC';
         case 'title':
           return 'jv.titre ASC';
         default:
-          return 'jv.moyennenotes DESC, jv.nb_reviews DESC, jv.id_jeu DESC';
+          // Default: best rated, most popular (clicks), most reviewed
+          return 'jv.moyennenotes DESC, jv.nb_clics DESC, jv.nb_reviews DESC, jv.id_jeu DESC';
       }
     })();
 
