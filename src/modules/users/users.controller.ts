@@ -12,7 +12,6 @@ import {
   ParseIntPipe,
   HttpCode,
   HttpStatus,
-  Header,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -314,9 +313,6 @@ export class UsersController {
   @Get(':id/recommendations/anime')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @Header('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate')
-  @Header('Pragma', 'no-cache')
-  @Header('Expires', '0')
   @ApiOperation({ summary: "Recommandations d'anime pour un utilisateur" })
   @ApiParam({ name: 'id', description: "ID de l'utilisateur", type: 'number' })
   @ApiQuery({ name: 'limit', required: false, description: 'Nombre de recommandations', example: 12 })
@@ -356,9 +352,6 @@ export class UsersController {
   @Get(':id/recommendations/manga')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @Header('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate')
-  @Header('Pragma', 'no-cache')
-  @Header('Expires', '0')
   @ApiOperation({ summary: "Recommandations de manga pour un utilisateur" })
   @ApiParam({ name: 'id', description: "ID de l'utilisateur", type: 'number' })
   @ApiQuery({ name: 'limit', required: false, description: 'Nombre de recommandations', example: 12 })
@@ -398,9 +391,6 @@ export class UsersController {
   @Get(':id/recommendations/games')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @Header('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate')
-  @Header('Pragma', 'no-cache')
-  @Header('Expires', '0')
   @ApiOperation({ summary: "Recommandations de jeux vidéo pour un utilisateur" })
   @ApiParam({ name: 'id', description: "ID de l'utilisateur", type: 'number' })
   @ApiQuery({ name: 'limit', required: false, description: 'Nombre de recommandations', example: 12 })
