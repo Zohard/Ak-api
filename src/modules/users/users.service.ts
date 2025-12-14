@@ -1172,7 +1172,7 @@ export class UsersService {
       LIMIT ${limit} OFFSET ${offset};
     `;
 
-      const games = await this.prisma.$queryRawUnsafe<GameRecommendation[]>(query);
+      const games = await this.prisma.$queryRawUnsafe<any[]>(query);
 
       // 🔁 Fallback if similarity finds nothing
       if (!games.length) {
