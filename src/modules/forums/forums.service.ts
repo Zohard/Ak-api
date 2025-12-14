@@ -173,7 +173,7 @@ export class ForumsService {
       // Check board access permissions
       const hasAccess = await this.checkBoardAccess(boardId, userId);
       if (!hasAccess) {
-        throw new Error('Access denied to this board');
+        throw new ForbiddenException('Access denied to this board');
       }
 
       const offset = (page - 1) * limit;
@@ -214,7 +214,7 @@ export class ForumsService {
       ]);
 
       if (!board) {
-        throw new Error('Board not found');
+        throw new NotFoundException('Board not found');
       }
 
       return {
@@ -299,13 +299,13 @@ export class ForumsService {
       ]);
 
       if (!topic) {
-        throw new Error('Topic not found');
+        throw new NotFoundException('Topic not found');
       }
 
       // Check board access permissions for the topic's board
       const hasAccess = await this.checkBoardAccess(topic.board.idBoard, userId);
       if (!hasAccess) {
-        throw new Error('Access denied to this topic');
+        throw new ForbiddenException('Access denied to this topic');
       }
 
       // Get poll data if topic has a poll
@@ -493,13 +493,13 @@ export class ForumsService {
       });
 
       if (!topic) {
-        throw new Error('Topic not found');
+        throw new NotFoundException('Topic not found');
       }
 
       // Check board access permissions
       const hasAccess = await this.checkBoardAccess(topic.board.idBoard, userId);
       if (!hasAccess) {
-        throw new Error('Access denied to this topic');
+        throw new ForbiddenException('Access denied to this topic');
       }
 
       return {
@@ -1013,7 +1013,7 @@ export class ForumsService {
       // Check board access
       const hasAccess = await this.checkBoardAccess(boardId, userId);
       if (!hasAccess) {
-        throw new Error('Access denied to this board');
+        throw new ForbiddenException('Access denied to this board');
       }
 
       // Get user info
@@ -1023,7 +1023,7 @@ export class ForumsService {
       });
 
       if (!user) {
-        throw new Error('User not found');
+        throw new NotFoundException('User not found');
       }
 
       // Get next message ID
@@ -1127,18 +1127,18 @@ export class ForumsService {
       });
 
       if (!topic) {
-        throw new Error('Topic not found');
+        throw new NotFoundException('Topic not found');
       }
 
       // Check if topic is locked
       if (topic.locked) {
-        throw new Error('Topic is locked');
+        throw new BadRequestException('Topic is locked');
       }
 
       // Check board access
       const hasAccess = await this.checkBoardAccess(topic.idBoard, userId);
       if (!hasAccess) {
-        throw new Error('Access denied to this board');
+        throw new ForbiddenException('Access denied to this board');
       }
 
       // Get user info
@@ -1148,7 +1148,7 @@ export class ForumsService {
       });
 
       if (!user) {
-        throw new Error('User not found');
+        throw new NotFoundException('User not found');
       }
 
       // Get next message ID
