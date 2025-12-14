@@ -402,23 +402,6 @@ export class AnimesController {
   @Patch(':id')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Mettre à jour partiellement un anime' })
-  async partialUpdate(
-    @Param('id', ParseIntPipe) id: number,
-    @Body() updateAnimeDto: UpdateAnimeDto,
-    @Request() req,
-  ) {
-    return this.animesService.update(
-      id,
-      updateAnimeDto,
-      req.user.id,
-      req.user.isAdmin,
-    );
-  }
-
-  @Patch(':id')
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
   @ApiOperation({ summary: 'Mettre à jour un anime' })
   @ApiParam({ name: 'id', description: "ID de l'anime", type: 'number' })
   @ApiResponse({ status: 200, description: 'Anime mis à jour avec succès' })
