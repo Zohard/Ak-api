@@ -1192,7 +1192,7 @@ export class UsersService {
      * DEFAULT / POPULAR GAME RECOMMENDATIONS
      * ============================================================
      */
-    const games = await this.prisma.$queryRawUnsafe<any[]>(`
+    let games = await this.prisma.$queryRawUnsafe<any[]>(`
     SELECT
       jv.id_jeu AS id,
       jv.titre,
@@ -1224,6 +1224,35 @@ export class UsersService {
     ORDER BY ${orderBy}
     LIMIT ${limit} OFFSET ${offset};
   `);
+
+    // Fallback: if no results (edge case), return top games without collection exclusion
+    if (!games.length && page === 1) {
+      games = await this.prisma.$queryRawUnsafe<any[]>(`
+      SELECT
+        jv.id_jeu AS id,
+        jv.titre,
+        jv.image,
+        'game' AS type,
+        jv.nice_url AS "niceUrl",
+        jv.moyennenotes AS "moyenneNotes",
+        jv.nb_reviews AS "nbReviews",
+        jv.annee,
+        jv.plateforme,
+        jv.editeur
+      FROM ak_jeux_video jv
+      WHERE jv.statut = 1
+        AND jv.id_jeu > 0
+        -- Only exclude reviewed games
+        AND NOT EXISTS (
+          SELECT 1 FROM ak_critique c
+          WHERE c.id_membre = ${id}
+            AND c.id_jeu = jv.id_jeu
+            AND c.id_jeu > 0
+        )
+      ORDER BY ${orderBy}
+      LIMIT ${limit};
+    `);
+    }
 
     return {
       items: games,
