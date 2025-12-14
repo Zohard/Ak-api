@@ -1046,7 +1046,7 @@ export class UsersService {
 
     const offset = (page - 1) * limit;
 
-    // Build ORDER BY clause
+    // ORDER BY logic
     const orderBy = (() => {
       switch (sortBy) {
         case 'rating':
@@ -1058,14 +1058,16 @@ export class UsersService {
         case 'title':
           return 'jv.titre ASC';
         default:
-          // Default: best rated, most popular (clicks), most reviewed
           return 'jv.moyennenotes DESC, jv.nb_clics DESC, jv.nb_reviews DESC, jv.id_jeu DESC';
       }
     })();
 
-    // If similarTo is provided, find similar games based on genres, studio, or title
+    /**
+     * ============================================================
+     * SIMILAR GAME RECOMMENDATIONS
+     * ============================================================
+     */
     if (similarTo) {
-      // Get the source game details
       const sourceGame = await this.prisma.akJeuxVideo.findUnique({
         where: { idJeu: similarTo },
         select: {
@@ -1074,9 +1076,7 @@ export class UsersService {
           editeur: true,
           genres: {
             select: {
-              genre: {
-                select: { name: true }
-              }
+              genre: { select: { name: true } }
             }
           }
         }
@@ -1086,65 +1086,98 @@ export class UsersService {
         throw new NotFoundException('Jeu source introuvable');
       }
 
-      // Extract genre names from source game
       const sourceGenres = sourceGame.genres.map(g => g.genre.name);
+      const genresList = genres
+        ? genres.split(',').map(g => g.trim()).filter(Boolean)
+        : [];
 
-      // Parse additional genres filter if provided
-      const genresList = genres ? genres.split(',').map(g => g.trim()) : [];
-      const allGenres = genresList.length > 0 ? genresList : sourceGenres;
+      const allGenres = genresList.length ? genresList : sourceGenres;
+      const safeGenres =
+        allGenres.length > 0
+          ? allGenres.map(g => `'${g.replace(/'/g, "''")}'`).join(',')
+          : null;
 
-      // Build the similarity query
-      let query = `
-        SELECT DISTINCT
-          jv.id_jeu as id,
-          jv.titre,
-          jv.image,
-          'game' as type,
-          jv.nice_url as "niceUrl",
-          jv.moyennenotes as "moyenneNotes",
-          jv.nb_reviews as "nbReviews",
-          jv.annee,
-          jv.plateforme,
-          jv.editeur,
-          (
-            -- Calculate similarity score
-            (CASE WHEN jv.editeur = '${sourceGame.editeur?.replace(/'/g, "''")}' THEN 30 ELSE 0 END) +
-            (CASE WHEN jv.titre ILIKE '%${sourceGame.titre.split(' ')[0].replace(/'/g, "''")}%' THEN 20 ELSE 0 END) +
+      const safeEditor = sourceGame.editeur
+        ? `'${sourceGame.editeur.replace(/'/g, "''")}'`
+        : null;
+
+      const safeTitleWord = sourceGame.titre
+        ? sourceGame.titre.split(' ')[0].replace(/'/g, "''")
+        : null;
+
+      let similarityConditions: string[] = [];
+
+      if (safeEditor) similarityConditions.push(`jv.editeur = ${safeEditor}`);
+      if (safeTitleWord) similarityConditions.push(`jv.titre ILIKE '%${safeTitleWord}%'`);
+      if (safeGenres) {
+        similarityConditions.push(`
+        EXISTS (
+          SELECT 1
+          FROM ak_jeux_video_genres jvg
+          JOIN ak_genres g ON g.id_genre = jvg.id_genre
+          WHERE jvg.id_jeu = jv.id_jeu
+            AND g.name IN (${safeGenres})
+        )
+      `);
+      }
+
+      // Fallback if no similarity criteria available
+      if (!similarityConditions.length) {
+        similarityConditions.push('1 = 1');
+      }
+
+      const query = `
+      SELECT DISTINCT
+        jv.id_jeu AS id,
+        jv.titre,
+        jv.image,
+        'game' AS type,
+        jv.nice_url AS "niceUrl",
+        jv.moyennenotes AS "moyenneNotes",
+        jv.nb_reviews AS "nbReviews",
+        jv.annee,
+        jv.plateforme,
+        jv.editeur,
+        (
+          ${safeEditor ? `CASE WHEN jv.editeur = ${safeEditor} THEN 30 ELSE 0 END` : '0'}
+          + ${safeTitleWord ? `CASE WHEN jv.titre ILIKE '%${safeTitleWord}%' THEN 20 ELSE 0 END` : '0'}
+          + ${safeGenres ? `
             (
               SELECT COUNT(*) * 10
               FROM ak_jeux_video_genres jvg
-              INNER JOIN ak_genres g ON jvg.id_genre = g.id_genre
+              JOIN ak_genres g ON g.id_genre = jvg.id_genre
               WHERE jvg.id_jeu = jv.id_jeu
-                AND g.name IN (${allGenres.map(g => `'${g.replace(/'/g, "''")}'`).join(',')})
+                AND g.name IN (${safeGenres})
             )
-          ) as pertinence
-        FROM ak_jeux_video jv
-        WHERE jv.statut = 1
-          AND jv.id_jeu != ${similarTo}
-          AND jv.id_jeu NOT IN (
-            SELECT id_jeu FROM ak_critique WHERE id_membre = ${id} AND id_jeu IS NOT NULL AND id_jeu > 0
-          )
-          AND jv.id_jeu NOT IN (
-            SELECT id_jeu FROM collection_jeuxvideo WHERE id_membre = ${id}
-          )
-          AND (
-            -- Match by studio
-            jv.editeur = '${sourceGame.editeur?.replace(/'/g, "''")}' OR
-            -- Match by similar title
-            jv.titre ILIKE '%${sourceGame.titre.split(' ')[0].replace(/'/g, "''")}%' OR
-            -- Match by genres
-            EXISTS (
-              SELECT 1 FROM ak_jeux_video_genres jvg
-              INNER JOIN ak_genres g ON jvg.id_genre = g.id_genre
-              WHERE jvg.id_jeu = jv.id_jeu
-                AND g.name IN (${allGenres.map(g => `'${g.replace(/'/g, "''")}'`).join(',')})
-            )
-          )
-        ORDER BY pertinence DESC, ${orderBy}
-        LIMIT ${limit} OFFSET ${offset}
-      `;
+          ` : '0'}
+        ) AS pertinence
+      FROM ak_jeux_video jv
+      WHERE jv.statut = 1
+        AND jv.id_jeu != ${similarTo}
+
+        -- SAFE exclusions
+        AND NOT EXISTS (
+          SELECT 1 FROM ak_critique c
+          WHERE c.id_membre = ${id}
+            AND c.id_jeu = jv.id_jeu
+        )
+        AND NOT EXISTS (
+          SELECT 1 FROM collection_jeuxvideo cj
+          WHERE cj.id_membre = ${id}
+            AND cj.id_jeu = jv.id_jeu
+        )
+
+        AND (${similarityConditions.join(' OR ')})
+      ORDER BY pertinence DESC, ${orderBy}
+      LIMIT ${limit} OFFSET ${offset};
+    `;
 
       const games = await this.prisma.$queryRawUnsafe(query);
+
+      // 🔁 Fallback if similarity finds nothing
+      if (!games.length) {
+        return this.getUserGameRecommendations(id, limit, page, sortBy);
+      }
 
       return {
         items: games,
@@ -1152,36 +1185,48 @@ export class UsersService {
       };
     }
 
-    // Get popular games that user hasn't reviewed or added to collection
+    /**
+     * ============================================================
+     * DEFAULT / POPULAR GAME RECOMMENDATIONS
+     * ============================================================
+     */
     const games = await this.prisma.$queryRawUnsafe(`
-      SELECT
-        jv.id_jeu as id,
-        jv.titre,
-        jv.image,
-        'game' as type,
-        jv.nice_url as "niceUrl",
-        jv.moyennenotes as "moyenneNotes",
-        jv.nb_reviews as "nbReviews",
-        jv.annee,
-        jv.plateforme,
-        jv.editeur
-      FROM ak_jeux_video jv
-      WHERE jv.statut = 1
-        AND jv.id_jeu NOT IN (
-          SELECT id_jeu FROM ak_critique WHERE id_membre = ${id} AND id_jeu IS NOT NULL AND id_jeu > 0
-        )
-        AND jv.id_jeu NOT IN (
-          SELECT id_jeu FROM collection_jeuxvideo WHERE id_membre = ${id}
-        )
-      ORDER BY ${orderBy}
-      LIMIT ${limit} OFFSET ${offset}
-    `);
+    SELECT
+      jv.id_jeu AS id,
+      jv.titre,
+      jv.image,
+      'game' AS type,
+      jv.nice_url AS "niceUrl",
+      jv.moyennenotes AS "moyenneNotes",
+      jv.nb_reviews AS "nbReviews",
+      jv.annee,
+      jv.plateforme,
+      jv.editeur
+    FROM ak_jeux_video jv
+    WHERE jv.statut = 1
+
+      -- SAFE exclusions
+      AND NOT EXISTS (
+        SELECT 1 FROM ak_critique c
+        WHERE c.id_membre = ${id}
+          AND c.id_jeu = jv.id_jeu
+      )
+      AND NOT EXISTS (
+        SELECT 1 FROM collection_jeuxvideo cj
+        WHERE cj.id_membre = ${id}
+          AND cj.id_jeu = jv.id_jeu
+      )
+
+    ORDER BY ${orderBy}
+    LIMIT ${limit} OFFSET ${offset};
+  `);
 
     return {
       items: games,
       pagination: { page, limit }
     };
   }
+
 
   // Public methods (no authentication required)
   async findPublicByPseudo(pseudo: string) {
