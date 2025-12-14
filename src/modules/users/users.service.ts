@@ -1154,12 +1154,14 @@ export class UsersService {
       FROM ak_jeux_video jv
       WHERE jv.statut = 1
         AND jv.id_jeu != ${similarTo}
+        AND jv.id_jeu > 0
 
         -- SAFE exclusions
         AND NOT EXISTS (
           SELECT 1 FROM ak_critique c
           WHERE c.id_membre = ${id}
             AND c.id_jeu = jv.id_jeu
+            AND c.id_jeu > 0
         )
         AND NOT EXISTS (
           SELECT 1 FROM collection_jeuxvideo cj
@@ -1204,12 +1206,14 @@ export class UsersService {
       jv.editeur
     FROM ak_jeux_video jv
     WHERE jv.statut = 1
+      AND jv.id_jeu > 0
 
       -- SAFE exclusions
       AND NOT EXISTS (
         SELECT 1 FROM ak_critique c
         WHERE c.id_membre = ${id}
           AND c.id_jeu = jv.id_jeu
+          AND c.id_jeu > 0
       )
       AND NOT EXISTS (
         SELECT 1 FROM collection_jeuxvideo cj
