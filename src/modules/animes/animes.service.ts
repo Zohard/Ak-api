@@ -1008,7 +1008,11 @@ export class AnimesService extends BaseContentService<
           json_data LIKE ${'%[' + id + ',%'} OR
           json_data LIKE ${'%,' + id + ',%'} OR
           json_data LIKE ${'%,' + id + ']%'} OR
-          json_data LIKE ${'%[' + id + ']%'}
+          json_data LIKE ${'%[' + id + ']%'} OR
+          json_data LIKE ${'%["' + id + '",%'} OR
+          json_data LIKE ${'%,"' + id + '",%'} OR
+          json_data LIKE ${'%,"' + id + '"]%'} OR
+          json_data LIKE ${'%["' + id + '"]%'}
         )
         AND statut = 1
         ORDER BY annee DESC, saison DESC
