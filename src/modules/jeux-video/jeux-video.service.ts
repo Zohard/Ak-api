@@ -279,24 +279,6 @@ export class JeuxVideoService {
     };
   }
 
-  async getPlatforms() {
-    const platforms = await this.prisma.akPlatform.findMany({
-      orderBy: [
-        { platformType: 'asc' },
-        { name: 'asc' }
-      ],
-      select: {
-        idPlatform: true,
-        name: true,
-        shortName: true,
-        manufacturer: true,
-        platformType: true,
-      }
-    });
-
-    return { platforms };
-  }
-
   async getSimilarGames(id: number, limit: number = 6) {
     // First check if game exists
     const game = await this.prisma.akJeuxVideo.findUnique({
