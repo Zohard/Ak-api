@@ -438,11 +438,11 @@ export class AdminJeuxVideoService {
       try {
         const imageBuffer = await this.igdbService.downloadCoverImage(igdbGame.cover.image_id);
         if (imageBuffer) {
-          // Upload to ImageKit
-          const filename = `igdb-${igdbId}-${Date.now()}.jpg`;
+          // Upload to ImageKit with sanitized title + timestamp
+          const filename = this.imagekitService.createSafeFileName(igdbGame.name, 'jeu-video');
           const uploadResult = await this.imagekitService.uploadImage(
             imageBuffer,
-            filename,
+            `${filename}.jpg`,
             'images/games', // Upload to images/games folder
             true // Replace existing if same name
           );
@@ -555,11 +555,11 @@ export class AdminJeuxVideoService {
             try {
               const imageBuffer = await this.igdbService.downloadCoverImage(ic.company.logo.image_id, 'cover_small');
               if (imageBuffer) {
-                // Upload to ImageKit in business folder
-                const filename = `igdb-company-${ic.company.id}-${Date.now()}.jpg`;
+                // Upload to ImageKit in business folder with sanitized title + timestamp
+                const filename = this.imagekitService.createSafeFileName(ic.company.name, 'business');
                 const uploadResult = await this.imagekitService.uploadImage(
                   imageBuffer,
-                  filename,
+                  `${filename}.jpg`,
                   'images/business', // Upload to images/business folder
                   true
                 );
@@ -585,10 +585,10 @@ export class AdminJeuxVideoService {
           try {
             const imageBuffer = await this.igdbService.downloadCoverImage(ic.company.logo.image_id, 'cover_small');
             if (imageBuffer) {
-              const filename = `igdb-company-${ic.company.id}-${Date.now()}.jpg`;
+              const filename = this.imagekitService.createSafeFileName(ic.company.name, 'business');
               const uploadResult = await this.imagekitService.uploadImage(
                 imageBuffer,
-                filename,
+                `${filename}.jpg`,
                 'images/business',
                 true
               );
@@ -701,11 +701,11 @@ export class AdminJeuxVideoService {
       try {
         const imageBuffer = await this.igdbService.downloadCoverImage(igdbGame.cover.image_id);
         if (imageBuffer) {
-          // Upload to ImageKit
-          const filename = `igdb-${igdbId}-${Date.now()}.jpg`;
+          // Upload to ImageKit with sanitized title + timestamp
+          const filename = this.imagekitService.createSafeFileName(igdbGame.name, 'jeu-video');
           const uploadResult = await this.imagekitService.uploadImage(
             imageBuffer,
-            filename,
+            `${filename}.jpg`,
             'images/games', // Upload to images/games folder
             true // Replace existing if same name
           );
@@ -1104,6 +1104,13 @@ export class AdminJeuxVideoService {
     igdbId: number,
     screenshots: Array<{ id: number; image_id: string }>
   ): Promise<number> {
+    // Fetch game title for screenshot filenames
+    const game = await this.prisma.akJeuxVideo.findUnique({
+      where: { idJeu },
+      select: { titre: true }
+    });
+    const gameTitle = game?.titre || `game-${idJeu}`;
+
     let sortorder = 0;
 
     // Get current max sortorder
@@ -1127,11 +1134,12 @@ export class AdminJeuxVideoService {
         );
 
         if (imageBuffer) {
-          // Upload to ImageKit
-          const filename = `igdb-${igdbId}-screenshot-${screenshot.id}-${Date.now()}.jpg`;
+          // Upload to ImageKit with sanitized title + timestamp
+          const baseFilename = this.imagekitService.createSafeFileName(gameTitle, 'jeu-video');
+          const filename = `${baseFilename}-screenshot-${sortorder}`;
           const uploadResult = await this.imagekitService.uploadImage(
             imageBuffer,
-            filename,
+            `${filename}.jpg`,
             'images/games/screenshots', // Screenshots folder
             true // Replace if exists
           );
