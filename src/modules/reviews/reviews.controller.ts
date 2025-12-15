@@ -252,8 +252,6 @@ export class ReviewsController {
   @ApiResponse({ status: 200, description: 'Statistiques de la critique' })
   @ApiResponse({ status: 404, description: 'Critique introuvable' })
   async getReviewStats(@Param('id', ParseIntPipe) id: number) {
-    const stats = await this.reviewsService.getReviewStats(id);
-    // Wrap to match frontend expectations: { success, data }
-    return { success: true, data: stats } as any;
+    return this.reviewsService.getReviewStats(id);
   }
 }
