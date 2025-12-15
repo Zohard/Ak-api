@@ -205,17 +205,15 @@ export class AuthService {
       },
     });
 
-    // Send verification email
-    try {
-      await this.emailService.sendEmailVerification(
-        user.emailAddress,
-        user.memberName,
-        verificationToken,
-      );
-    } catch (error) {
+    // Send verification email (async, don't await)
+    this.emailService.sendEmailVerification(
+      user.emailAddress,
+      user.memberName,
+      verificationToken,
+    ).catch(error => {
       console.error('Failed to send verification email:', error);
       // Don't fail registration if email fails - user can request another verification email
-    }
+    });
 
     // Track successful registration attempt
     this.metricsService.trackAuthAttempt('register', 'success', 'local');
@@ -333,12 +331,14 @@ export class AuthService {
       },
     });
 
-    // Send verification email
-    await this.emailService.sendEmailVerification(
+    // Send verification email (async, don't await)
+    this.emailService.sendEmailVerification(
       user.emailAddress,
       user.memberName,
       verificationToken,
-    );
+    ).catch(error => {
+      console.error('Failed to send verification email:', error);
+    });
 
     return {
       message: 'Verification email sent. Please check your inbox.',
@@ -431,13 +431,11 @@ export class AuthService {
       },
     });
 
-    // Send email with reset link
-    try {
-      await this.emailService.sendForgotPasswordEmail(user.emailAddress, resetToken);
-    } catch (error) {
-      console.error('Failed to send password reset email:', error);
-      // Continue execution - don't fail the request if email fails
-    }
+    // Send email with reset link (async, don't await)
+    this.emailService.sendForgotPasswordEmail(user.emailAddress, resetToken)
+      .catch(error => {
+        console.error('Failed to send password reset email:', error);
+      });
 
     return {
       message:
