@@ -233,8 +233,9 @@ export class SourcesExternesService {
         return { success: false, error: 'No image URL provided' };
       }
 
-      // Generate a clean filename using the ImageKit helper (sanitized title + timestamp)
-      const filename = this.imageKitService.createSafeFileName(animeTitle, 'anime');
+      // Generate a clean filename using the ImageKit helper (sanitized title + timestamp + cover number)
+      const baseFilename = this.imageKitService.createSafeFileName(animeTitle, 'anime');
+      const filename = `${baseFilename}-cover-1`;
       const folder = this.imageKitService.getFolderForMediaType('anime');
 
       // Use ImageKit service to upload from URL

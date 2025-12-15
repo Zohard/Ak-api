@@ -438,8 +438,9 @@ export class AdminJeuxVideoService {
       try {
         const imageBuffer = await this.igdbService.downloadCoverImage(igdbGame.cover.image_id);
         if (imageBuffer) {
-          // Upload to ImageKit with sanitized title + timestamp
-          const filename = this.imagekitService.createSafeFileName(igdbGame.name, 'jeu-video');
+          // Upload to ImageKit with sanitized title + timestamp + cover number
+          const baseFilename = this.imagekitService.createSafeFileName(igdbGame.name, 'jeu-video');
+          const filename = `${baseFilename}-cover-1`;
           const uploadResult = await this.imagekitService.uploadImage(
             imageBuffer,
             `${filename}.jpg`,
@@ -555,8 +556,9 @@ export class AdminJeuxVideoService {
             try {
               const imageBuffer = await this.igdbService.downloadCoverImage(ic.company.logo.image_id, 'cover_small');
               if (imageBuffer) {
-                // Upload to ImageKit in business folder with sanitized title + timestamp
-                const filename = this.imagekitService.createSafeFileName(ic.company.name, 'business');
+                // Upload to ImageKit in business folder with sanitized title + timestamp + logo number
+                const baseFilename = this.imagekitService.createSafeFileName(ic.company.name, 'business');
+                const filename = `${baseFilename}-logo-1`;
                 const uploadResult = await this.imagekitService.uploadImage(
                   imageBuffer,
                   `${filename}.jpg`,
@@ -585,7 +587,8 @@ export class AdminJeuxVideoService {
           try {
             const imageBuffer = await this.igdbService.downloadCoverImage(ic.company.logo.image_id, 'cover_small');
             if (imageBuffer) {
-              const filename = this.imagekitService.createSafeFileName(ic.company.name, 'business');
+              const baseFilename = this.imagekitService.createSafeFileName(ic.company.name, 'business');
+              const filename = `${baseFilename}-logo-1`;
               const uploadResult = await this.imagekitService.uploadImage(
                 imageBuffer,
                 `${filename}.jpg`,
@@ -701,8 +704,9 @@ export class AdminJeuxVideoService {
       try {
         const imageBuffer = await this.igdbService.downloadCoverImage(igdbGame.cover.image_id);
         if (imageBuffer) {
-          // Upload to ImageKit with sanitized title + timestamp
-          const filename = this.imagekitService.createSafeFileName(igdbGame.name, 'jeu-video');
+          // Upload to ImageKit with sanitized title + timestamp + cover number
+          const baseFilename = this.imagekitService.createSafeFileName(igdbGame.name, 'jeu-video');
+          const filename = `${baseFilename}-cover-1`;
           const uploadResult = await this.imagekitService.uploadImage(
             imageBuffer,
             `${filename}.jpg`,
@@ -1125,6 +1129,7 @@ export class AdminJeuxVideoService {
     }
 
     let importedCount = 0;
+    let screenshotNumber = sortorder + 1; // Start numbering from current position + 1
 
     for (const screenshot of screenshots.slice(0, 10)) { // Limit to first 10 screenshots
       try {
@@ -1134,9 +1139,9 @@ export class AdminJeuxVideoService {
         );
 
         if (imageBuffer) {
-          // Upload to ImageKit with sanitized title + timestamp
+          // Upload to ImageKit with sanitized title + timestamp + screenshot number
           const baseFilename = this.imagekitService.createSafeFileName(gameTitle, 'jeu-video');
-          const filename = `${baseFilename}-screenshot-${sortorder}`;
+          const filename = `${baseFilename}-screenshot-${screenshotNumber}`;
           const uploadResult = await this.imagekitService.uploadImage(
             imageBuffer,
             `${filename}.jpg`,
@@ -1155,7 +1160,8 @@ export class AdminJeuxVideoService {
               }
             });
             importedCount++;
-            console.log(`Successfully imported screenshot ${screenshot.id} for game ${idJeu}`);
+            screenshotNumber++;
+            console.log(`Successfully imported screenshot ${screenshotNumber - 1} for game ${idJeu}`);
           }
         }
       } catch (error) {

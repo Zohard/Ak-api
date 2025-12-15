@@ -114,8 +114,9 @@ export class AdminBusinessService {
         return { success: false, error: 'No image URL provided' };
       }
 
-      // Generate a clean filename using the ImageKit helper
-      const filename = this.imageKitService.createSafeFileName(businessName, 'business');
+      // Generate a clean filename using the ImageKit helper (sanitized title + timestamp + logo number)
+      const baseFilename = this.imageKitService.createSafeFileName(businessName, 'business');
+      const filename = `${baseFilename}-logo-1`;
       const folder = this.imageKitService.getFolderForMediaType('business');
 
       // Use ImageKit service to upload from URL

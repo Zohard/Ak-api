@@ -173,8 +173,9 @@ export class AdminMangasService {
         return { success: false, error: 'No image URL provided' };
       }
 
-      // Generate a clean filename using the ImageKit helper
-      const filename = this.imageKitService.createSafeFileName(mangaTitle, 'manga');
+      // Generate a clean filename using the ImageKit helper (sanitized title + timestamp + cover number)
+      const baseFilename = this.imageKitService.createSafeFileName(mangaTitle, 'manga');
+      const filename = `${baseFilename}-cover-1`;
       const folder = this.imageKitService.getFolderForMediaType('manga');
 
       // Use ImageKit service to upload from URL
