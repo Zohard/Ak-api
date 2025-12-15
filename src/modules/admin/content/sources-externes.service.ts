@@ -233,16 +233,15 @@ export class SourcesExternesService {
         return { success: false, error: 'No image URL provided' };
       }
 
-      // Generate a clean filename from the anime title
-      const cleanTitle = animeTitle
-        .replace(/[^a-zA-Z0-9\s-]/g, '') // Remove special characters
-        .replace(/\s+/g, '_') // Replace spaces with underscores
-        .toLowerCase();
+      // Generate a clean filename using the ImageKit helper (sanitized title + timestamp)
+      const filename = this.imageKitService.createSafeFileName(animeTitle, 'anime');
+      const folder = this.imageKitService.getFolderForMediaType('anime');
 
+      // Use ImageKit service to upload from URL
       const result = await this.imageKitService.uploadImageFromUrl(
         imageUrl,
-        `${cleanTitle}_poster`,
-        'images/animes'
+        filename,
+        folder
       );
 
       return {
