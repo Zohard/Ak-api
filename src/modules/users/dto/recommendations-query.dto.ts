@@ -41,7 +41,7 @@ export class RecommendationsQueryDto {
   @ApiPropertyOptional({ description: 'Similar to media type', enum: ['anime', 'manga', 'game'] })
   @IsOptional()
   @IsString()
-  similarToType?: string;
+  similarToType?: 'anime' | 'manga' | 'game';
 
   @ApiPropertyOptional({ description: 'Tags to include, comma-separated' })
   @IsOptional()

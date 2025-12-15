@@ -330,7 +330,7 @@ export class UsersController {
       genresParam,
       query.sortBy,
       query.similarTo,
-      query.similarToType,
+      query.similarToType as 'anime' | 'manga',
       query.tags
     );
   }
@@ -354,7 +354,7 @@ export class UsersController {
       genresParam,
       query.sortBy,
       query.similarTo,
-      query.similarToType,
+      query.similarToType as 'anime' | 'manga',
       query.tags
     );
   }
