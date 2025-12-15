@@ -221,9 +221,33 @@ export class JeuxVideoService {
       throw new NotFoundException('Jeu vidéo introuvable');
     }
 
+    // Fallback: If no platforms in junction table, parse legacy plateforme field
+    let platforms = item.platforms || [];
+    if (platforms.length === 0 && item.plateforme) {
+      // Parse comma-separated legacy platform field
+      const legacyPlatforms = item.plateforme
+        .split(',')
+        .map(p => p.trim())
+        .filter(Boolean);
+
+      // Create virtual platform objects from legacy data
+      platforms = legacyPlatforms.map((platformName, index) => ({
+        releaseDate: null,
+        isPrimary: index === 0, // First one is primary
+        platform: {
+          idPlatform: null,
+          name: platformName,
+          shortName: platformName,
+          manufacturer: null,
+          platformType: null,
+        }
+      }));
+    }
+
     // Map idJeu to id and presentation to description for frontend consistency
     return {
       ...item,
+      platforms, // Use fallback platforms if needed
       id: item.idJeu,
       description: item.presentation,
     };
@@ -253,6 +277,24 @@ export class JeuxVideoService {
     return {
       tags: game.genres.map(g => g.genre.name)
     };
+  }
+
+  async getPlatforms() {
+    const platforms = await this.prisma.akPlatform.findMany({
+      orderBy: [
+        { platformType: 'asc' },
+        { name: 'asc' }
+      ],
+      select: {
+        idPlatform: true,
+        name: true,
+        shortName: true,
+        manufacturer: true,
+        platformType: true,
+      }
+    });
+
+    return { platforms };
   }
 
   async getSimilarGames(id: number, limit: number = 6) {
