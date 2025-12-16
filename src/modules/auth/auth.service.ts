@@ -542,13 +542,16 @@ export class AuthService {
   }
 
   private async trackLoginIP(userId: number, ipAddress: string): Promise<void> {
+    // Detect IPv4 vs IPv6
+    const isIPv6 = ipAddress.includes(':');
+
     // Insert new login record
     await this.prisma.smfMemberLogin.create({
       data: {
         idMember: userId,
         time: Math.floor(Date.now() / 1000),
-        ip: ipAddress,
-        ip2: ipAddress,
+        ip: isIPv6 ? '' : ipAddress,  // IPv4 goes in ip column
+        ip2: isIPv6 ? ipAddress : '', // IPv6 goes in ip2 column
       },
     });
 
