@@ -244,6 +244,9 @@ export class JeuxVideoService {
       }));
     }
 
+    // Increment view count
+    await this.incrementViewCount(id);
+
     // Map idJeu to id and presentation to description for frontend consistency
     return {
       ...item,
@@ -251,6 +254,22 @@ export class JeuxVideoService {
       id: item.idJeu,
       description: item.presentation,
     };
+  }
+
+  private async incrementViewCount(id: number): Promise<void> {
+    try {
+      await this.prisma.akJeuxVideo.update({
+        where: { idJeu: id },
+        data: {
+          nbClics: {
+            increment: 1
+          }
+        }
+      });
+    } catch (error) {
+      // Log error but don't fail the request
+      console.error(`Failed to increment view count for game ${id}:`, error);
+    }
   }
 
   async getGenres(id: number) {
