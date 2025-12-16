@@ -91,6 +91,18 @@ model SmfMember {
   @@map("smf_members")
 }
 
+// SMF Member Logins - Track user login IPs
+model SmfMemberLogin {
+  idLogin   Int      @id @default(autoincrement()) @map("id_login")
+  idMember  Int      @map("id_member") @default(0)
+  time      Int      @default(0)
+  ip        String   @default("") @db.VarChar(255)
+  ip2       String   @default("") @db.VarChar(255)
+
+  @@index([idMember, time])
+  @@map("smf_member_logins")
+}
+
 // Refresh Tokens
 model AkRefreshToken {
   id          Int       @id @default(autoincrement())

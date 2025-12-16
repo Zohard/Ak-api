@@ -125,6 +125,11 @@ export class AuthService {
       },
     });
 
+    // Track login IP (keep only last 4 IPs)
+    if (ipAddress) {
+      await this.trackLoginIP(user.idMember, ipAddress);
+    }
+
     const payload = {
       sub: user.idMember,
       username: user.memberName,
@@ -534,6 +539,36 @@ export class AuthService {
     });
 
     return token;
+  }
+
+  private async trackLoginIP(userId: number, ipAddress: string): Promise<void> {
+    // Insert new login record
+    await this.prisma.smfMemberLogin.create({
+      data: {
+        idMember: userId,
+        time: Math.floor(Date.now() / 1000),
+        ip: ipAddress,
+        ip2: ipAddress,
+      },
+    });
+
+    // Get all login records for this user, ordered by most recent first
+    const loginRecords = await this.prisma.smfMemberLogin.findMany({
+      where: { idMember: userId },
+      orderBy: { time: 'desc' },
+    });
+
+    // If more than 4 records, delete the oldest ones
+    if (loginRecords.length > 4) {
+      const recordsToDelete = loginRecords.slice(4);
+      const idsToDelete = recordsToDelete.map(record => record.idLogin);
+
+      await this.prisma.smfMemberLogin.deleteMany({
+        where: {
+          idLogin: { in: idsToDelete },
+        },
+      });
+    }
   }
 
   private sanitizeUser(user: SmfMember) {
