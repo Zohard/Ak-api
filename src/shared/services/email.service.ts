@@ -7,14 +7,35 @@ export class EmailService {
   private transporter: nodemailer.Transporter;
 
   constructor(private readonly configService: ConfigService) {
-    this.transporter = nodemailer.createTransport({
+    const smtpConfig = {
       host: this.configService.get<string>('MAILTRAP_HOST'),
-      port: this.configService.get<number>('MAILTRAP_PORT'),
-      secure: false,
+      port: parseInt(this.configService.get<string>('MAILTRAP_PORT') || '587', 10),
+      secure: false, // Use TLS (false for port 587, true for port 465)
       auth: {
         user: this.configService.get<string>('MAILTRAP_USER'),
         pass: this.configService.get<string>('MAILTRAP_PASS'),
       },
+      tls: {
+        rejectUnauthorized: true, // Don't fail on invalid certs in production
+      },
+    };
+
+    console.log('📧 Initializing email service with Brevo SMTP:', {
+      host: smtpConfig.host,
+      port: smtpConfig.port,
+      user: smtpConfig.auth.user,
+      from: this.configService.get<string>('MAILTRAP_FROM'),
+    });
+
+    this.transporter = nodemailer.createTransport(smtpConfig);
+
+    // Verify connection configuration
+    this.transporter.verify((error, success) => {
+      if (error) {
+        console.error('❌ SMTP connection error:', error);
+      } else {
+        console.log('✅ SMTP server is ready to send emails');
+      }
     });
   }
 
@@ -29,10 +50,10 @@ export class EmailService {
     };
 
     try {
-      await this.transporter.sendMail(mailOptions);
-      console.log(`Verification email sent to ${email}`);
+      const info = await this.transporter.sendMail(mailOptions);
+      console.log(`✅ Verification email sent to ${email} (Message ID: ${info.messageId})`);
     } catch (error) {
-      console.error('Error sending verification email:', error);
+      console.error('❌ Error sending verification email to', email, ':', error);
       throw error;
     }
   }
@@ -48,10 +69,10 @@ export class EmailService {
     };
 
     try {
-      await this.transporter.sendMail(mailOptions);
-      console.log(`Password reset email sent to ${email}`);
+      const info = await this.transporter.sendMail(mailOptions);
+      console.log(`✅ Password reset email sent to ${email} (Message ID: ${info.messageId})`);
     } catch (error) {
-      console.error('Error sending email:', error);
+      console.error('❌ Error sending password reset email to', email, ':', error);
       throw error;
     }
   }
@@ -73,10 +94,10 @@ export class EmailService {
     };
 
     try {
-      await this.transporter.sendMail(mailOptions);
-      console.log(`PM notification email sent to ${recipientEmail}`);
+      const info = await this.transporter.sendMail(mailOptions);
+      console.log(`✅ PM notification email sent to ${recipientEmail} (Message ID: ${info.messageId})`);
     } catch (error) {
-      console.error('Error sending PM notification email:', error);
+      console.error('❌ Error sending PM notification email to', recipientEmail, ':', error);
       // Don't throw - we don't want to fail the PM send if email fails
     }
   }
@@ -98,10 +119,10 @@ export class EmailService {
     };
 
     try {
-      await this.transporter.sendMail(mailOptions);
-      console.log(`Review rejection email sent to ${recipientEmail}`);
+      const info = await this.transporter.sendMail(mailOptions);
+      console.log(`✅ Review rejection email sent to ${recipientEmail} (Message ID: ${info.messageId})`);
     } catch (error) {
-      console.error('Error sending review rejection email:', error);
+      console.error('❌ Error sending review rejection email to', recipientEmail, ':', error);
       // Don't throw - we don't want to fail the moderation if email fails
     }
   }

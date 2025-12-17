@@ -315,8 +315,21 @@ export class JeuxVideoService {
       throw new NotFoundException('Jeu vidéo introuvable');
     }
 
+    // Check if game has genres
+    const hasGenres = await this.prisma.akJeuxVideoGenre.count({
+      where: { idJeu: id }
+    });
+
+    const hasEditeur = game.editeur && game.editeur !== '';
+    const useTitleFallback = hasGenres === 0 && !hasEditeur;
+
+    if (useTitleFallback) {
+      console.log(`[Similar Games] Using title similarity fallback for game ${id} (${game.titre}) - no genres and no editeur`);
+    }
+
     // Optimized query using UNION strategy for better performance
     // Prioritize shared content (genres), then developer/publisher, then year
+    // If no genres/editeur, fallback to title similarity
     const similarGames = await this.prisma.$queryRaw`
       WITH results AS (
         -- Priority 1: Shared genres (highest relevance - same themes/genres)
@@ -408,6 +421,49 @@ export class JeuxVideoService {
         WHERE ABS(j.annee - ${game.annee || 0}) <= 2
           AND j.id_jeu != ${id}
           AND j.statut = 1
+        ORDER BY j.moyennenotes DESC NULLS LAST
+        LIMIT ${limit * 2})
+
+        UNION ALL
+
+        -- Priority 5: Title similarity (fallback when no genres/editeur)
+        -- Only used if game has no genres and no editeur
+        (SELECT
+          j.id_jeu as "idJeu",
+          j.titre,
+          j.image,
+          j.annee,
+          j.editeur,
+          j.developpeur,
+          j.moyennenotes as "moyenneNotes",
+          j.nb_reviews as "nbReviews",
+          j.nice_url as "niceUrl",
+          CASE
+            WHEN ${useTitleFallback} THEN 6
+            ELSE 1
+          END as similarity_score
+        FROM ak_jeux_video j
+        WHERE j.id_jeu != ${id}
+          AND j.statut = 1
+          AND (
+            -- Use title similarity when game lacks genres and editeur
+            ${useTitleFallback} = true
+            AND (
+              -- Match similar title words (first word of title)
+              LOWER(j.titre) LIKE '%' || LOWER(SUBSTRING(${game.titre} FROM 1 FOR
+                CASE WHEN POSITION(' ' IN ${game.titre}) > 0
+                THEN POSITION(' ' IN ${game.titre}) - 1
+                ELSE LENGTH(${game.titre})
+                END
+              )) || '%'
+              OR LOWER(${game.titre}) LIKE '%' || LOWER(SUBSTRING(j.titre FROM 1 FOR
+                CASE WHEN POSITION(' ' IN j.titre) > 0
+                THEN POSITION(' ' IN j.titre) - 1
+                ELSE LENGTH(j.titre)
+                END
+              )) || '%'
+            )
+          )
         ORDER BY j.moyennenotes DESC NULLS LAST
         LIMIT ${limit * 2})
       )
