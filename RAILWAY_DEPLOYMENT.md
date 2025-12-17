@@ -48,11 +48,12 @@ REDIS_HOST=your-redis-host
 REDIS_PORT=6379
 REDIS_PASSWORD=your-redis-password
 
-# Email (if using nodemailer)
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
-SMTP_USER=your-email@gmail.com
-SMTP_PASS=your-app-password
+# Email (Resend SMTP)
+MAILTRAP_HOST=smtp.resend.com
+MAILTRAP_PORT=465
+MAILTRAP_USER=resend
+MAILTRAP_PASS=your-resend-api-key
+MAILTRAP_FROM="Anime-Kun <noreply@anime-kun.onresend.dev>"
 
 # DeepL Translation (if using)
 DEEPL_API_KEY=your-deepl-key
