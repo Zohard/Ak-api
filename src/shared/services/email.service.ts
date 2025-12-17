@@ -7,22 +7,24 @@ export class EmailService {
   private transporter: nodemailer.Transporter;
 
   constructor(private readonly configService: ConfigService) {
+    const port = parseInt(this.configService.get<string>('MAILTRAP_PORT') || '587', 10);
     const smtpConfig = {
       host: this.configService.get<string>('MAILTRAP_HOST'),
-      port: parseInt(this.configService.get<string>('MAILTRAP_PORT') || '587', 10),
-      secure: false, // Use TLS (false for port 587, true for port 465)
+      port: port,
+      secure: port === 465, // Use SSL/TLS for port 465, STARTTLS for port 587
       auth: {
         user: this.configService.get<string>('MAILTRAP_USER'),
         pass: this.configService.get<string>('MAILTRAP_PASS'),
       },
       tls: {
-        rejectUnauthorized: true, // Don't fail on invalid certs in production
+        rejectUnauthorized: true,
       },
     };
 
-    console.log('📧 Initializing email service with Brevo SMTP:', {
+    console.log('📧 Initializing email service with Resend SMTP:', {
       host: smtpConfig.host,
       port: smtpConfig.port,
+      secure: smtpConfig.secure,
       user: smtpConfig.auth.user,
       from: this.configService.get<string>('MAILTRAP_FROM'),
     });
