@@ -198,6 +198,22 @@ export class BusinessController {
     return this.businessService.getRelatedGames(id);
   }
 
+  @Get(':id/businesses')
+  @ApiOperation({
+    summary: 'Récupérer les entités business liées à une entité business',
+    description: "Récupère toutes les entités business associées (filiales, partenaires, maison mère, etc.)",
+  })
+  @ApiParam({
+    name: 'id',
+    description: "ID de l'entité business",
+    type: 'number',
+  })
+  @ApiResponse({ status: 200, description: "Liste des entités business liées" })
+  @ApiResponse({ status: 404, description: 'Entité business introuvable' })
+  async getRelatedBusinesses(@Param('id', ParseIntPipe) id: number) {
+    return this.businessService.getRelatedBusinesses(id);
+  }
+
   @Patch(':id')
   @UseGuards(JwtAuthGuard, AdminGuard)
   @ApiBearerAuth()

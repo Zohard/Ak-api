@@ -69,5 +69,43 @@ export class AdminBusinessController {
   ): Promise<any> {
     return this.service.importBusinessImage(importData.imageUrl, importData.businessName);
   }
+
+  @Get(':id/relations')
+  @ApiOperation({ summary: 'Obtenir les relations business d\'une fiche (admin)' })
+  async getBusinessRelations(@Param('id', ParseIntPipe) id: number) {
+    return this.service.getBusinessRelations(id);
+  }
+
+  @Post(':id/relations')
+  @ApiOperation({ summary: 'Ajouter une relation business (admin)' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        relatedBusinessId: { type: 'number', description: 'ID du business cible' },
+        type: { type: 'string', description: 'Type de relation (optionnel)' },
+        precisions: { type: 'string', description: 'Précisions sur la relation (optionnel)' }
+      },
+      required: ['relatedBusinessId']
+    }
+  })
+  async addBusinessRelation(
+    @Request() req,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: { relatedBusinessId: number; type?: string; precisions?: string }
+  ) {
+    const username = req.user?.pseudo || req.user?.member_name || 'admin';
+    return this.service.addBusinessRelation(id, body.relatedBusinessId, body.type, body.precisions, username);
+  }
+
+  @Delete('relations/:relationId')
+  @ApiOperation({ summary: 'Supprimer une relation business (admin)' })
+  async deleteBusinessRelation(
+    @Request() req,
+    @Param('relationId', ParseIntPipe) relationId: number
+  ) {
+    const username = req.user?.pseudo || req.user?.member_name || 'admin';
+    return this.service.deleteBusinessRelation(relationId, username);
+  }
 }
 

@@ -402,6 +402,94 @@ export class BusinessService {
     });
   }
 
+  async getRelatedBusinesses(businessId: number) {
+    // Get business IDs related to this business (both as source and related)
+    const relations = await this.prisma.$queryRaw<
+      Array<{
+        id_business_source: number;
+        id_business_related: number;
+        type: string;
+        precisions: string | null;
+      }>
+    >`
+      SELECT id_business_source, id_business_related, type, precisions
+      FROM ak_business_to_business
+      WHERE (id_business_source = ${businessId} OR id_business_related = ${businessId})
+        AND doublon = 0
+    `;
+
+    if (!relations || relations.length === 0) {
+      return [];
+    }
+
+    // Collect all related business IDs (excluding the current business)
+    const relatedBusinessIds = new Set<number>();
+    relations.forEach(r => {
+      if (r.id_business_source !== businessId) {
+        relatedBusinessIds.add(r.id_business_source);
+      }
+      if (r.id_business_related !== businessId) {
+        relatedBusinessIds.add(r.id_business_related);
+      }
+    });
+
+    const businessIds = Array.from(relatedBusinessIds);
+
+    if (businessIds.length === 0) {
+      return [];
+    }
+
+    // Fetch business details
+    const businesses = await this.prisma.$queryRaw<any[]>`
+      SELECT
+        id_business,
+        nice_url,
+        denomination,
+        autres_denominations,
+        type,
+        image,
+        origine,
+        date,
+        site_officiel,
+        nb_clics,
+        statut
+      FROM ak_business
+      WHERE id_business = ANY(${businessIds}::int[])
+        AND statut = 1
+      ORDER BY denomination
+    `;
+
+    // Combine business data with relation info
+    return businesses.map(business => {
+      // Find the relation for this business
+      const relation = relations.find(r =>
+        (r.id_business_source === business.id_business && r.id_business_related === businessId) ||
+        (r.id_business_related === business.id_business && r.id_business_source === businessId)
+      );
+
+      // Determine relation direction for better UX
+      const isSource = relation?.id_business_source === businessId;
+
+      return {
+        id: business.id_business,
+        idBusiness: business.id_business,
+        niceUrl: business.nice_url,
+        denomination: business.denomination,
+        autresDenominations: business.autres_denominations,
+        type: business.type,
+        image: business.image,
+        origine: business.origine,
+        date: business.date,
+        siteOfficiel: business.site_officiel,
+        nbClics: business.nb_clics,
+        statut: business.statut,
+        relationType: relation?.type,
+        relationPrecisions: relation?.precisions,
+        relationDirection: isSource ? 'from' : 'to'
+      };
+    });
+  }
+
   async uploadImageFromUrl(imageUrl: string) {
     try {
       // Download the image from the URL

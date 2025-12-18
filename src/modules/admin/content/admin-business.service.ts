@@ -140,6 +140,140 @@ export class AdminBusinessService {
     }
   }
 
+  async getBusinessRelations(businessId: number) {
+    const relations = await this.prisma.$queryRaw<Array<{
+      id_relation: number;
+      id_business_source: number;
+      id_business_related: number;
+      type: string;
+      precisions: string;
+    }>>`
+      SELECT id_relation, id_business_source, id_business_related, type, precisions
+      FROM ak_business_to_business
+      WHERE id_business_source = ${businessId} OR id_business_related = ${businessId}
+    `;
+
+    if (!relations || relations.length === 0) {
+      return [];
+    }
+
+    // Get all related business IDs
+    const relatedBusinessIds = relations.map(r =>
+      r.id_business_source === businessId ? r.id_business_related : r.id_business_source
+    );
+
+    // Fetch business details
+    const businesses = await this.prisma.akBusiness.findMany({
+      where: {
+        idBusiness: {
+          in: relatedBusinessIds
+        }
+      },
+      select: {
+        idBusiness: true,
+        denomination: true,
+        type: true,
+        image: true,
+        origine: true,
+        statut: true,
+      }
+    });
+
+    // Combine business data with relation info
+    return relations.map(relation => {
+      const relatedBusinessId = relation.id_business_source === businessId
+        ? relation.id_business_related
+        : relation.id_business_source;
+      const relatedBusiness = businesses.find(b => b.idBusiness === relatedBusinessId);
+
+      return {
+        id_relation: relation.id_relation,
+        id_business: relatedBusinessId,
+        denomination: relatedBusiness?.denomination,
+        type: relation.type,
+        business_type: relatedBusiness?.type,
+        precisions: relation.precisions,
+        image: relatedBusiness?.image,
+        origine: relatedBusiness?.origine,
+        statut: relatedBusiness?.statut,
+      };
+    });
+  }
+
+  async addBusinessRelation(
+    businessId: number,
+    relatedBusinessId: number,
+    type?: string,
+    precisions?: string,
+    username?: string
+  ) {
+    // Check if both businesses exist
+    const [business, relatedBusiness] = await Promise.all([
+      this.prisma.akBusiness.findUnique({ where: { idBusiness: businessId } }),
+      this.prisma.akBusiness.findUnique({ where: { idBusiness: relatedBusinessId } }),
+    ]);
+
+    if (!business) throw new NotFoundException('Business source introuvable');
+    if (!relatedBusiness) throw new NotFoundException('Business cible introuvable');
+
+    // Check if relation already exists
+    const existing = await this.prisma.$queryRaw<any[]>`
+      SELECT 1 FROM ak_business_to_business
+      WHERE (id_business_source = ${businessId} AND id_business_related = ${relatedBusinessId})
+         OR (id_business_source = ${relatedBusinessId} AND id_business_related = ${businessId})
+      LIMIT 1
+    `;
+
+    if (existing.length > 0) {
+      throw new BadRequestException('Cette relation existe déjà');
+    }
+
+    // Create the relation
+    await this.prisma.$queryRaw`
+      INSERT INTO ak_business_to_business (id_business_source, id_business_related, type, precisions, doublon)
+      VALUES (${businessId}, ${relatedBusinessId}, ${type || null}, ${precisions || null}, 0)
+    `;
+
+    // Log the action
+    if (username) {
+      await this.adminLogging.addLog(
+        businessId,
+        'business',
+        username,
+        `Ajout relation business: ${relatedBusiness.denomination}`
+      );
+    }
+
+    return { message: 'Relation business créée avec succès' };
+  }
+
+  async deleteBusinessRelation(relationId: number, username?: string) {
+    // Get relation details before deletion for logging
+    const relation = await this.prisma.$queryRaw<any[]>`
+      SELECT id_business_source FROM ak_business_to_business WHERE id_relation = ${relationId}
+    `;
+
+    if (relation.length === 0) {
+      throw new NotFoundException('Relation introuvable');
+    }
+
+    await this.prisma.$queryRaw`
+      DELETE FROM ak_business_to_business WHERE id_relation = ${relationId}
+    `;
+
+    // Log the action
+    if (username && relation[0]) {
+      await this.adminLogging.addLog(
+        relation[0].id_business_source,
+        'business',
+        username,
+        'Suppression relation business'
+      );
+    }
+
+    return { message: 'Relation business supprimée avec succès' };
+  }
+
   private slugify(text: string) {
     return text
       .toLowerCase()

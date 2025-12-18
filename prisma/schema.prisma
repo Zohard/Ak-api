@@ -338,9 +338,11 @@ model AkBusiness {
   latestCache           Int?      @map("latest_cache")
 
   // Relations
-  animeRelations        AkBusinessToAnime[] @relation("BusinessToAnime")
-  mangaRelations        AkBusinessToManga[] @relation("BusinessToManga")
-  jeuxVideoRelations    AkBusinessToJeux[]  @relation("BusinessToJeux")
+  animeRelations        AkBusinessToAnime[]     @relation("BusinessToAnime")
+  mangaRelations        AkBusinessToManga[]     @relation("BusinessToManga")
+  jeuxVideoRelations    AkBusinessToJeux[]      @relation("BusinessToJeux")
+  businessSourceRel     AkBusinessToBusiness[]  @relation("BusinessSource")
+  businessRelatedRel    AkBusinessToBusiness[]  @relation("BusinessRelated")
 
   @@map("ak_business")
 }
@@ -538,6 +540,21 @@ model AkBusinessToJeux {
   business    AkBusiness  @relation("BusinessToJeux", fields: [idBusiness], references: [idBusiness], onDelete: Cascade)
 
   @@map("ak_business_to_jeux")
+}
+
+model AkBusinessToBusiness {
+  idRelation        Int         @id @default(autoincrement()) @map("id_relation")
+  idBusinessSource  Int?        @map("id_business_source")
+  idBusinessRelated Int?        @map("id_business_related")
+  type              String?     @db.VarChar(100)
+  precisions        String?     @db.Text
+  doublon           Int?        @default(0) @db.SmallInt
+
+  // Relations
+  businessSource  AkBusiness? @relation("BusinessSource", fields: [idBusinessSource], references: [idBusiness], onDelete: Cascade)
+  businessRelated AkBusiness? @relation("BusinessRelated", fields: [idBusinessRelated], references: [idBusiness], onDelete: Cascade)
+
+  @@map("ak_business_to_business")
 }
 
 // User Lists/Tops
