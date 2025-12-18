@@ -212,21 +212,30 @@ export class HomePageService {
       const [
         totalAnimes,
         totalMangas,
+        totalGames,
         animeReviews,
         mangaReviews,
+        gameReviews,
       ] = await Promise.all([
         this.prisma.akAnime.count({ where: { statut: 1 } }),
         this.prisma.akManga.count({ where: { statut: 1 } }),
+        this.prisma.akJeuxVideo.count({ where: { statut: 1 } }),
         this.prisma.akCritique.count({
           where: {
             idAnime: { gt: 0 },
-            statut: 1,
+            statut: 0, // 0 = Published, 1 = Draft, 2 = Rejected
           },
         }),
         this.prisma.akCritique.count({
           where: {
             idManga: { gt: 0 },
-            statut: 1,
+            statut: 0, // 0 = Published
+          },
+        }),
+        this.prisma.akCritique.count({
+          where: {
+            idJeu: { gt: 0 },
+            statut: 0, // 0 = Published
           },
         }),
       ]);
@@ -239,6 +248,10 @@ export class HomePageService {
         mangas: {
           total: totalMangas,
           reviews: mangaReviews,
+        },
+        games: {
+          total: totalGames,
+          reviews: gameReviews,
         },
       };
 

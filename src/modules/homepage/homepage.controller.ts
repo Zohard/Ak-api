@@ -57,6 +57,13 @@ export class HomePageController {
             reviews: { type: 'number' },
           },
         },
+        games: {
+          type: 'object',
+          properties: {
+            total: { type: 'number' },
+            reviews: { type: 'number' },
+          },
+        },
       },
     },
   })
