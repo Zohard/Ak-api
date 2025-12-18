@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as nodemailer from 'nodemailer';
+import * as SMTPTransport from 'nodemailer/lib/smtp-transport';
 
 @Injectable()
 export class EmailService {
@@ -8,7 +9,7 @@ export class EmailService {
 
   constructor(private readonly configService: ConfigService) {
     const port = parseInt(this.configService.get<string>('MAILTRAP_PORT') || '587', 10);
-    const smtpConfig: nodemailer.TransportOptions = {
+    const smtpConfig: SMTPTransport.Options = {
       host: this.configService.get<string>('MAILTRAP_HOST'),
       port: port,
       secure: port === 465, // Use SSL/TLS for port 465, STARTTLS for port 587
@@ -27,7 +28,7 @@ export class EmailService {
       host: smtpConfig.host,
       port: smtpConfig.port,
       secure: smtpConfig.secure,
-      user: smtpConfig.auth.user,
+      user: smtpConfig.auth?.user,
       from: this.configService.get<string>('MAILTRAP_FROM'),
     });
 
