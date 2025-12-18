@@ -5,6 +5,7 @@ import { UpdateBusinessDto } from './dto/update-business.dto';
 import { BusinessQueryDto } from './dto/business-query.dto';
 import { BusinessSearchDto } from './dto/business-search.dto';
 import { ImageKitService } from '../media/imagekit.service';
+import { decodeHTMLEntities } from '../../shared/utils/text.util';
 import axios from 'axios';
 
 @Injectable()
@@ -541,13 +542,16 @@ export class BusinessService {
   }
 
   private formatBusiness(business: any) {
-    const { idBusiness, dateAjout, dateModification, ...otherFields } =
+    const { idBusiness, dateAjout, dateModification, autresDenominations, denomination, notes, ...otherFields } =
       business;
 
     return {
       id: idBusiness,
       addedDate: dateAjout?.toISOString(),
       modificationDate: dateModification,
+      denomination: decodeHTMLEntities(denomination),
+      autresDenominations: decodeHTMLEntities(autresDenominations),
+      notes: decodeHTMLEntities(notes),
       ...otherFields,
     };
   }
