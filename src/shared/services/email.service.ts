@@ -21,7 +21,7 @@ export class EmailService {
         rejectUnauthorized: true,
         minVersion: 'TLSv1.2', // Resend requires TLS 1.2 or higher
       },
-      requireTls: true, // Fixed: changed from requireTLS to requireTls
+      requireTLS: true, // Force TLS for Resend
     };
 
     console.log('📧 Initializing email service with Resend SMTP:', {
