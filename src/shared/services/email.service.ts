@@ -8,7 +8,7 @@ export class EmailService {
 
   constructor(private readonly configService: ConfigService) {
     const port = parseInt(this.configService.get<string>('MAILTRAP_PORT') || '587', 10);
-    const smtpConfig = {
+    const smtpConfig: nodemailer.TransportOptions = {
       host: this.configService.get<string>('MAILTRAP_HOST'),
       port: port,
       secure: port === 465, // Use SSL/TLS for port 465, STARTTLS for port 587
@@ -20,7 +20,7 @@ export class EmailService {
         rejectUnauthorized: true,
         minVersion: 'TLSv1.2', // Resend requires TLS 1.2 or higher
       },
-      requireTLS: true, // Force TLS for Resend
+      requireTls: true, // Fixed: changed from requireTLS to requireTls
     };
 
     console.log('📧 Initializing email service with Resend SMTP:', {
