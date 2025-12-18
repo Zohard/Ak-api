@@ -345,7 +345,15 @@ export class BusinessService {
     return mangas.map(manga => {
       const relation = relations.find(r => r.id_manga === manga.id_manga);
       return {
-        ...manga,
+        id: manga.id_manga,
+        idManga: manga.id_manga,
+        niceUrl: manga.niceUrl,
+        titre: manga.titre,
+        annee: manga.annee,
+        image: manga.image,
+        moyenneNotes: manga.moyenneNotes,
+        nbReviews: manga.nbReviews,
+        statut: manga.statut,
         relationType: relation?.type,
         relationDetails: relation?.precisions
       };
