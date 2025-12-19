@@ -103,6 +103,10 @@ export class CreateAdminMangaDto {
   @IsString()
   synopsis?: string;
 
+  @ApiPropertyOptional({ description: 'Ajouter l\'attribution du synopsis (true par défaut)' })
+  @IsOptional()
+  addSynopsisAttribution?: boolean;
+
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()

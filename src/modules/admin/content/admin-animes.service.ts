@@ -164,9 +164,14 @@ export class AdminAnimesService {
         let cleanSynopsis = dto.synopsis;
         const attributionRegex = /<br><br>"Synopsis soumis par .+"/g;
         cleanSynopsis = cleanSynopsis.replace(attributionRegex, '');
-        
-        // Append the new attribution
-        data.synopsis = `${cleanSynopsis}<br><br>"Synopsis soumis par ${user.username}"`;
+
+        // Only append attribution if explicitly requested (default: true for backward compatibility)
+        const shouldAddAttribution = dto.addSynopsisAttribution !== false;
+        if (shouldAddAttribution) {
+          data.synopsis = `${cleanSynopsis}<br><br>"Synopsis soumis par ${user.username}"`;
+        } else {
+          data.synopsis = cleanSynopsis;
+        }
       }
     }
 
