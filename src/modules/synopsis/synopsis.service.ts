@@ -152,7 +152,7 @@ export class SynopsisService {
     const enrichedSynopses = await Promise.all(
       pendingSynopses.map(async (synopsis) => {
         let contentTitle = 'Contenu introuvable';
-        
+
         if (synopsis.type === 1) {
           // Anime
           const anime = await this.prisma.akAnime.findUnique({
@@ -185,6 +185,77 @@ export class SynopsisService {
     return {
       success: true,
       synopses: enrichedSynopses,
+    };
+  }
+
+  async findAllSynopses(page: number = 1, limit: number = 20, validation?: number) {
+    const skip = (page - 1) * limit;
+
+    const where: any = {};
+    if (validation !== undefined) {
+      where.validation = validation;
+    }
+
+    const [synopses, total] = await Promise.all([
+      this.prisma.akSynopsis.findMany({
+        where,
+        orderBy: {
+          date: 'desc', // Most recent first
+        },
+        skip,
+        take: limit,
+        include: {
+          user: {
+            select: {
+              memberName: true,
+            },
+          },
+        },
+      }),
+      this.prisma.akSynopsis.count({ where }),
+    ]);
+
+    // Enrich with content information
+    const enrichedSynopses = await Promise.all(
+      synopses.map(async (synopsis) => {
+        let contentTitle = 'Contenu introuvable';
+
+        if (synopsis.type === 1) {
+          const anime = await this.prisma.akAnime.findUnique({
+            where: { idAnime: synopsis.idFiche ?? undefined },
+            select: { titre: true, niceUrl: true },
+          });
+          contentTitle = anime?.titre || 'Anime introuvable';
+        } else if (synopsis.type === 2) {
+          const manga = await this.prisma.akManga.findUnique({
+            where: { idManga: synopsis.idFiche ?? undefined },
+            select: { titre: true, niceUrl: true },
+          });
+          contentTitle = manga?.titre || 'Manga introuvable';
+        }
+
+        return {
+          id_synopsis: synopsis.idSynopsis,
+          synopsis: synopsis.synopsis,
+          type: synopsis.type,
+          id_fiche: synopsis.idFiche,
+          validation: synopsis.validation,
+          date: synopsis.date,
+          author_name: synopsis.user?.memberName || 'Utilisateur introuvable',
+          content_title: contentTitle,
+        };
+      })
+    );
+
+    return {
+      success: true,
+      synopses: enrichedSynopses,
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
     };
   }
 

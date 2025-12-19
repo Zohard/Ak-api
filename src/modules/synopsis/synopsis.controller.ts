@@ -126,12 +126,31 @@ export class SynopsisController {
   }
 
   // Admin endpoints
+  @Get('all')
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Obtenir tous les synopsis avec pagination (Admin seulement)' })
+  @ApiResponse({
+    status: 200,
+    description: 'Liste paginée de tous les synopsis',
+  })
+  async getAllSynopses(
+    @Query('page') pageStr?: string,
+    @Query('limit') limitStr?: string,
+    @Query('validation') validationStr?: string,
+  ) {
+    const page = pageStr ? parseInt(pageStr) : 1;
+    const limit = limitStr ? parseInt(limitStr) : 20;
+    const validation = validationStr !== undefined ? parseInt(validationStr) : undefined;
+    return this.synopsisService.findAllSynopses(page, limit, validation);
+  }
+
   @Get('pending')
   @UseGuards(JwtAuthGuard, AdminGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Obtenir les synopsis en attente de validation (Admin seulement)' })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: 'Liste des synopsis en attente de validation',
     schema: {
       type: 'object',
