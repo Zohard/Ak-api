@@ -259,7 +259,13 @@ export class SynopsisService {
     };
   }
 
-  async validateSynopsis(synopsisId: number, validation: number, moderatorId: number) {
+  async validateSynopsis(
+    synopsisId: number,
+    validation: number,
+    moderatorId: number,
+    editedSynopsis?: string,
+    customAuthor?: string,
+  ) {
     const synopsis = await this.prisma.akSynopsis.findUnique({
       where: { idSynopsis: synopsisId },
     });
@@ -272,22 +278,29 @@ export class SynopsisService {
       throw new BadRequestException('Ce synopsis a déjà été traité');
     }
 
-    // Update synopsis validation status
+    // Use edited synopsis if provided, otherwise use original
+    const finalSynopsis = editedSynopsis || synopsis.synopsis;
+
+    // Update synopsis validation status (and optionally the synopsis text)
     const updatedSynopsis = await this.prisma.akSynopsis.update({
       where: { idSynopsis: synopsisId },
-      data: { validation },
+      data: {
+        validation,
+        synopsis: finalSynopsis,
+      },
     });
 
     // If validated (validation = 1), update the anime/manga table and user stats
     if (validation === 1) {
-      const attribution = await this.getUserAttribution(synopsis.idMembre);
-      
+      // Use custom author if provided, otherwise use original author
+      const attribution = customAuthor || await this.getUserAttribution(synopsis.idMembre);
+
       if (synopsis.type === 1) {
         // Update anime synopsis
         await this.prisma.akAnime.update({
           where: { idAnime: synopsis.idFiche ?? undefined },
           data: {
-            synopsis: `${synopsis.synopsis}\n\nSynopsis soumis par ${attribution}`,
+            synopsis: `${finalSynopsis}\n\nSynopsis soumis par ${attribution}`,
           },
         });
       } else if (synopsis.type === 2) {
@@ -295,7 +308,7 @@ export class SynopsisService {
         await this.prisma.akManga.update({
           where: { idManga: synopsis.idFiche ?? undefined },
           data: {
-            synopsis: `${synopsis.synopsis}\n\nSynopsis soumis par ${attribution}`,
+            synopsis: `${finalSynopsis}\n\nSynopsis soumis par ${attribution}`,
           },
         });
       }

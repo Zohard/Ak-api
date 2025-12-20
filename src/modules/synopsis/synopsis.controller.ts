@@ -22,6 +22,7 @@ import {
 import { SynopsisService } from './synopsis.service';
 import { CreateSynopsisDto } from './dto/create-synopsis.dto';
 import { SynopsisQueryDto } from './dto/synopsis-query.dto';
+import { ValidateSynopsisDto } from './dto/validate-synopsis.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { AdminGuard } from '../../common/guards/admin.guard';
 
@@ -184,8 +185,8 @@ export class SynopsisController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Valider un synopsis (Admin seulement)' })
   @ApiParam({ name: 'id', description: 'ID du synopsis', type: 'number' })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: 'Synopsis validé avec succès',
     schema: {
       type: 'object',
@@ -195,8 +196,18 @@ export class SynopsisController {
       }
     }
   })
-  async validateSynopsis(@Param('id', ParseIntPipe) id: number, @Request() req) {
-    return this.synopsisService.validateSynopsis(id, 1, req.user.id);
+  async validateSynopsis(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: ValidateSynopsisDto,
+    @Request() req
+  ) {
+    return this.synopsisService.validateSynopsis(
+      id,
+      1,
+      req.user.id,
+      dto.editedSynopsis,
+      dto.customAuthor
+    );
   }
 
   @Patch(':id/reject')
