@@ -2359,8 +2359,27 @@ export class CollectionsService {
   }
 
   async updateJeuxVideoInCollection(userId: number, collectionId: number, dto: UpdateJeuxVideoCollectionDto, currentUserId: number) {
+    // Debug logging - log all parameters
+    console.log('updateJeuxVideoInCollection called with:', {
+      userId,
+      userIdType: typeof userId,
+      collectionId,
+      currentUserId,
+      currentUserIdType: typeof currentUserId,
+      dto
+    });
+
     // Check authorization
     if (Number(userId) !== Number(currentUserId)) {
+      console.error('Authorization check failed - userId !== currentUserId:', {
+        userId,
+        userIdType: typeof userId,
+        currentUserId,
+        currentUserIdType: typeof currentUserId,
+        userIdNum: Number(userId),
+        currentUserIdNum: Number(currentUserId),
+        areEqual: Number(userId) === Number(currentUserId)
+      });
       throw new ForbiddenException('You can only modify your own collection');
     }
 
