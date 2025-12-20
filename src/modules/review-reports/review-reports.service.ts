@@ -35,7 +35,7 @@ export class ReviewReportsService {
         idCritique: createReviewReportDto.id_critique,
         idReporter: userId,
         reason: createReviewReportDto.reason,
-        comment: createReviewReportDto.comment,
+        comment: createReviewReportDto.comment || null,
       },
     });
 
