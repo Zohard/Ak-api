@@ -139,11 +139,12 @@ export class SynopsisController {
     @Query('page') pageStr?: string,
     @Query('limit') limitStr?: string,
     @Query('validation') validationStr?: string,
+    @Query('search') search?: string,
   ) {
     const page = pageStr ? parseInt(pageStr) : 1;
     const limit = limitStr ? parseInt(limitStr) : 20;
     const validation = validationStr !== undefined ? parseInt(validationStr) : undefined;
-    return this.synopsisService.findAllSynopses(page, limit, validation);
+    return this.synopsisService.findAllSynopses(page, limit, validation, search);
   }
 
   @Get('pending')

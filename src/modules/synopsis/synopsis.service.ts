@@ -188,9 +188,122 @@ export class SynopsisService {
     };
   }
 
-  async findAllSynopses(page: number = 1, limit: number = 20, validation?: number) {
+  async findAllSynopses(page: number = 1, limit: number = 20, validation?: number, search?: string) {
     const skip = (page - 1) * limit;
 
+    // If search is provided, we need to use raw SQL to search across anime/manga titles
+    if (search && search.trim()) {
+      const searchTerm = `%${search.trim()}%`;
+
+      let synopsesRaw: any[];
+      let countRaw: any[];
+
+      if (validation !== undefined) {
+        synopsesRaw = await this.prisma.$queryRaw<any[]>`
+          SELECT
+            s.id_synopsis,
+            s.synopsis,
+            s.type,
+            s.id_fiche,
+            s.validation,
+            s.date,
+            s.id_membre,
+            m.member_name,
+            CASE
+              WHEN s.type = 1 THEN a.titre
+              WHEN s.type = 2 THEN ma.titre
+              ELSE 'Contenu introuvable'
+            END as content_title
+          FROM ak_synopsis s
+          LEFT JOIN smf_members m ON s.id_membre = m.id_member
+          LEFT JOIN ak_animes a ON s.type = 1 AND s.id_fiche = a.id_anime
+          LEFT JOIN ak_mangas ma ON s.type = 2 AND s.id_fiche = ma.id_manga
+          WHERE (
+            (s.type = 1 AND a.titre ILIKE ${searchTerm})
+            OR (s.type = 2 AND ma.titre ILIKE ${searchTerm})
+          )
+          AND s.validation = ${validation}
+          ORDER BY s.date DESC
+          LIMIT ${limit} OFFSET ${skip}
+        `;
+
+        countRaw = await this.prisma.$queryRaw<any[]>`
+          SELECT COUNT(*) as count
+          FROM ak_synopsis s
+          LEFT JOIN ak_animes a ON s.type = 1 AND s.id_fiche = a.id_anime
+          LEFT JOIN ak_mangas ma ON s.type = 2 AND s.id_fiche = ma.id_manga
+          WHERE (
+            (s.type = 1 AND a.titre ILIKE ${searchTerm})
+            OR (s.type = 2 AND ma.titre ILIKE ${searchTerm})
+          )
+          AND s.validation = ${validation}
+        `;
+      } else {
+        synopsesRaw = await this.prisma.$queryRaw<any[]>`
+          SELECT
+            s.id_synopsis,
+            s.synopsis,
+            s.type,
+            s.id_fiche,
+            s.validation,
+            s.date,
+            s.id_membre,
+            m.member_name,
+            CASE
+              WHEN s.type = 1 THEN a.titre
+              WHEN s.type = 2 THEN ma.titre
+              ELSE 'Contenu introuvable'
+            END as content_title
+          FROM ak_synopsis s
+          LEFT JOIN smf_members m ON s.id_membre = m.id_member
+          LEFT JOIN ak_animes a ON s.type = 1 AND s.id_fiche = a.id_anime
+          LEFT JOIN ak_mangas ma ON s.type = 2 AND s.id_fiche = ma.id_manga
+          WHERE (
+            (s.type = 1 AND a.titre ILIKE ${searchTerm})
+            OR (s.type = 2 AND ma.titre ILIKE ${searchTerm})
+          )
+          ORDER BY s.date DESC
+          LIMIT ${limit} OFFSET ${skip}
+        `;
+
+        countRaw = await this.prisma.$queryRaw<any[]>`
+          SELECT COUNT(*) as count
+          FROM ak_synopsis s
+          LEFT JOIN ak_animes a ON s.type = 1 AND s.id_fiche = a.id_anime
+          LEFT JOIN ak_mangas ma ON s.type = 2 AND s.id_fiche = ma.id_manga
+          WHERE (
+            (s.type = 1 AND a.titre ILIKE ${searchTerm})
+            OR (s.type = 2 AND ma.titre ILIKE ${searchTerm})
+          )
+        `;
+      }
+
+      const total = Number(countRaw[0]?.count || 0);
+
+      const enrichedSynopses = synopsesRaw.map((synopsis) => ({
+        id_synopsis: synopsis.id_synopsis,
+        synopsis: synopsis.synopsis,
+        type: synopsis.type,
+        id_fiche: synopsis.id_fiche,
+        validation: synopsis.validation,
+        date: synopsis.date,
+        author_name: synopsis.member_name || 'Utilisateur introuvable',
+        content_title: synopsis.content_title || 'Contenu introuvable',
+      }));
+
+      return {
+        success: true,
+        synopses: enrichedSynopses,
+        pagination: {
+          total,
+          page,
+          limit,
+          totalPages: Math.ceil(total / limit),
+        },
+      };
+    }
+
+    // Original logic for non-search queries
     const where: any = {};
     if (validation !== undefined) {
       where.validation = validation;
