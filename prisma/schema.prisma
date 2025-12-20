@@ -86,6 +86,10 @@ model SmfMember {
   reportsSubmitted SmfMessageReport[] @relation("ReportedBy")
   reportsClosed    SmfMessageReport[] @relation("ReportClosedBy")
 
+  // Review reports relations
+  reviewReportsSubmitted AkReviewReport[] @relation("ReportedBy")
+  reviewReportsTreated   AkReviewReport[] @relation("TreatedBy")
+
   @@index([idGroup])
   @@index([memberName])
   @@map("smf_members")
@@ -612,6 +616,7 @@ model AkCritique {
   anime        AkAnime?  @relation(fields: [idAnime], references: [idAnime], onDelete: Cascade)
   manga        AkManga?  @relation(fields: [idManga], references: [idManga], onDelete: Cascade)
   jeuxVideo    AkJeuxVideo? @relation(fields: [idJeu], references: [idJeu], onDelete: Cascade)
+  reports      AkReviewReport[]
 
   @@index([idMembre])
   @@index([idAnime])
@@ -1190,5 +1195,29 @@ model AkTag {
   categorie   String? @db.VarChar(100)
 
   @@map("ak_tags")
+}
+
+// Review Reports (Signalements de critiques)
+model AkReviewReport {
+  idReport      Int       @id @default(autoincrement()) @map("id_report")
+  idCritique    Int       @map("id_critique")
+  idReporter    Int       @map("id_reporter")
+  reason        String    @db.VarChar(100)  // Type de signalement
+  comment       String?   @db.Text          // Commentaire optionnel
+  status        Int       @default(0)       // 0 = en attente, 1 = traité, 2 = rejeté
+  dateReport    DateTime  @default(now()) @map("date_report") @db.Timestamp
+  dateTreated   DateTime? @map("date_treated") @db.Timestamp
+  idModerator   Int?      @map("id_moderator") // Qui a traité le signalement
+  moderatorNote String?   @map("moderator_note") @db.Text
+
+  // Relations
+  critique      AkCritique @relation(fields: [idCritique], references: [idCritique], onDelete: Cascade)
+  reporter      SmfMember  @relation("ReportedBy", fields: [idReporter], references: [idMember], onDelete: Cascade)
+  moderator     SmfMember? @relation("TreatedBy", fields: [idModerator], references: [idMember], onDelete: SetNull)
+
+  @@index([idCritique])
+  @@index([idReporter])
+  @@index([status])
+  @@map("ak_review_reports")
 }
 
