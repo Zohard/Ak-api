@@ -2420,7 +2420,7 @@ export class CollectionsService {
 
   async removeJeuxVideoFromCollection(userId: number, collectionId: number, currentUserId: number) {
     // Check authorization
-    if (userId !== currentUserId) {
+    if (Number(userId) !== Number(currentUserId)) {
       throw new ForbiddenException('You can only modify your own collection');
     }
 
@@ -2433,7 +2433,8 @@ export class CollectionsService {
       throw new NotFoundException('Collection entry not found');
     }
 
-    if (existing.idMembre !== userId) {
+    // Ensure type consistency for comparison
+    if (Number(existing.idMembre) !== Number(userId)) {
       throw new ForbiddenException('This collection entry does not belong to you');
     }
 
