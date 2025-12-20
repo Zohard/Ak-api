@@ -458,6 +458,18 @@ export class CollectionsController {
     @Request() req,
   ) {
     const currentUserId = req.user?.id;
+
+    // Debug logging
+    console.log('Controller - updateJeuxVideoInCollection:', {
+      userId,
+      userIdType: typeof userId,
+      collectionId,
+      currentUserId,
+      currentUserIdType: typeof currentUserId,
+      reqUser: req.user,
+      dto
+    });
+
     return this.collectionsService.updateJeuxVideoInCollection(userId, collectionId, dto, currentUserId);
   }
 
