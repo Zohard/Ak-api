@@ -766,7 +766,7 @@ export class CollectionsService {
         collections: collections.map(c => ({
           type: c.type,
           name: this.getCollectionNameByTypeId(c.type),
-          rating: c.evaluation,
+          rating: c.evaluation ? Number(c.evaluation) : 0,
           notes: c.notes,
           collectionId: c.id_collection || undefined,
           platformPlayed: c.platform_played || undefined,
