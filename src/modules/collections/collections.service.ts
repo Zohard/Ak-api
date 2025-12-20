@@ -2360,7 +2360,7 @@ export class CollectionsService {
 
   async updateJeuxVideoInCollection(userId: number, collectionId: number, dto: UpdateJeuxVideoCollectionDto, currentUserId: number) {
     // Check authorization
-    if (userId !== currentUserId) {
+    if (Number(userId) !== Number(currentUserId)) {
       throw new ForbiddenException('You can only modify your own collection');
     }
 
@@ -2373,7 +2373,15 @@ export class CollectionsService {
       throw new NotFoundException('Collection entry not found');
     }
 
-    if (existing.idMembre !== userId) {
+    // Ensure type consistency for comparison
+    if (Number(existing.idMembre) !== Number(userId)) {
+      console.error('Ownership check failed:', {
+        existingIdMembre: existing.idMembre,
+        existingIdMembreType: typeof existing.idMembre,
+        userId: userId,
+        userIdType: typeof userId,
+        collectionId: collectionId
+      });
       throw new ForbiddenException('This collection entry does not belong to you');
     }
 
