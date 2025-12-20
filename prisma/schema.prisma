@@ -881,6 +881,7 @@ model CollectionJeuxVideo {
   user               SmfMember     @relation("UserJeuxVideoCollection", fields: [idMembre], references: [idMember], onDelete: Cascade)
   jeuxVideo          AkJeuxVideo   @relation("UserJeuxVideoList", fields: [idJeu], references: [idJeu], onDelete: Cascade)
 
+  @@unique([idMembre, idJeu], name: "unique_user_game")
   @@index([idMembre])
   @@index([idJeu])
   @@index([idMembre, idJeu])

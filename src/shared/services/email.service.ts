@@ -1,62 +1,46 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import * as nodemailer from 'nodemailer';
-import * as SMTPTransport from 'nodemailer/lib/smtp-transport';
+import { Resend } from 'resend';
 
 @Injectable()
 export class EmailService {
-  private transporter: nodemailer.Transporter;
+  private resend: Resend;
+  private fromEmail: string;
 
   constructor(private readonly configService: ConfigService) {
-    const port = parseInt(this.configService.get<string>('MAILTRAP_PORT') || '587', 10);
-    const smtpConfig: SMTPTransport.Options = {
-      host: this.configService.get<string>('MAILTRAP_HOST'),
-      port: port,
-      secure: port === 465, // Use SSL/TLS for port 465, STARTTLS for port 587
-      auth: {
-        user: this.configService.get<string>('MAILTRAP_USER'),
-        pass: this.configService.get<string>('MAILTRAP_PASS'),
-      },
-      tls: {
-        rejectUnauthorized: true,
-        minVersion: 'TLSv1.2', // Resend requires TLS 1.2 or higher
-      },
-      requireTLS: true, // Force TLS for Resend
-    };
+    const apiKey = this.configService.get<string>('RESEND_API_KEY');
+    this.fromEmail = this.configService.get<string>('FROM_EMAIL') || 'Anime-Kun <noreply@anime-kun.xyz>';
 
-    console.log('📧 Initializing email service with Resend SMTP:', {
-      host: smtpConfig.host,
-      port: smtpConfig.port,
-      secure: smtpConfig.secure,
-      user: smtpConfig.auth?.user,
-      from: this.configService.get<string>('MAILTRAP_FROM'),
-    });
+    if (!apiKey) {
+      console.error('❌ RESEND_API_KEY is not configured');
+      throw new Error('RESEND_API_KEY is required');
+    }
 
-    this.transporter = nodemailer.createTransport(smtpConfig);
+    this.resend = new Resend(apiKey);
 
-    // Verify connection configuration
-    this.transporter.verify((error, success) => {
-      if (error) {
-        console.error('❌ SMTP connection error:', error);
-      } else {
-        console.log('✅ SMTP server is ready to send emails');
-      }
+    console.log('📧 Initializing email service with Resend API:', {
+      fromEmail: this.fromEmail,
+      apiKeyLength: apiKey.length,
     });
   }
 
   async sendEmailVerification(email: string, username: string, verificationToken: string): Promise<void> {
     const verificationUrl = `${this.configService.get('FRONTEND_URL')}/verify-email?token=${verificationToken}`;
 
-    const mailOptions = {
-      from: this.configService.get<string>('MAILTRAP_FROM'),
-      to: email,
-      subject: 'Confirmez votre adresse email - Anime-Kun',
-      html: this.getEmailVerificationTemplate(username, verificationUrl),
-    };
-
     try {
-      const info = await this.transporter.sendMail(mailOptions);
-      console.log(`✅ Verification email sent to ${email} (Message ID: ${info.messageId})`);
+      const { data, error } = await this.resend.emails.send({
+        from: this.fromEmail,
+        to: email,
+        subject: 'Confirmez votre adresse email - Anime-Kun',
+        html: this.getEmailVerificationTemplate(username, verificationUrl),
+      });
+
+      if (error) {
+        console.error('❌ Error sending verification email to', email, ':', error);
+        throw error;
+      }
+
+      console.log(`✅ Verification email sent to ${email} (Message ID: ${data?.id})`);
     } catch (error) {
       console.error('❌ Error sending verification email to', email, ':', error);
       throw error;
@@ -66,16 +50,20 @@ export class EmailService {
   async sendForgotPasswordEmail(email: string, resetToken: string): Promise<void> {
     const resetUrl = `${this.configService.get('FRONTEND_URL')}/reset-password?token=${resetToken}`;
 
-    const mailOptions = {
-      from: this.configService.get<string>('MAILTRAP_FROM'),
-      to: email,
-      subject: 'Réinitialisation de votre mot de passe - Anime-Kun',
-      html: this.getForgotPasswordTemplate(resetUrl),
-    };
-
     try {
-      const info = await this.transporter.sendMail(mailOptions);
-      console.log(`✅ Password reset email sent to ${email} (Message ID: ${info.messageId})`);
+      const { data, error } = await this.resend.emails.send({
+        from: this.fromEmail,
+        to: email,
+        subject: 'Réinitialisation de votre mot de passe - Anime-Kun',
+        html: this.getForgotPasswordTemplate(resetUrl),
+      });
+
+      if (error) {
+        console.error('❌ Error sending password reset email to', email, ':', error);
+        throw error;
+      }
+
+      console.log(`✅ Password reset email sent to ${email} (Message ID: ${data?.id})`);
     } catch (error) {
       console.error('❌ Error sending password reset email to', email, ':', error);
       throw error;
@@ -91,16 +79,21 @@ export class EmailService {
   ): Promise<void> {
     const messagesUrl = `${this.configService.get('FRONTEND_URL')}/messages`;
 
-    const mailOptions = {
-      from: this.configService.get<string>('MAILTRAP_FROM'),
-      to: recipientEmail,
-      subject: `Nouveau message privé de ${senderName} - Anime-Kun`,
-      html: this.getPrivateMessageTemplate(recipientUsername, senderName, subject, messagePreview, messagesUrl),
-    };
-
     try {
-      const info = await this.transporter.sendMail(mailOptions);
-      console.log(`✅ PM notification email sent to ${recipientEmail} (Message ID: ${info.messageId})`);
+      const { data, error } = await this.resend.emails.send({
+        from: this.fromEmail,
+        to: recipientEmail,
+        subject: `Nouveau message privé de ${senderName} - Anime-Kun`,
+        html: this.getPrivateMessageTemplate(recipientUsername, senderName, subject, messagePreview, messagesUrl),
+      });
+
+      if (error) {
+        console.error('❌ Error sending PM notification email to', recipientEmail, ':', error);
+        // Don't throw - we don't want to fail the PM send if email fails
+        return;
+      }
+
+      console.log(`✅ PM notification email sent to ${recipientEmail} (Message ID: ${data?.id})`);
     } catch (error) {
       console.error('❌ Error sending PM notification email to', recipientEmail, ':', error);
       // Don't throw - we don't want to fail the PM send if email fails
@@ -116,16 +109,21 @@ export class EmailService {
   ): Promise<void> {
     const reviewsUrl = `${this.configService.get('FRONTEND_URL')}/profile#critiques`;
 
-    const mailOptions = {
-      from: this.configService.get<string>('MAILTRAP_FROM'),
-      to: recipientEmail,
-      subject: `Votre critique a été rejetée - Anime-Kun`,
-      html: this.getReviewRejectionTemplate(recipientUsername, reviewTitle, reason, contentTitle, reviewsUrl),
-    };
-
     try {
-      const info = await this.transporter.sendMail(mailOptions);
-      console.log(`✅ Review rejection email sent to ${recipientEmail} (Message ID: ${info.messageId})`);
+      const { data, error } = await this.resend.emails.send({
+        from: this.fromEmail,
+        to: recipientEmail,
+        subject: `Votre critique a été rejetée - Anime-Kun`,
+        html: this.getReviewRejectionTemplate(recipientUsername, reviewTitle, reason, contentTitle, reviewsUrl),
+      });
+
+      if (error) {
+        console.error('❌ Error sending review rejection email to', recipientEmail, ':', error);
+        // Don't throw - we don't want to fail the moderation if email fails
+        return;
+      }
+
+      console.log(`✅ Review rejection email sent to ${recipientEmail} (Message ID: ${data?.id})`);
     } catch (error) {
       console.error('❌ Error sending review rejection email to', recipientEmail, ':', error);
       // Don't throw - we don't want to fail the moderation if email fails
