@@ -86,6 +86,34 @@ export class AdminUsersController {
     return this.adminUsersService.findAll(query);
   }
 
+  @Get('search')
+  @ApiOperation({ summary: 'Search members by name for autocomplete' })
+  @ApiQuery({ name: 'q', description: 'Search query', required: true })
+  @ApiQuery({ name: 'limit', description: 'Max results', required: false })
+  @ApiResponse({
+    status: 200,
+    description: 'Members found',
+    schema: {
+      type: 'object',
+      properties: {
+        members: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              id_member: { type: 'number' },
+              member_name: { type: 'string' },
+            },
+          },
+        },
+      },
+    },
+  })
+  async searchMembers(@Query('q') query: string, @Query('limit') limitStr?: string) {
+    const limit = limitStr ? parseInt(limitStr) : 10;
+    return this.adminUsersService.searchMembers(query, limit);
+  }
+
   @Get('stats')
   @ApiOperation({ summary: 'Get user statistics for admin dashboard' })
   @ApiResponse({

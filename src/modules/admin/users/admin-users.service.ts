@@ -327,9 +327,27 @@ export class AdminUsersService {
     return { message: 'User deleted successfully' };
   }
 
+  async searchMembers(query: string, limit: number = 10) {
+    if (!query || query.trim().length < 2) {
+      return { members: [] };
+    }
+
+    const members = await this.prisma.$queryRaw`
+      SELECT
+        id_member,
+        member_name
+      FROM smf_members
+      WHERE member_name ILIKE ${`%${query.trim()}%`}
+      ORDER BY member_name ASC
+      LIMIT ${limit}
+    `;
+
+    return { members };
+  }
+
   async getUserStats() {
     const stats = await this.prisma.$queryRaw`
-      SELECT 
+      SELECT
         COUNT(*) as total_users,
         COUNT(CASE WHEN is_activated = 1 THEN 1 END) as active_users,
         COUNT(CASE WHEN is_activated = 0 THEN 1 END) as banned_users,
