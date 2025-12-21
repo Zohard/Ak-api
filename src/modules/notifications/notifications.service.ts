@@ -17,6 +17,8 @@ export interface NotificationPreferences {
   emailSecurityAlerts: boolean;
   emailMarketing: boolean;
   emailReviewLiked: boolean;
+  emailSynopsisValidated: boolean;
+  emailSynopsisRejected: boolean;
 }
 
 export interface NotificationData {
@@ -32,7 +34,9 @@ export interface NotificationData {
     | 'friend_request'
     | 'friend_accepted'
     | 'event_voting_started'
-    | 'event_voting_ended';
+    | 'event_voting_ended'
+    | 'synopsis_validated'
+    | 'synopsis_rejected';
   title: string;
   message: string;
   data?: any;
