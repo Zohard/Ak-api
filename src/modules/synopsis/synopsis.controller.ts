@@ -181,6 +181,35 @@ export class SynopsisController {
     return this.synopsisService.findPendingSynopses();
   }
 
+  @Patch(':id/update')
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Mettre à jour un synopsis sans valider (Admin seulement)' })
+  @ApiParam({ name: 'id', description: 'ID du synopsis', type: 'number' })
+  @ApiResponse({
+    status: 200,
+    description: 'Synopsis mis à jour avec succès',
+    schema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean', example: true },
+        message: { type: 'string', example: 'Synopsis mis à jour avec succès' }
+      }
+    }
+  })
+  async updateSynopsis(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: ValidateSynopsisDto,
+    @Request() req
+  ) {
+    return this.synopsisService.updateSynopsisOnly(
+      id,
+      req.user.id,
+      dto.editedSynopsis,
+      dto.customAuthor
+    );
+  }
+
   @Patch(':id/validate')
   @UseGuards(JwtAuthGuard, AdminGuard)
   @ApiBearerAuth()

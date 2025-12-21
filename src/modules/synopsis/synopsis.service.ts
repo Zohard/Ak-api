@@ -455,16 +455,56 @@ export class SynopsisService {
     };
   }
 
+  async updateSynopsisOnly(
+    synopsisId: number,
+    moderatorId: number,
+    editedSynopsis?: string,
+    customAuthor?: string,
+  ) {
+    const synopsis = await this.prisma.akSynopsis.findUnique({
+      where: { idSynopsis: synopsisId },
+    });
+
+    if (!synopsis) {
+      throw new NotFoundException('Synopsis introuvable');
+    }
+
+    // Prepare update data - only update if values are provided
+    const updateData: any = {};
+
+    if (editedSynopsis) {
+      updateData.synopsis = editedSynopsis;
+    }
+
+    // Note: customAuthor is stored separately and used during validation
+    // We're not changing the validation status here, just updating the synopsis text
+
+    const updatedSynopsis = await this.prisma.akSynopsis.update({
+      where: { idSynopsis: synopsisId },
+      data: updateData,
+    });
+
+    return {
+      success: true,
+      message: 'Synopsis mis à jour avec succès',
+      data: {
+        id_synopsis: updatedSynopsis.idSynopsis,
+        validation: updatedSynopsis.validation,
+        customAuthor: customAuthor, // Return for frontend tracking
+      },
+    };
+  }
+
   private sanitizeSynopsis(synopsis: string): string {
     // Remove potentially dangerous HTML/script tags
     let sanitized = synopsis.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
     sanitized = sanitized.replace(/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi, '');
     sanitized = sanitized.replace(/<object\b[^<]*(?:(?!<\/object>)<[^<]*)*<\/object>/gi, '');
     sanitized = sanitized.replace(/<embed\b[^<]*(?:(?!<\/embed>)<[^<]*)*<\/embed>/gi, '');
-    
+
     // Trim whitespace
     sanitized = sanitized.trim();
-    
+
     return sanitized;
   }
 
