@@ -85,6 +85,7 @@ model SmfMember {
   updatedTopics    SmfTopic[] @relation("TopicUpdater")
   reportsSubmitted SmfMessageReport[] @relation("ReportedBy")
   reportsClosed    SmfMessageReport[] @relation("ReportClosedBy")
+  topicReadLogs    SmfLogTopics[]
 
   // Review reports relations
   reviewReportsSubmitted AkReviewReport[] @relation("ReportedBy")
@@ -1051,6 +1052,7 @@ model SmfTopic {
   board            SmfBoard @relation(fields: [idBoard], references: [idBoard], onDelete: Cascade)
   messages         SmfMessage[]
   poll             SmfPoll? @relation(fields: [idPoll], references: [idPoll])
+  readLogs         SmfLogTopics[]
 
   // Computed relations for convenience
   firstMessage     SmfMessage? @relation("TopicFirstMessage", fields: [idFirstMsg], references: [idMsg])
@@ -1168,6 +1170,21 @@ model SmfLogPoll {
   @@id([idPoll, idMember, idChoice])
   @@index([idPoll, idMember, idChoice])
   @@map("smf_log_polls")
+}
+
+// SMF Topic Read Tracking Log
+model SmfLogTopics {
+  idTopic   Int @map("id_topic")
+  idMember  Int @map("id_member")
+  idMsg     Int @map("id_msg") @default(0)
+
+  // Relations
+  topic     SmfTopic @relation(fields: [idTopic], references: [idTopic], onDelete: Cascade)
+  member    SmfMember @relation(fields: [idMember], references: [idMember], onDelete: Cascade)
+
+  @@id([idTopic, idMember])
+  @@index([idMember])
+  @@map("smf_log_topics")
 }
 
 // SMF Online Activity Log

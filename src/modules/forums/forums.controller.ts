@@ -32,6 +32,7 @@ export class ForumsController {
   }
 
   @Get('boards/:boardId')
+  @UseGuards(OptionalJwtAuthGuard)
   @ApiOperation({ summary: 'Get board with topics' })
   @ApiParam({ name: 'boardId', type: 'number', description: 'Board ID' })
   @ApiQuery({ name: 'page', required: false, type: Number, description: 'Page number (default: 1)' })

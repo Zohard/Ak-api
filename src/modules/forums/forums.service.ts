@@ -217,6 +217,25 @@ export class ForumsService {
         throw new NotFoundException('Board not found');
       }
 
+      // Fetch read logs for this user if authenticated
+      let readLogsMap = new Map<number, number>();
+      if (userId) {
+        const topicIds = topics.map(t => t.idTopic);
+        const readLogs = await this.prisma.smfLogTopics.findMany({
+          where: {
+            idMember: userId,
+            idTopic: { in: topicIds }
+          },
+          select: {
+            idTopic: true,
+            idMsg: true
+          }
+        });
+
+        // Map topic ID to last read message ID
+        readLogsMap = new Map(readLogs.map(log => [log.idTopic, log.idMsg]));
+      }
+
       return {
         board: {
           id: board.idBoard,
@@ -226,25 +245,44 @@ export class ForumsService {
           numTopics: board.numTopics,
           numPosts: board.numPosts
         },
-        topics: topics.map(topic => ({
-          id: topic.idTopic,
-          subject: topic.firstMessage?.subject || 'Untitled',
-          isSticky: Boolean(topic.isSticky),
-          locked: Boolean(topic.locked),
-          hasPoll: topic.idPoll > 0,
-          numReplies: topic.numReplies,
-          numViews: topic.numViews,
-          starter: {
-            id: topic.starter?.idMember || 0,
-            name: topic.starter?.memberName || topic.firstMessage?.posterName || 'Unknown'
-          },
-          lastMessage: topic.lastMessage ? {
-            id: topic.lastMessage.idMsg,
-            time: topic.lastMessage.posterTime,
-            author: topic.lastMessage.member?.memberName || topic.lastMessage.posterName
-          } : null,
-          firstMessageTime: topic.firstMessage?.posterTime || 0
-        })),
+        topics: topics.map(topic => {
+          // Topic is unread if:
+          // 1. User is not logged in -> always read (false)
+          // 2. No entry in log_topics for this topic -> unread (true)
+          // 3. Last read message (idMsg) is less than topic's last message (idLastMsg) -> unread (true)
+          let isUnread = false;
+          if (userId) {
+            const lastReadMsgId = readLogsMap.get(topic.idTopic);
+            if (lastReadMsgId === undefined) {
+              // No read log entry = topic is unread
+              isUnread = true;
+            } else if (topic.idLastMsg > lastReadMsgId) {
+              // Topic has new messages since last read
+              isUnread = true;
+            }
+          }
+
+          return {
+            id: topic.idTopic,
+            subject: topic.firstMessage?.subject || 'Untitled',
+            isSticky: Boolean(topic.isSticky),
+            locked: Boolean(topic.locked),
+            hasPoll: topic.idPoll > 0,
+            numReplies: topic.numReplies,
+            numViews: topic.numViews,
+            isUnread,
+            starter: {
+              id: topic.starter?.idMember || 0,
+              name: topic.starter?.memberName || topic.firstMessage?.posterName || 'Unknown'
+            },
+            lastMessage: topic.lastMessage ? {
+              id: topic.lastMessage.idMsg,
+              time: topic.lastMessage.posterTime,
+              author: topic.lastMessage.member?.memberName || topic.lastMessage.posterName
+            } : null,
+            firstMessageTime: topic.firstMessage?.posterTime || 0
+          };
+        }),
         pagination: {
           currentPage: page,
           totalPages: Math.ceil(totalTopics / limit),
@@ -312,6 +350,31 @@ export class ForumsService {
       let pollData = null;
       if (topic.idPoll > 0) {
         pollData = await this.getPollData(topic.idPoll, userId);
+      }
+
+      // Mark topic as read for authenticated users (track the last message they've seen on this page)
+      if (userId && posts.length > 0) {
+        const lastPostOnPage = posts[posts.length - 1];
+        // Update/create the read log entry with the last message ID visible on this page
+        await this.prisma.smfLogTopics.upsert({
+          where: {
+            idTopic_idMember: {
+              idTopic: topicId,
+              idMember: userId
+            }
+          },
+          update: {
+            idMsg: lastPostOnPage.idMsg
+          },
+          create: {
+            idTopic: topicId,
+            idMember: userId,
+            idMsg: lastPostOnPage.idMsg
+          }
+        }).catch(err => {
+          // Don't fail the whole request if read tracking fails
+          this.logger.error('Error updating read log:', err);
+        });
       }
 
       return {
@@ -2716,12 +2779,34 @@ export class ForumsService {
 
   async markTopicAsRead(topicId: number, userId: number): Promise<{ success: boolean }> {
     try {
-      // TODO: Implement proper read tracking using smf_log_topics table
-      // DO NOT update lastLogin here - it breaks unread message detection
-      // lastLogin should ONLY be updated during actual login (auth.service.ts)
+      // Get the topic to find its last message ID
+      const topic = await this.prisma.smfTopic.findUnique({
+        where: { idTopic: topicId },
+        select: { idLastMsg: true }
+      });
 
-      // For now, just return successfully
-      // Proper topic read tracking will be implemented with smf_log_topics table
+      if (!topic) {
+        return { success: false };
+      }
+
+      // Upsert the read log entry
+      await this.prisma.smfLogTopics.upsert({
+        where: {
+          idTopic_idMember: {
+            idTopic: topicId,
+            idMember: userId
+          }
+        },
+        update: {
+          idMsg: topic.idLastMsg
+        },
+        create: {
+          idTopic: topicId,
+          idMember: userId,
+          idMsg: topic.idLastMsg
+        }
+      });
+
       return { success: true };
     } catch (error) {
       this.logger.error('Error marking topic as read:', error);
