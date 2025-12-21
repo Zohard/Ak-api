@@ -133,13 +133,12 @@ export class SynopsisService {
   async findPendingSynopses() {
     const pendingSynopses = await this.prisma.akSynopsis.findMany({
       where: {
-        validation: 0, // Only pending synopses
+        validation: 0,
       },
       orderBy: {
-        date: 'asc', // Oldest first for fairness
+        date: 'asc',
       },
       include: {
-        // Join with user to get author name
         user: {
           select: {
             memberName: true,
@@ -148,39 +147,52 @@ export class SynopsisService {
       },
     });
 
-    // Enrich with content information
-    const enrichedSynopses = await Promise.all(
-      pendingSynopses.map(async (synopsis) => {
-        let contentTitle = 'Contenu introuvable';
+    // Fetch all anime and manga IDs in bulk
+    const animeIds = pendingSynopses
+      .filter(s => s.type === 1 && s.idFiche)
+      .map(s => s.idFiche!);
 
-        if (synopsis.type === 1) {
-          // Anime
-          const anime = await this.prisma.akAnime.findUnique({
-            where: { idAnime: synopsis.idFiche ?? undefined },
-            select: { titre: true },
-          });
-          contentTitle = anime?.titre || 'Anime introuvable';
-        } else if (synopsis.type === 2) {
-          // Manga
-          const manga = await this.prisma.akManga.findUnique({
-            where: { idManga: synopsis.idFiche ?? undefined },
-            select: { titre: true },
-          });
-          contentTitle = manga?.titre || 'Manga introuvable';
-        }
+    const mangaIds = pendingSynopses
+      .filter(s => s.type === 2 && s.idFiche)
+      .map(s => s.idFiche!);
 
-        return {
-          id_synopsis: synopsis.idSynopsis,
-          synopsis: synopsis.synopsis,
-          type: synopsis.type,
-          id_fiche: synopsis.idFiche,
-          validation: synopsis.validation,
-          date: synopsis.date,
-          author_name: synopsis.user?.memberName || 'Utilisateur introuvable',
-          content_title: contentTitle,
-        };
-      })
-    );
+    // Bulk fetch animes and mangas
+    const [animes, mangas] = await Promise.all([
+      this.prisma.akAnime.findMany({
+        where: { idAnime: { in: animeIds } },
+        select: { idAnime: true, titre: true },
+      }),
+      this.prisma.akManga.findMany({
+        where: { idManga: { in: mangaIds } },
+        select: { idManga: true, titre: true },
+      }),
+    ]);
+
+    // Create lookup maps
+    const animeMap = new Map(animes.map(a => [a.idAnime, a.titre]));
+    const mangaMap = new Map(mangas.map(m => [m.idManga, m.titre]));
+
+    // Enrich synopses
+    const enrichedSynopses = pendingSynopses.map((synopsis) => {
+      let contentTitle = 'Contenu introuvable';
+
+      if (synopsis.type === 1 && synopsis.idFiche) {
+        contentTitle = animeMap.get(synopsis.idFiche) || 'Anime introuvable';
+      } else if (synopsis.type === 2 && synopsis.idFiche) {
+        contentTitle = mangaMap.get(synopsis.idFiche) || 'Manga introuvable';
+      }
+
+      return {
+        id_synopsis: synopsis.idSynopsis,
+        synopsis: synopsis.synopsis,
+        type: synopsis.type,
+        id_fiche: synopsis.idFiche,
+        validation: synopsis.validation,
+        date: synopsis.date,
+        author_name: synopsis.user?.memberName || 'Utilisateur introuvable',
+        content_title: contentTitle,
+      };
+    });
 
     return {
       success: true,
@@ -191,174 +203,170 @@ export class SynopsisService {
   async findAllSynopses(page: number = 1, limit: number = 20, validation?: number, search?: string) {
     const skip = (page - 1) * limit;
 
-    // If search is provided, we need to use raw SQL to search across anime/manga titles
+    let synopsesRaw: any[];
+    let countRaw: any[];
+
+    // Build WHERE clause conditions
+    const conditions: string[] = [];
+    const countConditions: string[] = [];
+
     if (search && search.trim()) {
       const searchTerm = `%${search.trim()}%`;
 
-      let synopsesRaw: any[];
-      let countRaw: any[];
-
       if (validation !== undefined) {
         synopsesRaw = await this.prisma.$queryRaw<any[]>`
-          SELECT
-            s.id_synopsis,
-            s.synopsis,
-            s.type,
-            s.id_fiche,
-            s.validation,
-            s.date,
-            s.id_membre,
-            m.member_name,
-            CASE
-              WHEN s.type = 1 THEN a.titre
-              WHEN s.type = 2 THEN ma.titre
-              ELSE 'Contenu introuvable'
-            END as content_title
-          FROM ak_synopsis s
-          LEFT JOIN smf_members m ON s.id_membre = m.id_member
-          LEFT JOIN ak_animes a ON s.type = 1 AND s.id_fiche = a.id_anime
-          LEFT JOIN ak_mangas ma ON s.type = 2 AND s.id_fiche = ma.id_manga
-          WHERE (
-            (s.type = 1 AND a.titre ILIKE ${searchTerm})
-            OR (s.type = 2 AND ma.titre ILIKE ${searchTerm})
-          )
-          AND s.validation = ${validation}
-          ORDER BY s.date DESC
-          LIMIT ${limit} OFFSET ${skip}
-        `;
+        SELECT
+          s.id_synopsis,
+          s.synopsis,
+          s.type,
+          s.id_fiche,
+          s.validation,
+          s.date,
+          s.id_membre,
+          m.member_name,
+          CASE
+            WHEN s.type = 1 THEN a.titre
+            WHEN s.type = 2 THEN ma.titre
+            ELSE 'Contenu introuvable'
+          END as content_title
+        FROM ak_synopsis s
+        LEFT JOIN smf_members m ON s.id_membre = m.id_member
+        LEFT JOIN ak_animes a ON s.id_fiche = a.id_anime
+        LEFT JOIN ak_mangas ma ON s.id_fiche = ma.id_manga
+        WHERE (
+          (s.type = 1 AND a.titre ILIKE ${searchTerm})
+          OR (s.type = 2 AND ma.titre ILIKE ${searchTerm})
+        )
+        AND s.validation = ${validation}
+        ORDER BY s.date DESC
+        LIMIT ${limit} OFFSET ${skip}
+      `;
 
         countRaw = await this.prisma.$queryRaw<any[]>`
-          SELECT COUNT(*) as count
-          FROM ak_synopsis s
-          LEFT JOIN ak_animes a ON s.type = 1 AND s.id_fiche = a.id_anime
-          LEFT JOIN ak_mangas ma ON s.type = 2 AND s.id_fiche = ma.id_manga
-          WHERE (
-            (s.type = 1 AND a.titre ILIKE ${searchTerm})
-            OR (s.type = 2 AND ma.titre ILIKE ${searchTerm})
-          )
-          AND s.validation = ${validation}
-        `;
+        SELECT COUNT(*) as count
+        FROM ak_synopsis s
+        LEFT JOIN ak_animes a ON s.id_fiche = a.id_anime
+        LEFT JOIN ak_mangas ma ON s.id_fiche = ma.id_manga
+        WHERE (
+          (s.type = 1 AND a.titre ILIKE ${searchTerm})
+          OR (s.type = 2 AND ma.titre ILIKE ${searchTerm})
+        )
+        AND s.validation = ${validation}
+      `;
       } else {
         synopsesRaw = await this.prisma.$queryRaw<any[]>`
-          SELECT
-            s.id_synopsis,
-            s.synopsis,
-            s.type,
-            s.id_fiche,
-            s.validation,
-            s.date,
-            s.id_membre,
-            m.member_name,
-            CASE
-              WHEN s.type = 1 THEN a.titre
-              WHEN s.type = 2 THEN ma.titre
-              ELSE 'Contenu introuvable'
-            END as content_title
-          FROM ak_synopsis s
-          LEFT JOIN smf_members m ON s.id_membre = m.id_member
-          LEFT JOIN ak_animes a ON s.type = 1 AND s.id_fiche = a.id_anime
-          LEFT JOIN ak_mangas ma ON s.type = 2 AND s.id_fiche = ma.id_manga
-          WHERE (
-            (s.type = 1 AND a.titre ILIKE ${searchTerm})
-            OR (s.type = 2 AND ma.titre ILIKE ${searchTerm})
-          )
-          ORDER BY s.date DESC
-          LIMIT ${limit} OFFSET ${skip}
-        `;
+        SELECT
+          s.id_synopsis,
+          s.synopsis,
+          s.type,
+          s.id_fiche,
+          s.validation,
+          s.date,
+          s.id_membre,
+          m.member_name,
+          CASE
+            WHEN s.type = 1 THEN a.titre
+            WHEN s.type = 2 THEN ma.titre
+            ELSE 'Contenu introuvable'
+          END as content_title
+        FROM ak_synopsis s
+        LEFT JOIN smf_members m ON s.id_membre = m.id_member
+        LEFT JOIN ak_animes a ON s.id_fiche = a.id_anime
+        LEFT JOIN ak_mangas ma ON s.id_fiche = ma.id_manga
+        WHERE (
+          (s.type = 1 AND a.titre ILIKE ${searchTerm})
+          OR (s.type = 2 AND ma.titre ILIKE ${searchTerm})
+        )
+        ORDER BY s.date DESC
+        LIMIT ${limit} OFFSET ${skip}
+      `;
 
         countRaw = await this.prisma.$queryRaw<any[]>`
-          SELECT COUNT(*) as count
-          FROM ak_synopsis s
-          LEFT JOIN ak_animes a ON s.type = 1 AND s.id_fiche = a.id_anime
-          LEFT JOIN ak_mangas ma ON s.type = 2 AND s.id_fiche = ma.id_manga
-          WHERE (
-            (s.type = 1 AND a.titre ILIKE ${searchTerm})
-            OR (s.type = 2 AND ma.titre ILIKE ${searchTerm})
-          )
-        `;
+        SELECT COUNT(*) as count
+        FROM ak_synopsis s
+        LEFT JOIN ak_animes a ON s.id_fiche = a.id_anime
+        LEFT JOIN ak_mangas ma ON s.id_fiche = ma.id_manga
+        WHERE (
+          (s.type = 1 AND a.titre ILIKE ${searchTerm})
+          OR (s.type = 2 AND ma.titre ILIKE ${searchTerm})
+        )
+      `;
       }
+    } else {
+      // Non-search queries - also use raw SQL for consistency and performance
+      if (validation !== undefined) {
+        synopsesRaw = await this.prisma.$queryRaw<any[]>`
+        SELECT
+          s.id_synopsis,
+          s.synopsis,
+          s.type,
+          s.id_fiche,
+          s.validation,
+          s.date,
+          s.id_membre,
+          m.member_name,
+          CASE
+            WHEN s.type = 1 THEN a.titre
+            WHEN s.type = 2 THEN ma.titre
+            ELSE 'Contenu introuvable'
+          END as content_title
+        FROM ak_synopsis s
+        LEFT JOIN smf_members m ON s.id_membre = m.id_member
+        LEFT JOIN ak_animes a ON s.id_fiche = a.id_anime
+        LEFT JOIN ak_mangas ma ON s.id_fiche = ma.id_manga
+        WHERE s.validation = ${validation}
+        ORDER BY s.date DESC
+        LIMIT ${limit} OFFSET ${skip}
+      `;
 
-      const total = Number(countRaw[0]?.count || 0);
+        countRaw = await this.prisma.$queryRaw<any[]>`
+        SELECT COUNT(*) as count
+        FROM ak_synopsis s
+        WHERE s.validation = ${validation}
+      `;
+      } else {
+        synopsesRaw = await this.prisma.$queryRaw<any[]>`
+        SELECT
+          s.id_synopsis,
+          s.synopsis,
+          s.type,
+          s.id_fiche,
+          s.validation,
+          s.date,
+          s.id_membre,
+          m.member_name,
+          CASE
+            WHEN s.type = 1 THEN a.titre
+            WHEN s.type = 2 THEN ma.titre
+            ELSE 'Contenu introuvable'
+          END as content_title
+        FROM ak_synopsis s
+        LEFT JOIN smf_members m ON s.id_membre = m.id_member
+        LEFT JOIN ak_animes a ON s.id_fiche = a.id_anime
+        LEFT JOIN ak_mangas ma ON s.id_fiche = ma.id_manga
+        ORDER BY s.date DESC
+        LIMIT ${limit} OFFSET ${skip}
+      `;
 
-      const enrichedSynopses = synopsesRaw.map((synopsis) => ({
-        id_synopsis: synopsis.id_synopsis,
-        synopsis: synopsis.synopsis,
-        type: synopsis.type,
-        id_fiche: synopsis.id_fiche,
-        validation: synopsis.validation,
-        date: synopsis.date,
-        author_name: synopsis.member_name || 'Utilisateur introuvable',
-        content_title: synopsis.content_title || 'Contenu introuvable',
-      }));
-
-      return {
-        success: true,
-        synopses: enrichedSynopses,
-        pagination: {
-          total,
-          page,
-          limit,
-          totalPages: Math.ceil(total / limit),
-        },
-      };
+        countRaw = await this.prisma.$queryRaw<any[]>`
+        SELECT COUNT(*) as count
+        FROM ak_synopsis s
+      `;
+      }
     }
 
-    // Original logic for non-search queries
-    const where: any = {};
-    if (validation !== undefined) {
-      where.validation = validation;
-    }
+    const total = Number(countRaw[0]?.count || 0);
 
-    const [synopses, total] = await Promise.all([
-      this.prisma.akSynopsis.findMany({
-        where,
-        orderBy: {
-          date: 'desc', // Most recent first
-        },
-        skip,
-        take: limit,
-        include: {
-          user: {
-            select: {
-              memberName: true,
-            },
-          },
-        },
-      }),
-      this.prisma.akSynopsis.count({ where }),
-    ]);
-
-    // Enrich with content information
-    const enrichedSynopses = await Promise.all(
-      synopses.map(async (synopsis) => {
-        let contentTitle = 'Contenu introuvable';
-
-        if (synopsis.type === 1) {
-          const anime = await this.prisma.akAnime.findUnique({
-            where: { idAnime: synopsis.idFiche ?? undefined },
-            select: { titre: true, niceUrl: true },
-          });
-          contentTitle = anime?.titre || 'Anime introuvable';
-        } else if (synopsis.type === 2) {
-          const manga = await this.prisma.akManga.findUnique({
-            where: { idManga: synopsis.idFiche ?? undefined },
-            select: { titre: true, niceUrl: true },
-          });
-          contentTitle = manga?.titre || 'Manga introuvable';
-        }
-
-        return {
-          id_synopsis: synopsis.idSynopsis,
-          synopsis: synopsis.synopsis,
-          type: synopsis.type,
-          id_fiche: synopsis.idFiche,
-          validation: synopsis.validation,
-          date: synopsis.date,
-          author_name: synopsis.user?.memberName || 'Utilisateur introuvable',
-          content_title: contentTitle,
-        };
-      })
-    );
+    const enrichedSynopses = synopsesRaw.map((synopsis) => ({
+      id_synopsis: synopsis.id_synopsis,
+      synopsis: synopsis.synopsis,
+      type: synopsis.type,
+      id_fiche: synopsis.id_fiche,
+      validation: synopsis.validation,
+      date: synopsis.date,
+      author_name: synopsis.member_name || 'Utilisateur introuvable',
+      content_title: synopsis.content_title || 'Contenu introuvable',
+    }));
 
     return {
       success: true,
@@ -371,7 +379,6 @@ export class SynopsisService {
       },
     };
   }
-
   async validateSynopsis(
     synopsisId: number,
     validation: number,
