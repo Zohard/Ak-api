@@ -519,6 +519,20 @@ export class ForumsController {
     return await this.forumsService.markAllAsRead(userId);
   }
 
+  @Post('boards/:boardId/mark-read')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Mark all topics in a board as read' })
+  @ApiParam({ name: 'boardId', type: 'number', description: 'Board ID' })
+  @ApiResponse({ status: 200, description: 'Board topics marked as read successfully' })
+  async markBoardAsRead(
+    @Param('boardId', ParseIntPipe) boardId: number,
+    @Request() req
+  ) {
+    const userId = req.user.id;
+    return await this.forumsService.markBoardAsRead(boardId, userId);
+  }
+
   @Get('online')
   @ApiOperation({ summary: 'Get list of online users and guests with their activities' })
   @ApiQuery({ name: 'filter', required: false, enum: ['all', 'members', 'guests'], description: 'Filter by user type' })

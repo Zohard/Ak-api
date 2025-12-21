@@ -2832,6 +2832,51 @@ export class ForumsService {
     }
   }
 
+  async markBoardAsRead(boardId: number, userId: number): Promise<{ success: boolean; count: number }> {
+    try {
+      // Get all topics in this board
+      const topics = await this.prisma.smfTopic.findMany({
+        where: { idBoard: boardId },
+        select: {
+          idTopic: true,
+          idLastMsg: true
+        }
+      });
+
+      if (topics.length === 0) {
+        return { success: true, count: 0 };
+      }
+
+      // Prepare data for bulk upsert
+      const upsertPromises = topics.map(topic =>
+        this.prisma.smfLogTopics.upsert({
+          where: {
+            idTopic_idMember: {
+              idTopic: topic.idTopic,
+              idMember: userId
+            }
+          },
+          update: {
+            idMsg: topic.idLastMsg
+          },
+          create: {
+            idTopic: topic.idTopic,
+            idMember: userId,
+            idMsg: topic.idLastMsg
+          }
+        })
+      );
+
+      // Execute all upserts in parallel
+      await Promise.all(upsertPromises);
+
+      return { success: true, count: topics.length };
+    } catch (error) {
+      this.logger.error('Error marking board as read:', error);
+      return { success: false, count: 0 };
+    }
+  }
+
   async searchForums(searchQuery: string, limit: number, offset: number, userId?: number) {
     try {
       const searchTerm = `%${searchQuery}%`;
