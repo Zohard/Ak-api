@@ -501,6 +501,19 @@ model AkJeuxVideoScreenshot {
   @@map("ak_jeux_video_screenshots")
 }
 
+// Anime/Manga Screenshots (polymorphic table - no FK constraints in DB)
+model AkScreenshot {
+  idScreen    Int       @id @default(autoincrement()) @map("id_screen")
+  urlScreen   String?   @map("url_screen") @db.VarChar(255)
+  idTitre     Int       @map("id_titre")
+  type        Int       @default(1) // 1 = anime, 2 = manga
+  uploadDate  DateTime? @default(now()) @map("upload_date") @db.Timestamp
+
+  @@index([idTitre])
+  @@index([idTitre, type])
+  @@map("ak_screenshots")
+}
+
 // Business to Anime Relations
 model AkBusinessToAnime {
   idRelation  Int       @id @default(autoincrement()) @map("id_relation")

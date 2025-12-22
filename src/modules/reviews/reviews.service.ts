@@ -350,6 +350,68 @@ export class ReviewsService {
       this.prisma.akCritique.count({ where }),
     ]);
 
+    // Fetch screenshots for anime and manga
+    const animeIds = reviews.filter(r => r.idAnime > 0).map(r => r.idAnime);
+    const mangaIds = reviews.filter(r => r.idManga > 0).map(r => r.idManga);
+
+    const [animeScreenshots, mangaScreenshots] = await Promise.all([
+      animeIds.length > 0
+        ? this.prisma.akScreenshot.findMany({
+            where: {
+              idTitre: { in: animeIds },
+              type: 1, // 1 = anime
+            },
+            select: {
+              idScreen: true,
+              urlScreen: true,
+              idTitre: true,
+            },
+            orderBy: {
+              uploadDate: 'desc',
+            },
+          })
+        : [],
+      mangaIds.length > 0
+        ? this.prisma.akScreenshot.findMany({
+            where: {
+              idTitre: { in: mangaIds },
+              type: 2, // 2 = manga
+            },
+            select: {
+              idScreen: true,
+              urlScreen: true,
+              idTitre: true,
+            },
+            orderBy: {
+              uploadDate: 'desc',
+            },
+          })
+        : [],
+    ]);
+
+    // Map screenshots to anime/manga
+    const animeScreenshotMap = animeScreenshots.reduce((acc, s) => {
+      if (!acc[s.idTitre]) acc[s.idTitre] = [];
+      acc[s.idTitre].push({ id: s.idScreen, url: s.urlScreen });
+      return acc;
+    }, {} as Record<number, Array<{ id: number; url: string }>>);
+
+    const mangaScreenshotMap = mangaScreenshots.reduce((acc, s) => {
+      if (!acc[s.idTitre]) acc[s.idTitre] = [];
+      acc[s.idTitre].push({ id: s.idScreen, url: s.urlScreen });
+      return acc;
+    }, {} as Record<number, Array<{ id: number; url: string }>>);
+
+    // Attach screenshots to reviews
+    reviews.forEach(review => {
+      if (review.anime && animeScreenshotMap[review.idAnime]) {
+        review.anime.screenshots = animeScreenshotMap[review.idAnime].slice(0, 10);
+      }
+      if (review.manga && mangaScreenshotMap[review.idManga]) {
+        review.manga.screenshots = mangaScreenshotMap[review.idManga].slice(0, 10);
+      }
+    });
+
     const result = {
       reviews: reviews.map(this.formatReview),
       pagination: {

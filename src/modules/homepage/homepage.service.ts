@@ -20,8 +20,8 @@ export class HomePageService {
   ) {}
 
   async getHomePageData() {
-    const cacheKey = 'v2';
-    
+    const cacheKey = 'v3'; // v3: Added screenshots for anime/manga
+
     // Try cache first
     const cached = await this.cache.getHomepageData(cacheKey);
     if (cached) {
