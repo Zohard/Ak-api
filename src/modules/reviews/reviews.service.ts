@@ -331,6 +331,18 @@ export class ReviewsService {
               titre: true,
               image: true,
               annee: true,
+              screenshots: {
+                select: {
+                  id: true,
+                  filename: true,
+                  caption: true,
+                  sortorder: true,
+                },
+                orderBy: {
+                  sortorder: 'asc',
+                },
+                take: 10, // Limit to first 10 screenshots for performance
+              },
             },
           },
         },
