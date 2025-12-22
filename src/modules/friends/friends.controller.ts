@@ -624,6 +624,30 @@ export class FriendsController {
     );
   }
 
+  // Alias endpoint for backwards compatibility
+  @Get('activities')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Get friends activity timeline (alias)',
+    description: 'Alias endpoint for /activity - retrieve a timeline of recent activities from the user\'s friends'
+  })
+  @ApiQuery({ name: 'page', type: 'number', required: false, description: 'Page number (default: 1)' })
+  @ApiQuery({ name: 'limit', type: 'number', required: false, description: 'Items per page (default: 20, max: 50)' })
+  @ApiQuery({ name: 'type', type: 'string', required: false, description: 'Filter by activity type (rating, review, top_list, all)', enum: ['rating', 'review', 'top_list', 'all'] })
+  @ApiQuery({ name: 'contentType', type: 'string', required: false, description: 'Filter by content type (anime, manga, game, all)', enum: ['anime', 'manga', 'game', 'all'] })
+  @ApiResponse({ status: 200, description: 'Activity timeline retrieved successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  async getFriendsActivitiesAlias(
+    @Request() req: any,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('type') type?: string,
+    @Query('contentType') contentType?: string
+  ) {
+    return this.getFriendsActivity(req, page, limit, type, contentType);
+  }
+
   @Get('activity/public/:userId')
   @ApiOperation({
     summary: 'Get user\'s friends activity timeline (public)',
