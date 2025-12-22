@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../../shared/services/prisma.service';
 import { AdminLoggingService } from '../logging/admin-logging.service';
+import { CacheService } from '../../../shared/services/cache.service';
 import {
   AdminAnimeListQueryDto,
   CreateAdminAnimeDto,
@@ -12,6 +13,7 @@ export class AdminAnimesService {
   constructor(
     private prisma: PrismaService,
     private adminLogging: AdminLoggingService,
+    private cacheService: CacheService,
   ) {}
 
   async getOne(id: number) {
@@ -189,6 +191,9 @@ export class AdminAnimesService {
       await this.adminLogging.addLog(id, 'anime', username, 'Modification infos principales');
     }
 
+    // Invalidate cache
+    await this.cacheService.invalidateAnime(id);
+
     return updated;
   }
 
@@ -203,13 +208,21 @@ export class AdminAnimesService {
       await this.adminLogging.addLog(id, 'anime', username, `Modification statut (${statut})`);
     }
 
+    // Invalidate cache
+    await this.cacheService.invalidateAnime(id);
+
     return updated;
   }
 
   async remove(id: number) {
     const existing = await this.prisma.akAnime.findUnique({ where: { idAnime: id } });
     if (!existing) throw new NotFoundException('Anime introuvable');
+
     await this.prisma.akAnime.delete({ where: { idAnime: id } });
+
+    // Invalidate cache
+    await this.cacheService.invalidateAnime(id);
+
     return { message: 'Anime supprimé' };
   }
 
@@ -266,6 +279,9 @@ export class AdminAnimesService {
         // Continue with next staff member instead of failing entire operation
       }
     }
+
+    // Invalidate cache after updating business relations
+    await this.cacheService.invalidateAnime(animeId);
   }
 
   private getBusinessTypeFromRole(role: string): string {

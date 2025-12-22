@@ -15,6 +15,7 @@ import { AdminTagsController } from './admin-tags.controller';
 import { SourcesExternesController } from './sources-externes.controller';
 import { SourcesExternesService } from './sources-externes.service';
 import { PrismaService } from '../../../shared/services/prisma.service';
+import { CacheService } from '../../../shared/services/cache.service';
 import { IgdbService } from '../../../shared/services/igdb.service';
 import { DeepLService } from '../../../shared/services/deepl.service';
 import { MediaModule } from '../../media/media.module';
@@ -23,7 +24,7 @@ import { AdminLoggingModule } from '../logging/admin-logging.module';
 @Module({
   imports: [MediaModule, AdminLoggingModule],
   controllers: [AdminContentController, AdminAnimesController, AdminMangasController, AdminBusinessController, AdminJeuxVideoController, AdminPlatformsController, AdminGenresController, AdminTagsController, SourcesExternesController],
-  providers: [AdminContentService, AdminAnimesService, AdminMangasService, AdminBusinessService, AdminJeuxVideoService, SourcesExternesService, PrismaService, IgdbService, DeepLService],
+  providers: [AdminContentService, AdminAnimesService, AdminMangasService, AdminBusinessService, AdminJeuxVideoService, SourcesExternesService, PrismaService, CacheService, IgdbService, DeepLService],
   exports: [AdminContentService],
 })
 export class AdminContentModule {}
