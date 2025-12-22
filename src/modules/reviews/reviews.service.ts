@@ -390,25 +390,25 @@ export class ReviewsService {
     ]);
 
     // Map screenshots to anime/manga
-    const animeScreenshotMap = animeScreenshots.reduce((acc, s) => {
-      if (!acc[s.idTitre]) acc[s.idTitre] = [];
-      acc[s.idTitre].push({ id: s.idScreen, url: s.urlScreen });
-      return acc;
-    }, {} as Record<number, Array<{ id: number; url: string }>>);
+    const animeScreenshotMap: Record<number, Array<{ id: number; url: string }>> = {};
+    animeScreenshots.forEach(s => {
+      if (!animeScreenshotMap[s.idTitre]) animeScreenshotMap[s.idTitre] = [];
+      animeScreenshotMap[s.idTitre].push({ id: s.idScreen, url: s.urlScreen });
+    });
 
-    const mangaScreenshotMap = mangaScreenshots.reduce((acc, s) => {
-      if (!acc[s.idTitre]) acc[s.idTitre] = [];
-      acc[s.idTitre].push({ id: s.idScreen, url: s.urlScreen });
-      return acc;
-    }, {} as Record<number, Array<{ id: number; url: string }>>);
+    const mangaScreenshotMap: Record<number, Array<{ id: number; url: string }>> = {};
+    mangaScreenshots.forEach(s => {
+      if (!mangaScreenshotMap[s.idTitre]) mangaScreenshotMap[s.idTitre] = [];
+      mangaScreenshotMap[s.idTitre].push({ id: s.idScreen, url: s.urlScreen });
+    });
 
     // Attach screenshots to reviews
     reviews.forEach(review => {
       if (review.anime && animeScreenshotMap[review.idAnime]) {
-        review.anime.screenshots = animeScreenshotMap[review.idAnime].slice(0, 10);
+        (review.anime as any).screenshots = animeScreenshotMap[review.idAnime].slice(0, 10);
       }
       if (review.manga && mangaScreenshotMap[review.idManga]) {
-        review.manga.screenshots = mangaScreenshotMap[review.idManga].slice(0, 10);
+        (review.manga as any).screenshots = mangaScreenshotMap[review.idManga].slice(0, 10);
       }
     });
 
