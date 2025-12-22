@@ -252,6 +252,11 @@ export class AnimesService extends BaseContentService<
       }
     }
 
+    // Exclude null dateAjout when sorting by it
+    if (sortBy === 'dateAjout' || !sortBy) {
+      where.dateAjout = { not: null };
+    }
+
     // Build order by clause
     const orderBy = { [sortBy || 'dateAjout']: sortOrder || 'desc' };
 
