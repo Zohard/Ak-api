@@ -105,6 +105,7 @@ export class AdminAnimesService {
       niceUrl: dto.niceUrl || this.slugify(dto.titre),
       titreOrig,
       annee: dto.annee ?? null,
+      dateDiffusion: dto.dateDiffusion ? new Date(dto.dateDiffusion) : null,
       nbEp,
       studio: dto.studio || null,
       realisateur: dto.realisateur || null,
@@ -181,6 +182,11 @@ export class AdminAnimesService {
     if (data.format) {
       const t = String(data.format).trim();
       data.format = /^série$/i.test(t) ? 'Série TV' : t;
+    }
+
+    // Convert dateDiffusion string to Date if provided
+    if (data.dateDiffusion) {
+      data.dateDiffusion = new Date(data.dateDiffusion);
     }
 
     const updated = await this.prisma.akAnime.update({ where: { idAnime: id }, data });

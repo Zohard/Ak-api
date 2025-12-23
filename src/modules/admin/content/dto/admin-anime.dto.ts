@@ -30,6 +30,11 @@ export class CreateAdminAnimeDto {
   @Min(1900)
   annee?: number;
 
+  @ApiPropertyOptional({ description: 'Date de diffusion (YYYY-MM-DD)' })
+  @IsOptional()
+  @IsString()
+  dateDiffusion?: string;
+
   @ApiPropertyOptional({ description: 'Nombre d\'épisodes', minimum: 0 })
   @IsOptional()
   @IsInt()
@@ -163,6 +168,11 @@ export class UpdateAdminAnimeDto {
   @IsInt()
   @Min(1900)
   annee?: number;
+
+  @ApiPropertyOptional({ description: 'Date de diffusion (YYYY-MM-DD)' })
+  @IsOptional()
+  @IsString()
+  dateDiffusion?: string;
 
   @ApiPropertyOptional()
   @IsOptional()
