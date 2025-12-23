@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../shared/services/prisma.service';
 import { ImageKitService } from './imagekit.service';
+import { slugify } from '../../shared/utils/text.util';
 import sharp from 'sharp';
 import * as path from 'path';
 import * as fs from 'fs/promises';
@@ -49,7 +50,26 @@ export class MediaService {
 
     // Generate unique filename
     const fileExtension = path.extname(file.originalname);
-    const filename = `${type}_${Date.now()}_${Math.random().toString(36).substring(7)}${fileExtension}`;
+    let filename = `${type}_${Date.now()}_${Math.random().toString(36).substring(7)}${fileExtension}`;
+
+    // For game screenshots, use the game title in the filename
+    if (isScreenshot && type === 'game' && relatedId) {
+      try {
+        const game = await this.prisma.akJeuxVideo.findUnique({
+          where: { idJeu: relatedId },
+          select: { titre: true }
+        });
+
+        if (game?.titre) {
+          const safeTitle = slugify(game.titre);
+          const timestamp = Date.now();
+          filename = `${safeTitle}-${timestamp}${fileExtension}`;
+        }
+      } catch (error) {
+        console.error('Failed to fetch game title for filename:', error);
+        // Fall back to default filename if fetch fails
+      }
+    }
 
     let uploadResult: any = null;
 
@@ -78,28 +98,49 @@ export class MediaService {
         folderPath
       );
 
-      // Save to database with screenshots/ prefix if it's a screenshot
-      const dbFilename = isScreenshot ? `screenshots/${uploadResult.name}` : uploadResult.name;
+      // Save to database based on type
+      if (isScreenshot && relatedId) {
+        try {
+          let result: any;
+          let screenshotId: number;
 
-      try {
-        const result = await this.prisma.$queryRaw`
-          INSERT INTO ak_screenshots (url_screen, id_titre, type, upload_date)
-          VALUES (${dbFilename}, ${relatedId || 0}, ${this.getTypeId(type)}, NOW())
-          RETURNING id_screen
-        `;
+          if (type === 'game') {
+            // Save to ak_jeux_video_screenshots for games
+            result = await this.prisma.akJeuxVideoScreenshot.create({
+              data: {
+                jeuVideoId: relatedId,
+                filename: uploadResult.name,
+                caption: null,
+                sortorder: 0,
+                createdat: new Date(),
+              },
+            });
+            screenshotId = result.id;
+          } else if (type === 'anime' || type === 'manga') {
+            // Save to ak_screenshots for anime/manga
+            const dbFilename = `screenshots/${uploadResult.name}`;
+            const queryResult = await this.prisma.$queryRaw`
+              INSERT INTO ak_screenshots (url_screen, id_titre, type, upload_date)
+              VALUES (${dbFilename}, ${relatedId}, ${this.getTypeId(type)}, NOW())
+              RETURNING id_screen
+            `;
+            screenshotId = (queryResult as any[])[0]?.id_screen;
+          } else {
+            throw new BadRequestException(`Screenshot upload not supported for type: ${type}`);
+          }
 
-        return {
-          id: (result as any[])[0]?.id_screen,
-          filename: dbFilename,
-          originalName: file.originalname,
-          size: processedImage.length,
-          type,
-          url: uploadResult.url,
-          relatedId,
-          imagekitFileId: uploadResult.fileId,
-        };
-      } catch (dbError) {
-        // Database save failed - delete the uploaded file from ImageKit to prevent orphaned files
+          return {
+            id: screenshotId,
+            filename: uploadResult.name,
+            originalName: file.originalname,
+            size: processedImage.length,
+            type,
+            url: uploadResult.url,
+            relatedId,
+            imagekitFileId: uploadResult.fileId,
+          };
+        } catch (dbError) {
+          // Database save failed - delete the uploaded file from ImageKit to prevent orphaned files
         console.error('[MediaService] Database save failed, deleting ImageKit file:', {
           fileId: uploadResult.fileId,
           filename: uploadResult.name,
@@ -121,7 +162,19 @@ export class MediaService {
           // Log this for manual cleanup but don't fail the operation
         }
 
-        throw new BadRequestException(`Failed to save image metadata: ${dbError.message}`);
+          throw new BadRequestException(`Failed to save image metadata: ${dbError.message}`);
+        }
+      } else {
+        // For non-screenshot uploads (covers, avatars, etc.), just return the upload result
+        return {
+          filename: uploadResult.name,
+          originalName: file.originalname,
+          size: processedImage.length,
+          type,
+          url: uploadResult.url,
+          relatedId,
+          imagekitFileId: uploadResult.fileId,
+        };
       }
     } catch (error) {
       // If it's already a BadRequestException, re-throw it
@@ -173,7 +226,26 @@ export class MediaService {
 
       // Generate filename
       const extension = contentType.split('/')[1] || 'jpg';
-      const filename = `${type}_${Date.now()}_${Math.random().toString(36).substring(7)}.${extension}`;
+      let filename = `${type}_${Date.now()}_${Math.random().toString(36).substring(7)}.${extension}`;
+
+      // For game screenshots, use the game title in the filename
+      if (saveAsScreenshot && type === 'game' && relatedId) {
+        try {
+          const game = await this.prisma.akJeuxVideo.findUnique({
+            where: { idJeu: relatedId },
+            select: { titre: true }
+          });
+
+          if (game?.titre) {
+            const safeTitle = slugify(game.titre);
+            const timestamp = Date.now();
+            filename = `${safeTitle}-${timestamp}.${extension}`;
+          }
+        } catch (error) {
+          console.error('Failed to fetch game title for filename:', error);
+          // Fall back to default filename if fetch fails
+        }
+      }
 
       // Process image with Sharp
       const processedImage = await this.processImage(Buffer.from(response.data), type);
@@ -198,14 +270,35 @@ export class MediaService {
       // Save to database as screenshot ONLY if explicitly requested
       if (relatedId && saveAsScreenshot) {
         try {
-          const result = await this.prisma.$queryRaw`
-            INSERT INTO ak_screenshots (url_screen, id_titre, type, upload_date)
-            VALUES (${uploadResult.name}, ${relatedId}, ${this.getTypeId(type)}, NOW())
-            RETURNING id_screen
-          `;
+          let result: any;
+          let screenshotId: number;
+
+          if (type === 'game') {
+            // Save to ak_jeux_video_screenshots for games
+            result = await this.prisma.akJeuxVideoScreenshot.create({
+              data: {
+                jeuVideoId: relatedId,
+                filename: uploadResult.name,
+                caption: null,
+                sortorder: 0,
+                createdat: new Date(),
+              },
+            });
+            screenshotId = result.id;
+          } else if (type === 'anime' || type === 'manga') {
+            // Save to ak_screenshots for anime/manga
+            const queryResult = await this.prisma.$queryRaw`
+              INSERT INTO ak_screenshots (url_screen, id_titre, type, upload_date)
+              VALUES (${uploadResult.name}, ${relatedId}, ${this.getTypeId(type)}, NOW())
+              RETURNING id_screen
+            `;
+            screenshotId = (queryResult as any[])[0]?.id_screen;
+          } else {
+            throw new BadRequestException(`Screenshot upload not supported for type: ${type}`);
+          }
 
           return {
-            id: (result as any[])[0]?.id_screen,
+            id: screenshotId,
             filename: uploadResult.name,
             size: processedImage.length,
             type,
