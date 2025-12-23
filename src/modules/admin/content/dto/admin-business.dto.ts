@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsInt, IsNotEmpty, IsOptional, IsString, IsUrl } from 'class-validator';
+import { IsInt, IsNotEmpty, IsOptional, IsString, IsUrl, ValidateIf } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class CreateAdminBusinessDto {
@@ -40,6 +40,7 @@ export class CreateAdminBusinessDto {
 
   @ApiPropertyOptional()
   @IsOptional()
+  @ValidateIf((o) => o.siteOfficiel !== '' && o.siteOfficiel !== null)
   @IsUrl()
   siteOfficiel?: string;
 
