@@ -146,7 +146,7 @@ export class AdminAnimesService {
     const existing = await this.prisma.akAnime.findUnique({ where: { idAnime: id } });
     if (!existing) throw new NotFoundException('Anime introuvable');
 
-    const { topic, lienforum, ...rest } = dto as any;
+    const { topic, lienforum, addSynopsisAttribution, ...rest } = dto as any;
     const data: any = { ...rest };
     if (dto.titre) {
       data.titre = dto.titre;

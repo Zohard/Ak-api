@@ -115,7 +115,8 @@ export class AdminMangasService {
   async update(id: number, dto: UpdateAdminMangaDto, user?: any) {
     const existing = await this.prisma.akManga.findUnique({ where: { idManga: id } });
     if (!existing) throw new NotFoundException('Manga introuvable');
-    const data: any = { ...dto };
+    const { addSynopsisAttribution, ...rest } = dto as any;
+    const data: any = { ...rest };
     if (dto.titre && !dto.niceUrl) data.niceUrl = this.slugify(dto.titre);
 
     // Handle synopsis validation - append user attribution if synopsis is being updated
