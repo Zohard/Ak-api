@@ -958,9 +958,9 @@ model AkWebzineToFiches {
 
   // Relations
   wpPost       WpPost?     @relation(fields: [idWpArticle], references: [ID], onDelete: Cascade)
-  anime        AkAnime?    @relation("AnimeArticles", fields: [idFiche], references: [idAnime], onDelete: Cascade)
-  manga        AkManga?    @relation("MangaArticles", fields: [idFiche], references: [idManga], onDelete: Cascade)
-  business     AkBusiness? @relation("BusinessArticles", fields: [idFiche], references: [idBusiness], onDelete: Cascade)
+  anime        AkAnime?    @relation("AnimeArticles", fields: [idFiche], references: [idAnime], onDelete: Cascade, map: "ak_webzine_to_fiches_anime_fkey")
+  manga        AkManga?    @relation("MangaArticles", fields: [idFiche], references: [idManga], onDelete: Cascade, map: "ak_webzine_to_fiches_manga_fkey")
+  business     AkBusiness? @relation("BusinessArticles", fields: [idFiche], references: [idBusiness], onDelete: Cascade, map: "ak_webzine_to_fiches_business_fkey")
 
   @@unique([idFiche, idWpArticle, type])
   @@index([idFiche, type])
