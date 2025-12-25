@@ -1219,6 +1219,17 @@ export class AnimesService extends BaseContentService<
               postDate: true,
               postExcerpt: true,
               postStatus: true,
+              postMeta: {
+                where: {
+                  metaKey: {
+                    in: ['imgunebig', 'imgunebig2', 'ak_img', 'img'],
+                  },
+                },
+                select: {
+                  metaKey: true,
+                  metaValue: true,
+                },
+              },
             },
           },
         },
@@ -1227,11 +1238,23 @@ export class AnimesService extends BaseContentService<
       // Add published articles to related content
       for (const articleRel of articleRelations) {
         if (articleRel.wpPost?.postStatus === 'publish') {
+          // Extract cover image from postMeta (prioritize imgunebig)
+          const imgunebigMeta = articleRel.wpPost.postMeta.find(meta => meta.metaKey === 'imgunebig');
+          const imgunebig2Meta = articleRel.wpPost.postMeta.find(meta => meta.metaKey === 'imgunebig2');
+          const akImgMeta = articleRel.wpPost.postMeta.find(meta => meta.metaKey === 'ak_img');
+          const imgMeta = articleRel.wpPost.postMeta.find(meta => meta.metaKey === 'img');
+
+          const coverImage = imgunebigMeta?.metaValue ||
+                            imgunebig2Meta?.metaValue ||
+                            akImgMeta?.metaValue ||
+                            imgMeta?.metaValue ||
+                            null;
+
           relatedContent.push({
             id: Number(articleRel.wpPost.ID),
             type: 'article',
             title: articleRel.wpPost.postTitle || 'Sans titre',
-            image: null, // Articles don't have direct images in this table
+            image: coverImage,
             year: null,
             rating: null,
             niceUrl: null,
