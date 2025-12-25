@@ -15,6 +15,7 @@ import { AdminModule } from './modules/admin/admin.module';
 import { MediaModule } from './modules/media/media.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { ArticlesModule } from './modules/articles/articles.module';
+import { ArticleRelationsModule } from './modules/article-relations/article-relations.module';
 import { SeasonsModule } from './modules/seasons/seasons.module';
 import { ForumsModule } from './modules/forums/forums.module';
 import { CollectionsModule } from './modules/collections/collections.module';
@@ -68,6 +69,7 @@ import jwtConfig from './config/jwt.config';
     MediaModule,
     NotificationsModule,
     ArticlesModule,
+    ArticleRelationsModule,
     SeasonsModule,
     ForumsModule,
     CollectionsModule,

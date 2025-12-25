@@ -201,6 +201,7 @@ model AkAnime {
   trailers     AkAnimesTrailer[]
   businessRelations AkBusinessToAnime[]
   userCollections CollectionAnime[] @relation("UserAnimeList")
+  articleRelations AkWebzineToFiches[] @relation("AnimeArticles")
 
   @@index([statut])
   @@index([dateAjout])
@@ -290,6 +291,7 @@ model AkManga {
   businessRelations    AkBusinessToManga[]
   userCollections      CollectionManga[] @relation("UserMangaList")
   volumes              MangaVolume[] @relation("MangaVolumes")
+  articleRelations     AkWebzineToFiches[] @relation("MangaArticles")
 
   @@index([statut])
   @@index([dateAjout])
@@ -348,6 +350,7 @@ model AkBusiness {
   jeuxVideoRelations    AkBusinessToJeux[]      @relation("BusinessToJeux")
   businessSourceRel     AkBusinessToBusiness[]  @relation("BusinessSource")
   businessRelatedRel    AkBusinessToBusiness[]  @relation("BusinessRelated")
+  articleRelations      AkWebzineToFiches[]     @relation("BusinessArticles")
 
   @@map("ak_business")
 }
@@ -954,7 +957,10 @@ model AkWebzineToFiches {
   type         String @db.VarChar(50) // 'anime', 'manga', or 'business'
 
   // Relations
-  wpPost       WpPost? @relation(fields: [idWpArticle], references: [ID], onDelete: Cascade)
+  wpPost       WpPost?     @relation(fields: [idWpArticle], references: [ID], onDelete: Cascade)
+  anime        AkAnime?    @relation("AnimeArticles", fields: [idFiche], references: [idAnime], onDelete: Cascade)
+  manga        AkManga?    @relation("MangaArticles", fields: [idFiche], references: [idManga], onDelete: Cascade)
+  business     AkBusiness? @relation("BusinessArticles", fields: [idFiche], references: [idBusiness], onDelete: Cascade)
 
   @@unique([idFiche, idWpArticle, type])
   @@index([idFiche, type])
