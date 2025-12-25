@@ -35,7 +35,7 @@ export class ArticleRelationsService {
         business: {
           select: {
             idBusiness: true,
-            nom: true,
+            denomination: true,
           },
         },
       },
@@ -45,7 +45,7 @@ export class ArticleRelationsService {
       idRelation: rel.idRelation,
       idFiche: rel.idFiche,
       type: rel.type,
-      ficheTitle: rel.anime?.titre || rel.manga?.titre || rel.business?.nom || 'Unknown',
+      ficheTitle: rel.anime?.titre || rel.manga?.titre || rel.business?.denomination || 'Unknown',
     }));
   }
 
