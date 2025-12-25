@@ -342,7 +342,11 @@ export class AnimesService extends BaseContentService<
           type: true,
           business: {
             select: {
+              idBusiness: true,
               denomination: true,
+              niceUrl: true,
+              image: true,
+              presentation: true,
             },
           },
         },

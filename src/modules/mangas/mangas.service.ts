@@ -337,7 +337,11 @@ export class MangasService extends BaseContentService<
           precisions: true,
           business: {
             select: {
+              idBusiness: true,
               denomination: true,
+              niceUrl: true,
+              image: true,
+              presentation: true,
             },
           },
         },
