@@ -10,6 +10,7 @@ import { BaseContentService } from '../../shared/services/base-content.service';
 import { CreateMangaDto } from './dto/create-manga.dto';
 import { UpdateMangaDto } from './dto/update-manga.dto';
 import { MangaQueryDto } from './dto/manga-query.dto';
+import { AddMediaRelationDto, MediaRelationType } from './dto/add-media-relation.dto';
 import { RelatedContentItem, RelationsResponse } from '../shared/types/relations.types';
 import { ImageKitService } from '../media/imagekit.service';
 import { MediaService } from '../media/media.service';
@@ -2383,5 +2384,274 @@ export class MangasService extends BaseContentService<
       created: true,
       message: 'Volume created successfully',
     };
+  }
+
+  // ==================== CROSS-MEDIA RELATIONS METHODS ====================
+
+  /**
+   * Get all cross-media relations for a manga
+   */
+  async getMediaRelations(mangaId: number) {
+    const manga = await this.prisma.akMangas.findUnique({
+      where: { idManga: mangaId },
+    });
+
+    if (!manga) {
+      throw new NotFoundException(`Manga with ID ${mangaId} not found`);
+    }
+
+    // Get all different types of relations
+    const [animeRelations, mangaRelations, gameRelations, businessRelations, articleRelations] = await Promise.all([
+      // Anime relations
+      this.prisma.akMangaToAnime.findMany({
+        where: { id_manga: mangaId, doublon: 0 },
+        include: {
+          anime: {
+            select: {
+              idAnime: true,
+              titre: true,
+              image: true,
+              annee: true,
+              niceUrl: true,
+            },
+          },
+        },
+      }),
+      // Manga relations
+      this.prisma.akMangaToManga.findMany({
+        where: { id_manga_1: mangaId, doublon: 0 },
+        include: {
+          relatedManga: {
+            select: {
+              idManga: true,
+              titre: true,
+              image: true,
+              annee: true,
+              niceUrl: true,
+            },
+          },
+        },
+      }),
+      // Game relations (if table exists)
+      this.prisma.$queryRawUnsafe(`
+        SELECT g.*, r.type, r.precisions
+        FROM ak_games g
+        JOIN ak_manga_to_game r ON g.id = r.id_game
+        WHERE r.id_manga = ${mangaId} AND r.doublon = 0
+      `).catch(() => []),
+      // Business relations
+      this.prisma.akMangaToBusiness.findMany({
+        where: { idManga: mangaId, doublon: 0 },
+        include: {
+          business: {
+            select: {
+              idBusiness: true,
+              denomination: true,
+              image: true,
+              niceUrl: true,
+            },
+          },
+        },
+      }),
+      // Article relations
+      this.prisma.$queryRawUnsafe(`
+        SELECT a.*, r.relation_type
+        FROM ak_articles a
+        JOIN ak_manga_to_article r ON a.id = r.id_article
+        WHERE r.id_manga = ${mangaId}
+      `).catch(() => []),
+    ]);
+
+    return {
+      anime: animeRelations.map(r => ({
+        id: r.anime.idAnime,
+        title: r.anime.titre,
+        image: r.anime.image,
+        year: r.anime.annee,
+        niceUrl: r.anime.niceUrl,
+        relationType: r.type,
+        precisions: r.precisions,
+        mediaType: 'anime',
+      })),
+      manga: mangaRelations.map(r => ({
+        id: r.relatedManga.idManga,
+        title: r.relatedManga.titre,
+        image: r.relatedManga.image,
+        year: r.relatedManga.annee,
+        niceUrl: r.relatedManga.niceUrl,
+        relationType: r.type,
+        precisions: r.precisions,
+        mediaType: 'manga',
+      })),
+      game: gameRelations,
+      business: businessRelations.map(r => ({
+        id: r.business.idBusiness,
+        title: r.business.denomination,
+        image: r.business.image,
+        niceUrl: r.business.niceUrl,
+        relationType: r.type,
+        precisions: r.precisions,
+        mediaType: 'business',
+      })),
+      article: articleRelations,
+    };
+  }
+
+  /**
+   * Add a cross-media relation to a manga
+   */
+  async addMediaRelation(mangaId: number, dto: AddMediaRelationDto) {
+    // Verify manga exists
+    const manga = await this.prisma.akMangas.findUnique({
+      where: { idManga: mangaId },
+    });
+
+    if (!manga) {
+      throw new NotFoundException(`Manga with ID ${mangaId} not found`);
+    }
+
+    // Add relation based on media type
+    switch (dto.mediaType) {
+      case MediaRelationType.ANIME:
+        // Verify anime exists
+        const anime = await this.prisma.akAnimes.findUnique({
+          where: { idAnime: dto.mediaId },
+        });
+        if (!anime) {
+          throw new NotFoundException(`Anime with ID ${dto.mediaId} not found`);
+        }
+
+        // Create relation
+        return await this.prisma.akMangaToAnime.create({
+          data: {
+            id_manga: mangaId,
+            id_anime: dto.mediaId,
+            type: dto.relationType || 'Adaptation',
+            precisions: dto.precisions,
+            doublon: 0,
+          },
+        });
+
+      case MediaRelationType.MANGA:
+        // Verify related manga exists
+        const relatedManga = await this.prisma.akMangas.findUnique({
+          where: { idManga: dto.mediaId },
+        });
+        if (!relatedManga) {
+          throw new NotFoundException(`Manga with ID ${dto.mediaId} not found`);
+        }
+
+        // Create relation
+        return await this.prisma.akMangaToManga.create({
+          data: {
+            id_manga_1: mangaId,
+            id_manga_2: dto.mediaId,
+            type: dto.relationType || 'Lié',
+            precisions: dto.precisions,
+            doublon: 0,
+          },
+        });
+
+      case MediaRelationType.GAME:
+        // Create game relation (using raw query if table doesn't have Prisma model)
+        await this.prisma.$executeRawUnsafe(`
+          INSERT INTO ak_manga_to_game (id_manga, id_game, type, precisions, doublon)
+          VALUES (${mangaId}, ${dto.mediaId}, '${dto.relationType || 'Adaptation'}', '${dto.precisions || ''}', 0)
+        `);
+        return { success: true, message: 'Game relation created' };
+
+      case MediaRelationType.BUSINESS:
+        // Verify business exists
+        const business = await this.prisma.akBusiness.findUnique({
+          where: { idBusiness: dto.mediaId },
+        });
+        if (!business) {
+          throw new NotFoundException(`Business with ID ${dto.mediaId} not found`);
+        }
+
+        // Create relation
+        return await this.prisma.akMangaToBusiness.create({
+          data: {
+            idManga: mangaId,
+            idBusiness: dto.mediaId,
+            type: dto.relationType || 'Lié',
+            precisions: dto.precisions,
+            doublon: 0,
+          },
+        });
+
+      case MediaRelationType.ARTICLE:
+        // Create article relation (using raw query)
+        await this.prisma.$executeRawUnsafe(`
+          INSERT INTO ak_manga_to_article (id_manga, id_article, relation_type)
+          VALUES (${mangaId}, ${dto.mediaId}, '${dto.relationType || 'Mentionné'}')
+        `);
+        return { success: true, message: 'Article relation created' };
+
+      default:
+        throw new BadRequestException(`Unsupported media type: ${dto.mediaType}`);
+    }
+  }
+
+  /**
+   * Remove a cross-media relation from a manga
+   */
+  async removeMediaRelation(mangaId: number, mediaType: string, mediaId: number) {
+    switch (mediaType) {
+      case 'anime':
+        const animeRelation = await this.prisma.akMangaToAnime.findFirst({
+          where: { id_manga: mangaId, id_anime: mediaId },
+        });
+        if (!animeRelation) {
+          throw new NotFoundException('Anime relation not found');
+        }
+        await this.prisma.akMangaToAnime.delete({
+          where: { idRelation: animeRelation.idRelation },
+        });
+        break;
+
+      case 'manga':
+        const mangaRelation = await this.prisma.akMangaToManga.findFirst({
+          where: { id_manga_1: mangaId, id_manga_2: mediaId },
+        });
+        if (!mangaRelation) {
+          throw new NotFoundException('Manga relation not found');
+        }
+        await this.prisma.akMangaToManga.delete({
+          where: { idRelation: mangaRelation.idRelation },
+        });
+        break;
+
+      case 'game':
+        await this.prisma.$executeRawUnsafe(`
+          DELETE FROM ak_manga_to_game
+          WHERE id_manga = ${mangaId} AND id_game = ${mediaId}
+        `);
+        break;
+
+      case 'business':
+        const businessRelation = await this.prisma.akMangaToBusiness.findFirst({
+          where: { idManga: mangaId, idBusiness: mediaId },
+        });
+        if (!businessRelation) {
+          throw new NotFoundException('Business relation not found');
+        }
+        await this.prisma.akMangaToBusiness.delete({
+          where: { idRelation: businessRelation.idRelation },
+        });
+        break;
+
+      case 'article':
+        await this.prisma.$executeRawUnsafe(`
+          DELETE FROM ak_manga_to_article
+          WHERE id_manga = ${mangaId} AND id_article = ${mediaId}
+        `);
+        break;
+
+      default:
+        throw new BadRequestException(`Unsupported media type: ${mediaType}`);
+    }
+
+    return { success: true, message: 'Relation removed successfully' };
   }
 }

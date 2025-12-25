@@ -31,6 +31,7 @@ import { GoogleBooksService } from './google-books.service';
 import { CreateMangaDto } from './dto/create-manga.dto';
 import { UpdateMangaDto } from './dto/update-manga.dto';
 import { MangaQueryDto } from './dto/manga-query.dto';
+import { AddMediaRelationDto } from './dto/add-media-relation.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { OptionalJwtAuthGuard } from '../../common/guards/optional-jwt-auth.guard';
 import { AdminGuard } from '../../common/guards/admin.guard';
@@ -599,5 +600,54 @@ export class MangasController {
 
     // Create volume with the book data
     return this.mangasService.upsertVolumeFromIsbn(mangaId, isbn, bookData);
+  }
+
+  // ==================== CROSS-MEDIA RELATIONS ENDPOINTS ====================
+
+  @Get(':id/media-relations')
+  @ApiOperation({ summary: 'Get all cross-media relations for a manga' })
+  @ApiParam({ name: 'id', description: 'Manga ID' })
+  @ApiResponse({ status: 200, description: 'Returns all media relations' })
+  @ApiResponse({ status: 404, description: 'Manga not found' })
+  async getMediaRelations(@Param('id', ParseIntPipe) mangaId: number) {
+    return this.mangasService.getMediaRelations(mangaId);
+  }
+
+  @Post(':id/media-relations')
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Add a cross-media relation to a manga (Admin only)' })
+  @ApiParam({ name: 'id', description: 'Manga ID' })
+  @ApiBody({ type: AddMediaRelationDto })
+  @ApiResponse({ status: 201, description: 'Media relation created successfully' })
+  @ApiResponse({ status: 400, description: 'Invalid data' })
+  @ApiResponse({ status: 401, description: 'Authentication required' })
+  @ApiResponse({ status: 403, description: 'Admin rights required' })
+  @ApiResponse({ status: 404, description: 'Manga or related media not found' })
+  async addMediaRelation(
+    @Param('id', ParseIntPipe) mangaId: number,
+    @Body() addMediaRelationDto: AddMediaRelationDto,
+  ) {
+    return this.mangasService.addMediaRelation(mangaId, addMediaRelationDto);
+  }
+
+  @Delete(':id/media-relations/:mediaType/:mediaId')
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Remove a cross-media relation from a manga (Admin only)' })
+  @ApiParam({ name: 'id', description: 'Manga ID' })
+  @ApiParam({ name: 'mediaType', description: 'Type of related media', enum: ['anime', 'manga', 'game', 'business', 'article'] })
+  @ApiParam({ name: 'mediaId', description: 'ID of related media' })
+  @ApiResponse({ status: 204, description: 'Media relation deleted successfully' })
+  @ApiResponse({ status: 401, description: 'Authentication required' })
+  @ApiResponse({ status: 403, description: 'Admin rights required' })
+  @ApiResponse({ status: 404, description: 'Media relation not found' })
+  async removeMediaRelation(
+    @Param('id', ParseIntPipe) mangaId: number,
+    @Param('mediaType') mediaType: string,
+    @Param('mediaId', ParseIntPipe) mediaId: number,
+  ) {
+    return this.mangasService.removeMediaRelation(mangaId, mediaType, mediaId);
   }
 }
