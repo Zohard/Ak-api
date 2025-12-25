@@ -24,6 +24,16 @@ import {
 export class ArticleRelationsController {
   constructor(private readonly service: ArticleRelationsService) {}
 
+  @Get('article/:wpId')
+  @ApiOperation({ summary: 'Get all anime/manga/business related to an article' })
+  @ApiResponse({
+    status: 200,
+    description: 'List of entities linked to this article',
+  })
+  getArticleRelations(@Param('wpId', ParseIntPipe) wpId: number) {
+    return this.service.getArticleRelations(wpId);
+  }
+
   @Get('anime/:id')
   @ApiOperation({ summary: 'Get articles related to an anime' })
   @ApiResponse({

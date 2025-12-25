@@ -12,6 +12,44 @@ export class ArticleRelationsService {
   constructor(private prisma: PrismaService) {}
 
   /**
+   * Get all anime/manga/business related to an article
+   */
+  async getArticleRelations(idWpArticle: number) {
+    const relations = await this.prisma.akWebzineToFiches.findMany({
+      where: {
+        idWpArticle: BigInt(idWpArticle),
+      },
+      include: {
+        anime: {
+          select: {
+            idAnime: true,
+            titre: true,
+          },
+        },
+        manga: {
+          select: {
+            idManga: true,
+            titre: true,
+          },
+        },
+        business: {
+          select: {
+            idBusiness: true,
+            nom: true,
+          },
+        },
+      },
+    });
+
+    return relations.map((rel) => ({
+      idRelation: rel.idRelation,
+      idFiche: rel.idFiche,
+      type: rel.type,
+      ficheTitle: rel.anime?.titre || rel.manga?.titre || rel.business?.nom || 'Unknown',
+    }));
+  }
+
+  /**
    * Get all articles related to an anime/manga/business
    */
   async getRelations(idFiche: number, type: 'anime' | 'manga' | 'business') {
