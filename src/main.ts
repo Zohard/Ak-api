@@ -32,11 +32,12 @@ async function bootstrap() {
   // CORS configuration
   app.enableCors({
     origin: [
-      'http://localhost:3000', // Frontend dev
-      'http://localhost:3001', // Frontend prod  
+      'http://localhost:3000', // Nuxt frontend dev
+      'http://localhost:3001', // AI orchestrator dev
       'http://localhost:3003', // Frontend dev alternate port
-      configService.get('FRONTEND_URL'),
-      configService.get('CORS_ORIGIN'),
+      configService.get('FRONTEND_URL'), // Production frontend
+      configService.get('CORS_ORIGIN'), // Additional CORS origins
+      configService.get('AI_ORCHESTRATOR_URL'), // Production AI orchestrator
     ].filter(Boolean),
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'HEAD', 'PATCH'],
@@ -48,6 +49,7 @@ async function bootstrap() {
       'Origin',
       'X-Current-Page',
       'X-Page-Path',
+      'X-User-Id', // Add this for AI orchestrator
     ],
   });
 
