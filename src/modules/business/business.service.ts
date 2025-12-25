@@ -499,6 +499,83 @@ export class BusinessService {
     });
   }
 
+  async getBusinessArticles(id: number) {
+    // First check if business exists
+    const business = await this.prisma.akBusiness.findUnique({
+      where: { idBusiness: id, statut: 1 },
+      select: { idBusiness: true },
+    });
+
+    if (!business) {
+      throw new NotFoundException('Entité business introuvable');
+    }
+
+    // Get articles linked to this business
+    const articles = await this.prisma.akWebzineToFiches.findMany({
+      where: {
+        idFiche: id,
+        type: 'business',
+      },
+      include: {
+        wpPost: {
+          select: {
+            ID: true,
+            postTitle: true,
+            postContent: true,
+            postExcerpt: true,
+            postDate: true,
+            postName: true,
+            postStatus: true,
+            postMeta: {
+              where: {
+                metaKey: {
+                  in: ['imgunebig', 'imgunebig2', 'ak_img', 'img'],
+                },
+              },
+              select: {
+                metaKey: true,
+                metaValue: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: {
+        idRelation: 'desc',
+      },
+    });
+
+    // Format the response
+    return articles
+      .filter((article) => article.wpPost !== null && article.wpPost.postStatus === 'publish')
+      .map((article) => {
+        // TypeScript now knows wpPost is not null due to the filter above
+        const post = article.wpPost!;
+
+        // Extract cover image from postMeta (prioritize imgunebig like ArticleCard)
+        const imgunebigMeta = post.postMeta.find(meta => meta.metaKey === 'imgunebig');
+        const imgunebig2Meta = post.postMeta.find(meta => meta.metaKey === 'imgunebig2');
+        const akImgMeta = post.postMeta.find(meta => meta.metaKey === 'ak_img');
+        const imgMeta = post.postMeta.find(meta => meta.metaKey === 'img');
+
+        const coverImage = imgunebigMeta?.metaValue ||
+                          imgunebig2Meta?.metaValue ||
+                          akImgMeta?.metaValue ||
+                          imgMeta?.metaValue ||
+                          null;
+
+        return {
+          id: post.ID,
+          title: post.postTitle,
+          excerpt: post.postExcerpt,
+          content: post.postContent,
+          date: post.postDate,
+          slug: post.postName,
+          coverImage,
+        };
+      });
+  }
+
   async uploadImageFromUrl(imageUrl: string) {
     try {
       // Download the image from the URL

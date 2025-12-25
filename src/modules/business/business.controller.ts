@@ -214,6 +214,27 @@ export class BusinessController {
     return this.businessService.getRelatedBusinesses(id);
   }
 
+  @Get(':id/articles')
+  @ApiOperation({
+    summary: 'Articles webzine liés à une entité business',
+    description: "Récupère tous les articles du webzine liés à une entité business",
+  })
+  @ApiParam({
+    name: 'id',
+    description: "ID de l'entité business",
+    type: 'number',
+  })
+  @ApiResponse({ status: 200, description: 'Liste des articles' })
+  @ApiResponse({ status: 404, description: 'Entité business introuvable' })
+  async getBusinessArticles(@Param('id', ParseIntPipe) id: number) {
+    try {
+      return await this.businessService.getBusinessArticles(id);
+    } catch (error) {
+      console.error('Controller error in getBusinessArticles:', error);
+      throw error;
+    }
+  }
+
   @Patch(':id')
   @UseGuards(JwtAuthGuard, AdminGuard)
   @ApiBearerAuth()
