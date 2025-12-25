@@ -160,10 +160,26 @@ export class BusinessController {
     description: "ID de l'entité business",
     type: 'number',
   })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    description: 'Page number (starts at 1)',
+    type: 'number',
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    description: 'Items per page',
+    type: 'number',
+  })
   @ApiResponse({ status: 200, description: "Liste des animes liés" })
   @ApiResponse({ status: 404, description: 'Entité business introuvable' })
-  async getRelatedAnimes(@Param('id', ParseIntPipe) id: number) {
-    return this.businessService.getRelatedAnimes(id);
+  async getRelatedAnimes(
+    @Param('id', ParseIntPipe) id: number,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+  ) {
+    return this.businessService.getRelatedAnimes(id, page, limit);
   }
 
   @Get(':id/mangas')
@@ -176,10 +192,26 @@ export class BusinessController {
     description: "ID de l'entité business",
     type: 'number',
   })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    description: 'Page number (starts at 1)',
+    type: 'number',
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    description: 'Items per page',
+    type: 'number',
+  })
   @ApiResponse({ status: 200, description: "Liste des mangas liés" })
   @ApiResponse({ status: 404, description: 'Entité business introuvable' })
-  async getRelatedMangas(@Param('id', ParseIntPipe) id: number) {
-    return this.businessService.getRelatedMangas(id);
+  async getRelatedMangas(
+    @Param('id', ParseIntPipe) id: number,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+  ) {
+    return this.businessService.getRelatedMangas(id, page, limit);
   }
 
   @Get(':id/jeux-video')

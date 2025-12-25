@@ -256,17 +256,37 @@ export class BusinessService {
     return this.formatBusiness(updatedBusiness);
   }
 
-  async getRelatedAnimes(businessId: number) {
-    // Get anime IDs related to this business
+  async getRelatedAnimes(businessId: number, page?: number, limit?: number) {
+    // Get total count first
+    const countResult = await this.prisma.$queryRaw<Array<{ count: bigint }>>`
+      SELECT COUNT(*)::int as count
+      FROM ak_business_to_animes
+      WHERE id_business = ${businessId}
+        AND doublon = 0
+    `;
+    const total = Number(countResult[0]?.count || 0);
+
+    if (total === 0) {
+      return { data: [], pagination: { total, page: 1, limit: limit || 18, hasMore: false } };
+    }
+
+    // Calculate pagination
+    const currentPage = page || 1;
+    const pageLimit = limit || 18;
+    const offset = (currentPage - 1) * pageLimit;
+
+    // Get anime IDs related to this business with pagination
     const relations = await this.prisma.$queryRaw<Array<{ id_anime: number; type: string; precisions: string }>>`
       SELECT id_anime, type, precisions
       FROM ak_business_to_animes
       WHERE id_business = ${businessId}
         AND doublon = 0
+      ORDER BY id_relation
+      LIMIT ${pageLimit} OFFSET ${offset}
     `;
 
     if (!relations || relations.length === 0) {
-      return [];
+      return { data: [], pagination: { total, page: currentPage, limit: pageLimit, hasMore: false } };
     }
 
     const animeIds = relations.map(r => r.id_anime);
@@ -290,7 +310,7 @@ export class BusinessService {
     `;
 
     // Combine anime data with relation info
-    return animes.map(anime => {
+    const data = animes.map(anime => {
       const relation = relations.find(r => r.id_anime === anime.id_anime);
       return {
         id: anime.id_anime,
@@ -307,19 +327,49 @@ export class BusinessService {
         relationDetails: relation?.precisions
       };
     });
+
+    return {
+      data,
+      pagination: {
+        total,
+        page: currentPage,
+        limit: pageLimit,
+        hasMore: offset + data.length < total
+      }
+    };
   }
 
-  async getRelatedMangas(businessId: number) {
-    // Get manga IDs related to this business
+  async getRelatedMangas(businessId: number, page?: number, limit?: number) {
+    // Get total count first
+    const countResult = await this.prisma.$queryRaw<Array<{ count: bigint }>>`
+      SELECT COUNT(*)::int as count
+      FROM ak_business_to_mangas
+      WHERE id_business = ${businessId}
+        AND doublon = 0
+    `;
+    const total = Number(countResult[0]?.count || 0);
+
+    if (total === 0) {
+      return { data: [], pagination: { total, page: 1, limit: limit || 18, hasMore: false } };
+    }
+
+    // Calculate pagination
+    const currentPage = page || 1;
+    const pageLimit = limit || 18;
+    const offset = (currentPage - 1) * pageLimit;
+
+    // Get manga IDs related to this business with pagination
     const relations = await this.prisma.$queryRaw<Array<{ id_manga: number; type: string; precisions: string }>>`
       SELECT id_manga, type, precisions
       FROM ak_business_to_mangas
       WHERE id_business = ${businessId}
         AND doublon = 0
+      ORDER BY id_relation
+      LIMIT ${pageLimit} OFFSET ${offset}
     `;
 
     if (!relations || relations.length === 0) {
-      return [];
+      return { data: [], pagination: { total, page: currentPage, limit: pageLimit, hasMore: false } };
     }
 
     const mangaIds = relations.map(r => r.id_manga);
@@ -342,7 +392,7 @@ export class BusinessService {
     `;
 
     // Combine manga data with relation info
-    return mangas.map(manga => {
+    const data = mangas.map(manga => {
       const relation = relations.find(r => r.id_manga === manga.id_manga);
       return {
         id: manga.id_manga,
@@ -358,6 +408,16 @@ export class BusinessService {
         relationDetails: relation?.precisions
       };
     });
+
+    return {
+      data,
+      pagination: {
+        total,
+        page: currentPage,
+        limit: pageLimit,
+        hasMore: offset + data.length < total
+      }
+    };
   }
 
   async getRelatedGames(businessId: number) {
