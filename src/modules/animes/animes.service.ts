@@ -346,7 +346,7 @@ export class AnimesService extends BaseContentService<
               denomination: true,
               niceUrl: true,
               image: true,
-              presentation: true,
+              notes: true,
             },
           },
         },

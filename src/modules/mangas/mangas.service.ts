@@ -341,7 +341,7 @@ export class MangasService extends BaseContentService<
               denomination: true,
               niceUrl: true,
               image: true,
-              presentation: true,
+              notes: true,
             },
           },
         },
