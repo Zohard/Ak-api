@@ -19,34 +19,47 @@ export class ArticleRelationsService {
       where: {
         idWpArticle: BigInt(idWpArticle),
       },
-      include: {
-        anime: {
-          select: {
-            idAnime: true,
-            titre: true,
-          },
-        },
-        manga: {
-          select: {
-            idManga: true,
-            titre: true,
-          },
-        },
-        business: {
-          select: {
-            idBusiness: true,
-            denomination: true,
-          },
-        },
-      },
     });
 
-    return relations.map((rel) => ({
-      idRelation: rel.idRelation,
-      idFiche: rel.idFiche,
-      type: rel.type,
-      ficheTitle: rel.anime?.titre || rel.manga?.titre || rel.business?.denomination || 'Unknown',
-    }));
+    // Fetch titles separately based on type to avoid foreign key issues
+    const results = await Promise.all(
+      relations.map(async (rel) => {
+        let ficheTitle = 'Unknown';
+
+        try {
+          if (rel.type === 'anime') {
+            const anime = await this.prisma.akAnime.findUnique({
+              where: { idAnime: rel.idFiche },
+              select: { titre: true },
+            });
+            ficheTitle = anime?.titre || 'Unknown';
+          } else if (rel.type === 'manga') {
+            const manga = await this.prisma.akManga.findUnique({
+              where: { idManga: rel.idFiche },
+              select: { titre: true },
+            });
+            ficheTitle = manga?.titre || 'Unknown';
+          } else if (rel.type === 'business') {
+            const business = await this.prisma.akBusiness.findUnique({
+              where: { idBusiness: rel.idFiche },
+              select: { denomination: true },
+            });
+            ficheTitle = business?.denomination || 'Unknown';
+          }
+        } catch (error) {
+          console.error(`Error fetching title for ${rel.type} ${rel.idFiche}:`, error);
+        }
+
+        return {
+          idRelation: rel.idRelation,
+          idFiche: rel.idFiche,
+          type: rel.type,
+          ficheTitle,
+        };
+      }),
+    );
+
+    return results;
   }
 
   /**
