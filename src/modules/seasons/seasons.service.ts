@@ -43,22 +43,51 @@ export class SeasonsService {
         return cached;
       }
 
+      // Current season = last created entry with statut=1 (ordered by id_saison DESC)
       const currentSeason = await this.prisma.$queryRaw`
         SELECT id_saison, saison, annee, statut, json_data
         FROM ak_animes_saisons
         WHERE statut = 1
-        ORDER BY annee DESC, saison DESC
+        ORDER BY id_saison DESC
         LIMIT 1
       `;
-      
+
       const result = Array.isArray(currentSeason) && currentSeason.length > 0 ? currentSeason[0] : null;
-      
+
       // Cache for 30 minutes (1800 seconds) - current season is frequently accessed
       await this.cacheService.set('seasons:current', result, 1800);
-      
+
       return result;
     } catch (error) {
       this.logger.error('Error fetching current season:', error);
+      throw error;
+    }
+  }
+
+  async findLastCreated() {
+    try {
+      // Try to get from cache first
+      const cached = await this.cacheService.get('seasons:last-created');
+      if (cached) {
+        return cached;
+      }
+
+      // Last created season = most recent entry regardless of status (ordered by id_saison DESC)
+      const lastSeason = await this.prisma.$queryRaw`
+        SELECT id_saison, saison, annee, statut, json_data
+        FROM ak_animes_saisons
+        ORDER BY id_saison DESC
+        LIMIT 1
+      `;
+
+      const result = Array.isArray(lastSeason) && lastSeason.length > 0 ? lastSeason[0] : null;
+
+      // Cache for 30 minutes (1800 seconds)
+      await this.cacheService.set('seasons:last-created', result, 1800);
+
+      return result;
+    } catch (error) {
+      this.logger.error('Error fetching last created season:', error);
       throw error;
     }
   }

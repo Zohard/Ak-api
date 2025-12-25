@@ -26,6 +26,7 @@ export class SeasonsController {
     }));
   }
 
+  // IMPORTANT: Specific routes must come BEFORE :id route
   @Get('current')
   async getCurrentSeason() {
     const season = await this.seasonsService.findCurrent();
@@ -47,6 +48,38 @@ export class SeasonsController {
     };
   }
 
+  @Get('last-created')
+  async getLastCreatedSeason() {
+    const season = await this.seasonsService.findLastCreated();
+    if (!season) {
+      return null;
+    }
+
+    // Map season number to French season name
+    const saisonMap: Record<number, string> = {
+      1: 'hiver',
+      2: 'printemps',
+      3: 'été',
+      4: 'automne'
+    };
+
+    return {
+      ...season,
+      nom_saison: saisonMap[season.saison] || 'été'
+    };
+  }
+
+  // More specific parameterized routes come FIRST
+  @Get(':id/animes')
+  async getSeasonAnimes(@Param('id', ParseIntPipe) id: number) {
+    const season = await this.seasonsService.findById(id);
+    if (!season) {
+      throw new NotFoundException(`Season with ID ${id} not found`);
+    }
+    return this.seasonsService.getSeasonAnimes(id);
+  }
+
+  // Generic :id route must be LAST among parameterized routes
   @Get(':id')
   async getSeasonById(@Param('id', ParseIntPipe) id: number) {
     const season = await this.seasonsService.findById(id);
@@ -66,15 +99,6 @@ export class SeasonsController {
       ...season,
       nom_saison: saisonMap[season.saison] || 'été'
     };
-  }
-
-  @Get(':id/animes')
-  async getSeasonAnimes(@Param('id', ParseIntPipe) id: number) {
-    const season = await this.seasonsService.findById(id);
-    if (!season) {
-      throw new NotFoundException(`Season with ID ${id} not found`);
-    }
-    return this.seasonsService.getSeasonAnimes(id);
   }
 
   // Admin endpoints
