@@ -1689,11 +1689,16 @@ export class MangasService extends BaseContentService<
             postDate: true,
             postName: true,
             postStatus: true,
-            images: {
-              select: {
-                urlImg: true,
+            postMeta: {
+              where: {
+                metaKey: {
+                  in: ['imgunebig', 'imgunebig2', 'ak_img', 'img'],
+                },
               },
-              take: 1,
+              select: {
+                metaKey: true,
+                metaValue: true,
+              },
             },
           },
         },
@@ -1709,6 +1714,19 @@ export class MangasService extends BaseContentService<
       .map((article) => {
         // TypeScript now knows wpPost is not null due to the filter above
         const post = article.wpPost!;
+
+        // Extract cover image from postMeta (prioritize imgunebig like ArticleCard)
+        const imgunebigMeta = post.postMeta.find(meta => meta.metaKey === 'imgunebig');
+        const imgunebig2Meta = post.postMeta.find(meta => meta.metaKey === 'imgunebig2');
+        const akImgMeta = post.postMeta.find(meta => meta.metaKey === 'ak_img');
+        const imgMeta = post.postMeta.find(meta => meta.metaKey === 'img');
+
+        const coverImage = imgunebigMeta?.metaValue ||
+                          imgunebig2Meta?.metaValue ||
+                          akImgMeta?.metaValue ||
+                          imgMeta?.metaValue ||
+                          null;
+
         return {
           id: post.ID,
           title: post.postTitle,
@@ -1716,7 +1734,7 @@ export class MangasService extends BaseContentService<
           content: post.postContent,
           date: post.postDate,
           slug: post.postName,
-          coverImage: post.images?.[0]?.urlImg || null,
+          coverImage,
         };
       });
   }
