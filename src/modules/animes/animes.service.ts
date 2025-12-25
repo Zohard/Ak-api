@@ -1204,6 +1204,45 @@ export class AnimesService extends BaseContentService<
         }
       }
 
+      // Fetch article relations from ak_webzine_to_fiches
+      const articleRelations = await this.prisma.akWebzineToFiches.findMany({
+        where: {
+          idFiche: id,
+          type: 'anime',
+        },
+        include: {
+          wpPost: {
+            select: {
+              ID: true,
+              postTitle: true,
+              postName: true,
+              postDate: true,
+              postExcerpt: true,
+              postStatus: true,
+            },
+          },
+        },
+      });
+
+      // Add published articles to related content
+      for (const articleRel of articleRelations) {
+        if (articleRel.wpPost?.postStatus === 'publish') {
+          relatedContent.push({
+            id: Number(articleRel.wpPost.ID),
+            type: 'article',
+            title: articleRel.wpPost.postTitle || 'Sans titre',
+            image: null, // Articles don't have direct images in this table
+            year: null,
+            rating: null,
+            niceUrl: null,
+            relationType: 'article',
+            slug: articleRel.wpPost.postName || '',
+            date: articleRel.wpPost.postDate,
+            excerpt: articleRel.wpPost.postExcerpt || '',
+          });
+        }
+      }
+
       return {
         anime_id: id,
         relations: relatedContent,
