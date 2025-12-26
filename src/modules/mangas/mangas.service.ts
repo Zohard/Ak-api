@@ -2400,42 +2400,42 @@ export class MangasService extends BaseContentService<
       throw new NotFoundException(`Manga with ID ${mangaId} not found`);
     }
 
-    // Get all different types of relations using raw SQL (legacy tables)
+    // Get all different types of relations using raw SQL with ak_fiche_to_fiche
     const [animeRelations, mangaRelations, gameRelations, businessRelations, articleRelations] = await Promise.all([
       // Anime relations
       this.prisma.$queryRawUnsafe<any[]>(`
-        SELECT a.id_anime, a.titre, a.image, a.annee, a.nice_url, r.type, r.precisions
+        SELECT a.id_anime, a.titre, a.image, a.annee, a.nice_url
         FROM ak_animes a
-        JOIN ak_manga_to_anime r ON a.id_anime = r.id_anime
-        WHERE r.id_manga = ${mangaId} AND r.doublon = 0
+        JOIN ak_fiche_to_fiche r ON a.id_anime = r.id_anime
+        WHERE r.id_fiche_depart = 'manga_${mangaId}' AND r.id_anime > 0
       `).catch(() => []),
       // Manga relations
       this.prisma.$queryRawUnsafe<any[]>(`
-        SELECT m.id_manga, m.titre, m.image, m.annee, m.nice_url, r.type, r.precisions
+        SELECT m.id_manga, m.titre, m.image, m.annee, m.nice_url
         FROM ak_mangas m
-        JOIN ak_manga_to_manga r ON m.id_manga = r.id_manga_2
-        WHERE r.id_manga_1 = ${mangaId} AND r.doublon = 0
+        JOIN ak_fiche_to_fiche r ON m.id_manga = r.id_manga
+        WHERE r.id_fiche_depart = 'manga_${mangaId}' AND r.id_manga > 0
       `).catch(() => []),
       // Game relations
       this.prisma.$queryRawUnsafe<any[]>(`
-        SELECT g.id_jeu, g.titre, g.image, g.annee, g.nice_url, r.type, r.precisions
+        SELECT g.id_jeu, g.titre, g.image, g.annee, g.nice_url
         FROM ak_jeux_video g
-        JOIN ak_manga_to_game r ON g.id_jeu = r.id_game
-        WHERE r.id_manga = ${mangaId} AND r.doublon = 0
+        JOIN ak_fiche_to_fiche r ON g.id_jeu = r.id_jeu
+        WHERE r.id_fiche_depart = 'manga_${mangaId}' AND r.id_jeu > 0
       `).catch(() => []),
       // Business relations
       this.prisma.$queryRawUnsafe<any[]>(`
-        SELECT b.id_business, b.denomination, b.image, b.nice_url, r.type, r.precisions
+        SELECT b.id_business, b.denomination, b.image, b.nice_url
         FROM ak_business b
-        JOIN ak_manga_to_business r ON b.id_business = r.id_business
-        WHERE r.id_manga = ${mangaId} AND r.doublon = 0
+        JOIN ak_fiche_to_fiche r ON b.id_business = r.id_business
+        WHERE r.id_fiche_depart = 'manga_${mangaId}' AND r.id_business > 0
       `).catch(() => []),
       // Article relations
       this.prisma.$queryRawUnsafe<any[]>(`
-        SELECT a.id, a.title, a.image, r.relation_type as type
+        SELECT a.id, a.title, a.image
         FROM ak_articles a
-        JOIN ak_manga_to_article r ON a.id = r.id_article
-        WHERE r.id_manga = ${mangaId}
+        JOIN ak_webzine_to_fiches r ON a.id = r.id_article
+        WHERE r.id_fiche = ${mangaId} AND r.type_fiche = 'manga'
       `).catch(() => []),
     ]);
 
@@ -2446,8 +2446,6 @@ export class MangasService extends BaseContentService<
         image: r.image,
         year: r.annee,
         niceUrl: r.nice_url,
-        relationType: r.type,
-        precisions: r.precisions,
         mediaType: 'anime',
       })),
       manga: mangaRelations.map((r: any) => ({
@@ -2456,8 +2454,6 @@ export class MangasService extends BaseContentService<
         image: r.image,
         year: r.annee,
         niceUrl: r.nice_url,
-        relationType: r.type,
-        precisions: r.precisions,
         mediaType: 'manga',
       })),
       game: gameRelations.map((r: any) => ({
@@ -2466,8 +2462,6 @@ export class MangasService extends BaseContentService<
         image: r.image,
         year: r.annee,
         niceUrl: r.nice_url,
-        relationType: r.type,
-        precisions: r.precisions,
         mediaType: 'game',
       })),
       business: businessRelations.map((r: any) => ({
@@ -2475,15 +2469,12 @@ export class MangasService extends BaseContentService<
         title: r.denomination,
         image: r.image,
         niceUrl: r.nice_url,
-        relationType: r.type,
-        precisions: r.precisions,
         mediaType: 'business',
       })),
       article: articleRelations.map((r: any) => ({
         id: r.id,
         title: r.title,
         image: r.image,
-        relationType: r.type,
         mediaType: 'article',
       })),
     };
@@ -2519,10 +2510,10 @@ export class MangasService extends BaseContentService<
           throw new NotFoundException(`Anime with ID ${dto.mediaId} not found`);
         }
 
-        // Create relation
+        // Create relation using ak_fiche_to_fiche
         await this.prisma.$executeRawUnsafe(`
-          INSERT INTO ak_manga_to_anime (id_manga, id_anime, type, precisions, doublon)
-          VALUES (${mangaId}, ${dto.mediaId}, '${escapeString(dto.relationType || 'Adaptation')}', '${escapeString(dto.precisions)}', 0)
+          INSERT INTO ak_fiche_to_fiche (id_fiche_depart, id_anime, id_manga, id_ost, id_jeu, id_business)
+          VALUES ('manga_${mangaId}', ${dto.mediaId}, 0, 0, 0, 0)
         `);
         return { success: true, message: 'Anime relation created' };
 
@@ -2535,10 +2526,10 @@ export class MangasService extends BaseContentService<
           throw new NotFoundException(`Manga with ID ${dto.mediaId} not found`);
         }
 
-        // Create relation
+        // Create relation using ak_fiche_to_fiche
         await this.prisma.$executeRawUnsafe(`
-          INSERT INTO ak_manga_to_manga (id_manga_1, id_manga_2, type, precisions, doublon)
-          VALUES (${mangaId}, ${dto.mediaId}, '${escapeString(dto.relationType || 'Lié')}', '${escapeString(dto.precisions)}', 0)
+          INSERT INTO ak_fiche_to_fiche (id_fiche_depart, id_anime, id_manga, id_ost, id_jeu, id_business)
+          VALUES ('manga_${mangaId}', 0, ${dto.mediaId}, 0, 0, 0)
         `);
         return { success: true, message: 'Manga relation created' };
 
@@ -2551,10 +2542,10 @@ export class MangasService extends BaseContentService<
           throw new NotFoundException(`Game with ID ${dto.mediaId} not found`);
         }
 
-        // Create game relation
+        // Create game relation using ak_fiche_to_fiche
         await this.prisma.$executeRawUnsafe(`
-          INSERT INTO ak_manga_to_game (id_manga, id_game, type, precisions, doublon)
-          VALUES (${mangaId}, ${dto.mediaId}, '${escapeString(dto.relationType || 'Adaptation')}', '${escapeString(dto.precisions)}', 0)
+          INSERT INTO ak_fiche_to_fiche (id_fiche_depart, id_anime, id_manga, id_ost, id_jeu, id_business)
+          VALUES ('manga_${mangaId}', 0, 0, 0, ${dto.mediaId}, 0)
         `);
         return { success: true, message: 'Game relation created' };
 
@@ -2567,18 +2558,18 @@ export class MangasService extends BaseContentService<
           throw new NotFoundException(`Business with ID ${dto.mediaId} not found`);
         }
 
-        // Create relation
+        // Create relation using ak_fiche_to_fiche
         await this.prisma.$executeRawUnsafe(`
-          INSERT INTO ak_manga_to_business (id_manga, id_business, type, precisions, doublon)
-          VALUES (${mangaId}, ${dto.mediaId}, '${escapeString(dto.relationType || 'Lié')}', '${escapeString(dto.precisions)}', 0)
+          INSERT INTO ak_fiche_to_fiche (id_fiche_depart, id_anime, id_manga, id_ost, id_jeu, id_business)
+          VALUES ('manga_${mangaId}', 0, 0, 0, 0, ${dto.mediaId})
         `);
         return { success: true, message: 'Business relation created' };
 
       case MediaRelationType.ARTICLE:
-        // Create article relation
+        // Create article relation using ak_webzine_to_fiches
         await this.prisma.$executeRawUnsafe(`
-          INSERT INTO ak_manga_to_article (id_manga, id_article, relation_type)
-          VALUES (${mangaId}, ${dto.mediaId}, '${escapeString(dto.relationType || 'Mentionné')}')
+          INSERT INTO ak_webzine_to_fiches (id_article, id_fiche, type_fiche)
+          VALUES (${dto.mediaId}, ${mangaId}, 'manga')
         `);
         return { success: true, message: 'Article relation created' };
 
@@ -2591,40 +2582,40 @@ export class MangasService extends BaseContentService<
    * Remove a cross-media relation from a manga
    */
   async removeMediaRelation(mangaId: number, mediaType: string, mediaId: number) {
-    // Use raw SQL for all relation types (legacy tables)
+    // Use raw SQL for all relation types using ak_fiche_to_fiche
     switch (mediaType) {
       case 'anime':
         await this.prisma.$executeRawUnsafe(`
-          DELETE FROM ak_manga_to_anime
-          WHERE id_manga = ${mangaId} AND id_anime = ${mediaId}
+          DELETE FROM ak_fiche_to_fiche
+          WHERE id_fiche_depart = 'manga_${mangaId}' AND id_anime = ${mediaId}
         `);
         break;
 
       case 'manga':
         await this.prisma.$executeRawUnsafe(`
-          DELETE FROM ak_manga_to_manga
-          WHERE id_manga_1 = ${mangaId} AND id_manga_2 = ${mediaId}
+          DELETE FROM ak_fiche_to_fiche
+          WHERE id_fiche_depart = 'manga_${mangaId}' AND id_manga = ${mediaId}
         `);
         break;
 
       case 'game':
         await this.prisma.$executeRawUnsafe(`
-          DELETE FROM ak_manga_to_game
-          WHERE id_manga = ${mangaId} AND id_game = ${mediaId}
+          DELETE FROM ak_fiche_to_fiche
+          WHERE id_fiche_depart = 'manga_${mangaId}' AND id_jeu = ${mediaId}
         `);
         break;
 
       case 'business':
         await this.prisma.$executeRawUnsafe(`
-          DELETE FROM ak_manga_to_business
-          WHERE id_manga = ${mangaId} AND id_business = ${mediaId}
+          DELETE FROM ak_fiche_to_fiche
+          WHERE id_fiche_depart = 'manga_${mangaId}' AND id_business = ${mediaId}
         `);
         break;
 
       case 'article':
         await this.prisma.$executeRawUnsafe(`
-          DELETE FROM ak_manga_to_article
-          WHERE id_manga = ${mangaId} AND id_article = ${mediaId}
+          DELETE FROM ak_webzine_to_fiches
+          WHERE id_fiche = ${mangaId} AND id_article = ${mediaId} AND type_fiche = 'manga'
         `);
         break;
 
