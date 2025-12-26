@@ -2392,7 +2392,7 @@ export class MangasService extends BaseContentService<
    * Get all cross-media relations for a manga
    */
   async getMediaRelations(mangaId: number) {
-    const manga = await this.prisma.akMangas.findUnique({
+    const manga = await this.prisma.akManga.findUnique({
       where: { idManga: mangaId },
     });
 
@@ -2502,7 +2502,7 @@ export class MangasService extends BaseContentService<
    */
   async addMediaRelation(mangaId: number, dto: AddMediaRelationDto) {
     // Verify manga exists
-    const manga = await this.prisma.akMangas.findUnique({
+    const manga = await this.prisma.akManga.findUnique({
       where: { idManga: mangaId },
     });
 
@@ -2534,7 +2534,7 @@ export class MangasService extends BaseContentService<
 
       case MediaRelationType.MANGA:
         // Verify related manga exists
-        const relatedManga = await this.prisma.akMangas.findUnique({
+        const relatedManga = await this.prisma.akManga.findUnique({
           where: { idManga: dto.mediaId },
         });
         if (!relatedManga) {

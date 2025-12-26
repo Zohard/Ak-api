@@ -1,4 +1,5 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { PrismaService } from './prisma.service';
 
 interface IgdbGame {
   id: number;
@@ -49,7 +50,7 @@ export class IgdbService {
   private accessToken: string | null = null;
   private tokenExpiry: number = 0;
 
-  constructor() {
+  constructor(private prisma: PrismaService) {
     this.clientId = process.env.IGDB_CLIENT_ID || '';
     this.clientSecret = process.env.IGDB_CLIENT_SECRET || '';
 
@@ -223,5 +224,123 @@ export class IgdbService {
       default:
         return null;
     }
+  }
+
+  /**
+   * Import a game from IGDB to local database
+   */
+  async importGame(igdbId: number) {
+    // Fetch game data from IGDB
+    const igdbGame = await this.getGameById(igdbId);
+    if (!igdbGame) {
+      throw new NotFoundException(`Game with IGDB ID ${igdbId} not found`);
+    }
+
+    this.logger.log(`Importing game: ${igdbGame.name} (IGDB ID: ${igdbId})`);
+
+    // Check if game already exists
+    const existing = await this.prisma.$queryRaw<Array<{ idJeu: number }>>`
+      SELECT id_jeu as "idJeu" FROM ak_jeux_video WHERE igdb_id = ${igdbId}
+    `;
+
+    if (existing && existing.length > 0) {
+      this.logger.warn(`Game already exists with ID ${existing[0].idJeu}`);
+      return this.prisma.akJeuxVideo.findUnique({
+        where: { idJeu: existing[0].idJeu },
+      });
+    }
+
+    // Download cover image if available
+    let coverImageBase64: string | null = null;
+    if (igdbGame.cover?.image_id) {
+      const imageBuffer = await this.downloadCoverImage(igdbGame.cover.image_id);
+      if (imageBuffer) {
+        coverImageBase64 = imageBuffer.toString('base64');
+      }
+    }
+
+    // Extract first release date
+    const firstReleaseYear = igdbGame.first_release_date
+      ? new Date(igdbGame.first_release_date * 1000).getFullYear()
+      : 0;
+
+    // Extract release dates by region
+    let dateSortieJapon: Date | null = null;
+    let dateSortieUsa: Date | null = null;
+    let dateSortieEurope: Date | null = null;
+    let dateSortieWorldwide: Date | null = null;
+
+    if (igdbGame.release_dates) {
+      for (const releaseDate of igdbGame.release_dates) {
+        if (releaseDate.date) {
+          const date = new Date(releaseDate.date * 1000);
+          const region = this.mapRegion(releaseDate.region);
+
+          switch (region) {
+            case 'japon':
+              if (!dateSortieJapon) dateSortieJapon = date;
+              break;
+            case 'usa':
+              if (!dateSortieUsa) dateSortieUsa = date;
+              break;
+            case 'europe':
+              if (!dateSortieEurope) dateSortieEurope = date;
+              break;
+            case 'worldwide':
+              if (!dateSortieWorldwide) dateSortieWorldwide = date;
+              break;
+          }
+        }
+      }
+    }
+
+    // Extract developers and publishers
+    const developers: string[] = [];
+    const publishers: string[] = [];
+
+    if (igdbGame.involved_companies) {
+      for (const company of igdbGame.involved_companies) {
+        if (company.developer && company.company?.name) {
+          developers.push(company.company.name);
+        }
+        if (company.publisher && company.company?.name) {
+          publishers.push(company.company.name);
+        }
+      }
+    }
+
+    // Create nice URL from title
+    const niceUrl = igdbGame.name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '');
+
+    // Create game in database
+    const game = await this.prisma.akJeuxVideo.create({
+      data: {
+        titre: igdbGame.name,
+        niceUrl,
+        image: coverImageBase64 ? `data:image/jpeg;base64,${coverImageBase64}` : null,
+        annee: firstReleaseYear,
+        dateSortieJapon,
+        dateSortieUsa,
+        dateSortieEurope,
+        dateSortieWorldwide,
+        developpeur: developers.length > 0 ? developers.join(', ') : null,
+        editeur: publishers.length > 0 ? publishers.join(', ') : null,
+        plateforme: igdbGame.platforms?.map(p => p.abbreviation || p.name).join(', ') || null,
+        presentation: igdbGame.summary || null,
+        statut: 1, // Published
+        nbClicsDay: 0,
+        nbClicsWeek: 0,
+        nbClicsMonth: 0,
+        dateModification: Math.floor(Date.now() / 1000),
+        igdbId: igdbId,
+      },
+    });
+
+    this.logger.log(`Game imported successfully: ${game.titre} (ID: ${game.idJeu})`);
+
+    return game;
   }
 }
