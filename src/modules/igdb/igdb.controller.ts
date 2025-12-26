@@ -3,11 +3,11 @@ import {
   Get,
   Post,
   Query,
-  Body,
+  Param,
   ParseIntPipe,
   BadRequestException,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiQuery, ApiBody } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
 import { IgdbService } from '../../shared/services/igdb.service';
 
 @ApiTags('IGDB')
@@ -50,24 +50,11 @@ export class IgdbController {
     }));
   }
 
-  @Post('import')
+  @Post('import/:id')
   @ApiOperation({ summary: 'Import a game from IGDB to local database' })
-  @ApiBody({
-    schema: {
-      type: 'object',
-      properties: {
-        igdbId: { type: 'number', description: 'IGDB game ID' },
-      },
-      required: ['igdbId'],
-    },
-  })
   @ApiResponse({ status: 201, description: 'Game imported successfully' })
   @ApiResponse({ status: 400, description: 'Invalid request' })
-  async import(@Body('igdbId', ParseIntPipe) igdbId: number) {
-    if (!igdbId) {
-      throw new BadRequestException('IGDB ID is required');
-    }
-
+  async import(@Param('id', ParseIntPipe) igdbId: number) {
     const game = await this.igdbService.importGame(igdbId);
     return game;
   }
