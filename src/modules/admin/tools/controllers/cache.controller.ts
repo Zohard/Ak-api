@@ -14,7 +14,7 @@ import { CacheService } from '../../../../shared/services/cache.service';
 
 @Controller('admin/cache')
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles('super_admin')
+@Roles('admin')
 export class AdminCacheController {
   constructor(private readonly cacheService: CacheService) {}
 
