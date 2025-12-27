@@ -1,6 +1,7 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../../shared/services/prisma.service';
 import { ImageKitService } from '../../media/imagekit.service';
+import { MediaService } from '../../media/media.service';
 import { AdminLoggingService } from '../logging/admin-logging.service';
 import {
   AdminMangaListQueryDto,
@@ -13,8 +14,42 @@ export class AdminMangasService {
   constructor(
     private prisma: PrismaService,
     private imageKitService: ImageKitService,
+    private mediaService: MediaService,
     private adminLogging: AdminLoggingService,
   ) {}
+
+  /**
+   * Upload external image URL to ImageKit
+   * Returns the full ImageKit URL if successful
+   * Throws BadRequestException if upload fails
+   */
+  private async uploadExternalImageToImageKit(imageUrl: string, title?: string): Promise<string> {
+    // Only process external URLs (not already ImageKit URLs)
+    if (!imageUrl || !imageUrl.startsWith('http') || imageUrl.includes('imagekit.io')) {
+      return imageUrl;
+    }
+
+    try {
+      const result = await this.mediaService.uploadImageFromUrl(
+        imageUrl,
+        'manga',
+        undefined, // relatedId
+        false, // saveAsScreenshot
+        title // title for filename generation
+      );
+      // Return the full ImageKit URL
+      return result.url;
+    } catch (error) {
+      console.error('[AdminMangasService] Failed to upload external image to ImageKit:', {
+        imageUrl,
+        title,
+        error: error.message,
+        stack: error.stack
+      });
+      // Throw error instead of silently falling back to prevent saving external URLs
+      throw new BadRequestException(`Failed to upload image to ImageKit: ${error.message}`);
+    }
+  }
 
   async list(query: AdminMangaListQueryDto) {
     const { page = 1, limit = 20, search, annee, ficheComplete, statut } = query;
@@ -102,6 +137,20 @@ export class AdminMangasService {
   async create(dto: CreateAdminMangaDto, username?: string) {
     const data: any = { ...dto };
     if (!data.niceUrl && data.titre) data.niceUrl = this.slugify(data.titre);
+
+    // Upload external image to ImageKit if present
+    if (data.image && data.image.startsWith('http')) {
+      data.image = await this.uploadExternalImageToImageKit(data.image, data.titre);
+    }
+
+    // Map nbVolumes (string) to nbVol (int) if valid number
+    if (data.nbVolumes) {
+      const nbVolInt = parseInt(data.nbVolumes, 10);
+      if (!isNaN(nbVolInt) && nbVolInt > 0) {
+        data.nbVol = nbVolInt;
+      }
+    }
+
     const created = await this.prisma.akManga.create({ data });
 
     // Log the creation
@@ -118,6 +167,25 @@ export class AdminMangasService {
     const { addSynopsisAttribution, ...rest } = dto as any;
     const data: any = { ...rest };
     if (dto.titre && !dto.niceUrl) data.niceUrl = this.slugify(dto.titre);
+
+    // Upload external image to ImageKit if present
+    if (data.image && data.image.startsWith('http')) {
+      data.image = await this.uploadExternalImageToImageKit(data.image, data.titre || existing.titre);
+    }
+
+    // Map nbVolumes (string) to nbVol (int) if valid number
+    if (data.nbVolumes !== undefined) {
+      if (data.nbVolumes) {
+        const nbVolInt = parseInt(data.nbVolumes, 10);
+        if (!isNaN(nbVolInt) && nbVolInt > 0) {
+          data.nbVol = nbVolInt;
+        } else {
+          data.nbVol = null;
+        }
+      } else {
+        data.nbVol = null;
+      }
+    }
 
     // Handle synopsis validation - append user attribution if synopsis is being updated
     if (dto.synopsis && user?.username) {

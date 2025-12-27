@@ -154,6 +154,7 @@ export class MediaController {
     @Body('type') type: 'anime' | 'manga' | 'avatar' | 'cover' | 'game' | 'business',
     @Body('relatedId') relatedId?: number,
     @Body('saveAsScreenshot') saveAsScreenshot?: boolean,
+    @Body('title') title?: string,
   ) {
     if (!imageUrl || !imageUrl.trim()) {
       throw new BadRequestException('Image URL is required');
@@ -163,7 +164,7 @@ export class MediaController {
       throw new BadRequestException('Invalid type. Must be anime, manga, avatar, cover, game, or business');
     }
 
-    return this.mediaService.uploadImageFromUrl(imageUrl, type, relatedId, saveAsScreenshot);
+    return this.mediaService.uploadImageFromUrl(imageUrl, type, relatedId, saveAsScreenshot, title);
   }
 
   @Get('serve/:type/:filename')

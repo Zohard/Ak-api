@@ -201,6 +201,7 @@ export class MediaService {
     type: 'anime' | 'manga' | 'avatar' | 'cover' | 'game' | 'business',
     relatedId?: number,
     saveAsScreenshot: boolean = false,
+    title?: string,
   ) {
     try {
       // Download the image from the URL
@@ -229,32 +230,35 @@ export class MediaService {
       let filename = `${type}_${Date.now()}_${Math.random().toString(36).substring(7)}.${extension}`;
 
       // Use title + timestamp for anime, manga, and game
-      if (relatedId && (type === 'anime' || type === 'manga' || type === 'game')) {
+      if ((title || relatedId) && (type === 'anime' || type === 'manga' || type === 'game')) {
         try {
-          let title: string | null = null;
+          let entityTitle: string | null = title || null;
 
-          if (type === 'anime') {
-            const anime = await this.prisma.akAnime.findUnique({
-              where: { idAnime: relatedId },
-              select: { titre: true }
-            });
-            title = anime?.titre;
-          } else if (type === 'manga') {
-            const manga = await this.prisma.akManga.findUnique({
-              where: { idManga: relatedId },
-              select: { titre: true }
-            });
-            title = manga?.titre;
-          } else if (type === 'game') {
-            const game = await this.prisma.akJeuxVideo.findUnique({
-              where: { idJeu: relatedId },
-              select: { titre: true }
-            });
-            title = game?.titre;
+          // Fetch title from database only if not provided
+          if (!entityTitle && relatedId) {
+            if (type === 'anime') {
+              const anime = await this.prisma.akAnime.findUnique({
+                where: { idAnime: relatedId },
+                select: { titre: true }
+              });
+              entityTitle = anime?.titre;
+            } else if (type === 'manga') {
+              const manga = await this.prisma.akManga.findUnique({
+                where: { idManga: relatedId },
+                select: { titre: true }
+              });
+              entityTitle = manga?.titre;
+            } else if (type === 'game') {
+              const game = await this.prisma.akJeuxVideo.findUnique({
+                where: { idJeu: relatedId },
+                select: { titre: true }
+              });
+              entityTitle = game?.titre;
+            }
           }
 
-          if (title) {
-            const safeTitle = slugify(title);
+          if (entityTitle) {
+            const safeTitle = slugify(entityTitle);
             const timestamp = Date.now();
             filename = `${safeTitle}-${timestamp}.${extension}`;
           }

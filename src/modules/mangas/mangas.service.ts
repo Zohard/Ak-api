@@ -76,22 +76,36 @@ export class MangasService extends BaseContentService<
 
   /**
    * Upload external image URL to ImageKit
-   * Returns the full ImageKit URL if successful, or the original URL if it fails
+   * Returns the full ImageKit URL if successful
+   * Throws BadRequestException if upload fails
+   * @param imageUrl - The external image URL to upload
+   * @param title - Optional title for filename generation (format: titre-timestamp.ext)
    */
-  private async uploadExternalImageToImageKit(imageUrl: string): Promise<string> {
+  private async uploadExternalImageToImageKit(imageUrl: string, title?: string): Promise<string> {
     // Only process external URLs (not already ImageKit URLs)
     if (!imageUrl || !imageUrl.startsWith('http') || imageUrl.includes('imagekit.io')) {
       return imageUrl;
     }
 
     try {
-      const result = await this.mediaService.uploadImageFromUrl(imageUrl, 'manga');
+      const result = await this.mediaService.uploadImageFromUrl(
+        imageUrl,
+        'manga',
+        undefined, // relatedId
+        false, // saveAsScreenshot
+        title // title for filename generation
+      );
       // Return the full ImageKit URL
       return result.url;
     } catch (error) {
-      console.warn('Failed to upload external image to ImageKit:', error.message);
-      // Return original URL as fallback
-      return imageUrl;
+      console.error('[MangasService] Failed to upload external image to ImageKit:', {
+        imageUrl,
+        title,
+        error: error.message,
+        stack: error.stack
+      });
+      // Throw error instead of silently falling back to prevent saving external URLs
+      throw new BadRequestException(`Failed to upload image to ImageKit: ${error.message}`);
     }
   }
 
@@ -123,7 +137,15 @@ export class MangasService extends BaseContentService<
 
     // Upload external image to ImageKit if present
     if (data.image && data.image.startsWith('http')) {
-      data.image = await this.uploadExternalImageToImageKit(data.image);
+      data.image = await this.uploadExternalImageToImageKit(data.image, data.titre);
+    }
+
+    // Map nbVolumes (string) to nbVol (int) if valid number
+    if (data.nbVolumes) {
+      const nbVolInt = parseInt(data.nbVolumes, 10);
+      if (!isNaN(nbVolInt) && nbVolInt > 0) {
+        data.nbVol = nbVolInt;
+      }
     }
 
     const manga = await this.prisma.akManga.create({
@@ -512,6 +534,25 @@ export class MangasService extends BaseContentService<
     // Normalize empty string to null for image field
     if (updateData.image === '') {
       updateData.image = null;
+    }
+
+    // Upload external image to ImageKit if present
+    if (updateData.image && updateData.image.startsWith('http')) {
+      updateData.image = await this.uploadExternalImageToImageKit(updateData.image, updateData.titre || manga.titre);
+    }
+
+    // Map nbVolumes (string) to nbVol (int) if valid number
+    if (updateData.nbVolumes !== undefined) {
+      if (updateData.nbVolumes) {
+        const nbVolInt = parseInt(updateData.nbVolumes, 10);
+        if (!isNaN(nbVolInt) && nbVolInt > 0) {
+          updateData.nbVol = nbVolInt;
+        } else {
+          updateData.nbVol = null;
+        }
+      } else {
+        updateData.nbVol = null;
+      }
     }
 
     // If replacing or deleting image and previous image is an ImageKit URL, attempt deletion in IK
