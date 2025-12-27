@@ -69,13 +69,13 @@ export class JeuxVideoService {
     // Sorting with secondary sort by idJeuVideo for stable pagination
     const orderBy: any = [];
     if (sortBy === 'titre') {
-      orderBy.push({ titre: sortOrder }, { idJeuVideo: 'asc' });
+      orderBy.push({ titre: sortOrder }, { idJeuVideo: 'asc' as const });
     } else if (sortBy === 'annee') {
-      orderBy.push({ annee: sortOrder }, { idJeuVideo: 'asc' });
+      orderBy.push({ annee: sortOrder }, { idJeuVideo: 'asc' as const });
     } else if (sortBy === 'moyenneNotes') {
-      orderBy.push({ moyenneNotes: sortOrder }, { idJeuVideo: 'asc' });
+      orderBy.push({ moyenneNotes: sortOrder }, { idJeuVideo: 'asc' as const });
     } else {
-      orderBy.push({ dateAjout: sortOrder }, { idJeuVideo: 'asc' });
+      orderBy.push({ dateAjout: sortOrder }, { idJeuVideo: 'asc' as const });
     }
 
     const [items, total] = await Promise.all([

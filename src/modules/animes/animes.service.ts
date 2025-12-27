@@ -258,9 +258,9 @@ export class AnimesService extends BaseContentService<
     }
 
     // Build order by clause with secondary sort by idAnime for stable pagination
-    const orderBy = [
+    const orderBy: any = [
       { [sortBy || 'dateAjout']: sortOrder || 'desc' },
-      { idAnime: 'asc' } // Secondary sort for stable pagination when primary values are equal
+      { idAnime: 'asc' as const } // Secondary sort for stable pagination when primary values are equal
     ];
 
     // Build include clause

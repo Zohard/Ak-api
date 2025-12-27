@@ -241,9 +241,9 @@ export class MangasService extends BaseContentService<
     }
 
     // Build order by clause with secondary sort by idManga for stable pagination
-    const orderBy = [
+    const orderBy: any = [
       { [sortBy || 'dateAjout']: sortOrder || 'desc' },
-      { idManga: 'asc' } // Secondary sort for stable pagination when primary values are equal
+      { idManga: 'asc' as const } // Secondary sort for stable pagination when primary values are equal
     ];
 
     const include: any = {};

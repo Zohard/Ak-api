@@ -27,9 +27,9 @@ export class UsersService {
       : {};
 
     // Build order by clause with secondary sort by idMember for stable pagination
-    const orderBy = [
+    const orderBy: any = [
       { [sortBy || 'dateRegistered']: sortOrder || 'desc' },
-      { idMember: 'asc' } // Secondary sort for stable pagination when primary values are equal
+      { idMember: 'asc' as const } // Secondary sort for stable pagination when primary values are equal
     ];
 
     const [users, total] = await Promise.all([
