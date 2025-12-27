@@ -203,6 +203,7 @@ export class MangasService extends BaseContentService<
       where.annee = annee || year;
     }
 
+    where.statut = 1; //default published one
     if (statut !== undefined) {
       where.statut = statut;
     }
