@@ -240,7 +240,11 @@ export class MangasService extends BaseContentService<
       }
     }
 
-    const orderBy = { [sortBy || 'dateAjout']: sortOrder || 'desc' };
+    // Build order by clause with secondary sort by idManga for stable pagination
+    const orderBy = [
+      { [sortBy || 'dateAjout']: sortOrder || 'desc' },
+      { idManga: 'asc' } // Secondary sort for stable pagination when primary values are equal
+    ];
 
     const include: any = {};
     if (includeReviews) {

@@ -66,16 +66,16 @@ export class JeuxVideoService {
       };
     }
 
-    // Sorting
-    const orderBy: any = {};
+    // Sorting with secondary sort by idJeuVideo for stable pagination
+    const orderBy: any = [];
     if (sortBy === 'titre') {
-      orderBy.titre = sortOrder;
+      orderBy.push({ titre: sortOrder }, { idJeuVideo: 'asc' });
     } else if (sortBy === 'annee') {
-      orderBy.annee = sortOrder;
+      orderBy.push({ annee: sortOrder }, { idJeuVideo: 'asc' });
     } else if (sortBy === 'moyenneNotes') {
-      orderBy.moyenneNotes = sortOrder;
+      orderBy.push({ moyenneNotes: sortOrder }, { idJeuVideo: 'asc' });
     } else {
-      orderBy.dateAjout = sortOrder;
+      orderBy.push({ dateAjout: sortOrder }, { idJeuVideo: 'asc' });
     }
 
     const [items, total] = await Promise.all([

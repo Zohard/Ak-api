@@ -26,8 +26,11 @@ export class UsersService {
       }
       : {};
 
-    // Build order by clause
-    const orderBy = { [sortBy || 'dateRegistered']: sortOrder || 'desc' };
+    // Build order by clause with secondary sort by idMember for stable pagination
+    const orderBy = [
+      { [sortBy || 'dateRegistered']: sortOrder || 'desc' },
+      { idMember: 'asc' } // Secondary sort for stable pagination when primary values are equal
+    ];
 
     const [users, total] = await Promise.all([
       this.prisma.smfMember.findMany({

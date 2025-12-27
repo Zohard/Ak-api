@@ -257,8 +257,11 @@ export class AnimesService extends BaseContentService<
       where.dateAjout = { not: null };
     }
 
-    // Build order by clause
-    const orderBy = { [sortBy || 'dateAjout']: sortOrder || 'desc' };
+    // Build order by clause with secondary sort by idAnime for stable pagination
+    const orderBy = [
+      { [sortBy || 'dateAjout']: sortOrder || 'desc' },
+      { idAnime: 'asc' } // Secondary sort for stable pagination when primary values are equal
+    ];
 
     // Build include clause
     const include: any = {};
