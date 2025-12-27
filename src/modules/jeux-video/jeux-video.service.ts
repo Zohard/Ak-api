@@ -66,6 +66,16 @@ export class JeuxVideoService {
       };
     }
 
+    // Exclude null dateAjout when sorting by it
+    if (sortBy === 'dateAjout' || !sortBy) {
+      where.dateAjout = { not: null };
+    }
+
+    // Exclude null annee when sorting by it
+    if (sortBy === 'annee') {
+      where.annee = { not: null };
+    }
+
     // Sorting with secondary sort by idJeuVideo for stable pagination
     const orderBy: any = [];
     if (sortBy === 'titre') {

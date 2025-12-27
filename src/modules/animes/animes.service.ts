@@ -257,6 +257,11 @@ export class AnimesService extends BaseContentService<
       where.dateAjout = { not: null };
     }
 
+    // Exclude null annee when sorting by it
+    if (sortBy === 'annee') {
+      where.annee = { not: null };
+    }
+
     // Build order by clause with secondary sort by idAnime for stable pagination
     const orderBy: any = [
       { [sortBy || 'dateAjout']: sortOrder || 'desc' },

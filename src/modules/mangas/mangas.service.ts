@@ -240,6 +240,16 @@ export class MangasService extends BaseContentService<
       }
     }
 
+    // Exclude null dateAjout when sorting by it
+    if (sortBy === 'dateAjout' || !sortBy) {
+      where.dateAjout = { not: null };
+    }
+
+    // Exclude null annee when sorting by it
+    if (sortBy === 'annee') {
+      where.annee = { not: null };
+    }
+
     // Build order by clause with secondary sort by idManga for stable pagination
     const orderBy: any = [
       { [sortBy || 'dateAjout']: sortOrder || 'desc' },
