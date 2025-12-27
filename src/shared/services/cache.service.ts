@@ -397,16 +397,23 @@ export class CacheService implements OnModuleInit {
       rankings: 'rankings:*',
       lists: 'lists*',
       collections: 'user_collections:*',
-      top: 'top:*',
-      other: '*'
+      top: 'top:*'
     };
 
     const result: Record<string, string[]> = {};
+    const categorizedKeys = new Set<string>();
 
+    // Get keys for each specific category
     for (const [category, pattern] of Object.entries(categories)) {
       const keys = await this.getAllKeys(pattern);
       result[category] = keys;
+      // Track all categorized keys
+      keys.forEach(key => categorizedKeys.add(key));
     }
+
+    // Get "other" keys - only those not matching any specific category
+    const allKeys = await this.getAllKeys('*');
+    result['other'] = allKeys.filter(key => !categorizedKeys.has(key));
 
     return result;
   }
