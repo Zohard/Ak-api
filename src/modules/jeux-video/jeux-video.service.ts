@@ -66,15 +66,9 @@ export class JeuxVideoService {
       };
     }
 
-    // Exclude null dateAjout when sorting by it
-    if (sortBy === 'dateAjout' || !sortBy) {
-      where.dateAjout = { not: null };
-    }
-
-    // Exclude null annee when sorting by it
-    if (sortBy === 'annee') {
-      where.annee = { not: null };
-    }
+    // REMOVED: No need to filter out null values since columns are NOT NULL
+    // dateAjout is TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    // annee is INTEGER NOT NULL DEFAULT 0
 
     // Sorting with secondary sort by idJeuVideo for stable pagination
     const orderBy: any = [];
