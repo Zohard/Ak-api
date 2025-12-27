@@ -309,12 +309,14 @@ export class BusinessService {
   }
 
   async getRelatedAnimes(businessId: number, page?: number, limit?: number) {
-    // Get total count first
+    // Get total count first - only count animes with statut = 1
     const countResult = await this.prisma.$queryRaw<Array<{ count: bigint }>>`
       SELECT COUNT(*)::int as count
-      FROM ak_business_to_animes
-      WHERE id_business = ${businessId}
-        AND doublon = 0
+      FROM ak_business_to_animes bta
+      INNER JOIN ak_animes a ON a.id_anime = bta.id_anime
+      WHERE bta.id_business = ${businessId}
+        AND bta.doublon = 0
+        AND a.statut = 1
     `;
     const total = Number(countResult[0]?.count || 0);
 
@@ -392,12 +394,14 @@ export class BusinessService {
   }
 
   async getRelatedMangas(businessId: number, page?: number, limit?: number) {
-    // Get total count first
+    // Get total count first - only count mangas with statut = 1
     const countResult = await this.prisma.$queryRaw<Array<{ count: bigint }>>`
       SELECT COUNT(*)::int as count
-      FROM ak_business_to_mangas
-      WHERE id_business = ${businessId}
-        AND doublon = 0
+      FROM ak_business_to_mangas btm
+      INNER JOIN ak_mangas m ON m.id_manga = btm.id_manga
+      WHERE btm.id_business = ${businessId}
+        AND btm.doublon = 0
+        AND m.statut = 1
     `;
     const total = Number(countResult[0]?.count || 0);
 
