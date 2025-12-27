@@ -44,6 +44,28 @@ export class BusinessController {
     private readonly aniListService: AniListService,
   ) {}
 
+  @Get('autocomplete')
+  @ApiOperation({ summary: 'Recherche autocomplete pour business' })
+  @ApiQuery({
+    name: 'q',
+    required: true,
+    description: 'Terme de recherche',
+    example: 'pierrot',
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    description: 'Nombre maximum de résultats',
+    example: 5,
+  })
+  @ApiResponse({ status: 200, description: 'Résultats autocomplete limités' })
+  async autocomplete(
+    @Query('q') query: string,
+    @Query('limit') limit?: number,
+  ) {
+    return this.businessService.autocomplete(query, limit ? parseInt(String(limit)) : 5);
+  }
+
   @Get('search')
   @ApiOperation({
     summary: "Recherche d'entités business (pas d'auth requise)",

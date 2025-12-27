@@ -169,6 +169,58 @@ export class BusinessService {
     return { message: 'Entité business supprimée avec succès' };
   }
 
+  async autocomplete(query: string, limit: number = 5) {
+    if (!query || query.trim().length < 2) {
+      return { data: [] };
+    }
+
+    const businesses = await this.prisma.akBusiness.findMany({
+      where: {
+        statut: 1,
+        OR: [
+          {
+            denomination: {
+              contains: query.trim(),
+              mode: 'insensitive',
+            },
+          },
+          {
+            autresDenominations: {
+              contains: query.trim(),
+              mode: 'insensitive',
+            },
+          },
+        ],
+      },
+      select: {
+        idBusiness: true,
+        denomination: true,
+        type: true,
+        origine: true,
+        image: true,
+        niceUrl: true,
+      },
+      orderBy: [
+        { denomination: 'asc' },
+        { idBusiness: 'asc' }
+      ],
+      take: limit,
+    });
+
+    return {
+      data: businesses.map(b => ({
+        id: b.idBusiness,
+        id_business: b.idBusiness,
+        idBusiness: b.idBusiness,
+        denomination: b.denomination,
+        type: b.type,
+        origine: b.origine,
+        image: b.image,
+        niceUrl: b.niceUrl,
+      }))
+    };
+  }
+
   async search(searchDto: BusinessSearchDto) {
     const { q, limit = 10 } = searchDto;
 
