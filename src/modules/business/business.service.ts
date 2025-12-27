@@ -309,9 +309,9 @@ export class BusinessService {
   }
 
   async getRelatedAnimes(businessId: number, page?: number, limit?: number) {
-    // Get total count first - only count animes with statut = 1
+    // Get total count of UNIQUE animes (not relations) with statut = 1
     const countResult = await this.prisma.$queryRaw<Array<{ count: bigint }>>`
-      SELECT COUNT(*)::int as count
+      SELECT COUNT(DISTINCT bta.id_anime)::int as count
       FROM ak_business_to_animes bta
       INNER JOIN ak_animes a ON a.id_anime = bta.id_anime
       WHERE bta.id_business = ${businessId}
@@ -329,15 +329,19 @@ export class BusinessService {
     const pageLimit = limit || 18;
     const offset = (currentPage - 1) * pageLimit;
 
-    // Get anime IDs related to this business with pagination - only valid animes
-    const relations = await this.prisma.$queryRaw<Array<{ id_anime: number; type: string; precisions: string }>>`
-      SELECT bta.id_anime, bta.type, bta.precisions
+    // Get DISTINCT anime IDs with their first relation type - only valid animes
+    const relations = await this.prisma.$queryRaw<Array<{ id_anime: number; type: string; precisions: string; min_relation: number }>>`
+      SELECT DISTINCT ON (bta.id_anime)
+        bta.id_anime,
+        bta.type,
+        bta.precisions,
+        bta.id_relation as min_relation
       FROM ak_business_to_animes bta
       INNER JOIN ak_animes a ON a.id_anime = bta.id_anime
       WHERE bta.id_business = ${businessId}
         AND bta.doublon = 0
         AND a.statut = 1
-      ORDER BY bta.id_relation
+      ORDER BY bta.id_anime, bta.id_relation
       LIMIT ${pageLimit} OFFSET ${offset}
     `;
 
@@ -396,9 +400,9 @@ export class BusinessService {
   }
 
   async getRelatedMangas(businessId: number, page?: number, limit?: number) {
-    // Get total count first - only count mangas with statut = 1
+    // Get total count of UNIQUE mangas (not relations) with statut = 1
     const countResult = await this.prisma.$queryRaw<Array<{ count: bigint }>>`
-      SELECT COUNT(*)::int as count
+      SELECT COUNT(DISTINCT btm.id_manga)::int as count
       FROM ak_business_to_mangas btm
       INNER JOIN ak_mangas m ON m.id_manga = btm.id_manga
       WHERE btm.id_business = ${businessId}
@@ -416,15 +420,19 @@ export class BusinessService {
     const pageLimit = limit || 18;
     const offset = (currentPage - 1) * pageLimit;
 
-    // Get manga IDs related to this business with pagination - only valid mangas
-    const relations = await this.prisma.$queryRaw<Array<{ id_manga: number; type: string; precisions: string }>>`
-      SELECT btm.id_manga, btm.type, btm.precisions
+    // Get DISTINCT manga IDs with their first relation type - only valid mangas
+    const relations = await this.prisma.$queryRaw<Array<{ id_manga: number; type: string; precisions: string; min_relation: number }>>`
+      SELECT DISTINCT ON (btm.id_manga)
+        btm.id_manga,
+        btm.type,
+        btm.precisions,
+        btm.id_relation as min_relation
       FROM ak_business_to_mangas btm
       INNER JOIN ak_mangas m ON m.id_manga = btm.id_manga
       WHERE btm.id_business = ${businessId}
         AND btm.doublon = 0
         AND m.statut = 1
-      ORDER BY btm.id_relation
+      ORDER BY btm.id_manga, btm.id_relation
       LIMIT ${pageLimit} OFFSET ${offset}
     `;
 
