@@ -48,7 +48,7 @@ export class BusinessController {
   @ApiOperation({ summary: 'Recherche autocomplete pour business' })
   @ApiQuery({
     name: 'q',
-    required: true,
+    required: false,
     description: 'Terme de recherche',
     example: 'pierrot',
   })
@@ -60,9 +60,12 @@ export class BusinessController {
   })
   @ApiResponse({ status: 200, description: 'Résultats autocomplete limités' })
   async autocomplete(
-    @Query('q') query: string,
+    @Query('q') query?: string,
     @Query('limit') limit?: number,
   ) {
+    if (!query) {
+      return { data: [] };
+    }
     return this.businessService.autocomplete(query, limit ? parseInt(String(limit)) : 5);
   }
 
