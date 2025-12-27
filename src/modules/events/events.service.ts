@@ -32,13 +32,14 @@ export class EventsService {
 
     // Create event
     const [event] = await this.prisma.$queryRaw<any[]>`
-      INSERT INTO ak_events (title, slug, description, image, year, topic_id, media_type, event_type, voting_start, voting_end, results_visible, notify_users, created_by, created_at, updated_at)
+      INSERT INTO ak_events (title, slug, description, image, year, top_number, topic_id, media_type, event_type, voting_start, voting_end, results_visible, notify_users, created_by, created_at, updated_at)
       VALUES (
         ${createEventDto.title},
         ${slug},
         ${createEventDto.description || null},
         ${createEventDto.image || null},
         ${createEventDto.year || null},
+        ${createEventDto.topNumber || null},
         ${createEventDto.topicId || null},
         ${createEventDto.mediaType || 'mixed'},
         ${createEventDto.eventType || 'awards'},
@@ -255,6 +256,10 @@ export class EventsService {
     if (updateEventDto.year !== undefined) {
       updates.push('year = $' + (values.length + 1));
       values.push(updateEventDto.year);
+    }
+    if (updateEventDto.topNumber !== undefined) {
+      updates.push('top_number = $' + (values.length + 1));
+      values.push(updateEventDto.topNumber);
     }
     if (updateEventDto.topicId !== undefined) {
       updates.push('topic_id = $' + (values.length + 1));

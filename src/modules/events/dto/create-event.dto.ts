@@ -13,6 +13,7 @@ export enum EventType {
   AWARDS = 'awards',
   SELECTION = 'selection',
   POLL = 'poll',
+  RANKING = 'ranking',
 }
 
 export enum EventStatus {
@@ -107,6 +108,11 @@ export class CreateEventDto {
   @IsOptional()
   @IsNumber()
   year?: number;
+
+  @ApiPropertyOptional({ description: 'Nombre de places dans le classement (ex: 50 pour "top 50")' })
+  @IsOptional()
+  @IsNumber()
+  topNumber?: number;
 
   @ApiPropertyOptional({ description: 'ID du sujet de forum associé' })
   @IsOptional()
