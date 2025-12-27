@@ -50,6 +50,7 @@ export class MediaController {
     @Body('type') type: 'anime' | 'manga' | 'avatar' | 'cover' | 'game' | 'business',
     @Body('relatedId') relatedId?: string,
     @Body('isScreenshot') isScreenshot?: string,
+    @Body('title') title?: string,
     @CurrentUser() user?: any,
   ) {
     if (!file) {
@@ -74,7 +75,7 @@ export class MediaController {
 
     const isScreenshotBool = isScreenshot === 'true' || isScreenshot === '1';
 
-    return this.mediaService.uploadImage(file, type, parsedRelatedId, isScreenshotBool);
+    return this.mediaService.uploadImage(file, type, parsedRelatedId, isScreenshotBool, title);
   }
 
   @Get('url-metadata')

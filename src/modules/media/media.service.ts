@@ -32,6 +32,7 @@ export class MediaService {
     type: 'anime' | 'manga' | 'avatar' | 'cover' | 'game' | 'business',
     relatedId?: number,
     isScreenshot?: boolean,
+    title?: string,
   ) {
     if (!file) {
       throw new BadRequestException('No file provided');
@@ -52,21 +53,41 @@ export class MediaService {
     const fileExtension = path.extname(file.originalname);
     let filename = `${type}_${Date.now()}_${Math.random().toString(36).substring(7)}${fileExtension}`;
 
-    // For game screenshots, use the game title in the filename
-    if (isScreenshot && type === 'game' && relatedId) {
+    // Use title + timestamp for anime, manga, and game (both screenshots and covers)
+    if ((title || relatedId) && (type === 'anime' || type === 'manga' || type === 'game')) {
       try {
-        const game = await this.prisma.akJeuxVideo.findUnique({
-          where: { idJeu: relatedId },
-          select: { titre: true }
-        });
+        let entityTitle: string | null = title || null;
 
-        if (game?.titre) {
-          const safeTitle = slugify(game.titre);
+        // Fetch title from database only if not provided
+        if (!entityTitle && relatedId) {
+          if (type === 'anime') {
+            const anime = await this.prisma.akAnime.findUnique({
+              where: { idAnime: relatedId },
+              select: { titre: true }
+            });
+            entityTitle = anime?.titre;
+          } else if (type === 'manga') {
+            const manga = await this.prisma.akManga.findUnique({
+              where: { idManga: relatedId },
+              select: { titre: true }
+            });
+            entityTitle = manga?.titre;
+          } else if (type === 'game') {
+            const game = await this.prisma.akJeuxVideo.findUnique({
+              where: { idJeu: relatedId },
+              select: { titre: true }
+            });
+            entityTitle = game?.titre;
+          }
+        }
+
+        if (entityTitle) {
+          const safeTitle = slugify(entityTitle);
           const timestamp = Date.now();
           filename = `${safeTitle}-${timestamp}${fileExtension}`;
         }
       } catch (error) {
-        console.error('Failed to fetch game title for filename:', error);
+        console.error('Failed to fetch title for filename:', error);
         // Fall back to default filename if fetch fails
       }
     }
