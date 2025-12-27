@@ -56,7 +56,7 @@ export class AdminJeuxVideoService {
     // Map idJeu to idJeuVideo for frontend consistency
     const mappedItems = items.map(item => ({
       ...item,
-      idJeuVideo: item.idJeu,
+      idJeu:item.idJeu,
     }));
 
     return {
@@ -166,7 +166,7 @@ export class AdminJeuxVideoService {
     // Map idJeu to idJeuVideo and presentation to description for frontend consistency
     return {
       ...item,
-      idJeuVideo: item.idJeu,
+      idJeu:item.idJeu,
       description: item.presentation,
       platformIds: item.platforms.map(p => p.idPlatform),
       genreIds: item.genres.map(g => g.idGenre),
@@ -226,7 +226,7 @@ export class AdminJeuxVideoService {
 
     return {
       ...created,
-      idJeuVideo: created.idJeu,
+      idJeu:created.idJeu,
       description: created.presentation,
       platformIds,
       genreIds,
@@ -308,7 +308,7 @@ export class AdminJeuxVideoService {
 
     return {
       ...updated,
-      idJeuVideo: updated.idJeu,
+      idJeu:updated.idJeu,
       description: updated.presentation,
       platformIds,
       genreIds,
@@ -331,7 +331,7 @@ export class AdminJeuxVideoService {
 
     return {
       ...updated,
-      idJeuVideo: updated.idJeu,
+      idJeu:updated.idJeu,
     };
   }
 
@@ -507,7 +507,7 @@ export class AdminJeuxVideoService {
 
     return {
       ...created,
-      idJeuVideo: created.idJeu,
+      idJeu:created.idJeu,
       description: created.presentation,
       platformIds,
       genreIds,
