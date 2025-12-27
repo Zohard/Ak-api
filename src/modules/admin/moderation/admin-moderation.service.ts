@@ -436,37 +436,37 @@ export class AdminModerationService {
   private async updateContentRatingStats(animeId?: number, mangaId?: number) {
     if (animeId) {
       await this.prisma.$queryRaw`
-        UPDATE ak_animes 
-        SET 
-          note_moyenne = (
-            SELECT AVG(notation)::DECIMAL(3,2) 
-            FROM ak_critique 
-            WHERE anime_id = ${animeId} AND statut = 0
+        UPDATE ak_animes
+        SET
+          moyennenotes = (
+            SELECT AVG(notation)
+            FROM ak_critique
+            WHERE id_anime = ${animeId} AND statut = 0
           ),
-          nb_critiques = (
-            SELECT COUNT(*) 
-            FROM ak_critique 
-            WHERE anime_id = ${animeId} AND statut = 0
+          nb_reviews = (
+            SELECT COUNT(*)
+            FROM ak_critique
+            WHERE id_anime = ${animeId} AND statut = 0
           )
-        WHERE id = ${animeId}
+        WHERE id_anime = ${animeId}
       `;
     }
 
     if (mangaId) {
       await this.prisma.$queryRaw`
-        UPDATE ak_mangas 
-        SET 
-          note_moyenne = (
-            SELECT AVG(notation)::DECIMAL(3,2) 
-            FROM ak_critique 
-            WHERE manga_id = ${mangaId} AND statut = 0
+        UPDATE ak_mangas
+        SET
+          moyennenotes = (
+            SELECT AVG(notation)
+            FROM ak_critique
+            WHERE id_manga = ${mangaId} AND statut = 0
           ),
-          nb_critiques = (
-            SELECT COUNT(*) 
-            FROM ak_critique 
-            WHERE manga_id = ${mangaId} AND statut = 0
+          nb_reviews = (
+            SELECT COUNT(*)
+            FROM ak_critique
+            WHERE id_manga = ${mangaId} AND statut = 0
           )
-        WHERE id = ${mangaId}
+        WHERE id_manga = ${mangaId}
       `;
     }
   }

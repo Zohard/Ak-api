@@ -142,6 +142,11 @@ export class ReviewsService {
       },
     });
 
+    // Update content rating statistics if review is published (statut: 0)
+    if (review.statut === 0) {
+      await this.updateContentRatingStats(idAnime, idManga, idJeu);
+    }
+
     // Invalidate user review cache after creation
     await this.invalidateReviewCache(review.idCritique, idAnime, idManga, userId);
 
@@ -626,6 +631,9 @@ export class ReviewsService {
     // Don't allow changing anime/manga IDs
     const { idAnime, idManga, ...updateData } = updateReviewDto;
 
+    // Check if notation is being updated
+    const notationChanged = updateData.notation !== undefined && updateData.notation !== review.notation;
+
     const updatedReview = await this.prisma.akCritique.update({
       where: { idCritique: id },
       data: updateData,
@@ -658,6 +666,15 @@ export class ReviewsService {
           : false,
       },
     });
+
+    // Update content rating statistics if notation changed and review is published
+    if (notationChanged && updatedReview.statut === 0) {
+      await this.updateContentRatingStats(
+        review.idAnime > 0 ? review.idAnime : undefined,
+        review.idManga > 0 ? review.idManga : undefined,
+        review.idJeu > 0 ? review.idJeu : undefined
+      );
+    }
 
     // Invalidate caches after update
     await this.invalidateReviewCache(id, review.idAnime, review.idManga, userId);
@@ -694,6 +711,13 @@ export class ReviewsService {
         },
       },
     });
+
+    // Update content rating statistics after deletion
+    await this.updateContentRatingStats(
+      review.idAnime > 0 ? review.idAnime : undefined,
+      review.idManga > 0 ? review.idManga : undefined,
+      review.idJeu > 0 ? review.idJeu : undefined
+    );
 
     // Invalidate caches after removal
     await this.invalidateReviewCache(id, review.idAnime, review.idManga, userId);
@@ -1550,6 +1574,15 @@ export class ReviewsService {
       },
     });
 
+    // Update content rating statistics when approving a review
+    if (moderateDto.action === 'approve') {
+      await this.updateContentRatingStats(
+        review.idAnime > 0 ? review.idAnime : undefined,
+        review.idManga > 0 ? review.idManga : undefined,
+        review.idJeu > 0 ? review.idJeu : undefined
+      );
+    }
+
     // Invalidate review cache
     await this.invalidateReviewCache(id, review.idAnime, review.idManga, review.idMembre);
 
@@ -1627,6 +1660,15 @@ export class ReviewsService {
           },
         });
 
+        // Update content rating statistics when approving
+        if (action === 'approve') {
+          await this.updateContentRatingStats(
+            review.idAnime > 0 ? review.idAnime : undefined,
+            review.idManga > 0 ? review.idManga : undefined,
+            review.idJeu > 0 ? review.idJeu : undefined
+          );
+        }
+
         // Send email for rejection
         if (action === 'reject' && review.membre?.emailAddress && causeSuppr) {
           try {
@@ -1680,5 +1722,69 @@ export class ReviewsService {
       pending: draft, // For compatibility with frontend expecting "pending"
       rejected,
     };
+  }
+
+  /**
+   * Update content rating statistics (moyennenotes and nbReviews) for anime, manga, or game
+   * Called automatically when reviews are created, updated, or deleted
+   */
+  private async updateContentRatingStats(
+    animeId?: number,
+    mangaId?: number,
+    jeuId?: number
+  ): Promise<void> {
+    if (animeId) {
+      await this.prisma.$queryRaw`
+        UPDATE ak_animes
+        SET
+          moyennenotes = (
+            SELECT AVG(notation)
+            FROM ak_critique
+            WHERE id_anime = ${animeId} AND statut = 0
+          ),
+          nb_reviews = (
+            SELECT COUNT(*)
+            FROM ak_critique
+            WHERE id_anime = ${animeId} AND statut = 0
+          )
+        WHERE id_anime = ${animeId}
+      `;
+    }
+
+    if (mangaId) {
+      await this.prisma.$queryRaw`
+        UPDATE ak_mangas
+        SET
+          moyennenotes = (
+            SELECT AVG(notation)
+            FROM ak_critique
+            WHERE id_manga = ${mangaId} AND statut = 0
+          ),
+          nb_reviews = (
+            SELECT COUNT(*)
+            FROM ak_critique
+            WHERE id_manga = ${mangaId} AND statut = 0
+          )
+        WHERE id_manga = ${mangaId}
+      `;
+    }
+
+    if (jeuId) {
+      await this.prisma.$queryRaw`
+        UPDATE ak_jeux_video
+        SET
+          moyennenotes = (
+            SELECT AVG(notation)
+            FROM ak_critique
+            WHERE id_jeu = ${jeuId} AND statut = 0
+          ),
+          nb_reviews = (
+            SELECT COUNT(*)
+            FROM ak_critique
+            WHERE id_jeu = ${jeuId} AND statut = 0
+          )
+        WHERE id_jeu = ${jeuId}
+      `;
+    }
   }
 }
