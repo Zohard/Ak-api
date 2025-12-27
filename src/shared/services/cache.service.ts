@@ -356,7 +356,7 @@ export class CacheService implements OnModuleInit {
   // Health check method
   async isHealthy(): Promise<boolean> {
     if (!this.redis) return false;
-    
+
     try {
       const testKey = 'health_check';
       const testValue = Date.now().toString();
@@ -367,6 +367,129 @@ export class CacheService implements OnModuleInit {
     } catch (error) {
       this.logger.error('Cache health check failed:', error);
       return false;
+    }
+  }
+
+  // Admin cache management methods
+  async getAllKeys(pattern: string = '*'): Promise<string[]> {
+    if (!this.redis) return [];
+
+    try {
+      const keys = await this.redis.keys(pattern);
+      return keys;
+    } catch (error) {
+      this.logger.error(`Error getting keys with pattern ${pattern}:`, error);
+      return [];
+    }
+  }
+
+  async getKeysByCategory(): Promise<Record<string, string[]>> {
+    const categories = {
+      anime: 'anime:*',
+      manga: 'manga:*',
+      game: 'game:*',
+      business: 'business:*',
+      homepage: 'homepage:*',
+      season: 'season:*',
+      articles: 'article*',
+      reviews: 'reviews:*',
+      search: 'search:*',
+      rankings: 'rankings:*',
+      lists: 'lists*',
+      collections: 'user_collections:*',
+      top: 'top:*',
+      other: '*'
+    };
+
+    const result: Record<string, string[]> = {};
+
+    for (const [category, pattern] of Object.entries(categories)) {
+      const keys = await this.getAllKeys(pattern);
+      result[category] = keys;
+    }
+
+    return result;
+  }
+
+  async getCacheStats(): Promise<{
+    totalKeys: number;
+    categoryCounts: Record<string, number>;
+    memoryUsage?: string;
+  }> {
+    if (!this.redis) {
+      return { totalKeys: 0, categoryCounts: {} };
+    }
+
+    try {
+      const keysByCategory = await this.getKeysByCategory();
+      const categoryCounts: Record<string, number> = {};
+      let totalKeys = 0;
+
+      for (const [category, keys] of Object.entries(keysByCategory)) {
+        const count = keys.length;
+        categoryCounts[category] = count;
+        totalKeys += count;
+      }
+
+      // Get memory info
+      let memoryUsage: string | undefined;
+      try {
+        const info = await this.redis.info('memory');
+        const match = info.match(/used_memory_human:([^\r\n]+)/);
+        if (match) {
+          memoryUsage = match[1];
+        }
+      } catch (err) {
+        this.logger.warn('Could not fetch memory usage');
+      }
+
+      return {
+        totalKeys,
+        categoryCounts,
+        memoryUsage
+      };
+    } catch (error) {
+      this.logger.error('Error getting cache stats:', error);
+      return { totalKeys: 0, categoryCounts: {} };
+    }
+  }
+
+  async clearCacheByCategory(category: string): Promise<number> {
+    const patterns: Record<string, string> = {
+      anime: 'anime:*',
+      manga: 'manga:*',
+      game: 'game:*',
+      business: 'business:*',
+      homepage: 'homepage:*',
+      season: 'season:*',
+      articles: 'article*',
+      reviews: 'reviews:*',
+      search: 'search:*',
+      rankings: 'rankings:*',
+      lists: 'lists*',
+      collections: 'user_collections:*',
+      top: 'top:*',
+      all: '*'
+    };
+
+    const pattern = patterns[category];
+    if (!pattern) {
+      throw new Error(`Unknown cache category: ${category}`);
+    }
+
+    if (!this.redis) return 0;
+
+    try {
+      const keys = await this.redis.keys(pattern);
+      if (keys.length > 0) {
+        await this.redis.del(...keys);
+        this.logger.log(`✅ Cleared ${keys.length} keys for category: ${category}`);
+        return keys.length;
+      }
+      return 0;
+    } catch (error) {
+      this.logger.error(`Error clearing cache for category ${category}:`, error);
+      throw error;
     }
   }
 }
