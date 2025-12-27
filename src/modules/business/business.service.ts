@@ -329,13 +329,15 @@ export class BusinessService {
     const pageLimit = limit || 18;
     const offset = (currentPage - 1) * pageLimit;
 
-    // Get anime IDs related to this business with pagination
+    // Get anime IDs related to this business with pagination - only valid animes
     const relations = await this.prisma.$queryRaw<Array<{ id_anime: number; type: string; precisions: string }>>`
-      SELECT id_anime, type, precisions
-      FROM ak_business_to_animes
-      WHERE id_business = ${businessId}
-        AND doublon = 0
-      ORDER BY id_relation
+      SELECT bta.id_anime, bta.type, bta.precisions
+      FROM ak_business_to_animes bta
+      INNER JOIN ak_animes a ON a.id_anime = bta.id_anime
+      WHERE bta.id_business = ${businessId}
+        AND bta.doublon = 0
+        AND a.statut = 1
+      ORDER BY bta.id_relation
       LIMIT ${pageLimit} OFFSET ${offset}
     `;
 
@@ -414,13 +416,15 @@ export class BusinessService {
     const pageLimit = limit || 18;
     const offset = (currentPage - 1) * pageLimit;
 
-    // Get manga IDs related to this business with pagination
+    // Get manga IDs related to this business with pagination - only valid mangas
     const relations = await this.prisma.$queryRaw<Array<{ id_manga: number; type: string; precisions: string }>>`
-      SELECT id_manga, type, precisions
-      FROM ak_business_to_mangas
-      WHERE id_business = ${businessId}
-        AND doublon = 0
-      ORDER BY id_relation
+      SELECT btm.id_manga, btm.type, btm.precisions
+      FROM ak_business_to_mangas btm
+      INNER JOIN ak_mangas m ON m.id_manga = btm.id_manga
+      WHERE btm.id_business = ${businessId}
+        AND btm.doublon = 0
+        AND m.statut = 1
+      ORDER BY btm.id_relation
       LIMIT ${pageLimit} OFFSET ${offset}
     `;
 
