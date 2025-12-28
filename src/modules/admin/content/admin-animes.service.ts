@@ -113,7 +113,7 @@ export class AdminAnimesService {
         orderBy = { dateAjout: 'desc' };
         break;
       case 'last_modified':
-        orderBy = { lastModified: 'desc' };
+        orderBy = { dateAjout: 'desc' }; // Use dateAjout as fallback
         break;
       case 'title':
         orderBy = { titre: 'asc' };
@@ -131,7 +131,6 @@ export class AdminAnimesService {
         annee: true,
         format: true,
         dateAjout: true,
-        lastModified: true,
       },
       orderBy,
       take: 500, // Limit to 500 results for performance
@@ -145,7 +144,7 @@ export class AdminAnimesService {
       annee: anime.annee,
       format: anime.format,
       date_ajout: anime.dateAjout,
-      last_modified: anime.lastModified,
+      last_modified: anime.dateAjout, // Use dateAjout as fallback
     }));
   }
 

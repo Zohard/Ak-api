@@ -140,7 +140,7 @@ export class AdminMangasService {
         orderBy = { dateAjout: 'desc' };
         break;
       case 'last_modified':
-        orderBy = { lastModified: 'desc' };
+        orderBy = { dateModification: 'desc' };
         break;
       case 'title':
         orderBy = { titre: 'asc' };
@@ -156,9 +156,8 @@ export class AdminMangasService {
         titre: true,
         titreOrig: true,
         annee: true,
-        format: true,
         dateAjout: true,
-        lastModified: true,
+        dateModification: true,
       },
       orderBy,
       take: 500, // Limit to 500 results for performance
@@ -170,9 +169,9 @@ export class AdminMangasService {
       titre: manga.titre,
       titreOrig: manga.titreOrig,
       annee: manga.annee,
-      format: manga.format,
+      format: null, // Manga model doesn't have format field
       date_ajout: manga.dateAjout,
-      last_modified: manga.lastModified,
+      last_modified: manga.dateModification ? new Date(manga.dateModification * 1000) : manga.dateAjout,
     }));
   }
 
