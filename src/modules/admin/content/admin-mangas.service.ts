@@ -109,6 +109,73 @@ export class AdminMangasService {
     return { items: enrichedItems, pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } };
   }
 
+  async getMangasWithoutScreenshots(search?: string, sortBy: string = 'year') {
+    // Build where clause
+    const where: any = {
+      // Exclude mangas that have screenshots
+      media: {
+        none: {
+          type: 'manga',
+          isScreenshot: true,
+        },
+      },
+    };
+
+    // Add search filter if provided
+    if (search) {
+      where.OR = [
+        { titre: { contains: search, mode: 'insensitive' } },
+        { titreOrig: { contains: search, mode: 'insensitive' } },
+        { titreFr: { contains: search, mode: 'insensitive' } },
+      ];
+    }
+
+    // Determine sort order
+    let orderBy: any;
+    switch (sortBy) {
+      case 'year':
+        orderBy = { annee: 'desc' };
+        break;
+      case 'date_ajout':
+        orderBy = { dateAjout: 'desc' };
+        break;
+      case 'last_modified':
+        orderBy = { lastModified: 'desc' };
+        break;
+      case 'title':
+        orderBy = { titre: 'asc' };
+        break;
+      default:
+        orderBy = { annee: 'desc' };
+    }
+
+    const mangas = await this.prisma.akManga.findMany({
+      where,
+      select: {
+        idManga: true,
+        titre: true,
+        titreOrig: true,
+        annee: true,
+        format: true,
+        dateAjout: true,
+        lastModified: true,
+      },
+      orderBy,
+      take: 500, // Limit to 500 results for performance
+    });
+
+    // Map to frontend-expected format
+    return mangas.map(manga => ({
+      id: manga.idManga,
+      titre: manga.titre,
+      titreOrig: manga.titreOrig,
+      annee: manga.annee,
+      format: manga.format,
+      date_ajout: manga.dateAjout,
+      last_modified: manga.lastModified,
+    }));
+  }
+
   async getOne(id: number) {
     const item = await this.prisma.akManga.findUnique({ where: { idManga: id } });
     if (!item) throw new NotFoundException('Manga introuvable');

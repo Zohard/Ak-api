@@ -17,6 +17,16 @@ export class AdminMangasController {
   @ApiOperation({ summary: 'Liste des mangas (admin)' })
   list(@Query() query: AdminMangaListQueryDto) { return this.service.list(query); }
 
+  @Get('no-screenshots')
+  @ApiOperation({ summary: 'Liste des mangas sans screenshots (admin)' })
+  @ApiResponse({ status: 200, description: 'Liste des mangas sans screenshots' })
+  getMangasWithoutScreenshots(
+    @Query('search') search?: string,
+    @Query('sortBy') sortBy?: string,
+  ) {
+    return this.service.getMangasWithoutScreenshots(search, sortBy);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Obtenir un manga (admin)' })
   getOne(@Param('id', ParseIntPipe) id: number) { return this.service.getOne(id); }

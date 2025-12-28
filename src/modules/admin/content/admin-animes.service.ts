@@ -82,6 +82,73 @@ export class AdminAnimesService {
     };
   }
 
+  async getAnimesWithoutScreenshots(search?: string, sortBy: string = 'year') {
+    // Build where clause
+    const where: any = {
+      // Exclude animes that have screenshots
+      media: {
+        none: {
+          type: 'anime',
+          isScreenshot: true,
+        },
+      },
+    };
+
+    // Add search filter if provided
+    if (search) {
+      where.OR = [
+        { titre: { contains: search, mode: 'insensitive' } },
+        { titreOrig: { contains: search, mode: 'insensitive' } },
+        { titreFr: { contains: search, mode: 'insensitive' } },
+      ];
+    }
+
+    // Determine sort order
+    let orderBy: any;
+    switch (sortBy) {
+      case 'year':
+        orderBy = { annee: 'desc' };
+        break;
+      case 'date_ajout':
+        orderBy = { dateAjout: 'desc' };
+        break;
+      case 'last_modified':
+        orderBy = { lastModified: 'desc' };
+        break;
+      case 'title':
+        orderBy = { titre: 'asc' };
+        break;
+      default:
+        orderBy = { annee: 'desc' };
+    }
+
+    const animes = await this.prisma.akAnime.findMany({
+      where,
+      select: {
+        idAnime: true,
+        titre: true,
+        titreOrig: true,
+        annee: true,
+        format: true,
+        dateAjout: true,
+        lastModified: true,
+      },
+      orderBy,
+      take: 500, // Limit to 500 results for performance
+    });
+
+    // Map to frontend-expected format
+    return animes.map(anime => ({
+      id: anime.idAnime,
+      titre: anime.titre,
+      titreOrig: anime.titreOrig,
+      annee: anime.annee,
+      format: anime.format,
+      date_ajout: anime.dateAjout,
+      last_modified: anime.lastModified,
+    }));
+  }
+
   async create(dto: CreateAdminAnimeDto, username?: string) {
     // Normalize legacy fields
     const titreOrig = dto.titreOrig ?? dto.titre_orig ?? null;

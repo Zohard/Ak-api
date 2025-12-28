@@ -36,6 +36,16 @@ export class AdminAnimesController {
     return this.service.list(query);
   }
 
+  @Get('no-screenshots')
+  @ApiOperation({ summary: 'Liste des animes sans screenshots (admin)' })
+  @ApiResponse({ status: 200, description: 'Liste des animes sans screenshots' })
+  getAnimesWithoutScreenshots(
+    @Query('search') search?: string,
+    @Query('sortBy') sortBy?: string,
+  ) {
+    return this.service.getAnimesWithoutScreenshots(search, sortBy);
+  }
+
   @Post()
   @ApiOperation({ summary: 'Créer un anime (admin)' })
   @ApiResponse({ status: 201, description: 'Anime créé' })
