@@ -206,16 +206,36 @@ export class ImageKitService {
 
       console.log(`Starting image upload from URL: ${imageUrl}`);
 
+      // Build headers based on the image URL domain
+      const headers: any = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'image/*',
+      };
+
+      // Add Referer header for CDNs that require it (like BookNode)
+      try {
+        const urlObj = new URL(imageUrl);
+        if (urlObj.hostname.includes('booknode.com')) {
+          headers['Referer'] = 'https://booknode.com/';
+        } else if (urlObj.hostname.includes('babelio.com')) {
+          headers['Referer'] = 'https://www.babelio.com/';
+        } else if (urlObj.hostname.includes('fnac.com')) {
+          headers['Referer'] = 'https://www.fnac.com/';
+        } else {
+          // For other URLs, use the origin as fallback
+          headers['Referer'] = urlObj.origin;
+        }
+      } catch (e) {
+        // If URL parsing fails, continue without Referer
+        console.warn('Failed to parse image URL for Referer header:', e.message);
+      }
+
       // Fetch the image from the URL using fetch with AbortController for timeout
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
 
       const response = await fetch(imageUrl, {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (compatible; AK-Scraper/1.0)',
-          'Accept': 'image/*',
-          'Referer': new URL(imageUrl).origin
-        },
+        headers,
         signal: controller.signal
       });
 
