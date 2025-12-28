@@ -56,7 +56,7 @@ export class AdminJeuxVideoService {
     // Map idJeu to idJeuVideo for frontend consistency
     const mappedItems = items.map(item => ({
       ...item,
-      idJeu:item.idJeu,
+      idJeuVideo: item.idJeu,
     }));
 
     return {
