@@ -83,14 +83,19 @@ export class AdminAnimesService {
   }
 
   async getAnimesWithoutScreenshots(search?: string, sortBy: string = 'year') {
-    // Build where clause
+    // Get all anime IDs that have screenshots (type = 1 for anime)
+    const animesWithScreenshots = await this.prisma.akScreenshot.findMany({
+      where: { type: 1 },
+      select: { idTitre: true },
+      distinct: ['idTitre'],
+    });
+
+    const idsWithScreenshots = animesWithScreenshots.map(s => s.idTitre);
+
+    // Build where clause to exclude animes with screenshots
     const where: any = {
-      // Exclude animes that have screenshots
-      media: {
-        none: {
-          type: 'anime',
-          isScreenshot: true,
-        },
+      idAnime: {
+        notIn: idsWithScreenshots,
       },
     };
 
