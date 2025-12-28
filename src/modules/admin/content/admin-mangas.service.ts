@@ -20,10 +20,10 @@ export class AdminMangasService {
 
   /**
    * Upload external image URL to ImageKit
-   * Returns the full ImageKit URL if successful
-   * Throws BadRequestException if upload fails
+   * Returns the full ImageKit URL if successful, null if upload fails
+   * Does NOT throw - allows manga creation to continue even if image upload fails
    */
-  private async uploadExternalImageToImageKit(imageUrl: string, title?: string): Promise<string> {
+  private async uploadExternalImageToImageKit(imageUrl: string, title?: string): Promise<string | null> {
     // Only process external URLs (not already ImageKit URLs)
     if (!imageUrl || !imageUrl.startsWith('http') || imageUrl.includes('imagekit.io')) {
       return imageUrl;
@@ -40,14 +40,14 @@ export class AdminMangasService {
       // Return the full ImageKit URL
       return result.url;
     } catch (error) {
-      console.error('[AdminMangasService] Failed to upload external image to ImageKit:', {
+      console.error('[AdminMangasService] Failed to upload external image to ImageKit (non-blocking):', {
         imageUrl,
         title,
         error: error.message,
         stack: error.stack
       });
-      // Throw error instead of silently falling back to prevent saving external URLs
-      throw new BadRequestException(`Failed to upload image to ImageKit: ${error.message}`);
+      // Return null instead of throwing - manga creation should continue without image
+      return null;
     }
   }
 
@@ -211,7 +211,9 @@ export class AdminMangasService {
 
     // Upload external image to ImageKit if present
     if (data.image && data.image.startsWith('http')) {
-      data.image = await this.uploadExternalImageToImageKit(data.image, data.titre);
+      const uploadedUrl = await this.uploadExternalImageToImageKit(data.image, data.titre);
+      // If upload failed (returns null), set image to null to avoid storing broken external URL
+      data.image = uploadedUrl;
     }
 
     // Map nbVolumes (string) to nbVol (int) if valid number
@@ -241,7 +243,9 @@ export class AdminMangasService {
 
     // Upload external image to ImageKit if present
     if (data.image && data.image.startsWith('http')) {
-      data.image = await this.uploadExternalImageToImageKit(data.image, data.titre || existing.titre);
+      const uploadedUrl = await this.uploadExternalImageToImageKit(data.image, data.titre || existing.titre);
+      // If upload failed (returns null), set image to null to avoid storing broken external URL
+      data.image = uploadedUrl;
     }
 
     // Map nbVolumes (string) to nbVol (int) if valid number
