@@ -140,6 +140,10 @@ export class AnimesService extends BaseContentService<
       },
     });
 
+    // Invalidate caches after creation
+    await this.cacheService.invalidateSearchCache();
+    await this.cacheService.invalidateRankings('anime');
+
     return this.formatAnime(anime);
   }
 
@@ -1658,6 +1662,8 @@ export class AnimesService extends BaseContentService<
     await this.cacheService.invalidateAnime(id);
     // Also invalidate related caches
     await this.cacheService.invalidateSearchCache();
+    // Invalidate rankings as anime updates may affect top/flop lists
+    await this.cacheService.invalidateRankings('anime');
 
     // Invalidate cache of all related animes (when image changes, related pages must refresh)
     try {
