@@ -1073,9 +1073,16 @@ export class AnimesService extends BaseContentService<
   // Use inherited autocomplete() method
 
   async getAnimeRelations(id: number): Promise<RelationsResponse> {
+    // Try to get from cache first (15 minutes TTL)
+    const cacheKey = `anime_relations:${id}`;
+    const cached = await this.cacheService.get(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
     try {
       console.log(`Starting getAnimeRelations for anime ID: ${id}`);
-      
+
       // First check if anime exists
       const anime = await this.prisma.akAnime.findUnique({
         where: { idAnime: id, statut: 1 },
@@ -1282,11 +1289,16 @@ export class AnimesService extends BaseContentService<
         }
       }
 
-      return {
+      const result = {
         anime_id: id,
         relations: relatedContent,
         total: relatedContent.length,
       };
+
+      // Cache for 15 minutes (900 seconds)
+      await this.cacheService.set(cacheKey, result, 900);
+
+      return result;
     } catch (error) {
       console.error('Error in getAnimeRelations:', error);
       throw error;
@@ -1294,6 +1306,13 @@ export class AnimesService extends BaseContentService<
   }
 
   async getAnimeArticles(id: number) {
+    // Try to get from cache first (10 minutes TTL)
+    const cacheKey = `anime_articles:${id}`;
+    const cached = await this.cacheService.get(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
     // First check if anime exists
     const anime = await this.prisma.akAnime.findUnique({
       where: { idAnime: id, statut: 1 },
@@ -1340,7 +1359,7 @@ export class AnimesService extends BaseContentService<
     });
 
     // Format the response
-    return articles
+    const result = articles
       .filter((article) => article.wpPost !== null && article.wpPost.postStatus === 'publish')
       .map((article) => {
         // TypeScript now knows wpPost is not null due to the filter above
@@ -1368,9 +1387,21 @@ export class AnimesService extends BaseContentService<
           coverImage,
         };
       });
+
+    // Cache for 10 minutes (600 seconds)
+    await this.cacheService.set(cacheKey, result, 600);
+
+    return result;
   }
 
   async getAnimeStaff(id: number) {
+    // Try to get from cache first (15 minutes TTL)
+    const cacheKey = `anime_staff:${id}`;
+    const cached = await this.cacheService.get(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
     // First check if anime exists
     const anime = await this.prisma.akAnime.findUnique({
       where: { idAnime: id, statut: 1 },
@@ -1404,7 +1435,7 @@ export class AnimesService extends BaseContentService<
       ORDER BY bs.type, b.denomination
     ` as any[];
 
-    return {
+    const result = {
       anime_id: id,
       staff: staff.map((s: any) => ({
         ...s,
@@ -1422,9 +1453,21 @@ export class AnimesService extends BaseContentService<
         },
       })),
     };
+
+    // Cache for 15 minutes (900 seconds)
+    await this.cacheService.set(cacheKey, result, 900);
+
+    return result;
   }
 
   async getSimilarAnimes(id: number, limit: number = 6) {
+    // Try to get from cache first (30 minutes TTL)
+    const cacheKey = `similar_animes:${id}:${limit}`;
+    const cached = await this.cacheService.get(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
     // First check if anime exists
     const anime = await this.prisma.akAnime.findUnique({
       where: { idAnime: id, statut: 1 },
@@ -1574,7 +1617,7 @@ export class AnimesService extends BaseContentService<
             LIMIT ${limit}
     ` as any[];
 
-    return {
+    const result = {
       anime_id: id,
       similar: similarAnimes.map((a: any) => ({
         id: a.idAnime,
@@ -1591,6 +1634,11 @@ export class AnimesService extends BaseContentService<
         similarityScore: Number(a.similarity_score),
       })),
     };
+
+    // Cache for 30 minutes (1800 seconds)
+    await this.cacheService.set(cacheKey, result, 1800);
+
+    return result;
   }
 
   private formatAnime(anime: any, season?: any, tags?: any[]) {
@@ -1664,6 +1712,14 @@ export class AnimesService extends BaseContentService<
     await this.cacheService.invalidateSearchCache();
     // Invalidate rankings as anime updates may affect top/flop lists
     await this.cacheService.invalidateRankings('anime');
+
+    // Invalidate specific endpoint caches for this anime
+    await Promise.all([
+      this.cacheService.del(`anime_staff:${id}`),
+      this.cacheService.del(`anime_relations:${id}`),
+      this.cacheService.del(`anime_articles:${id}`),
+      this.cacheService.del(`similar_animes:${id}:6`), // Default limit is 6
+    ]);
 
     // Invalidate cache of all related animes (when image changes, related pages must refresh)
     try {
