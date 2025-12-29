@@ -13,7 +13,10 @@ import {
   HttpCode,
   HttpStatus,
   BadRequestException,
+  UploadedFile,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import {
   ApiTags,
   ApiOperation,
@@ -23,6 +26,7 @@ import {
   ApiQuery,
 } from '@nestjs/swagger';
 import { AnimesService } from './animes.service';
+import { AnimeImageService } from './services/anime-image.service';
 import { CreateAnimeDto } from './dto/create-anime.dto';
 import { UpdateAnimeDto } from './dto/update-anime.dto';
 import { AnimeQueryDto } from './dto/anime-query.dto';
@@ -35,7 +39,10 @@ import { AdminGuard } from '../../common/guards/admin.guard';
 @ApiTags('Animes')
 @Controller('animes')
 export class AnimesController {
-  constructor(private readonly animesService: AnimesService) {}
+  constructor(
+    private readonly animesService: AnimesService,
+    private readonly animeImageService: AnimeImageService,
+  ) {}
 
   @Get()
   @ApiOperation({ summary: 'Liste des animes avec pagination et filtres' })
@@ -534,5 +541,155 @@ export class AnimesController {
     @Param('businessId', ParseIntPipe) businessId: number,
   ) {
     return this.animesService.removeAnimeBusiness(animeId, businessId);
+  }
+
+  // ===== Image Management =====
+
+  @Get('no-image')
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Liste des animes sans image (Admin seulement)' })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    description: "Nombre d'animes à retourner",
+    example: 50,
+  })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    description: 'Numéro de page',
+    example: 1,
+  })
+  @ApiResponse({ status: 200, description: 'Liste des animes sans image' })
+  @ApiResponse({ status: 401, description: 'Authentification requise' })
+  @ApiResponse({ status: 403, description: "Droits d'administrateur requis" })
+  async getAnimesWithoutImage(
+    @Query('limit') limit?: string,
+    @Query('page') page?: string,
+  ) {
+    return this.animeImageService.getAnimesWithoutImage(
+      page ? parseInt(page) : 1,
+      limit ? parseInt(limit) : 50,
+    );
+  }
+
+  @Post('batch-image/jikan')
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Traitement par lot des images depuis Jikan (Admin/AI Orchestrator)',
+    description: 'Traite plusieurs animes en une seule requête. Si aucun ID fourni, traite les animes sans image.'
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Résultats du traitement par lot avec détails pour chaque anime',
+    schema: {
+      type: 'object',
+      properties: {
+        results: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              animeId: { type: 'number' },
+              titre: { type: 'string' },
+              success: { type: 'boolean' },
+              imageUrl: { type: 'string' },
+              source: { type: 'string' },
+              error: { type: 'string' }
+            }
+          }
+        },
+        summary: {
+          type: 'object',
+          properties: {
+            total: { type: 'number' },
+            success: { type: 'number' },
+            failed: { type: 'number' }
+          }
+        }
+      }
+    }
+  })
+  @ApiResponse({ status: 401, description: 'Authentification requise' })
+  @ApiResponse({ status: 403, description: "Droits d'administrateur requis" })
+  async batchUpdateImagesFromJikan(
+    @Body() body: { animeIds?: number[]; limit?: number },
+  ) {
+    return this.animeImageService.batchUpdateImagesFromJikan(
+      body.animeIds,
+      body.limit || 10,
+    );
+  }
+
+  @Post(':id/auto-image')
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: "Mise à jour automatique de l'image (Admin/AI Orchestrator)",
+    description: "Détecte automatiquement la meilleure source et met à jour l'image. Idéal pour les orchestrateurs IA."
+  })
+  @ApiParam({ name: 'id', description: "ID de l'anime", type: 'number' })
+  @ApiResponse({ status: 200, description: 'Image mise à jour automatiquement avec succès' })
+  @ApiResponse({ status: 401, description: 'Authentification requise' })
+  @ApiResponse({ status: 403, description: "Droits d'administrateur requis" })
+  @ApiResponse({ status: 404, description: 'Anime introuvable ou aucune image disponible' })
+  async autoUpdateImage(@Param('id', ParseIntPipe) id: number) {
+    return this.animeImageService.autoUpdateImage(id);
+  }
+
+  @Post(':id/image/jikan')
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: "Mettre à jour l'image depuis Jikan/MyAnimeList (Admin seulement)" })
+  @ApiParam({ name: 'id', description: "ID de l'anime", type: 'number' })
+  @ApiResponse({ status: 200, description: 'Image mise à jour avec succès depuis Jikan' })
+  @ApiResponse({ status: 401, description: 'Authentification requise' })
+  @ApiResponse({ status: 403, description: "Droits d'administrateur requis" })
+  @ApiResponse({ status: 404, description: 'Anime introuvable ou aucune correspondance sur MyAnimeList' })
+  async updateImageFromJikan(@Param('id', ParseIntPipe) id: number) {
+    return this.animeImageService.updateImageFromJikan(id);
+  }
+
+  @Post(':id/image/url')
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: "Mettre à jour l'image depuis une URL (Admin seulement)" })
+  @ApiParam({ name: 'id', description: "ID de l'anime", type: 'number' })
+  @ApiResponse({ status: 200, description: 'Image mise à jour avec succès depuis URL' })
+  @ApiResponse({ status: 400, description: 'URL invalide' })
+  @ApiResponse({ status: 401, description: 'Authentification requise' })
+  @ApiResponse({ status: 403, description: "Droits d'administrateur requis" })
+  @ApiResponse({ status: 404, description: 'Anime introuvable' })
+  async updateImageFromUrl(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: { imageUrl: string },
+  ) {
+    if (!body.imageUrl) {
+      throw new BadRequestException('imageUrl is required');
+    }
+    return this.animeImageService.updateImageFromUrl(id, body.imageUrl);
+  }
+
+  @Post(':id/image/upload')
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @UseInterceptors(FileInterceptor('file'))
+  @ApiOperation({ summary: "Télécharger une image depuis le PC (Admin seulement)" })
+  @ApiParam({ name: 'id', description: "ID de l'anime", type: 'number' })
+  @ApiResponse({ status: 200, description: 'Image téléchargée avec succès' })
+  @ApiResponse({ status: 400, description: 'Fichier invalide ou trop volumineux' })
+  @ApiResponse({ status: 401, description: 'Authentification requise' })
+  @ApiResponse({ status: 403, description: "Droits d'administrateur requis" })
+  @ApiResponse({ status: 404, description: 'Anime introuvable' })
+  async updateImageFromFile(
+    @Param('id', ParseIntPipe) id: number,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    if (!file) {
+      throw new BadRequestException('No file uploaded');
+    }
+    return this.animeImageService.updateImageFromFile(id, file);
   }
 }

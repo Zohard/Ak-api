@@ -13,6 +13,7 @@ import { AnimeTrailersService } from './services/anime-trailers.service';
 import { AnimeRankingsService } from './services/anime-rankings.service';
 import { AnimeExternalService } from './services/anime-external.service';
 import { AnimeCacheService } from './services/anime-cache.service';
+import { AnimeImageService } from './services/anime-image.service';
 
 @Module({
   imports: [MediaModule, AniListModule, JikanModule, AdminLoggingModule],
@@ -27,6 +28,7 @@ import { AnimeCacheService } from './services/anime-cache.service';
     AnimeRankingsService,
     AnimeExternalService,
     AnimeCacheService,
+    AnimeImageService,
   ],
   exports: [AnimesService],
 })
