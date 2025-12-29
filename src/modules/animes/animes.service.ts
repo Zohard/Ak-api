@@ -16,6 +16,12 @@ import { ImageKitService } from '../media/imagekit.service';
 import { AniListService } from '../anilist/anilist.service';
 import { Prisma } from '@prisma/client';
 import { hasAdminAccess } from '../../shared/constants/rbac.constants';
+import { AnimeRelationsService } from './services/anime-relations.service';
+import { AnimeStaffService } from './services/anime-staff.service';
+import { AnimeTrailersService } from './services/anime-trailers.service';
+import { AnimeRankingsService } from './services/anime-rankings.service';
+import { AnimeExternalService } from './services/anime-external.service';
+import { AnimeCacheService } from './services/anime-cache.service';
 
 @Injectable()
 export class AnimesService extends BaseContentService<
@@ -30,6 +36,12 @@ export class AnimesService extends BaseContentService<
     private readonly imageKitService: ImageKitService,
     private readonly aniListService: AniListService,
     private readonly adminLoggingService: AdminLoggingService,
+    private readonly animeRelationsService: AnimeRelationsService,
+    private readonly animeStaffService: AnimeStaffService,
+    private readonly animeTrailersService: AnimeTrailersService,
+    private readonly animeRankingsService: AnimeRankingsService,
+    private readonly animeExternalService: AnimeExternalService,
+    private readonly animeCacheService: AnimeCacheService,
   ) {
     super(prisma);
   }
@@ -597,217 +609,16 @@ export class AnimesService extends BaseContentService<
   }
 
   async getTopAnimes(limit = 10, type = 'reviews-bayes') {
-    // Try to get from cache first (1 hour TTL)
-    const cached = await this.cacheService.getRankings('anime', 'top', type, limit);
-    if (cached) {
-      return cached;
-    }
-
-    let animes: any[];
-
-    // Collection-based rankings (ratings are out of 5)
-    if (type === 'collection-bayes' || type === 'collection-avg') {
-      const minRatings = type === 'collection-bayes' ? 10 : 3;
-
-      // Use raw SQL to calculate average from collection ratings
-      // Collection ratings are /5, so we multiply by 2 to get /10 for consistency
-      const results = await this.prisma.$queryRaw<Array<{
-        id_anime: number;
-        avg_rating: number;
-        num_ratings: number
-      }>>`
-        SELECT
-          a.id_anime,
-          (AVG(c.evaluation) * 2)::float as avg_rating,
-          COUNT(c.evaluation)::int as num_ratings
-        FROM ak_animes a
-        INNER JOIN collection_animes c ON a.id_anime = c.id_anime
-        WHERE a.statut = 1 AND c.evaluation > 0
-        GROUP BY a.id_anime
-        HAVING COUNT(c.evaluation) >= ${minRatings}
-        ORDER BY AVG(c.evaluation) DESC, COUNT(c.evaluation) DESC
-        LIMIT ${limit}
-      `;
-
-      // Fetch full anime details for each result
-      const animeIds = results.map(r => r.id_anime);
-      animes = await this.prisma.akAnime.findMany({
-        where: { idAnime: { in: animeIds }, statut: 1 },
-        include: {
-          reviews: {
-            take: 2,
-            orderBy: { dateCritique: 'desc' },
-            include: {
-              membre: {
-                select: { idMember: true, memberName: true },
-              },
-            },
-          },
-        },
-      });
-
-      // Sort animes in the same order as results and add collection stats
-      const animeMap = new Map(animes.map(a => [a.idAnime, a]));
-      animes = results.map(r => {
-        const anime = animeMap.get(r.id_anime);
-        return anime ? {
-          ...anime,
-          moyenneNotes: r.avg_rating, // Use collection average (converted to /10)
-          nbReviews: r.num_ratings, // Show number of collection ratings
-        } : null;
-      }).filter(Boolean);
-
-    } else {
-      // Reviews-based rankings (existing logic)
-      const minReviews = type === 'reviews-bayes' ? 10 : 3;
-      animes = await this.prisma.executeWithRetry(() =>
-        this.prisma.akAnime.findMany({
-          where: {
-            statut: 1,
-            nbReviews: { gte: minReviews },
-          },
-          orderBy: [{ moyenneNotes: 'desc' }, { nbReviews: 'desc' }],
-          take: limit,
-          include: {
-            reviews: {
-              take: 2,
-              orderBy: { dateCritique: 'desc' },
-              include: {
-                membre: {
-                  select: { idMember: true, memberName: true },
-                },
-              },
-            },
-          },
-        })
-      );
-    }
-
-    const result = {
-      topAnimes: animes.map(this.formatAnime.bind(this)),
-      rankingType: type,
-      generatedAt: new Date().toISOString(),
-    };
-
-    // Cache for 1 hour (3600 seconds)
-    await this.cacheService.setRankings('anime', 'top', type, limit, result);
-
-    return result;
+    return this.animeRankingsService.getTopAnimes(limit, type);
   }
 
   async getFlopAnimes(limit = 20, type = 'reviews-bayes') {
-    // Try to get from cache first (1 hour TTL)
-    const cached = await this.cacheService.getRankings('anime', 'flop', type, limit);
-    if (cached) {
-      return cached;
-    }
-
-    let animes: any[];
-
-    // Collection-based rankings (ratings are out of 5)
-    if (type === 'collection-bayes' || type === 'collection-avg') {
-      const minRatings = type === 'collection-bayes' ? 10 : 3;
-
-      // Use raw SQL to calculate average from collection ratings
-      // Collection ratings are /5, so we multiply by 2 to get /10 for consistency
-      const results = await this.prisma.$queryRaw<Array<{
-        id_anime: number;
-        avg_rating: number;
-        num_ratings: number
-      }>>`
-        SELECT
-          a.id_anime,
-          (AVG(c.evaluation) * 2)::float as avg_rating,
-          COUNT(c.evaluation)::int as num_ratings
-        FROM ak_animes a
-        INNER JOIN collection_animes c ON a.id_anime = c.id_anime
-        WHERE a.statut = 1 AND c.evaluation > 0
-        GROUP BY a.id_anime
-        HAVING COUNT(c.evaluation) >= ${minRatings}
-        ORDER BY AVG(c.evaluation) ASC, COUNT(c.evaluation) DESC
-        LIMIT ${limit}
-      `;
-
-      // Fetch full anime details for each result
-      const animeIds = results.map(r => r.id_anime);
-      animes = await this.prisma.akAnime.findMany({
-        where: { idAnime: { in: animeIds }, statut: 1 },
-        include: {
-          reviews: {
-            take: 2,
-            orderBy: { dateCritique: 'desc' },
-            include: {
-              membre: {
-                select: { idMember: true, memberName: true },
-              },
-            },
-          },
-        },
-      });
-
-      // Sort animes in the same order as results and add collection stats
-      const animeMap = new Map(animes.map(a => [a.idAnime, a]));
-      animes = results.map(r => {
-        const anime = animeMap.get(r.id_anime);
-        return anime ? {
-          ...anime,
-          moyenneNotes: r.avg_rating, // Use collection average (converted to /10)
-          nbReviews: r.num_ratings, // Show number of collection ratings
-        } : null;
-      }).filter(Boolean);
-
-    } else {
-      // Reviews-based rankings (existing logic)
-      const minReviews = type === 'reviews-bayes' ? 10 : 3;
-      animes = await this.prisma.executeWithRetry(() =>
-        this.prisma.akAnime.findMany({
-          where: {
-            statut: 1,
-            nbReviews: { gte: minReviews },
-          },
-          orderBy: [{ moyenneNotes: 'asc' }, { nbReviews: 'desc' }],
-          take: limit,
-          include: {
-            reviews: {
-              take: 2,
-              orderBy: { dateCritique: 'desc' },
-              include: {
-                membre: {
-                  select: { idMember: true, memberName: true },
-                },
-              },
-            },
-          },
-        })
-      );
-    }
-
-    const result = {
-      flopAnimes: animes.map(this.formatAnime.bind(this)),
-      rankingType: type,
-      generatedAt: new Date().toISOString(),
-    };
-
-    // Cache for 1 hour (3600 seconds)
-    await this.cacheService.setRankings('anime', 'flop', type, limit, result);
-
-    return result;
+    return this.animeRankingsService.getFlopAnimes(limit, type);
   }
 
   async getRandomAnime() {
-    // Get random anime using raw SQL for better performance
-    const randomAnime = await this.prisma.$queryRaw<Array<{ id_anime: number }>>`
-      SELECT id_anime FROM ak_animes 
-      WHERE statut = 1 
-      ORDER BY RANDOM() 
-      LIMIT 1
-    `;
-
-    if (randomAnime.length === 0) {
-      throw new NotFoundException('Aucun anime disponible');
-    }
-
-    return this.findOne(randomAnime[0].id_anime);
+    const randomResult = await this.animeRankingsService.getRandomAnime();
+    return this.findOne(randomResult.id);
   }
 
   // Use inherited getGenres() method
@@ -904,109 +715,11 @@ export class AnimesService extends BaseContentService<
   }
 
   async searchAniList(query: string, limit = 10) {
-    try {
-      // Create cache key for AniList search
-      const cacheKey = `anilist_search:${this.hashQuery(query)}:${limit}`;
-
-      // Try to get from cache first
-      const cached = await this.cacheService.get(cacheKey);
-      if (cached) {
-        return cached;
-      }
-
-      const results = await this.aniListService.searchAnime(query, limit);
-      const result = {
-        animes: results,
-        total: results.length,
-        query,
-        source: 'AniList',
-      };
-
-      // Cache the result for 2 hours (7200 seconds)
-      await this.cacheService.set(cacheKey, result, 7200);
-
-      return result;
-    } catch (error) {
-      console.error('Error searching AniList:', error.message);
-      throw new Error('Failed to search AniList');
-    }
+    return this.animeExternalService.searchAniList(query, limit);
   }
 
   async importSeasonalAnimeFromAniList(season: string, year: number, limit = 50) {
-    try {
-      // Create cache key for seasonal anime data
-      const cacheKey = `anilist_season:${season}:${year}:${limit}`;
-
-      // Try to get from cache first
-      const cached = await this.cacheService.get(cacheKey);
-      if (cached) {
-        return cached;
-      }
-
-      const seasonalAnime = await this.aniListService.getAnimesBySeason(season, year, limit);
-
-      const comparisons: any[] = [];
-
-      for (const anilistAnime of seasonalAnime) {
-        const primaryTitle = anilistAnime.title.romaji || anilistAnime.title.english || anilistAnime.title.native;
-
-        const orConditions: any[] = [];
-
-        if (primaryTitle) {
-          orConditions.push({ titre: { equals: primaryTitle, mode: Prisma.QueryMode.insensitive } });
-          orConditions.push({ titresAlternatifs: { contains: primaryTitle, mode: Prisma.QueryMode.insensitive } });
-        }
-
-        if (anilistAnime.title.native) {
-          orConditions.push({ titreOrig: { equals: anilistAnime.title.native, mode: Prisma.QueryMode.insensitive } });
-          orConditions.push({ titresAlternatifs: { contains: anilistAnime.title.native, mode: Prisma.QueryMode.insensitive } });
-        }
-
-        if (anilistAnime.title.english) {
-          orConditions.push({ titreFr: { equals: anilistAnime.title.english, mode: Prisma.QueryMode.insensitive } });
-          orConditions.push({ titresAlternatifs: { contains: anilistAnime.title.english, mode: Prisma.QueryMode.insensitive } });
-        }
-
-        const existingAnime = await this.prisma.akAnime.findFirst({
-          where: {
-            OR: orConditions,
-          },
-          select: {
-            idAnime: true,
-            titre: true,
-            titreOrig: true,
-            titreFr: true,
-            titresAlternatifs: true,
-          },
-        });
-
-        const comparison = {
-          titre: primaryTitle,
-          exists: !!existingAnime,
-          existingAnimeId: existingAnime?.idAnime,
-          anilistData: anilistAnime,
-          scrapedData: this.aniListService.mapToCreateAnimeDto(anilistAnime),
-        };
-
-        comparisons.push(comparison);
-      }
-
-      const result = {
-        season,
-        year,
-        total: seasonalAnime.length,
-        comparisons,
-        source: 'AniList',
-      };
-
-      // Cache the result for 5 minutes (300 seconds)
-      await this.cacheService.set(cacheKey, result, 300);
-
-      return result;
-    } catch (error) {
-      console.error('Error importing seasonal anime from AniList:', error.message);
-      throw new Error('Failed to import seasonal anime from AniList');
-    }
+    return this.animeExternalService.importSeasonalAnimeFromAniList(season, year, limit);
   }
 
   async getAnimeTags(id: number) {
@@ -1395,69 +1108,7 @@ export class AnimesService extends BaseContentService<
   }
 
   async getAnimeStaff(id: number) {
-    // Try to get from cache first (15 minutes TTL)
-    const cacheKey = `anime_staff:${id}`;
-    const cached = await this.cacheService.get(cacheKey);
-    if (cached) {
-      return cached;
-    }
-
-    // First check if anime exists
-    const anime = await this.prisma.akAnime.findUnique({
-      where: { idAnime: id, statut: 1 },
-      select: { idAnime: true },
-    });
-
-    if (!anime) {
-      throw new NotFoundException('Anime introuvable');
-    }
-
-    // Get staff/business relations
-    const staff = await this.prisma.$queryRaw`
-      SELECT 
-        bs.id_relation as idRelation,
-        bs.id_anime as idAnime,
-        bs.id_business as idBusiness,
-        bs.type,
-        bs.precisions,
-        b.denomination,
-        b.autres_denominations as autresDenominations,
-        b.type as businessType,
-        b.image,
-        b.notes,
-        b.origine,
-        b.site_officiel as siteOfficiel,
-        b.date,
-        b.statut
-      FROM ak_business_to_animes bs
-      JOIN ak_business b ON bs.id_business = b.id_business
-      WHERE bs.id_anime = ${id}
-      ORDER BY bs.type, b.denomination
-    ` as any[];
-
-    const result = {
-      anime_id: id,
-      staff: staff.map((s: any) => ({
-        ...s,
-        business: {
-          idBusiness: s.idBusiness,
-          denomination: s.denomination,
-          autresDenominations: s.autresDenominations,
-          type: s.businessType,
-          image: s.image,
-          notes: s.notes,
-          origine: s.origine,
-          siteOfficiel: s.siteOfficiel,
-          date: s.date,
-          statut: s.statut,
-        },
-      })),
-    };
-
-    // Cache for 15 minutes (900 seconds)
-    await this.cacheService.set(cacheKey, result, 900);
-
-    return result;
+    return this.animeStaffService.getAnimeStaff(id);
   }
 
   async getSimilarAnimes(id: number, limit: number = 6) {
@@ -1686,23 +1337,7 @@ export class AnimesService extends BaseContentService<
 
   // Cache helper methods
   private createCacheKey(query: AnimeQueryDto): string {
-    const {
-      page = 1,
-      limit = 20,
-      search = '',
-      studio = '',
-      annee = '',
-      statut = '',
-      format = '',
-      genre = [],
-      sortBy = 'dateAjout',
-      sortOrder = 'desc',
-      includeReviews = false,
-      includeEpisodes = false,
-    } = query;
-
-    const genreKey = Array.isArray(genre) ? genre.sort().join(',') : (genre || '');
-    return `${page}_${limit}_${search}_${studio}_${annee}_${statut}_${format}_${genreKey}_${sortBy}_${sortOrder}_${includeReviews}_${includeEpisodes}`;
+    return this.animeCacheService.createCacheKey(query);
   }
 
   // Cache invalidation methods
@@ -1762,99 +1397,15 @@ export class AnimesService extends BaseContentService<
   // ===== Trailer Management =====
 
   async createTrailer(createTrailerDto: any, username?: string) {
-    // Verify anime exists
-    const anime = await this.prisma.akAnime.findUnique({
-      where: { idAnime: createTrailerDto.idAnime },
-    });
-
-    if (!anime) {
-      throw new NotFoundException('Anime introuvable');
-    }
-
-    const trailer = await this.prisma.akAnimesTrailer.create({
-      data: {
-        idAnime: createTrailerDto.idAnime,
-        titre: createTrailerDto.titre,
-        url: createTrailerDto.url,
-        platform: createTrailerDto.platform,
-        langue: createTrailerDto.langue || 'ja',
-        typeTrailer: createTrailerDto.typeTrailer || 'PV',
-        ordre: createTrailerDto.ordre || 0,
-        statut: createTrailerDto.statut !== undefined ? createTrailerDto.statut : 1,
-      },
-    });
-
-    // Log activity
-    if (username) {
-      await this.adminLoggingService.addLog(
-        createTrailerDto.idAnime,
-        'anime',
-        username,
-        `Ajout vidéo: ${trailer.titre || trailer.typeTrailer} (${trailer.platform})`
-      );
-    }
-
-    // Invalidate anime cache
-    await this.cacheService.invalidateAnime(createTrailerDto.idAnime);
-
-    return trailer;
+    return this.animeTrailersService.createTrailer(createTrailerDto, username);
   }
 
   async updateTrailer(trailerId: number, updateTrailerDto: any, username?: string) {
-    const trailer = await this.prisma.akAnimesTrailer.findUnique({
-      where: { idTrailer: trailerId },
-    });
-
-    if (!trailer) {
-      throw new NotFoundException('Bande-annonce introuvable');
-    }
-
-    const updated = await this.prisma.akAnimesTrailer.update({
-      where: { idTrailer: trailerId },
-      data: updateTrailerDto,
-    });
-
-    // Log activity
-    if (username) {
-      await this.adminLoggingService.addLog(
-        trailer.idAnime,
-        'anime',
-        username,
-        `Modification vidéo: ${updated.titre || updated.typeTrailer} (${updated.platform})`
-      );
-    }
-
-    // Invalidate anime cache
-    await this.cacheService.invalidateAnime(trailer.idAnime);
-
-    return updated;
+    return this.animeTrailersService.updateTrailer(trailerId, updateTrailerDto, username);
   }
 
   async removeTrailer(trailerId: number, username?: string) {
-    const trailer = await this.prisma.akAnimesTrailer.findUnique({
-      where: { idTrailer: trailerId },
-    });
-
-    if (!trailer) {
-      throw new NotFoundException('Bande-annonce introuvable');
-    }
-
-    await this.prisma.akAnimesTrailer.delete({
-      where: { idTrailer: trailerId },
-    });
-
-    // Log activity
-    if (username) {
-      await this.adminLoggingService.addLog(
-        trailer.idAnime,
-        'anime',
-        username,
-        `Suppression vidéo: ${trailer.titre || trailer.typeTrailer} (${trailer.platform})`
-      );
-    }
-
-    // Invalidate anime cache
-    await this.cacheService.invalidateAnime(trailer.idAnime);
+    return this.animeTrailersService.removeTrailer(trailerId, username);
   }
 
   // ===== Business Relationships Management =====
