@@ -36,6 +36,7 @@ import { HealthModule } from './modules/health/health.module';
 import { ReviewReportsModule } from './modules/review-reports/review-reports.module';
 import { IgdbModule } from './modules/igdb/igdb.module';
 import { RbacModule } from './modules/rbac/rbac.module';
+import { ToolsModule } from './modules/admin/tools/tools.module';
 import { PrismaService } from './shared/services/prisma.service';
 import { CacheService } from './shared/services/cache.service';
 import { ActivityTrackerService } from './shared/services/activity-tracker.service';
@@ -69,6 +70,7 @@ import jwtConfig from './config/jwt.config';
     BusinessModule,
     AdminModule,
     RbacModule,
+    ToolsModule,
     MediaModule,
     NotificationsModule,
     ArticlesModule,
