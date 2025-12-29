@@ -95,7 +95,7 @@ export class AnimeExternalService {
           exists: !!existingAnime,
           existingAnimeId: existingAnime?.idAnime,
           anilistData: anilistAnime,
-          scrapedData: this.aniListService.mapToCreateAnimeDto(anilistAnime),
+          scrapedData: await this.aniListService.mapToCreateAnimeDto(anilistAnime),
         };
 
         comparisons.push(comparison);

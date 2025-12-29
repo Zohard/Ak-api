@@ -5,6 +5,7 @@ import { PrismaService } from '../../shared/services/prisma.service';
 import { CacheService } from '../../shared/services/cache.service';
 import { MediaModule } from '../media/media.module';
 import { AniListModule } from '../anilist/anilist.module';
+import { JikanModule } from '../jikan/jikan.module';
 import { AdminLoggingModule } from '../admin/logging/admin-logging.module';
 import { AnimeRelationsService } from './services/anime-relations.service';
 import { AnimeStaffService } from './services/anime-staff.service';
@@ -14,7 +15,7 @@ import { AnimeExternalService } from './services/anime-external.service';
 import { AnimeCacheService } from './services/anime-cache.service';
 
 @Module({
-  imports: [MediaModule, AniListModule, AdminLoggingModule],
+  imports: [MediaModule, AniListModule, JikanModule, AdminLoggingModule],
   controllers: [AnimesController],
   providers: [
     AnimesService,

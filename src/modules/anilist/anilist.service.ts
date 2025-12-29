@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import axios, { AxiosInstance } from 'axios';
 import { CreateBusinessDto } from '../business/dto/create-business.dto';
+import { JikanService } from '../jikan/jikan.service';
 
 export interface AniListAnime {
   id: number;
@@ -172,7 +173,10 @@ export class AniListService {
   private readonly httpClient: AxiosInstance;
   private readonly baseUrl = 'https://graphql.anilist.co';
 
-  constructor(private readonly configService: ConfigService) {
+  constructor(
+    private readonly configService: ConfigService,
+    private readonly jikanService: JikanService,
+  ) {
     this.httpClient = axios.create({
       baseURL: this.baseUrl,
       timeout: 60000, // Increased to 60 seconds for seasonal imports
@@ -406,7 +410,7 @@ export class AniListService {
     }
   }
 
-  mapToCreateAnimeDto(anilistAnime: AniListAnime): Partial<any> {
+  async mapToCreateAnimeDto(anilistAnime: AniListAnime): Promise<Partial<any>> {
     const studios = anilistAnime.studios?.nodes
       ?.filter(studio => studio.isAnimationStudio)
       ?.map(studio => studio.name)
@@ -439,6 +443,24 @@ export class AniListService {
       link.type === 'INFO'
     )?.url || '';
 
+    // Try to fetch better quality image from Jikan/MyAnimeList
+    let imageUrl = anilistAnime.coverImage?.large || anilistAnime.coverImage?.medium;
+    try {
+      const title = anilistAnime.title.romaji || anilistAnime.title.english || anilistAnime.title.native;
+      const year = anilistAnime.seasonYear || anilistAnime.startDate?.year;
+
+      const jikanAnime = await this.jikanService.findBestMatch(title, year);
+      if (jikanAnime) {
+        const jikanImageUrl = this.jikanService.getBestImageUrl(jikanAnime);
+        if (jikanImageUrl) {
+          imageUrl = jikanImageUrl;
+          this.logger.log(`Using Jikan image for "${title}" (better quality)`);
+        }
+      }
+    } catch (error) {
+      this.logger.warn('Failed to fetch Jikan image, using AniList image:', error.message);
+    }
+
     return {
       titre: anilistAnime.title.romaji || anilistAnime.title.english || anilistAnime.title.native,
       titreOrig: anilistAnime.title.native,
@@ -453,7 +475,7 @@ export class AniListService {
         .join('\n'),
       annee: anilistAnime.seasonYear || anilistAnime.startDate?.year,
       dateDiffusion: this.formatDate(anilistAnime.startDate),
-      image: anilistAnime.coverImage?.large || anilistAnime.coverImage?.medium,
+      image: imageUrl,
       nbEp: anilistAnime.episodes,
       studio: studios,
       realisateur: directors,

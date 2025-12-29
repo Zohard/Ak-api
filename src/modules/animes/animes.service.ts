@@ -88,7 +88,7 @@ export class AnimesService extends BaseContentService<
       try {
         const anilistAnime = await this.aniListService.getAnimeById(createAnimeDto.anilistId);
         if (anilistAnime) {
-          const anilistData = this.aniListService.mapToCreateAnimeDto(anilistAnime);
+          const anilistData = await this.aniListService.mapToCreateAnimeDto(anilistAnime);
           // Merge AniList data with provided data, giving priority to provided data
           data = {
             ...anilistData,
@@ -508,11 +508,17 @@ export class AnimesService extends BaseContentService<
       try {
         const anilistAnime = await this.aniListService.getAnimeById(updateAnimeDto.anilistId);
         if (anilistAnime) {
-          const anilistData = this.aniListService.mapToCreateAnimeDto(anilistAnime);
+          const anilistData = await this.aniListService.mapToCreateAnimeDto(anilistAnime);
+
+          // Preserve existing titre if not empty and not being explicitly updated
+          const preserveTitre = anime.titre && !updateData.titre;
+
           // Merge AniList data with provided data, giving priority to provided data
           updateData = {
             ...anilistData,
             ...updateData,
+            // Preserve existing titre if needed
+            ...(preserveTitre && { titre: anime.titre }),
             // Always preserve the AniList ID in the comment field
             commentaire: JSON.stringify({
               anilistId: updateAnimeDto.anilistId,
