@@ -590,12 +590,13 @@ export class MediaService {
     const metadata = await processor.metadata();
 
     // Define size constraints based on type
+    // Increased sizes for anime/manga to preserve quality
     const sizeConstraints = {
       avatar: { width: 150, height: 150 },
-      cover: { width: 400, height: 600 },
-      anime: { width: 800, height: 600 },
-      manga: { width: 400, height: 600 },
-      game: { width: 800, height: 600 },
+      cover: { width: 600, height: 900 },
+      anime: { width: 1200, height: 1800 },
+      manga: { width: 600, height: 900 },
+      game: { width: 1200, height: 1800 },
       business: { width: 400, height: 400 },
     };
 
@@ -612,8 +613,9 @@ export class MediaService {
       });
     }
 
-    // Optimize and convert to WebP for better compression
-    return processor.webp({ quality: 85 }).toBuffer();
+    // Optimize and convert to WebP with high quality (95 for covers, 90 for others)
+    const quality = (type === 'anime' || type === 'manga' || type === 'cover') ? 95 : 90;
+    return processor.webp({ quality }).toBuffer();
   }
 
 
