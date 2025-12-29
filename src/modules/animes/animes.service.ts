@@ -1077,7 +1077,7 @@ export class AnimesService extends BaseContentService<
     const cacheKey = `anime_relations:${id}`;
     const cached = await this.cacheService.get(cacheKey);
     if (cached) {
-      return cached;
+      return cached as RelationsResponse;
     }
 
     try {
