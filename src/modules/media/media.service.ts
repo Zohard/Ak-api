@@ -572,8 +572,40 @@ export class MediaService {
   async deleteMedia(id: number, userId: number) {
     const media = await this.getMediaById(id);
 
-    // TODO: Implement ImageKit file deletion if needed
-    // Files are now stored on ImageKit, not locally
+    // Delete from ImageKit
+    try {
+      // Extract filename from the stored path
+      // filename could be like "screenshots/filename.webp" or just "filename.webp"
+      let filename = (media as any).filename;
+
+      if (filename) {
+        // Remove "screenshots/" prefix if present
+        const cleanFilename = filename.replace(/^screenshots\//, '');
+
+        // Determine the media type and folder path
+        const type = (media as any).type;
+        const typeName = this.getTypeName(type);
+
+        // Build the folder path based on type
+        let folderPath: string;
+        if (typeName === 'game') {
+          folderPath = 'images/games/screenshots';
+        } else {
+          // For anime and manga
+          folderPath = `images/${typeName}s/screenshots`;
+        }
+
+        console.log(`Attempting to delete from ImageKit: ${cleanFilename} in folder: ${folderPath}`);
+
+        // Try to delete from ImageKit
+        await this.imagekitService.deleteExistingImage(cleanFilename, folderPath);
+        console.log(`Successfully deleted from ImageKit: ${cleanFilename}`);
+      }
+    } catch (error) {
+      // Log error but don't fail the entire deletion if ImageKit delete fails
+      console.warn(`Failed to delete from ImageKit (ID: ${id}):`, error.message);
+      // Continue to delete from database even if ImageKit deletion fails
+    }
 
     // Delete from database
     await this.prisma.$executeRaw`

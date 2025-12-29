@@ -104,7 +104,7 @@ export class ImageKitService {
     }
   }
 
-  private async deleteExistingImage(fileName: string, folder: string): Promise<void> {
+  async deleteExistingImage(fileName: string, folder: string): Promise<void> {
     try {
       // Search for existing file with the same name
       // Note: ImageKit's search API has changed, folderPath is no longer supported in searchQuery
