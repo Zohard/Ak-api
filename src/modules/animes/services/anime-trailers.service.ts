@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../../shared/services/prisma.service';
 import { CacheService } from '../../../shared/services/cache.service';
-import { AdminLoggingService } from '../../../shared/services/admin-logging.service';
+import { AdminLoggingService } from '../../admin/logging/admin-logging.service';
 
 @Injectable()
 export class AnimeTrailersService {

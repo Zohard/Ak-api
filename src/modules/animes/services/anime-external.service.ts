@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../shared/services/prisma.service';
 import { CacheService } from '../../../shared/services/cache.service';
-import { AniListService } from '../../../shared/services/anilist.service';
+import { AniListService } from '../../anilist/anilist.service';
 import { Prisma } from '@prisma/client';
 import * as crypto from 'crypto';
 
