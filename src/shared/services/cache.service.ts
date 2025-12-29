@@ -470,6 +470,10 @@ export class CacheService implements OnModuleInit {
   async getKeysByCategory(): Promise<Record<string, string[]>> {
     const categories = {
       anime: 'anime:*',
+      anime_staff: 'anime_staff:*',
+      anime_relations: 'anime_relations:*',
+      anime_articles: 'anime_articles:*',
+      anime_similar: 'similar_animes:*',
       manga: 'manga:*',
       game: 'game:*',
       business: 'business:*',
@@ -550,6 +554,10 @@ export class CacheService implements OnModuleInit {
   async clearCacheByCategory(category: string): Promise<number> {
     const patterns: Record<string, string> = {
       anime: 'anime:*',
+      anime_staff: 'anime_staff:*',
+      anime_relations: 'anime_relations:*',
+      anime_articles: 'anime_articles:*',
+      anime_similar: 'similar_animes:*',
       manga: 'manga:*',
       game: 'game:*',
       business: 'business:*',
