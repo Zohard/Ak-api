@@ -1,12 +1,16 @@
 import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../../shared/services/prisma.service';
+import { CacheService } from '../../shared/services/cache.service';
 import { CreateEventDto, CreateCategoryDto, CreateNomineeDto, EventStatus } from './dto/create-event.dto';
 import { UpdateEventDto } from './dto/update-event.dto';
 import { VoteDto } from './dto/vote.dto';
 
 @Injectable()
 export class EventsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private cacheService: CacheService,
+  ) {}
 
   // Generate slug from title
   private generateSlug(title: string): string {
@@ -61,6 +65,9 @@ export class EventsService {
       }
     }
 
+    // Invalidate events cache
+    await this.cacheService.invalidateAllEvents();
+
     return this.findOne(event.id);
   }
 
@@ -112,6 +119,15 @@ export class EventsService {
 
   // Get all events (public)
   async findAll(status?: string) {
+    // Create cache key based on status filter
+    const cacheKey = status ? `events:status:${status}` : 'events:public';
+
+    // Try to get from cache first (5 minutes TTL)
+    const cached = await this.cacheService.get(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
     const statusFilter = status ? `AND status = '${status}'` : `AND status IN ('active', 'voting', 'closed')`;
 
     const events = await this.prisma.$queryRawUnsafe<any[]>(`
@@ -132,6 +148,9 @@ export class EventsService {
         END,
         created_at DESC
     `);
+
+    // Cache for 5 minutes (300 seconds)
+    await this.cacheService.set(cacheKey, events, 300);
 
     return events;
   }
@@ -302,6 +321,9 @@ export class EventsService {
       await this.prisma.$queryRawUnsafe(query, ...values);
     }
 
+    // Invalidate events cache
+    await this.cacheService.invalidateAllEvents();
+
     return this.findOne(id);
   }
 
@@ -309,6 +331,10 @@ export class EventsService {
   async remove(id: number) {
     await this.findOne(id); // Check exists
     await this.prisma.$queryRaw`DELETE FROM ak_events WHERE id = ${id}`;
+
+    // Invalidate events cache
+    await this.cacheService.invalidateAllEvents();
+
     return { success: true };
   }
 
@@ -412,13 +438,21 @@ export class EventsService {
         AND voting_end <= ${now}
     `;
 
+    // Invalidate events cache since statuses changed
+    await this.cacheService.invalidateAllEvents();
+
     return { success: true };
   }
 
   // Add category to existing event
   async addCategory(eventId: number, categoryDto: CreateCategoryDto) {
     await this.findOne(eventId); // Check event exists
-    return this.createCategory(eventId, categoryDto);
+    const result = await this.createCategory(eventId, categoryDto);
+
+    // Invalidate events cache
+    await this.cacheService.invalidateAllEvents();
+
+    return result;
   }
 
   // Update category
@@ -441,12 +475,19 @@ export class EventsService {
       WHERE id = ${categoryId}
     `;
 
+    // Invalidate events cache
+    await this.cacheService.invalidateAllEvents();
+
     return this.prisma.$queryRaw<any[]>`SELECT * FROM ak_event_categories WHERE id = ${categoryId}`;
   }
 
   // Delete category
   async removeCategory(categoryId: number) {
     await this.prisma.$queryRaw`DELETE FROM ak_event_categories WHERE id = ${categoryId}`;
+
+    // Invalidate events cache
+    await this.cacheService.invalidateAllEvents();
+
     return { success: true };
   }
 
@@ -460,12 +501,21 @@ export class EventsService {
       throw new NotFoundException('Catégorie non trouvée');
     }
 
-    return this.createNominee(categoryId, nomineeDto);
+    const result = await this.createNominee(categoryId, nomineeDto);
+
+    // Invalidate events cache
+    await this.cacheService.invalidateAllEvents();
+
+    return result;
   }
 
   // Delete nominee
   async removeNominee(nomineeId: number) {
     await this.prisma.$queryRaw`DELETE FROM ak_event_nominees WHERE id = ${nomineeId}`;
+
+    // Invalidate events cache
+    await this.cacheService.invalidateAllEvents();
+
     return { success: true };
   }
 

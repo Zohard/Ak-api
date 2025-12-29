@@ -851,13 +851,25 @@ export class ReviewsService {
   }
 
   async getReviewsCount() {
+    // Try to get from cache first (5 minutes TTL)
+    const cacheKey = 'reviews:total_count';
+    const cached = await this.cacheService.get<{ count: number }>(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
     const total = await this.prisma.akCritique.count({
       where: {
         statut: 0, // Only count visible/active reviews
       },
     });
 
-    return { count: total };
+    const result = { count: total };
+
+    // Cache for 5 minutes (300 seconds)
+    await this.cacheService.set(cacheKey, result, 300);
+
+    return result;
   }
 
   async checkUserReview(userId: number, type: 'anime' | 'manga' | 'game', contentId: number) {

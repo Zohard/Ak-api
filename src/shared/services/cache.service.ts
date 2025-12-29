@@ -353,6 +353,36 @@ export class CacheService implements OnModuleInit {
     this.logger.debug(`Invalidated article cache for ID: ${id}`);
   }
 
+  // Events cache methods
+  async getEvent(id: number): Promise<any> {
+    return this.get(`event:${id}`);
+  }
+
+  async setEvent(id: number, event: any, ttl = 300): Promise<void> {
+    await this.set(`event:${id}`, event, ttl); // 5 minutes for individual events
+  }
+
+  async getEventsList(key: string): Promise<any> {
+    return this.get(`events:${key}`);
+  }
+
+  async setEventsList(key: string, events: any, ttl = 300): Promise<void> {
+    await this.set(`events:${key}`, events, ttl); // 5 minutes for events lists
+  }
+
+  async invalidateEvent(id: number): Promise<void> {
+    await Promise.all([
+      this.del(`event:${id}`),
+      this.delByPattern(`events:*`), // Invalidate all events lists
+    ]);
+    this.logger.debug(`Invalidated event cache for ID: ${id}`);
+  }
+
+  async invalidateAllEvents(): Promise<void> {
+    await this.delByPattern(`events:*`);
+    this.logger.debug('Invalidated all events cache');
+  }
+
   // Health check method
   async isHealthy(): Promise<boolean> {
     if (!this.redis) return false;
@@ -397,7 +427,8 @@ export class CacheService implements OnModuleInit {
       rankings: 'rankings:*',
       lists: 'lists*',
       collections: 'user_collections:*',
-      top: 'top:*'
+      top: 'top:*',
+      events: 'events:*'
     };
 
     const result: Record<string, string[]> = {};
@@ -476,6 +507,7 @@ export class CacheService implements OnModuleInit {
       lists: 'lists*',
       collections: 'user_collections:*',
       top: 'top:*',
+      events: 'events:*',
       all: '*'
     };
 
