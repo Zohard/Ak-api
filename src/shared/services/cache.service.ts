@@ -383,6 +383,60 @@ export class CacheService implements OnModuleInit {
     this.logger.debug('Invalidated all events cache');
   }
 
+  // Forums cache methods
+  async getForumCategories(userId?: number): Promise<any> {
+    const userKey = userId ? `:user${userId}` : ':public';
+    return this.get(`forums:categories${userKey}`);
+  }
+
+  async setForumCategories(categories: any, userId?: number, ttl = 600): Promise<void> {
+    const userKey = userId ? `:user${userId}` : ':public';
+    await this.set(`forums:categories${userKey}`, categories, ttl); // 10 minutes
+  }
+
+  async getForumBoard(boardId: number, page: number, limit: number, userId?: number): Promise<any> {
+    const userKey = userId ? `:user${userId}` : ':public';
+    return this.get(`forums:board:${boardId}:page${page}:limit${limit}${userKey}`);
+  }
+
+  async setForumBoard(boardId: number, page: number, limit: number, data: any, userId?: number, ttl = 120): Promise<void> {
+    const userKey = userId ? `:user${userId}` : ':public';
+    await this.set(`forums:board:${boardId}:page${page}:limit${limit}${userKey}`, data, ttl); // 2 minutes
+  }
+
+  async getForumTopic(topicId: number, page: number, limit: number): Promise<any> {
+    return this.get(`forums:topic:${topicId}:page${page}:limit${limit}`);
+  }
+
+  async setForumTopic(topicId: number, page: number, limit: number, data: any, ttl = 60): Promise<void> {
+    await this.set(`forums:topic:${topicId}:page${page}:limit${limit}`, data, ttl); // 1 minute
+  }
+
+  async getLatestForumMessages(limit: number, offset: number, boardId?: number): Promise<any> {
+    const boardKey = boardId ? `:board${boardId}` : ':all';
+    return this.get(`forums:messages:latest:limit${limit}:offset${offset}${boardKey}`);
+  }
+
+  async setLatestForumMessages(limit: number, offset: number, boardId: number | undefined, messages: any, ttl = 30): Promise<void> {
+    const boardKey = boardId ? `:board${boardId}` : ':all';
+    await this.set(`forums:messages:latest:limit${limit}:offset${offset}${boardKey}`, messages, ttl); // 30 seconds
+  }
+
+  async invalidateForumTopic(topicId: number): Promise<void> {
+    await this.delByPattern(`forums:topic:${topicId}:*`);
+    this.logger.debug(`Invalidated forum topic cache for ID: ${topicId}`);
+  }
+
+  async invalidateForumBoard(boardId: number): Promise<void> {
+    await this.delByPattern(`forums:board:${boardId}:*`);
+    this.logger.debug(`Invalidated forum board cache for ID: ${boardId}`);
+  }
+
+  async invalidateAllForums(): Promise<void> {
+    await this.delByPattern('forums:*');
+    this.logger.debug('Invalidated all forums cache');
+  }
+
   // Health check method
   async isHealthy(): Promise<boolean> {
     if (!this.redis) return false;
@@ -428,7 +482,8 @@ export class CacheService implements OnModuleInit {
       lists: 'lists*',
       collections: 'user_collections:*',
       top: 'top:*',
-      events: 'events:*'
+      events: 'events:*',
+      forums: 'forums:*'
     };
 
     const result: Record<string, string[]> = {};
@@ -508,6 +563,7 @@ export class CacheService implements OnModuleInit {
       collections: 'user_collections:*',
       top: 'top:*',
       events: 'events:*',
+      forums: 'forums:*',
       all: '*'
     };
 

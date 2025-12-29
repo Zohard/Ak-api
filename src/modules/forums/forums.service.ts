@@ -1,15 +1,25 @@
 import { Injectable, Logger, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../../shared/services/prisma.service';
+import { CacheService } from '../../shared/services/cache.service';
 import { ForumMessageQueryDto, ForumMessage, ForumMessageResponse } from './dto/forum-message.dto';
 
 @Injectable()
 export class ForumsService {
   private readonly logger = new Logger(ForumsService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly cacheService: CacheService,
+  ) {}
 
   async getCategories(userId?: number) {
     try {
+      // Try to get from cache first (10 minutes TTL)
+      const cached = await this.cacheService.getForumCategories(userId);
+      if (cached) {
+        return cached;
+      }
+
       // Fetch user groups ONCE at the start (HUGE performance improvement!)
       const userGroups = userId ? await this.getUserGroups(userId) : [0];
 
@@ -161,6 +171,9 @@ export class ForumsService {
       // Filter out categories with no accessible boards
       const categoriesWithBoards = filteredCategories.filter(category => category.boards.length > 0);
 
+      // Cache for 10 minutes (600 seconds)
+      await this.cacheService.setForumCategories(categoriesWithBoards, userId, 600);
+
       return categoriesWithBoards;
     } catch (error) {
       this.logger.error('=== ERROR in getCategories ===', error);
@@ -174,6 +187,12 @@ export class ForumsService {
       const hasAccess = await this.checkBoardAccess(boardId, userId);
       if (!hasAccess) {
         throw new ForbiddenException('Access denied to this board');
+      }
+
+      // Try to get from cache first (2 minutes TTL)
+      const cached = await this.cacheService.getForumBoard(boardId, page, limit, userId);
+      if (cached) {
+        return cached;
       }
 
       const offset = (page - 1) * limit;
@@ -290,6 +309,11 @@ export class ForumsService {
           itemsPerPage: limit
         }
       };
+
+      // Cache for 2 minutes (120 seconds)
+      await this.cacheService.setForumBoard(boardId, page, limit, result, userId, 120);
+
+      return result;
     } catch (error) {
       this.logger.error('Error fetching board with topics:', error);
       throw error;
@@ -587,6 +611,12 @@ export class ForumsService {
     const { limit = 10, offset = 0, boardId } = query;
 
     try {
+      // Try to get from cache first (30 seconds TTL)
+      const cached = await this.cacheService.getLatestForumMessages(limit, offset, boardId);
+      if (cached) {
+        return cached;
+      }
+
       // Build the WHERE clause
       let whereClause = '';
       let queryParams: any[] = [limit, offset];
@@ -676,12 +706,17 @@ export class ForumsService {
 
       const total = Number((countResult as any[])[0]?.total || 0);
 
-      return {
+      const result = {
         messages,
         total,
         limit,
         offset,
       };
+
+      // Cache for 30 seconds
+      await this.cacheService.setLatestForumMessages(limit, offset, boardId, result, 30);
+
+      return result;
 
     } catch (error) {
       this.logger.error('Error fetching forum messages:', error);
@@ -1166,6 +1201,11 @@ export class ForumsService {
         return { topic, message };
       });
 
+      // Invalidate caches after creating topic
+      await this.cacheService.invalidateForumBoard(boardId);
+      await this.cacheService.delByPattern('forums:categories:*'); // Invalidate all category caches
+      await this.cacheService.delByPattern('forums:messages:latest:*'); // Invalidate latest messages
+
       return {
         topicId: result.topic.idTopic,
         messageId: result.message.idMsg,
@@ -1273,6 +1313,11 @@ export class ForumsService {
 
         return message;
       });
+
+      // Invalidate caches after creating post
+      await this.cacheService.invalidateForumTopic(topicId);
+      await this.cacheService.invalidateForumBoard(topic.idBoard);
+      await this.cacheService.delByPattern('forums:messages:latest:*'); // Invalidate latest messages
 
       return {
         messageId: result.idMsg,
@@ -1619,6 +1664,10 @@ export class ForumsService {
         }
       });
 
+      // Invalidate caches after updating post
+      await this.cacheService.invalidateForumTopic(message.idTopic);
+      await this.cacheService.delByPattern('forums:messages:latest:*'); // Invalidate latest messages
+
       return {
         messageId: updatedMessage.idMsg,
         subject: updatedMessage.subject,
@@ -1690,6 +1739,12 @@ export class ForumsService {
             }
           });
         });
+
+        // Invalidate caches after deleting topic
+        await this.cacheService.invalidateForumTopic(message.idTopic);
+        await this.cacheService.invalidateForumBoard(message.idBoard);
+        await this.cacheService.delByPattern('forums:categories:*'); // Invalidate all category caches
+        await this.cacheService.delByPattern('forums:messages:latest:*'); // Invalidate latest messages
 
         return {
           success: true,
@@ -1770,6 +1825,11 @@ export class ForumsService {
             }
           });
         });
+
+        // Invalidate caches after deleting post
+        await this.cacheService.invalidateForumTopic(message.idTopic);
+        await this.cacheService.invalidateForumBoard(message.idBoard);
+        await this.cacheService.delByPattern('forums:messages:latest:*'); // Invalidate latest messages
 
         return {
           success: true,
