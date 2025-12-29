@@ -255,7 +255,7 @@ export class ForumsService {
         readLogsMap = new Map(readLogs.map(log => [log.idTopic, log.idMsg]));
       }
 
-      return {
+      const result = {
         board: {
           id: board.idBoard,
           name: board.name,
