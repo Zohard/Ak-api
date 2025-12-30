@@ -30,15 +30,20 @@ async function bootstrap() {
   app.use(cookieParser());
 
   // CORS configuration
+  const corsOrigins = [
+    'http://localhost:3000', // Nuxt frontend dev
+    'http://localhost:3001', // AI orchestrator dev
+    'http://localhost:3003', // Frontend dev alternate port
+    configService.get('FRONTEND_URL'), // Production frontend
+    configService.get('CORS_ORIGIN'), // Additional CORS origins
+    configService.get('AI_ORCHESTRATOR_URL'), // Production AI orchestrator
+  ].filter(Boolean);
+
+  // Log CORS origins for debugging
+  console.log('🔒 CORS Origins:', corsOrigins);
+
   app.enableCors({
-    origin: [
-      'http://localhost:3000', // Nuxt frontend dev
-      'http://localhost:3001', // AI orchestrator dev
-      'http://localhost:3003', // Frontend dev alternate port
-      configService.get('FRONTEND_URL'), // Production frontend
-      configService.get('CORS_ORIGIN'), // Additional CORS origins
-      configService.get('AI_ORCHESTRATOR_URL'), // Production AI orchestrator
-    ].filter(Boolean),
+    origin: corsOrigins.length > 3 ? corsOrigins : true, // Fallback to allow all if env vars missing
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'HEAD', 'PATCH'],
     allowedHeaders: [
@@ -51,6 +56,8 @@ async function bootstrap() {
       'X-Page-Path',
       'X-User-Id', // Add this for AI orchestrator
     ],
+    preflightContinue: false,
+    optionsSuccessStatus: 204,
   });
 
   // API prefix
