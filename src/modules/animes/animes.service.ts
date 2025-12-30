@@ -270,12 +270,14 @@ export class AnimesService extends BaseContentService<
 
     // Exclude null dateAjout when sorting by it
     if (sortBy === 'dateAjout' || !sortBy) {
-      where.dateAjout = { not: null };
+      where.NOT = where.NOT || [];
+      where.NOT.push({ dateAjout: null });
     }
 
     // Exclude null annee when sorting by it
     if (sortBy === 'annee') {
-      where.annee = { not: null };
+      where.NOT = where.NOT || [];
+      where.NOT.push({ annee: null });
     }
 
     // Build order by clause with secondary sort by idAnime for stable pagination
