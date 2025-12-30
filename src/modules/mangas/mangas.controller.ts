@@ -602,6 +602,85 @@ export class MangasController {
     return this.mangasService.upsertVolumeFromIsbn(mangaId, isbn, bookData);
   }
 
+  // ==================== IMAGE MANAGEMENT ENDPOINTS ====================
+
+  @Get('no-image')
+  @ApiOperation({ summary: 'Liste des mangas sans image de couverture' })
+  @ApiQuery({ name: 'page', required: false, example: 1, description: 'Page number' })
+  @ApiQuery({ name: 'limit', required: false, example: 50, description: 'Results per page' })
+  @ApiResponse({ status: 200, description: 'Liste des mangas sans image' })
+  async findMangasWithoutImage(
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    const parsedPage = page ? parseInt(page) : 1;
+    const parsedLimit = limit ? parseInt(limit) : 50;
+    return this.mangasService.findMangasWithoutImage(parsedPage, parsedLimit);
+  }
+
+  @Post('batch-image/jikan')
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Mise à jour en lot des images depuis Jikan/MyAnimeList' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        mangaIds: { type: 'array', items: { type: 'number' }, description: 'Specific manga IDs to process' },
+        limit: { type: 'number', example: 10, description: 'Number to process if no IDs provided' }
+      }
+    }
+  })
+  @ApiResponse({ status: 200, description: 'Résultats de la mise à jour en lot' })
+  async batchUpdateImagesFromJikan(
+    @Body('mangaIds') mangaIds?: number[],
+    @Body('limit') limit?: number,
+  ) {
+    return this.mangasService.batchUpdateImagesFromJikan(mangaIds, limit);
+  }
+
+  @Post(':id/auto-image')
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Mise à jour automatique de l\'image depuis MyAnimeList' })
+  @ApiParam({ name: 'id', description: 'Manga ID' })
+  @ApiResponse({ status: 200, description: 'Image mise à jour avec succès' })
+  async autoUpdateMangaImage(@Param('id', ParseIntPipe) id: number) {
+    return this.mangasService.autoUpdateMangaImage(id);
+  }
+
+  @Post(':id/image/jikan')
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Mettre à jour l\'image depuis Jikan API' })
+  @ApiParam({ name: 'id', description: 'Manga ID' })
+  @ApiResponse({ status: 200, description: 'Image mise à jour depuis Jikan' })
+  async updateMangaImageFromJikan(@Param('id', ParseIntPipe) id: number) {
+    return this.mangasService.updateMangaImageFromJikan(id);
+  }
+
+  @Post(':id/image/url')
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Mettre à jour l\'image depuis une URL' })
+  @ApiParam({ name: 'id', description: 'Manga ID' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        imageUrl: { type: 'string', format: 'uri', description: 'Image URL to download' }
+      },
+      required: ['imageUrl']
+    }
+  })
+  @ApiResponse({ status: 200, description: 'Image mise à jour depuis URL' })
+  async updateMangaImageFromUrl(
+    @Param('id', ParseIntPipe) id: number,
+    @Body('imageUrl') imageUrl: string,
+  ) {
+    return this.mangasService.updateMangaImageFromUrl(id, imageUrl);
+  }
+
   // ==================== CROSS-MEDIA RELATIONS ENDPOINTS ====================
 
   @Get(':id/media-relations')

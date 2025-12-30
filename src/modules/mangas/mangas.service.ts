@@ -2681,4 +2681,195 @@ export class MangasService extends BaseContentService<
 
     return { success: true, message: 'Relation removed successfully' };
   }
+
+  // ==================== IMAGE MANAGEMENT METHODS ====================
+
+  /**
+   * Find mangas without cover images
+   */
+  async findMangasWithoutImage(page: number = 1, limit: number = 50) {
+    const skip = (page - 1) * limit;
+
+    const [items, total] = await Promise.all([
+      this.prisma.akManga.findMany({
+        where: {
+          OR: [
+            { image: null },
+            { image: '' },
+          ],
+          statut: 1, // Only published mangas
+        },
+        select: {
+          idManga: true,
+          titre: true,
+          titreFr: true,
+          titreOrig: true,
+          annee: true,
+          nbVolumes: true,
+          auteur: true,
+          statut: true,
+        },
+        skip,
+        take: limit,
+        orderBy: { dateAjout: 'desc' },
+      }),
+      this.prisma.akManga.count({
+        where: {
+          OR: [{ image: null }, { image: '' }],
+          statut: 1,
+        },
+      }),
+    ]);
+
+    return {
+      items,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
+  }
+
+  /**
+   * Batch update images for multiple mangas from Jikan/MyAnimeList
+   */
+  async batchUpdateImagesFromJikan(mangaIds?: number[], limit: number = 10) {
+    let mangas;
+
+    if (mangaIds && mangaIds.length > 0) {
+      mangas = await this.prisma.akManga.findMany({
+        where: { idManga: { in: mangaIds } },
+        select: { idManga: true, titre: true, titreOrig: true, titreFr: true },
+      });
+    } else {
+      mangas = await this.prisma.akManga.findMany({
+        where: {
+          OR: [{ image: null }, { image: '' }],
+          statut: 1,
+        },
+        select: { idManga: true, titre: true, titreOrig: true, titreFr: true },
+        take: limit,
+        orderBy: { dateAjout: 'desc' },
+      });
+    }
+
+    const results = [];
+
+    for (const manga of mangas) {
+      try {
+        const result = await this.updateMangaImageFromJikan(manga.idManga);
+        results.push({
+          mangaId: manga.idManga,
+          titre: manga.titre,
+          success: true,
+          imageUrl: result.imageUrl,
+        });
+      } catch (error) {
+        results.push({
+          mangaId: manga.idManga,
+          titre: manga.titre,
+          success: false,
+          error: error.message,
+        });
+      }
+    }
+
+    const successCount = results.filter(r => r.success).length;
+    const failureCount = results.filter(r => !r.success).length;
+
+    return {
+      processed: results.length,
+      success: successCount,
+      failed: failureCount,
+      results,
+    };
+  }
+
+  /**
+   * Auto-update manga image (wrapper around updateMangaImageFromJikan)
+   */
+  async autoUpdateMangaImage(mangaId: number) {
+    return this.updateMangaImageFromJikan(mangaId);
+  }
+
+  /**
+   * Update manga cover image by fetching from Jikan/MyAnimeList API
+   */
+  async updateMangaImageFromJikan(mangaId: number) {
+    const manga = await this.prisma.akManga.findUnique({
+      where: { idManga: mangaId },
+      select: { titre: true, titreOrig: true, titreFr: true },
+    });
+
+    if (!manga) {
+      throw new NotFoundException(`Manga ${mangaId} not found`);
+    }
+
+    // Search Jikan API - try original title first, then French, then main title
+    const searchTitle = manga.titreOrig || manga.titreFr || manga.titre;
+    const jikanUrl = `https://api.jikan.moe/v4/manga?q=${encodeURIComponent(searchTitle)}&limit=1`;
+
+    const response = await fetch(jikanUrl);
+    if (!response.ok) {
+      throw new BadRequestException('Jikan API error');
+    }
+
+    const data = await response.json();
+    if (!data.data || data.data.length === 0) {
+      throw new NotFoundException('No manga found on MyAnimeList');
+    }
+
+    const jikanManga = data.data[0];
+    const imageUrl = jikanManga.images?.jpg?.large_image_url ||
+                     jikanManga.images?.jpg?.image_url;
+
+    if (!imageUrl) {
+      throw new BadRequestException('No image found in Jikan response');
+    }
+
+    // Download and upload to ImageKit
+    return this.updateMangaImageFromUrl(mangaId, imageUrl);
+  }
+
+  /**
+   * Update manga cover image from a direct image URL
+   */
+  async updateMangaImageFromUrl(mangaId: number, imageUrl: string) {
+    const manga = await this.prisma.akManga.findUnique({
+      where: { idManga: mangaId },
+    });
+
+    if (!manga) {
+      throw new NotFoundException(`Manga ${mangaId} not found`);
+    }
+
+    // Download image
+    const imageResponse = await fetch(imageUrl);
+    if (!imageResponse.ok) {
+      throw new BadRequestException('Failed to download image');
+    }
+
+    const buffer = Buffer.from(await imageResponse.arrayBuffer());
+
+    // Upload to ImageKit
+    const filename = `manga_${mangaId}_${Date.now()}.jpg`;
+    const uploadResult = await this.imageKitService.uploadImage(
+      buffer,
+      filename,
+      '/images/mangas',
+    );
+
+    // Update manga
+    await this.prisma.akManga.update({
+      where: { idManga: mangaId },
+      data: { image: uploadResult.url },
+    });
+
+    return {
+      success: true,
+      mangaId,
+      imageUrl: uploadResult.url,
+      source: imageUrl,
+    };
+  }
 }
