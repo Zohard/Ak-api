@@ -47,7 +47,7 @@ export class AnimeExternalService {
       // Create cache key for seasonal anime data
       const cacheKey = `anilist_season:${season}:${year}:${limit}`;
 
-      // Try to get from cache first
+      // Try to get from cache first (full result cached for 5 minutes)
       const cached = await this.cacheService.get(cacheKey);
       if (cached) {
         return cached;
@@ -55,47 +55,70 @@ export class AnimeExternalService {
 
       const seasonalAnime = await this.aniListService.getAnimesBySeason(season, year, limit);
 
+      // OPTIMIZATION: Batch query all existing animes in one go instead of N queries
+      const allTitles: string[] = [];
+      seasonalAnime.forEach(anime => {
+        if (anime.title.romaji) allTitles.push(anime.title.romaji.toLowerCase());
+        if (anime.title.english) allTitles.push(anime.title.english.toLowerCase());
+        if (anime.title.native) allTitles.push(anime.title.native.toLowerCase());
+      });
+
+      // Single batch query to get all potentially matching animes
+      const existingAnimes = await this.prisma.akAnime.findMany({
+        where: {
+          OR: [
+            { titre: { in: allTitles, mode: Prisma.QueryMode.insensitive } },
+            { titreOrig: { in: allTitles, mode: Prisma.QueryMode.insensitive } },
+            { titreFr: { in: allTitles, mode: Prisma.QueryMode.insensitive } },
+          ],
+        },
+        select: {
+          idAnime: true,
+          titre: true,
+          titreOrig: true,
+          titreFr: true,
+          titresAlternatifs: true,
+        },
+      });
+
+      // Build a fast lookup map: normalized title -> anime data
+      const titleToAnimeMap = new Map<string, typeof existingAnimes[0]>();
+      existingAnimes.forEach(anime => {
+        if (anime.titre) titleToAnimeMap.set(anime.titre.toLowerCase(), anime);
+        if (anime.titreOrig) titleToAnimeMap.set(anime.titreOrig.toLowerCase(), anime);
+        if (anime.titreFr) titleToAnimeMap.set(anime.titreFr.toLowerCase(), anime);
+
+        // Also index alternative titles
+        if (anime.titresAlternatifs) {
+          anime.titresAlternatifs.split('\n').forEach(alt => {
+            if (alt.trim()) titleToAnimeMap.set(alt.toLowerCase().trim(), anime);
+          });
+        }
+      });
+
+      // Now process comparisons using the in-memory map (no DB queries!)
       const comparisons: any[] = [];
 
       for (const anilistAnime of seasonalAnime) {
         const primaryTitle = anilistAnime.title.romaji || anilistAnime.title.english || anilistAnime.title.native;
 
-        const orConditions: any[] = [];
-
-        if (primaryTitle) {
-          orConditions.push({ titre: { equals: primaryTitle, mode: Prisma.QueryMode.insensitive } });
-          orConditions.push({ titresAlternatifs: { contains: primaryTitle, mode: Prisma.QueryMode.insensitive } });
+        // Check if anime exists using cached map (O(1) lookup)
+        let existingAnime = null;
+        if (anilistAnime.title.romaji) {
+          existingAnime = titleToAnimeMap.get(anilistAnime.title.romaji.toLowerCase());
         }
-
-        if (anilistAnime.title.native) {
-          orConditions.push({ titreOrig: { equals: anilistAnime.title.native, mode: Prisma.QueryMode.insensitive } });
-          orConditions.push({ titresAlternatifs: { contains: anilistAnime.title.native, mode: Prisma.QueryMode.insensitive } });
+        if (!existingAnime && anilistAnime.title.english) {
+          existingAnime = titleToAnimeMap.get(anilistAnime.title.english.toLowerCase());
         }
-
-        if (anilistAnime.title.english) {
-          orConditions.push({ titreFr: { equals: anilistAnime.title.english, mode: Prisma.QueryMode.insensitive } });
-          orConditions.push({ titresAlternatifs: { contains: anilistAnime.title.english, mode: Prisma.QueryMode.insensitive } });
+        if (!existingAnime && anilistAnime.title.native) {
+          existingAnime = titleToAnimeMap.get(anilistAnime.title.native.toLowerCase());
         }
-
-        const existingAnime = await this.prisma.akAnime.findFirst({
-          where: {
-            OR: orConditions,
-          },
-          select: {
-            idAnime: true,
-            titre: true,
-            titreOrig: true,
-            titreFr: true,
-            titresAlternatifs: true,
-          },
-        });
 
         const comparison = {
           titre: primaryTitle,
-          exists: !!existingAnime,
-          existingAnimeId: existingAnime?.idAnime,
+          existsInDb: !!existingAnime,
+          dbData: existingAnime || null,
           anilistData: anilistAnime,
-          scrapedData: await this.aniListService.mapToCreateAnimeDto(anilistAnime),
         };
 
         comparisons.push(comparison);
@@ -109,8 +132,9 @@ export class AnimeExternalService {
         source: 'AniList',
       };
 
-      // Cache the result for 5 minutes (300 seconds)
-      await this.cacheService.set(cacheKey, result, 300);
+      // Cache the result for 1 hour (3600 seconds) - increased from 5 minutes
+      // Season data doesn't change frequently, so we can cache longer
+      await this.cacheService.set(cacheKey, result, 3600);
 
       return result;
     } catch (error) {
