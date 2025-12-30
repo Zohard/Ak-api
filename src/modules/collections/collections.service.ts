@@ -399,6 +399,13 @@ export class CollectionsService {
     } finally {
       // Invalidate user's collection cache after any add operation
       await this.invalidateUserCollectionCache(userId);
+
+      // Invalidate anime/manga cache as ratings may have changed
+      if (mediaType === 'anime') {
+        await this.cacheService.invalidateAnime(mediaId);
+      } else if (mediaType === 'manga') {
+        await this.cacheService.invalidateManga(mediaId);
+      }
     }
   }
 
@@ -674,6 +681,13 @@ export class CollectionsService {
     // Invalidate user's collection cache after removal
     await this.invalidateUserCollectionCache(userId);
 
+    // Invalidate anime/manga cache as ratings may have changed
+    if (mediaType === 'anime') {
+      await this.cacheService.invalidateAnime(mediaId);
+    } else if (mediaType === 'manga') {
+      await this.cacheService.invalidateManga(mediaId);
+    }
+
     return { success: true };
   }
 
@@ -723,6 +737,13 @@ export class CollectionsService {
 
     // Invalidate user's collection cache after update
     await this.invalidateUserCollectionCache(userId);
+
+    // Invalidate anime/manga cache as ratings may have changed
+    if (mediaType === 'anime') {
+      await this.cacheService.invalidateAnime(mediaId);
+    } else if (mediaType === 'manga') {
+      await this.cacheService.invalidateManga(mediaId);
+    }
 
     return { success: true, rating };
   }
@@ -1491,6 +1512,9 @@ export class CollectionsService {
     // Invalidate user's collection cache after adding
     await this.invalidateUserCollectionCache(userId);
 
+    // Invalidate anime cache as ratings may have changed
+    await this.cacheService.invalidateAnime(addAnimeDto.animeId);
+
     return result;
   }
 
@@ -1520,6 +1544,9 @@ export class CollectionsService {
 
     // Invalidate user's collection cache after removal
     await this.invalidateUserCollectionCache(userId);
+
+    // Invalidate anime cache as ratings may have changed
+    await this.cacheService.invalidateAnime(animeId);
 
     return { message: 'Anime removed from collection successfully' };
   }
@@ -1727,6 +1754,9 @@ export class CollectionsService {
     // Invalidate user's collection cache after adding
     await this.invalidateUserCollectionCache(userId);
 
+    // Invalidate manga cache as ratings may have changed
+    await this.cacheService.invalidateManga(addMangaDto.mangaId);
+
     return result;
   }
 
@@ -1756,6 +1786,9 @@ export class CollectionsService {
 
     // Invalidate user's collection cache after removal
     await this.invalidateUserCollectionCache(userId);
+
+    // Invalidate manga cache as ratings may have changed
+    await this.cacheService.invalidateManga(mangaId);
 
     return { message: 'Manga removed from collection successfully' };
   }
