@@ -63,34 +63,30 @@ export class AnimeExternalService {
         if (anime.title.native) allTitles.push(anime.title.native.toLowerCase());
       });
 
-      // Single batch query to get all potentially matching animes
-      const existingAnimes = await this.prisma.akAnime.findMany({
-        where: {
-          OR: [
-            { titre: { in: allTitles, mode: Prisma.QueryMode.insensitive } },
-            { titreOrig: { in: allTitles, mode: Prisma.QueryMode.insensitive } },
-            { titreFr: { in: allTitles, mode: Prisma.QueryMode.insensitive } },
-          ],
-        },
-        select: {
-          idAnime: true,
-          titre: true,
-          titreOrig: true,
-          titreFr: true,
-          titresAlternatifs: true,
-        },
-      });
+      const existingAnimes = await this.prisma.$queryRaw<Array<{
+        id_anime: number;
+        titre: string | null;
+        titre_orig: string | null;
+        titre_fr: string | null;
+        titres_alternatifs: string | null;
+      }>>`
+        SELECT id_anime, titre, titre_orig, titre_fr, titres_alternatifs
+        FROM ak_animes
+        WHERE LOWER(titre) = ANY(${allTitles}::text[])
+           OR LOWER(titre_orig) = ANY(${allTitles}::text[])
+           OR LOWER(titre_fr) = ANY(${allTitles}::text[])
+      `;
 
       // Build a fast lookup map: normalized title -> anime data
       const titleToAnimeMap = new Map<string, typeof existingAnimes[0]>();
       existingAnimes.forEach(anime => {
         if (anime.titre) titleToAnimeMap.set(anime.titre.toLowerCase(), anime);
-        if (anime.titreOrig) titleToAnimeMap.set(anime.titreOrig.toLowerCase(), anime);
-        if (anime.titreFr) titleToAnimeMap.set(anime.titreFr.toLowerCase(), anime);
-
+        if (anime.titre_orig) titleToAnimeMap.set(anime.titre_orig.toLowerCase(), anime);  
+        if (anime.titre_fr) titleToAnimeMap.set(anime.titre_fr.toLowerCase(), anime);      
+      
         // Also index alternative titles
-        if (anime.titresAlternatifs) {
-          anime.titresAlternatifs.split('\n').forEach(alt => {
+        if (anime.titres_alternatifs) {                                                   
+          anime.titres_alternatifs.split('\n').forEach(alt => {                           
             if (alt.trim()) titleToAnimeMap.set(alt.toLowerCase().trim(), anime);
           });
         }
@@ -147,3 +143,4 @@ export class AnimeExternalService {
     return crypto.createHash('md5').update(query).digest('hex');
   }
 }
+
