@@ -192,6 +192,42 @@ export class CacheService implements OnModuleInit {
     await this.set(`reviews:${type}:${id}`, reviews, ttl); // 5 minutes
   }
 
+  // Reviews list cache (for paginated reviews)
+  async getReviewsList(cacheKey: string): Promise<any> {
+    return this.get(`reviews_list:${cacheKey}`);
+  }
+
+  async setReviewsList(cacheKey: string, reviews: any, ttl = 300): Promise<void> {
+    await this.set(`reviews_list:${cacheKey}`, reviews, ttl); // 5 minutes
+  }
+
+  // Reviews count cache
+  async getReviewsCount(): Promise<any> {
+    return this.get('reviews:count');
+  }
+
+  async setReviewsCount(count: number, ttl = 600): Promise<void> {
+    await this.set('reviews:count', count, ttl); // 10 minutes
+  }
+
+  // Top reviews cache
+  async getTopReviews(limit: number, type?: string): Promise<any> {
+    const typeKey = type || 'both';
+    return this.get(`reviews:top:${typeKey}:${limit}`);
+  }
+
+  async setTopReviews(limit: number, type: string | undefined, reviews: any, ttl = 600): Promise<void> {
+    const typeKey = type || 'both';
+    await this.set(`reviews:top:${typeKey}:${limit}`, reviews, ttl); // 10 minutes
+  }
+
+  // Invalidate all reviews cache
+  async invalidateAllReviews(): Promise<void> {
+    await this.delByPattern('reviews:*');
+    await this.delByPattern('reviews_list:*');
+    this.logger.debug('Invalidated all reviews cache');
+  }
+
   // Invalidation methods
   async invalidateAnime(id: number): Promise<void> {
     await Promise.all([
@@ -480,7 +516,7 @@ export class CacheService implements OnModuleInit {
       homepage: 'homepage:*',
       season: 'season:*',
       articles: 'article*',
-      reviews: 'reviews:*',
+      reviews: 'reviews*',
       search: 'search:*',
       rankings: 'rankings:*',
       lists: 'lists*',
@@ -564,7 +600,7 @@ export class CacheService implements OnModuleInit {
       homepage: 'homepage:*',
       season: 'season:*',
       articles: 'article*',
-      reviews: 'reviews:*',
+      reviews: 'reviews*',
       search: 'search:*',
       rankings: 'rankings:*',
       lists: 'lists*',

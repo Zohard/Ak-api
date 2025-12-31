@@ -172,10 +172,10 @@ export class ReviewsService {
     } = query;
 
     // Create cache key from query parameters
-    const cacheKey = `reviews:${this.createCacheKey(query)}`;
-    
+    const cacheKey = this.createCacheKey(query);
+
     // Try to get from cache first
-    const cached = await this.cacheService.get(cacheKey);
+    const cached = await this.cacheService.getReviewsList(cacheKey);
     if (cached && !search && !idMembre && !pseudo) { // Only cache non-search, non-user-specific queries
       return cached;
     }
@@ -430,7 +430,7 @@ export class ReviewsService {
     // Cache the result if it's not user-specific or search-based
     if (!search && !idMembre && !pseudo) {
       const ttl = idAnime || idManga ? 300 : 180; // 5 mins for specific anime/manga, 3 mins for general
-      await this.cacheService.set(cacheKey, result, ttl);
+      await this.cacheService.setReviewsList(cacheKey, result, ttl);
     }
 
     return result;
@@ -727,8 +727,7 @@ export class ReviewsService {
 
   async getTopReviews(limit = 10, type?: 'anime' | 'manga' | 'game' | 'both') {
     // Try to get from cache first
-    const cacheKey = `top_reviews:${type || 'both'}:${limit}`;
-    const cached = await this.cacheService.get(cacheKey);
+    const cached = await this.cacheService.getTopReviews(limit, type);
     if (cached) {
       return cached;
     }
@@ -797,8 +796,8 @@ export class ReviewsService {
       generatedAt: new Date().toISOString(),
     };
 
-    // Cache for 15 minutes
-    await this.cacheService.set(cacheKey, result, 900);
+    // Cache for 10 minutes
+    await this.cacheService.setTopReviews(limit, type, result, 600);
 
     return result;
   }
@@ -851,9 +850,8 @@ export class ReviewsService {
   }
 
   async getReviewsCount() {
-    // Try to get from cache first (5 minutes TTL)
-    const cacheKey = 'reviews:total_count';
-    const cached = await this.cacheService.get<{ count: number }>(cacheKey);
+    // Try to get from cache first (10 minutes TTL)
+    const cached = await this.cacheService.getReviewsCount();
     if (cached) {
       return cached;
     }
@@ -866,8 +864,8 @@ export class ReviewsService {
 
     const result = { count: total };
 
-    // Cache for 5 minutes (300 seconds)
-    await this.cacheService.set(cacheKey, result, 300);
+    // Cache for 10 minutes (600 seconds)
+    await this.cacheService.setReviewsCount(total, 600);
 
     return result;
   }
@@ -1521,8 +1519,8 @@ export class ReviewsService {
       await this.cacheService.invalidateManga(mangaId);
     }
 
-    // Invalidate top reviews cache
-    await this.cacheService.delByPattern('top_reviews:*');
+    // Invalidate all reviews-related caches (lists, counts, top reviews)
+    await this.cacheService.invalidateAllReviews();
   }
 
   /**
