@@ -112,7 +112,9 @@ export class AnimeExternalService {
 
         const comparison = {
           titre: primaryTitle,
-          existsInDb: !!existingAnime,
+          exists: !!existingAnime,           // ⚠️ Check if you're using 'exists' or 'existsInDb'
+          existsInDb: !!existingAnime,     
+          existingAnimeId: existingAnime?.id_anime || null,  /
           dbData: existingAnime || null,
           anilistData: anilistAnime,
         };
@@ -143,5 +145,6 @@ export class AnimeExternalService {
     return crypto.createHash('md5').update(query).digest('hex');
   }
 }
+
 
 
