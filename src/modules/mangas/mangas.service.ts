@@ -263,11 +263,7 @@ export class MangasService extends BaseContentService<
       }
     }
 
-    // Exclude null dateAjout when sorting by it
-    if (sortBy === 'dateAjout' || !sortBy) {
-      where.NOT = where.NOT || [];
-      where.NOT.push({ dateAjout: null });
-    }
+    // Note: dateAjout is NOT NULL with default value in database, so no need to filter nulls
 
     // Exclude null annee when sorting by it
     if (sortBy === 'annee') {
