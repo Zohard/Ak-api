@@ -63,7 +63,6 @@ export class AnimeExternalService {
         if (anime.title.native) allTitles.push(anime.title.native.toLowerCase());
       });
 
-      // Single batch query to get all potentially matching animes
       const existingAnimes = await this.prisma.$queryRaw<Array<{
         id_anime: number;
         titre: string | null;
@@ -76,7 +75,13 @@ export class AnimeExternalService {
         WHERE LOWER(titre) = ANY(${allTitles}::text[])
            OR LOWER(titre_orig) = ANY(${allTitles}::text[])
            OR LOWER(titre_fr) = ANY(${allTitles}::text[])
+           OR EXISTS (
+              SELECT 1
+              FROM unnest(${allTitles}::text[]) t
+              WHERE LOWER(ak_animes.titres_alternatifs) LIKE '%' || t || '%'
+           )
       `;
+
 
       console.log('Total animes in database:', existingAnimes.length);
       console.log('Sample from DB:', existingAnimes.slice(0, 3).map(a => a.titre));
@@ -154,3 +159,4 @@ export class AnimeExternalService {
     return crypto.createHash('md5').update(query).digest('hex');
   }
 }
+
