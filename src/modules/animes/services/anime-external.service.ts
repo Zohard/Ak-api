@@ -63,6 +63,7 @@ export class AnimeExternalService {
         if (anime.title.native) allTitles.push(anime.title.native.toLowerCase());
       });
 
+      // Single batch query to get all potentially matching animes
       const existingAnimes = await this.prisma.$queryRaw<Array<{
         id_anime: number;
         titre: string | null;
@@ -77,26 +78,34 @@ export class AnimeExternalService {
            OR LOWER(titre_fr) = ANY(${allTitles}::text[])
       `;
 
+      console.log('Total animes in database:', existingAnimes.length);
+      console.log('Sample from DB:', existingAnimes.slice(0, 3).map(a => a.titre));
+
       // Build a fast lookup map: normalized title -> anime data
       const titleToAnimeMap = new Map<string, typeof existingAnimes[0]>();
       existingAnimes.forEach(anime => {
         if (anime.titre) titleToAnimeMap.set(anime.titre.toLowerCase(), anime);
-        if (anime.titre_orig) titleToAnimeMap.set(anime.titre_orig.toLowerCase(), anime); 
-        if (anime.titre_fr) titleToAnimeMap.set(anime.titre_fr.toLowerCase(), anime);      
-      
+        if (anime.titre_orig) titleToAnimeMap.set(anime.titre_orig.toLowerCase(), anime);
+        if (anime.titre_fr) titleToAnimeMap.set(anime.titre_fr.toLowerCase(), anime);
+
         // Also index alternative titles
-        if (anime.titres_alternatifs) {                                                  
-          anime.titres_alternatifs.split('\n').forEach(alt => {                         
+        if (anime.titres_alternatifs) {
+          anime.titres_alternatifs.split('\n').forEach(alt => {
             if (alt.trim()) titleToAnimeMap.set(alt.toLowerCase().trim(), anime);
           });
         }
       });
+
+      console.log('Map size:', titleToAnimeMap.size);
+      console.log('Sample keys in map:', Array.from(titleToAnimeMap.keys()).slice(0, 5));
 
       // Now process comparisons using the in-memory map (no DB queries!)
       const comparisons: any[] = [];
 
       for (const anilistAnime of seasonalAnime) {
         const primaryTitle = anilistAnime.title.romaji || anilistAnime.title.english || anilistAnime.title.native;
+
+        console.log('Looking for:', primaryTitle?.toLowerCase());
 
         // Check if anime exists using cached map (O(1) lookup)
         let existingAnime = null;
@@ -112,9 +121,9 @@ export class AnimeExternalService {
 
         const comparison = {
           titre: primaryTitle,
-          exists: !!existingAnime,           // ⚠️ Check if you're using 'exists' or 'existsInDb'
-          existsInDb: !!existingAnime,     
-          existingAnimeId: existingAnime?.id_anime || null,  /
+          exists: !!existingAnime,
+          existsInDb: !!existingAnime,
+          existingAnimeId: existingAnime?.id_anime || null,
           dbData: existingAnime || null,
           anilistData: anilistAnime,
         };
@@ -145,6 +154,3 @@ export class AnimeExternalService {
     return crypto.createHash('md5').update(query).digest('hex');
   }
 }
-
-
-
