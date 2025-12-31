@@ -118,6 +118,30 @@ export class AnimesService extends BaseContentService<
       data.dateDiffusion = new Date(data.dateDiffusion);
     }
 
+    // Check for duplicate titles before creating
+    if (data.titre || data.titreOrig) {
+      const duplicateCheck = await this.prisma.akAnime.findFirst({
+        where: {
+          OR: [
+            data.titre ? { titre: { equals: data.titre, mode: 'insensitive' } } : null,
+            data.titreOrig ? { titreOrig: { equals: data.titreOrig, mode: 'insensitive' } } : null,
+          ].filter(Boolean),
+        },
+        select: {
+          idAnime: true,
+          titre: true,
+          titreOrig: true,
+        },
+      });
+
+      if (duplicateCheck) {
+        throw new BadRequestException(
+          `Un anime avec ce titre existe déjà (ID: ${duplicateCheck.idAnime}). ` +
+          `Titre: "${duplicateCheck.titre}"${duplicateCheck.titreOrig ? `, Titre original: "${duplicateCheck.titreOrig}"` : ''}`
+        );
+      }
+    }
+
     const anime = await this.prisma.akAnime.create({
       data: {
         ...data,

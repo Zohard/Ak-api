@@ -148,6 +148,30 @@ export class MangasService extends BaseContentService<
       }
     }
 
+    // Check for duplicate titles before creating
+    if (data.titre || data.titreOrig) {
+      const duplicateCheck = await this.prisma.akManga.findFirst({
+        where: {
+          OR: [
+            data.titre ? { titre: { equals: data.titre, mode: 'insensitive' } } : null,
+            data.titreOrig ? { titreOrig: { equals: data.titreOrig, mode: 'insensitive' } } : null,
+          ].filter(Boolean),
+        },
+        select: {
+          idManga: true,
+          titre: true,
+          titreOrig: true,
+        },
+      });
+
+      if (duplicateCheck) {
+        throw new BadRequestException(
+          `Un manga avec ce titre existe déjà (ID: ${duplicateCheck.idManga}). ` +
+          `Titre: "${duplicateCheck.titre}"${duplicateCheck.titreOrig ? `, Titre original: "${duplicateCheck.titreOrig}"` : ''}`
+        );
+      }
+    }
+
     const manga = await this.prisma.akManga.create({
       data: {
         ...data,
