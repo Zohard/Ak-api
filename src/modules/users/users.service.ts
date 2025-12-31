@@ -750,7 +750,7 @@ export class UsersService {
           FROM ak_animes a
           JOIN ak_tag2fiche tf ON a.id_anime = tf.id_fiche AND tf.type = 'anime'
           JOIN ak_tags t ON tf.id_tag = t.id_tag
-          WHERE LOWER(t.tag_name) IN (${genresToUse.map(g => `'${g.toLowerCase()}'`).join(',')})
+          WHERE LOWER(t.tag_name) IN (${genresToUse.map(g => `'${g.toLowerCase().replace(/'/g, "''")}'`).join(',')})
             AND a.statut = 1
             AND a.id_anime NOT IN (
               SELECT id_anime FROM ak_critique WHERE id_membre = ${id} AND id_anime IS NOT NULL
@@ -776,14 +776,14 @@ export class UsersService {
             a.annee,
             ${similarTo && originalMediaTitle ? `
               ROUND(
-                (COUNT(DISTINCT CASE WHEN LOWER(t.tag_name) = ANY(ARRAY[${genresToUse.map(g => `'${g.toLowerCase()}'`).join(',')}]) THEN t.tag_name END)::float / ${originalMediaTagCount}::float * 70) +
+                (COUNT(DISTINCT CASE WHEN LOWER(t.tag_name) = ANY(ARRAY[${genresToUse.map(g => `'${g.toLowerCase().replace(/'/g, "''")}'`).join(',')}]) THEN t.tag_name END)::float / ${originalMediaTagCount}::float * 70) +
                 (similarity(LOWER(a.titre), LOWER('${originalMediaTitle.replace(/'/g, "''")}')) * 30)
               ) as pertinence
             ` : 'NULL as pertinence'}
           FROM ak_animes a
           JOIN ak_tag2fiche tf ON a.id_anime = tf.id_fiche AND tf.type = 'anime'
           JOIN ak_tags t ON tf.id_tag = t.id_tag
-          WHERE LOWER(t.tag_name) = ANY(ARRAY[${genresToUse.map(g => `'${g.toLowerCase()}'`).join(',')}])
+          WHERE LOWER(t.tag_name) = ANY(ARRAY[${genresToUse.map(g => `'${g.toLowerCase().replace(/'/g, "''")}'`).join(',')}])
             AND a.statut = 1
             AND a.id_anime NOT IN (
               SELECT id_anime FROM ak_critique WHERE id_membre = ${id} AND id_anime IS NOT NULL
@@ -820,7 +820,7 @@ export class UsersService {
           FROM ak_mangas m
           JOIN ak_tag2fiche tf ON m.id_manga = tf.id_fiche AND tf.type = 'manga'
           JOIN ak_tags t ON tf.id_tag = t.id_tag
-          WHERE LOWER(t.tag_name) IN (${genresToUse.map(g => `'${g.toLowerCase()}'`).join(',')})
+          WHERE LOWER(t.tag_name) IN (${genresToUse.map(g => `'${g.toLowerCase().replace(/'/g, "''")}'`).join(',')})
             AND m.statut = 1
             AND m.id_manga NOT IN (
               SELECT id_manga FROM ak_critique WHERE id_membre = ${id} AND id_manga IS NOT NULL
@@ -846,14 +846,14 @@ export class UsersService {
             m.annee,
             ${similarTo && originalMediaTitle ? `
               ROUND(
-                (COUNT(DISTINCT CASE WHEN LOWER(t.tag_name) = ANY(ARRAY[${genresToUse.map(g => `'${g.toLowerCase()}'`).join(',')}]) THEN t.tag_name END)::float / ${originalMediaTagCount}::float * 70) +
+                (COUNT(DISTINCT CASE WHEN LOWER(t.tag_name) = ANY(ARRAY[${genresToUse.map(g => `'${g.toLowerCase().replace(/'/g, "''")}'`).join(',')}]) THEN t.tag_name END)::float / ${originalMediaTagCount}::float * 70) +
                 (similarity(LOWER(m.titre), LOWER('${originalMediaTitle.replace(/'/g, "''")}')) * 30)
               ) as pertinence
             ` : 'NULL as pertinence'}
           FROM ak_mangas m
           JOIN ak_tag2fiche tf ON m.id_manga = tf.id_fiche AND tf.type = 'manga'
           JOIN ak_tags t ON tf.id_tag = t.id_tag
-          WHERE LOWER(t.tag_name) = ANY(ARRAY[${genresToUse.map(g => `'${g.toLowerCase()}'`).join(',')}])
+          WHERE LOWER(t.tag_name) = ANY(ARRAY[${genresToUse.map(g => `'${g.toLowerCase().replace(/'/g, "''")}'`).join(',')}])
             AND m.statut = 1
             AND m.id_manga NOT IN (
               SELECT id_manga FROM ak_critique WHERE id_membre = ${id} AND id_manga IS NOT NULL
