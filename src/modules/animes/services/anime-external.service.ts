@@ -42,113 +42,128 @@ export class AnimeExternalService {
     }
   }
 
+  /**
+   * Check if an anime exists in the database by titles
+   * Cached individually per title for granular cache invalidation
+   */
+  async checkAnimeExists(titles: { romaji?: string; english?: string; native?: string }) {
+    const titleList = [
+      titles.romaji?.toLowerCase(),
+      titles.english?.toLowerCase(),
+      titles.native?.toLowerCase(),
+    ].filter(Boolean);
+
+    // Try to get from individual title caches first
+    for (const title of titleList) {
+      const cacheKey = `anime_exists:${this.hashQuery(title)}`;
+      const cached = await this.cacheService.get(cacheKey);
+      if (cached !== null && cached !== undefined) {
+        return cached; // Return cached result (can be null if doesn't exist)
+      }
+    }
+
+    // Not in cache, query database
+    const existingAnime = await this.prisma.$queryRaw<Array<{
+      id_anime: number;
+      titre: string | null;
+      titre_orig: string | null;
+      titre_fr: string | null;
+      titres_alternatifs: string | null;
+    }>>`
+      SELECT id_anime, titre, titre_orig, titre_fr, titres_alternatifs
+      FROM ak_animes
+      WHERE LOWER(titre) = ANY(${titleList}::text[])
+         OR LOWER(titre_orig) = ANY(${titleList}::text[])
+         OR LOWER(titre_fr) = ANY(${titleList}::text[])
+         OR EXISTS (
+            SELECT 1
+            FROM unnest(${titleList}::text[]) t
+            WHERE LOWER(ak_animes.titres_alternatifs) LIKE '%' || t || '%'
+         )
+      LIMIT 1
+    `;
+
+    const result = existingAnime.length > 0 ? {
+      exists: true,
+      existsInDb: true,
+      existingAnimeId: existingAnime[0].id_anime,
+      dbData: existingAnime[0],
+    } : {
+      exists: false,
+      existsInDb: false,
+      existingAnimeId: null,
+      dbData: null,
+    };
+
+    // Cache all title variations with the same result (1 hour cache)
+    for (const title of titleList) {
+      const cacheKey = `anime_exists:${this.hashQuery(title)}`;
+      await this.cacheService.set(cacheKey, result, 3600);
+    }
+
+    return result;
+  }
+
+  /**
+   * Invalidate existence cache for specific anime titles
+   * Call this after creating a new anime
+   */
+  async invalidateAnimeExistsCache(titles: { romaji?: string; english?: string; native?: string; alternatifs?: string[] }) {
+    const titleList = [
+      titles.romaji?.toLowerCase(),
+      titles.english?.toLowerCase(),
+      titles.native?.toLowerCase(),
+      ...(titles.alternatifs || []).map(t => t.toLowerCase()),
+    ].filter(Boolean);
+
+    for (const title of titleList) {
+      const cacheKey = `anime_exists:${this.hashQuery(title)}`;
+      await this.cacheService.del(cacheKey);
+    }
+  }
+
   async importSeasonalAnimeFromAniList(season: string, year: number, limit = 50) {
     try {
-      // Create cache key for seasonal anime data
-      const cacheKey = `anilist_season:${season}:${year}:${limit}`;
+      // Create cache key for seasonal anime data (only AniList data, not existence checks)
+      const cacheKey = `anilist_season_data:${season}:${year}:${limit}`;
 
-      // Try to get from cache first (full result cached for 5 minutes)
-      const cached = await this.cacheService.get(cacheKey);
-      if (cached) {
-        return cached;
+      // Try to get AniList data from cache first
+      let seasonalAnime = await this.cacheService.get(cacheKey);
+
+      if (!seasonalAnime) {
+        seasonalAnime = await this.aniListService.getAnimesBySeason(season, year, limit);
+        // Cache AniList data for 1 hour - this won't change
+        await this.cacheService.set(cacheKey, seasonalAnime, 3600);
       }
 
-      const seasonalAnime = await this.aniListService.getAnimesBySeason(season, year, limit);
-
-      // OPTIMIZATION: Batch query all existing animes in one go instead of N queries
-      const allTitles: string[] = [];
-      seasonalAnime.forEach(anime => {
-        if (anime.title.romaji) allTitles.push(anime.title.romaji.toLowerCase());
-        if (anime.title.english) allTitles.push(anime.title.english.toLowerCase());
-        if (anime.title.native) allTitles.push(anime.title.native.toLowerCase());
-      });
-
-      const existingAnimes = await this.prisma.$queryRaw<Array<{
-        id_anime: number;
-        titre: string | null;
-        titre_orig: string | null;
-        titre_fr: string | null;
-        titres_alternatifs: string | null;
-      }>>`
-        SELECT id_anime, titre, titre_orig, titre_fr, titres_alternatifs
-        FROM ak_animes
-        WHERE LOWER(titre) = ANY(${allTitles}::text[])
-           OR LOWER(titre_orig) = ANY(${allTitles}::text[])
-           OR LOWER(titre_fr) = ANY(${allTitles}::text[])
-           OR EXISTS (
-              SELECT 1
-              FROM unnest(${allTitles}::text[]) t
-              WHERE LOWER(ak_animes.titres_alternatifs) LIKE '%' || t || '%'
-           )
-      `;
-
-
-      console.log('Total animes in database:', existingAnimes.length);
-      console.log('Sample from DB:', existingAnimes.slice(0, 3).map(a => a.titre));
-
-      // Build a fast lookup map: normalized title -> anime data
-      const titleToAnimeMap = new Map<string, typeof existingAnimes[0]>();
-      existingAnimes.forEach(anime => {
-        if (anime.titre) titleToAnimeMap.set(anime.titre.toLowerCase(), anime);
-        if (anime.titre_orig) titleToAnimeMap.set(anime.titre_orig.toLowerCase(), anime);
-        if (anime.titre_fr) titleToAnimeMap.set(anime.titre_fr.toLowerCase(), anime);
-
-        // Also index alternative titles
-        if (anime.titres_alternatifs) {
-          anime.titres_alternatifs.split('\n').forEach(alt => {
-            if (alt.trim()) titleToAnimeMap.set(alt.toLowerCase().trim(), anime);
-          });
-        }
-      });
-
-      console.log('Map size:', titleToAnimeMap.size);
-      console.log('Sample keys in map:', Array.from(titleToAnimeMap.keys()).slice(0, 5));
-
-      // Now process comparisons using the in-memory map (no DB queries!)
+      // Check existence for each anime individually (uses per-title cache)
       const comparisons: any[] = [];
 
       for (const anilistAnime of seasonalAnime) {
         const primaryTitle = anilistAnime.title.romaji || anilistAnime.title.english || anilistAnime.title.native;
 
-        console.log('Looking for:', primaryTitle?.toLowerCase());
-
-        // Check if anime exists using cached map (O(1) lookup)
-        let existingAnime = null;
-        if (anilistAnime.title.romaji) {
-          existingAnime = titleToAnimeMap.get(anilistAnime.title.romaji.toLowerCase());
-        }
-        if (!existingAnime && anilistAnime.title.english) {
-          existingAnime = titleToAnimeMap.get(anilistAnime.title.english.toLowerCase());
-        }
-        if (!existingAnime && anilistAnime.title.native) {
-          existingAnime = titleToAnimeMap.get(anilistAnime.title.native.toLowerCase());
-        }
+        // Check existence using individual cache per title
+        const existenceCheck = await this.checkAnimeExists(anilistAnime.title);
 
         const comparison = {
           titre: primaryTitle,
-          exists: !!existingAnime,
-          existsInDb: !!existingAnime,
-          existingAnimeId: existingAnime?.id_anime || null,
-          dbData: existingAnime || null,
+          exists: existenceCheck.exists,
+          existsInDb: existenceCheck.existsInDb,
+          existingAnimeId: existenceCheck.existingAnimeId,
+          dbData: existenceCheck.dbData,
           anilistData: anilistAnime,
         };
 
         comparisons.push(comparison);
       }
 
-      const result = {
+      return {
         season,
         year,
         total: seasonalAnime.length,
         comparisons,
         source: 'AniList',
       };
-
-      // Cache the result for 1 hour (3600 seconds) - increased from 5 minutes
-      // Season data doesn't change frequently, so we can cache longer
-      await this.cacheService.set(cacheKey, result, 3600);
-
-      return result;
     } catch (error) {
       console.error('Error importing seasonal anime from AniList:', error.message);
       throw new Error('Failed to import seasonal anime from AniList');

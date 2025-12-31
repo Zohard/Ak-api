@@ -156,6 +156,14 @@ export class AnimesService extends BaseContentService<
     await this.cacheService.invalidateSearchCache();
     await this.cacheService.invalidateRankings('anime');
 
+    // Invalidate anime existence cache for the created anime's titles
+    await this.animeExternalService.invalidateAnimeExistsCache({
+      romaji: anime.titreOrig || undefined,
+      english: anime.titre || undefined,
+      native: undefined,
+      alternatifs: anime.titresAlternatifs ? anime.titresAlternatifs.split('\n').filter(Boolean) : undefined,
+    });
+
     return this.formatAnime(anime);
   }
 
