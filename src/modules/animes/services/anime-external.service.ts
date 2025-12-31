@@ -81,12 +81,12 @@ export class AnimeExternalService {
       const titleToAnimeMap = new Map<string, typeof existingAnimes[0]>();
       existingAnimes.forEach(anime => {
         if (anime.titre) titleToAnimeMap.set(anime.titre.toLowerCase(), anime);
-        if (anime.titre_orig) titleToAnimeMap.set(anime.titre_orig.toLowerCase(), anime);  
+        if (anime.titre_orig) titleToAnimeMap.set(anime.titre_orig.toLowerCase(), anime); 
         if (anime.titre_fr) titleToAnimeMap.set(anime.titre_fr.toLowerCase(), anime);      
       
         // Also index alternative titles
-        if (anime.titres_alternatifs) {                                                   
-          anime.titres_alternatifs.split('\n').forEach(alt => {                           
+        if (anime.titres_alternatifs) {                                                  
+          anime.titres_alternatifs.split('\n').forEach(alt => {                         
             if (alt.trim()) titleToAnimeMap.set(alt.toLowerCase().trim(), anime);
           });
         }
@@ -143,4 +143,5 @@ export class AnimeExternalService {
     return crypto.createHash('md5').update(query).digest('hex');
   }
 }
+
 
