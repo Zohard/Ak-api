@@ -128,7 +128,7 @@ export class AnimeExternalService {
       const cacheKey = `anilist_season_data:${season}:${year}:${limit}`;
 
       // Try to get AniList data from cache first
-      let seasonalAnime = await this.cacheService.get(cacheKey);
+      let seasonalAnime: any[] = await this.cacheService.get(cacheKey);
 
       if (!seasonalAnime) {
         seasonalAnime = await this.aniListService.getAnimesBySeason(season, year, limit);
@@ -143,7 +143,7 @@ export class AnimeExternalService {
         const primaryTitle = anilistAnime.title.romaji || anilistAnime.title.english || anilistAnime.title.native;
 
         // Check existence using individual cache per title
-        const existenceCheck = await this.checkAnimeExists(anilistAnime.title);
+        const existenceCheck: any = await this.checkAnimeExists(anilistAnime.title);
 
         const comparison = {
           titre: primaryTitle,

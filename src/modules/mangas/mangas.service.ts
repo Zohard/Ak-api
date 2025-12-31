@@ -150,12 +150,17 @@ export class MangasService extends BaseContentService<
 
     // Check for duplicate titles before creating
     if (data.titre || data.titreOrig) {
+      const whereConditions: any[] = [];
+      if (data.titre) {
+        whereConditions.push({ titre: { equals: data.titre, mode: 'insensitive' as const } });
+      }
+      if (data.titreOrig) {
+        whereConditions.push({ titreOrig: { equals: data.titreOrig, mode: 'insensitive' as const } });
+      }
+
       const duplicateCheck = await this.prisma.akManga.findFirst({
         where: {
-          OR: [
-            data.titre ? { titre: { equals: data.titre, mode: 'insensitive' } } : null,
-            data.titreOrig ? { titreOrig: { equals: data.titreOrig, mode: 'insensitive' } } : null,
-          ].filter(Boolean),
+          OR: whereConditions,
         },
         select: {
           idManga: true,
