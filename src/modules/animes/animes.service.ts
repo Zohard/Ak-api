@@ -643,6 +643,11 @@ export class AnimesService extends BaseContentService<
       );
     }
 
+    // Delete associated activity logs first
+    await this.prisma.$executeRaw`
+      DELETE FROM ak_logs_admin WHERE anime = ${id}
+    `;
+
     await this.prisma.akAnime.delete({
       where: { idAnime: id },
     });

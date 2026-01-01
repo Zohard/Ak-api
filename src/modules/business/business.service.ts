@@ -162,6 +162,11 @@ export class BusinessService {
       throw new NotFoundException('Entité business introuvable');
     }
 
+    // Delete associated activity logs first
+    await this.prisma.$executeRaw`
+      DELETE FROM ak_logs_admin WHERE business = ${id}
+    `;
+
     await this.prisma.akBusiness.delete({
       where: { idBusiness: id },
     });

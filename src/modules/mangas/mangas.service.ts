@@ -640,6 +640,11 @@ export class MangasService extends BaseContentService<
       );
     }
 
+    // Delete associated activity logs first
+    await this.prisma.$executeRaw`
+      DELETE FROM ak_logs_admin WHERE manga = ${id}
+    `;
+
     await this.prisma.akManga.delete({
       where: { idManga: id },
     });
