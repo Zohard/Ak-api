@@ -1021,10 +1021,12 @@ export class SourcesExternesService {
 
         // Add staff relationship (only for existing businesses)
         await this.prisma.$queryRawUnsafe(
-          `INSERT INTO ak_business_to_animes (id_anime, id_business, type) VALUES ($1, $2, $3)`,
+          `INSERT INTO ak_business_to_animes (id_anime, id_business, type, precisions, doublon) VALUES ($1, $2, $3, $4, $5)`,
           animeId,
           staff.businessId,
-          staff.role || null
+          staff.role || null,
+          null, // precisions
+          0    // doublon
         );
 
         results.push({

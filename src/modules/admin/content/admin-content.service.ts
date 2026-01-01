@@ -565,12 +565,14 @@ export class AdminContentService {
 
     await this.prisma.$queryRawUnsafe(
       `
-      INSERT INTO ${staffTable} (${idColumn}, id_business, type)
-      VALUES ($1, $2, $3)
+      INSERT INTO ${staffTable} (${idColumn}, id_business, type, precisions, doublon)
+      VALUES ($1, $2, $3, $4, $5)
     `,
       id,
       businessId,
       role || null,
+      null, // precisions
+      0,    // doublon
     );
 
     // Log the action
