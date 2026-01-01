@@ -506,9 +506,24 @@ export class AnimesService extends BaseContentService<
       },
     });
 
+    // Get collection score (average evaluation excluding 0.0)
+    const collectionStats = await this.prisma.$queryRaw<Array<{ avg: number; count: number }>>`
+      SELECT
+        AVG(evaluation) as avg,
+        COUNT(*) as count
+      FROM collection_animes
+      WHERE id_anime = ${id}
+        AND evaluation > 0.0
+    `;
+
+    const collectionScore = collectionStats[0]?.avg ? Number(collectionStats[0].avg) : null;
+    const collectionEvaluationsCount = collectionStats[0]?.count ? Number(collectionStats[0].count) : 0;
+
     const formattedAnime = {
       ...this.formatAnime(anime, season, tags),
       articlesCount,
+      collectionScore,
+      collectionEvaluationsCount,
     };
 
     // Cache the result
