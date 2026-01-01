@@ -34,7 +34,8 @@ export interface AniListAnime {
   seasonYear: number | null;
   episodes: number | null;
   duration: number | null;
-  status: string;
+  format: string | null;
+  status: string | null;
   genres: string[];
   averageScore: number | null;
   popularity: number;
