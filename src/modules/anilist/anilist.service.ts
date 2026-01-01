@@ -6,36 +6,40 @@ import { JikanService } from '../jikan/jikan.service';
 
 export interface AniListAnime {
   id: number;
+  idMal?: number;  // MyAnimeList ID for cross-referencing
   title: {
     romaji: string;
     english?: string;
     native: string;
   };
+  synonyms?: string[];  // Alternative titles
   description?: string;
-  seasonYear?: number;
-  episodes?: number;
-  duration?: number;
-  format: string;
-  status: string;
-  startDate?: {
-    year?: number;
-    month?: number;
-    day?: number;
-  };
-  endDate?: {
-    year?: number;
-    month?: number;
-    day?: number;
-  };
   coverImage: {
+    extraLarge: string;
     large: string;
     medium: string;
   };
-  bannerImage?: string;
+  bannerImage: string | null;
+  startDate: {
+    year: number | null;
+    month: number | null;
+    day: number | null;
+  };
+  endDate: {
+    year: number | null;
+    month: number | null;
+    day: number | null;
+  };
+  season: string | null;
+  seasonYear: number | null;
+  episodes: number | null;
+  duration: number | null;
+  status: string;
   genres: string[];
+  averageScore: number | null;
+  popularity: number;
   studios: {
     nodes: Array<{
-      id: number;
       name: string;
       isAnimationStudio: boolean;
     }>;
