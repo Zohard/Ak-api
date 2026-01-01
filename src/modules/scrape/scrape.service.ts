@@ -1,12 +1,16 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { load } from 'cheerio';
 import { PrismaService } from '../../shared/services/prisma.service';
+import { AniListService } from '../anilist/anilist.service';
 
-type ScrapeSource = 'mal' | 'nautiljon' | 'auto';
+type ScrapeSource = 'mal' | 'nautiljon' | 'anilist' | 'auto';
 
 @Injectable()
 export class ScrapeService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private anilistService: AniListService,
+  ) {}
 
   // Add these at the top of your ScrapeService class:
 private requestCache = new Map<string, { data: any; timestamp: number }>();
@@ -903,6 +907,62 @@ private async fetchHtml(url: string) {
 
     let mal: any = null;
     let nj: any = null;
+
+    // Handle AniList source
+    if (source === 'anilist') {
+      const anilistResults = await this.anilistService.searchAnime(q, 1);
+      if (!anilistResults || anilistResults.length === 0) {
+        throw new NotFoundException('No results from AniList');
+      }
+
+      const anime = anilistResults[0];
+
+      // Convert AniList data to scrape format
+      const result = {
+        form: {
+          titre: anime.title.romaji || anime.title.english || anime.title.native,
+          titre_orig: anime.title.romaji,
+          titres_alternatifs: [anime.title.english, anime.title.native, ...(anime.synonyms || [])].filter(Boolean).join(', '),
+          annee: anime.startDate?.year || new Date().getFullYear(),
+          date_diffusion: anime.startDate?.year && anime.startDate?.month && anime.startDate?.day
+            ? `${anime.startDate.year}-${String(anime.startDate.month).padStart(2, '0')}-${String(anime.startDate.day).padStart(2, '0')}`
+            : null,
+          format: anime.format === 'TV' ? 'Série TV' :
+                  anime.format === 'MOVIE' ? 'Film' :
+                  anime.format === 'OVA' ? 'OAV' :
+                  anime.format === 'ONA' ? 'ONA' :
+                  anime.format === 'SPECIAL' ? 'Spécial' : 'Série TV',
+          nb_epduree: anime.episodes || 'NC',
+          official_site: anime.externalLinks?.find((link: any) => link.site === 'Official Site')?.url || null,
+        },
+        merged: {
+          title: anime.title.romaji,
+          synopsis: anime.description,
+          studios: anime.studios?.nodes?.filter((s: any) => s.isAnimationStudio).map((s: any) => s.name) || [],
+          episode_count: anime.episodes || 'NC',
+          duration: anime.duration || null,
+          genres: anime.genres || [],
+          staff: anime.staff?.edges?.map((edge: any) => ({
+            name: edge.node.name.full,
+            role: edge.role
+          })) || [],
+          characters: anime.characters?.edges?.map((edge: any) => ({
+            name: edge.node.name.full,
+            role: edge.role,
+            voice_actors: edge.voiceActors?.map((va: any) => ({
+              name: va.name.full,
+              language: va.languageV2
+            })) || []
+          })) || [],
+          source_urls: {
+            anilist: `https://anilist.co/anime/${anime.id}`,
+            myanimelist: anime.idMal ? `https://myanimelist.net/anime/${anime.idMal}` : null
+          }
+        }
+      };
+
+      return result;
+    }
 
     if (source === 'mal') {
       mal = await this.scrapeMAL(q);
