@@ -88,7 +88,6 @@ export interface AniListAnime {
     site: string;
     url: string;
   }>;
-  averageScore?: number;
   meanScore?: number;
   siteUrl: string;
 }
