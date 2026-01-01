@@ -922,7 +922,7 @@ private async fetchHtml(url: string) {
         form: {
           titre: anime.title.romaji || anime.title.english || anime.title.native,
           titre_orig: anime.title.romaji,
-          titres_alternatifs: [anime.title.english, anime.title.native, ...(anime.synonyms || [])].filter(Boolean).join(', '),
+          titres_alternatifs: [anime.title.english, anime.title.native, ...(anime.synonyms || [])].filter(Boolean).join('\n'),
           annee: anime.startDate?.year || new Date().getFullYear(),
           date_diffusion: anime.startDate?.year && anime.startDate?.month && anime.startDate?.day
             ? `${anime.startDate.year}-${String(anime.startDate.month).padStart(2, '0')}-${String(anime.startDate.day).padStart(2, '0')}`
