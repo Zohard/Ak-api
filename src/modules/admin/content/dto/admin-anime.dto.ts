@@ -127,6 +127,11 @@ export class CreateAdminAnimeDto {
   @IsString()
   doublage?: string;
 
+  @ApiPropertyOptional({ description: 'Sources URLs (one per line)' })
+  @IsOptional()
+  @IsString()
+  sources?: string;
+
   // `topic` removed. Use `commentaire` instead.
 
   @ApiPropertyOptional({ description: 'Commentaire fiche (legacy only)' })
@@ -250,6 +255,11 @@ export class UpdateAdminAnimeDto {
   @IsOptional()
   @IsString()
   doublage?: string;
+
+  @ApiPropertyOptional({ description: 'Sources URLs (one per line)' })
+  @IsOptional()
+  @IsString()
+  sources?: string;
 
   // `topic` removed. Use `commentaire` instead.
 

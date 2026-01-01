@@ -200,6 +200,7 @@ export class AdminAnimesService {
     if (officialSite) data.officialSite = officialSite;
     if (dto.lien_adn) data.lienAdn = dto.lien_adn;
     if (dto.doublage) data.doublage = dto.doublage;
+    if (dto.sources) data.sources = dto.sources;
     if (dto.commentaire) data.commentaire = dto.commentaire;
     if (typeof dto.lienforum === 'number') data.lienForum = dto.lienforum;
     // Note: legacy `topic` is not supported; use `commentaire` instead
@@ -210,6 +211,13 @@ export class AdminAnimesService {
     if (username) {
       await this.adminLogging.addLog(created.idAnime, 'anime', username, 'Création fiche');
     }
+
+    // Invalidate cache for the newly created anime
+    await this.cacheService.invalidateAnime(created.idAnime);
+
+    // Invalidate anime_exists cache for title variations
+    // This ensures future existence checks will find this newly created anime
+    await this.invalidateAnimeExistsCache(created);
 
     return created;
   }
@@ -270,6 +278,10 @@ export class AdminAnimesService {
 
     // Invalidate cache
     await this.cacheService.invalidateAnime(id);
+
+    // Invalidate anime_exists cache for title/source variations
+    // This is important if titles or sources were updated
+    await this.invalidateAnimeExistsCache(updated);
 
     return updated;
   }
@@ -387,5 +399,61 @@ export class AdminAnimesService {
       .replace(/[\u0300-\u036f]/g, '')
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/(^-|-$)+/g, '');
+  }
+
+  /**
+   * Invalidate anime_exists cache for title variations and source URLs
+   * This ensures future existence checks will find this anime
+   */
+  private async invalidateAnimeExistsCache(anime: any): Promise<void> {
+    // Collect all title variations
+    const titles: string[] = [];
+
+    if (anime.titre) titles.push(anime.titre.toLowerCase());
+    if (anime.titreOrig) titles.push(anime.titreOrig.toLowerCase());
+    if (anime.titreFr) titles.push(anime.titreFr.toLowerCase());
+
+    // Add alternative titles (split by newlines)
+    if (anime.titresAlternatifs) {
+      const altTitles = anime.titresAlternatifs
+        .split('\n')
+        .map((t: string) => t.trim().toLowerCase())
+        .filter(Boolean);
+      titles.push(...altTitles);
+    }
+
+    // Invalidate cache for each title variation
+    for (const title of titles) {
+      const cacheKey = `anime_exists:${this.hashQuery(title)}`;
+      await this.cacheService.del(cacheKey);
+    }
+
+    // Invalidate cache for source URLs (if provided)
+    if (anime.sources) {
+      const sourceUrls = anime.sources
+        .split('\n')
+        .map((url: string) => url.trim())
+        .filter(Boolean);
+
+      for (const url of sourceUrls) {
+        const cacheKey = `anime_exists_url:${this.hashQuery(url)}`;
+        await this.cacheService.del(cacheKey);
+      }
+    }
+
+    console.log(`Invalidated anime_exists cache for ${titles.length} titles and ${anime.sources ? anime.sources.split('\n').length : 0} source URLs`);
+  }
+
+  /**
+   * Hash a query string for cache keys (same algorithm as anime-external.service.ts)
+   */
+  private hashQuery(query: string): string {
+    let hash = 0;
+    for (let i = 0; i < query.length; i++) {
+      const char = query.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash; // Convert to 32-bit integer
+    }
+    return Math.abs(hash).toString(36);
   }
 }

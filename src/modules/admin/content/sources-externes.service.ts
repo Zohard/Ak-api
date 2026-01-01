@@ -171,6 +171,19 @@ export class SourcesExternesService {
     if (!existingAnime) {
       try {
         const scrapedData = await this.scrapeAnimeData(title);
+
+        // Add source_urls to the scraped data if not already present
+        if (scrapedData && !scrapedData.merged) {
+          // Wrap the scraped data in a merged structure with source_urls
+          scrapedData.merged = {
+            ...scrapedData,
+            source_urls: this.extractSourceUrls(scrapedData)
+          };
+        } else if (scrapedData?.merged && !scrapedData.merged.source_urls) {
+          // Add source_urls if merged exists but source_urls doesn't
+          scrapedData.merged.source_urls = this.extractSourceUrls(scrapedData);
+        }
+
         comparison.scrapedData = scrapedData;
         comparison.ressources = scrapedData; // Store in ressources column format
       } catch (error) {
@@ -224,6 +237,34 @@ export class SourcesExternesService {
     });
   }
 
+  /**
+   * Extract source URLs from scraped data
+   */
+  private extractSourceUrls(scrapedData: any): { myanimelist?: string; nautiljon?: string; anilist?: string } {
+    const sourceUrls: { myanimelist?: string; nautiljon?: string; anilist?: string } = {};
+
+    // Extract MAL URL
+    if (scrapedData.mal?.url) {
+      sourceUrls.myanimelist = scrapedData.mal.url;
+    } else if (scrapedData.mal?.mal_id) {
+      sourceUrls.myanimelist = `https://myanimelist.net/anime/${scrapedData.mal.mal_id}`;
+    }
+
+    // Extract Nautiljon URL
+    if (scrapedData.nautiljon?.url) {
+      sourceUrls.nautiljon = scrapedData.nautiljon.url;
+    }
+
+    // Extract AniList URL (if available)
+    if (scrapedData.anilist?.url) {
+      sourceUrls.anilist = scrapedData.anilist.url;
+    } else if (scrapedData.anilist?.id) {
+      sourceUrls.anilist = `https://anilist.co/anime/${scrapedData.anilist.id}`;
+    }
+
+    return sourceUrls;
+  }
+
   async importAnimeImage(
     imageUrl: string,
     animeTitle: string
@@ -265,13 +306,14 @@ export class SourcesExternesService {
   ): Promise<any> {
     // Extract fields from resources data
     const ressources = createDto.ressources;
-    
+
     // Build the admin anime creation DTO
     const adminDto: CreateAdminAnimeDto = {
       titre: createDto.titre,
       titreOrig: createDto.titreOrig,
       titre_fr: createDto.titreFr,
       titres_alternatifs: createDto.titresAlternatifs,
+      sources: createDto.sources,
       // Default values
       annee: new Date().getFullYear(),
       statut: 0, // Pending approval

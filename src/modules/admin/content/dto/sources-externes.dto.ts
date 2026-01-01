@@ -60,6 +60,11 @@ export class CreateAnimeFromSourcesExternesDto {
   @IsString()
   titresAlternatifs?: string;
 
+  @ApiPropertyOptional({ description: 'Sources URLs (one per line)' })
+  @IsOptional()
+  @IsString()
+  sources?: string;
+
   @ApiProperty({ description: 'JSON resources data from scraping' })
   ressources: any;
 }
