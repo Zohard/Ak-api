@@ -190,4 +190,12 @@ export class CreateAnimeDto {
   @IsOptional()
   @IsNumber()
   anilistId?: number;
+
+  @ApiPropertyOptional({
+    description: 'Source URLs (e.g. AniList URL) for cache invalidation',
+    example: 'https://anilist.co/anime/21',
+  })
+  @IsOptional()
+  @IsString()
+  sources?: string;
 }

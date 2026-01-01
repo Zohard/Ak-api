@@ -186,12 +186,39 @@ export class AnimesService extends BaseContentService<
     await this.cacheService.invalidateRankings('anime');
 
     // Invalidate anime existence cache for the created anime's titles
-    await this.animeExternalService.invalidateAnimeExistsCache({
+    const titlesToInvalidate: any = {
       romaji: anime.titreOrig || undefined,
       english: anime.titre || undefined,
       native: undefined,
       alternatifs: anime.titresAlternatifs ? anime.titresAlternatifs.split('\n').filter(Boolean) : undefined,
-    });
+    };
+
+    // If sources contains AniList URL, fetch all title variations from AniList
+    if (anime.sources) {
+      const anilistMatch = anime.sources.match(/anilist\.co\/anime\/(\d+)/);
+      if (anilistMatch) {
+        const anilistId = parseInt(anilistMatch[1]);
+        try {
+          const anilistData = await this.aniListService.getAnimeById(anilistId);
+          if (anilistData?.title) {
+            // Add all title variations from AniList
+            titlesToInvalidate.romaji = anilistData.title.romaji || titlesToInvalidate.romaji;
+            titlesToInvalidate.english = anilistData.title.english || titlesToInvalidate.english;
+            titlesToInvalidate.native = anilistData.title.native || undefined;
+            // Add synonyms as alternatifs
+            if (anilistData.synonyms && anilistData.synonyms.length > 0) {
+              const existingAlternatifs = titlesToInvalidate.alternatifs || [];
+              titlesToInvalidate.alternatifs = [...existingAlternatifs, ...anilistData.synonyms];
+            }
+          }
+        } catch (error) {
+          console.warn(`Failed to fetch AniList data for cache invalidation: ${error.message}`);
+          // Continue with basic invalidation
+        }
+      }
+    }
+
+    await this.animeExternalService.invalidateAnimeExistsCache(titlesToInvalidate);
 
     return this.formatAnime(anime);
   }
