@@ -798,18 +798,21 @@ export class AnimesService extends BaseContentService<
 
     // Find studio ID and name from business relations
     let idStudio = null;
-    let studioName = dbStudio || null; // Use existing studio field as fallback
+    let studioName = null;
+
     if (businessRelations && Array.isArray(businessRelations)) {
       const studioRelation = businessRelations.find((rel: any) =>
         rel.type === "Studio d'animation" || rel.type === "Studio d'animation (sous-traitance)"
       );
       if (studioRelation) {
         idStudio = studioRelation.idBusiness;
-        // If studio field is empty but we have business relation, use business name
-        if (studioRelation.business?.denomination && !studioName) {
-          studioName = studioRelation.business.denomination;
-        }
+        studioName = studioRelation.business?.denomination || null;
       }
+    }
+
+    // Use dbStudio as fallback only if we didn't find a business relation
+    if (!studioName && dbStudio) {
+      studioName = dbStudio;
     }
 
     // Format dateDiffusion as YYYY-MM-DD string for frontend
