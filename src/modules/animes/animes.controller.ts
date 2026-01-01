@@ -32,6 +32,7 @@ import { UpdateAnimeDto } from './dto/update-anime.dto';
 import { AnimeQueryDto } from './dto/anime-query.dto';
 import { CreateTrailerDto } from './dto/create-trailer.dto';
 import { UpdateTrailerDto } from './dto/update-trailer.dto';
+import { AnimesNoImageQueryDto } from './dto/animes-no-image.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { OptionalJwtAuthGuard } from '../../common/guards/optional-jwt-auth.guard';
 import { AdminGuard } from '../../common/guards/admin.guard';
@@ -549,28 +550,15 @@ export class AnimesController {
   @UseGuards(JwtAuthGuard, AdminGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Liste des animes sans image (Admin seulement)' })
-  @ApiQuery({
-    name: 'limit',
-    required: false,
-    description: "Nombre d'animes à retourner",
-    example: 50,
-  })
-  @ApiQuery({
-    name: 'page',
-    required: false,
-    description: 'Numéro de page',
-    example: 1,
-  })
   @ApiResponse({ status: 200, description: 'Liste des animes sans image' })
   @ApiResponse({ status: 401, description: 'Authentification requise' })
   @ApiResponse({ status: 403, description: "Droits d'administrateur requis" })
   async getAnimesWithoutImage(
-    @Query('limit') limit?: string,
-    @Query('page') page?: string,
+    @Query() query: AnimesNoImageQueryDto,
   ) {
     return this.animeImageService.getAnimesWithoutImage(
-      page ? parseInt(page) : 1,
-      limit ? parseInt(limit) : 50,
+      query.page,
+      query.limit,
     );
   }
 
