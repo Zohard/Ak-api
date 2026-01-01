@@ -280,12 +280,12 @@ export class SourcesExternesService {
 
     // Add Nautiljon title to alternative titles if it's different from the main title
     if (ressources?.nautiljon?.title && ressources.nautiljon.title !== createDto.titre) {
-      const currentAltTitles = createDto.titresAlternatifs ? createDto.titresAlternatifs.split(',').map(t => t.trim()) : [];
+      const currentAltTitles = createDto.titresAlternatifs ? createDto.titresAlternatifs.split('\n').map(t => t.trim()).filter(Boolean) : [];
 
       // Only add if not already present
       if (!currentAltTitles.includes(ressources.nautiljon.title)) {
         currentAltTitles.push(ressources.nautiljon.title);
-        adminDto.titres_alternatifs = currentAltTitles.join(', ');
+        adminDto.titres_alternatifs = currentAltTitles.join('\n');
       }
     }
 
