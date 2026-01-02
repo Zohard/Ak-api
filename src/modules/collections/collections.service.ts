@@ -784,16 +784,25 @@ export class CollectionsService {
 
       return {
         inCollection,
-        collections: collections.map(c => ({
-          type: c.type,
-          name: this.getCollectionNameByTypeId(c.type),
-          rating: c.evaluation ? Number(c.evaluation) : 0,
-          notes: c.notes,
-          collectionId: c.id_collection || undefined,
-          platformPlayed: c.platform_played || undefined,
-          startedDate: c.started_date || undefined,
-          finishedDate: c.finished_date || undefined,
-        })),
+        collections: collections.map(c => {
+          // Convert rating: database stores Decimal(3,1), may contain 0-10 scale ratings
+          // Convert to 0-5 scale if rating > 5
+          let rating = c.evaluation ? Number(c.evaluation) : 0;
+          if (rating > 5) {
+            rating = rating / 2; // Convert from 0-10 to 0-5 scale
+          }
+
+          return {
+            type: c.type,
+            name: this.getCollectionNameByTypeId(c.type),
+            rating,
+            notes: c.notes,
+            collectionId: c.id_collection || undefined,
+            platformPlayed: c.platform_played || undefined,
+            startedDate: c.started_date || undefined,
+            finishedDate: c.finished_date || undefined,
+          };
+        }),
       };
     });
   }
