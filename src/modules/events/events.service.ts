@@ -128,7 +128,22 @@ export class EventsService {
       return cached;
     }
 
-    const statusFilter = status ? `AND status = '${status}'` : `AND status IN ('active', 'voting', 'closed')`;
+    // When no status is provided, show active, voting, and closed events from last 2 weeks
+    // When status='closed' is explicitly requested, show all closed events
+    let statusFilter: string;
+    if (status === 'closed') {
+      statusFilter = `AND status = 'closed'`;
+    } else if (status) {
+      statusFilter = `AND status = '${status}'`;
+    } else {
+      // For homepage/public: show active, voting, and recently closed (within 2 weeks)
+      const twoWeeksAgo = new Date();
+      twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
+      statusFilter = `AND (
+        status IN ('active', 'voting')
+        OR (status = 'closed' AND updated_at >= '${twoWeeksAgo.toISOString()}')
+      )`;
+    }
 
     const events = await this.prisma.$queryRawUnsafe<any[]>(`
       SELECT e.*,
