@@ -99,68 +99,129 @@ export class SourcesExternesService {
     // Normalize title for better matching: remove extra spaces, special chars
     const normalizedTitle = title.trim();
 
-    // Generate cache key based on normalized title
-    const cacheKey = `anime_exists:${normalizedTitle.toLowerCase()}`;
-
-    // Check cache first - only positive results are cached
-    const cachedResult = await this.cacheService.get<SourcesExternesAnimeComparisonDto>(cacheKey);
-    if (cachedResult) {
-      console.log(`[Cache HIT] Found cached result for "${title}"`);
-      return cachedResult;
-    }
-
     console.log(`[Title Matching Debug] Original title: "${title}"`);
 
-    // Create variations of the title for better matching
-    const titleVariations = [
-      normalizedTitle,
-      normalizedTitle.replace(/\s+/g, ' '), // Normalize spaces
-      normalizedTitle.replace(/[^\w\s]/g, ''), // Remove special chars
-      normalizedTitle.replace(/[^\w\s]/g, ' ').replace(/\s+/g, ' '), // Remove special chars and normalize spaces
+    // First, try to scrape data to get AniList URL for reliable cache key
+    let scrapedData: any = null;
+    let anilistUrl: string | null = null;
 
-      // Season variations
-      normalizedTitle.replace(/2nd\s+Season/gi, 'Season 2'),
-      normalizedTitle.replace(/2nd\s+Season/gi, '2nd'),
-      normalizedTitle.replace(/2nd\s+Season/gi, '2'),
-      normalizedTitle.replace(/Season\s*2/gi, '2nd Season'),
-      normalizedTitle.replace(/Season\s*2/gi, '2nd'),
-      normalizedTitle.replace(/Season\s*2/gi, '2'),
-      normalizedTitle.replace(/2nd/gi, 'Season 2'),
-      normalizedTitle.replace(/2nd/gi, '2'),
+    try {
+      scrapedData = await this.scrapeAnimeData(title);
 
-      normalizedTitle.replace(/:\s*/g, ' '), // Replace colons with spaces
-      normalizedTitle.replace(/\s*-\s*/g, ' '), // Replace dashes with spaces
-    ];
+      // Add source_urls to the scraped data if not already present
+      if (scrapedData && !scrapedData.merged) {
+        scrapedData.merged = {
+          ...scrapedData,
+          source_urls: this.extractSourceUrls(scrapedData)
+        };
+      } else if (scrapedData?.merged && !scrapedData.merged.source_urls) {
+        scrapedData.merged.source_urls = this.extractSourceUrls(scrapedData);
+      }
 
-    // Remove duplicates from variations
-    const uniqueVariations = [...new Set(titleVariations)];
+      // Extract AniList URL for cache key
+      anilistUrl = scrapedData?.merged?.source_urls?.anilist ||
+                   scrapedData?.anilist?.url ||
+                   null;
 
-    console.log(`[Title Matching Debug] Generated ${uniqueVariations.length} variations:`, uniqueVariations.slice(0, 5));
+      if (anilistUrl) {
+        console.log(`[Cache] Using AniList URL for cache key: ${anilistUrl}`);
 
-    // Search for anime in database using multiple fields with flexible matching
-    const existingAnime = await this.prisma.akAnime.findFirst({
-      where: {
-        OR: [
-          // Exact matches with any title variation on all title fields
-          ...uniqueVariations.flatMap(variation => [
-            { titre: { equals: variation, mode: 'insensitive' as const } },
-            { titreOrig: { equals: variation, mode: 'insensitive' as const } },
-            { titreFr: { equals: variation, mode: 'insensitive' as const } },
-          ]),
-          // Contains matches for alternative titles (handles comma-separated lists)
-          ...uniqueVariations.map(variation => ({
-            titresAlternatifs: { contains: variation, mode: 'insensitive' as const }
-          })),
-        ],
-      },
-      select: {
-        idAnime: true,
-        titre: true,
-        titreOrig: true,
-        titreFr: true,
-        titresAlternatifs: true,
-      },
-    });
+        // Check cache using AniList URL
+        const cacheKey = `anime_exists:${anilistUrl}`;
+        const cachedResult = await this.cacheService.get<SourcesExternesAnimeComparisonDto>(cacheKey);
+        if (cachedResult) {
+          console.log(`[Cache HIT] Found cached result for "${title}" using AniList URL`);
+          // Add scraped data to cached result
+          return {
+            ...cachedResult,
+            scrapedData,
+            ressources: scrapedData
+          };
+        }
+      }
+    } catch (error) {
+      console.warn(`Failed to scrape data for ${title}:`, error.message);
+    }
+
+    // Search in database - first try sources field if we have AniList URL
+    let existingAnime = null;
+
+    if (anilistUrl) {
+      console.log(`[DB Search] Searching by AniList URL in sources field`);
+      existingAnime = await this.prisma.akAnime.findFirst({
+        where: {
+          sources: {
+            contains: anilistUrl,
+            mode: 'insensitive' as const
+          }
+        },
+        select: {
+          idAnime: true,
+          titre: true,
+          titreOrig: true,
+          titreFr: true,
+          titresAlternatifs: true,
+          sources: true,
+        },
+      });
+    }
+
+    // Fallback to title matching if not found by AniList URL
+    if (!existingAnime) {
+      console.log(`[DB Search] Searching by title variations`);
+
+      // Create variations of the title for better matching
+      const titleVariations = [
+        normalizedTitle,
+        normalizedTitle.replace(/\s+/g, ' '), // Normalize spaces
+        normalizedTitle.replace(/[^\w\s]/g, ''), // Remove special chars
+        normalizedTitle.replace(/[^\w\s]/g, ' ').replace(/\s+/g, ' '), // Remove special chars and normalize spaces
+
+        // Season variations
+        normalizedTitle.replace(/2nd\s+Season/gi, 'Season 2'),
+        normalizedTitle.replace(/2nd\s+Season/gi, '2nd'),
+        normalizedTitle.replace(/2nd\s+Season/gi, '2'),
+        normalizedTitle.replace(/Season\s*2/gi, '2nd Season'),
+        normalizedTitle.replace(/Season\s*2/gi, '2nd'),
+        normalizedTitle.replace(/Season\s*2/gi, '2'),
+        normalizedTitle.replace(/2nd/gi, 'Season 2'),
+        normalizedTitle.replace(/2nd/gi, '2'),
+
+        normalizedTitle.replace(/:\s*/g, ' '), // Replace colons with spaces
+        normalizedTitle.replace(/\s*-\s*/g, ' '), // Replace dashes with spaces
+      ];
+
+      // Remove duplicates from variations
+      const uniqueVariations = [...new Set(titleVariations)];
+
+      console.log(`[Title Matching Debug] Generated ${uniqueVariations.length} variations:`, uniqueVariations.slice(0, 5));
+
+      // Search for anime in database using multiple fields with flexible matching
+      existingAnime = await this.prisma.akAnime.findFirst({
+        where: {
+          OR: [
+            // Exact matches with any title variation on all title fields
+            ...uniqueVariations.flatMap(variation => [
+              { titre: { equals: variation, mode: 'insensitive' as const } },
+              { titreOrig: { equals: variation, mode: 'insensitive' as const } },
+              { titreFr: { equals: variation, mode: 'insensitive' as const } },
+            ]),
+            // Contains matches for alternative titles (handles comma-separated lists)
+            ...uniqueVariations.map(variation => ({
+              titresAlternatifs: { contains: variation, mode: 'insensitive' as const }
+            })),
+          ],
+        },
+        select: {
+          idAnime: true,
+          titre: true,
+          titreOrig: true,
+          titreFr: true,
+          titresAlternatifs: true,
+          sources: true,
+        },
+      });
+    }
 
     if (existingAnime) {
       console.log(`[Title Matching Debug] MATCH FOUND for "${title}":`, {
@@ -179,35 +240,18 @@ export class SourcesExternesService {
       existingAnimeId: existingAnime?.idAnime,
     };
 
-    // ONLY cache when anime IS found (positive result)
-    // Don't cache negative results - allows newly created anime to be found on next check
-    if (existingAnime) {
-      await this.cacheService.set(cacheKey, comparison, 3600); // 1 hour TTL
-      console.log(`[Cache SET] Cached positive result for "${title}"`);
+    // Add scraped data to comparison
+    if (scrapedData) {
+      comparison.scrapedData = scrapedData;
+      comparison.ressources = scrapedData;
     }
 
-    // If anime doesn't exist, try to scrape additional data
-    if (!existingAnime) {
-      try {
-        const scrapedData = await this.scrapeAnimeData(title);
-
-        // Add source_urls to the scraped data if not already present
-        if (scrapedData && !scrapedData.merged) {
-          // Wrap the scraped data in a merged structure with source_urls
-          scrapedData.merged = {
-            ...scrapedData,
-            source_urls: this.extractSourceUrls(scrapedData)
-          };
-        } else if (scrapedData?.merged && !scrapedData.merged.source_urls) {
-          // Add source_urls if merged exists but source_urls doesn't
-          scrapedData.merged.source_urls = this.extractSourceUrls(scrapedData);
-        }
-
-        comparison.scrapedData = scrapedData;
-        comparison.ressources = scrapedData; // Store in ressources column format
-      } catch (error) {
-        console.warn(`Failed to scrape data for ${title}:`, error.message);
-      }
+    // ONLY cache when anime IS found (positive result) AND we have AniList URL
+    // Don't cache negative results - allows newly created anime to be found on next check
+    if (existingAnime && anilistUrl) {
+      const cacheKey = `anime_exists:${anilistUrl}`;
+      await this.cacheService.set(cacheKey, comparison, 3600); // 1 hour TTL
+      console.log(`[Cache SET] Cached positive result for "${title}" using AniList URL`);
     }
 
     return comparison;
@@ -399,15 +443,31 @@ export class SourcesExternesService {
     // Create the anime
     const createdAnime = await this.adminAnimesService.create(adminDto);
 
-    // Proactively cache the newly created anime to avoid "manquant" status on refresh
-    const cacheKey = `anime_exists:${createDto.titre.trim().toLowerCase()}`;
-    const cacheValue: SourcesExternesAnimeComparisonDto = {
-      titre: createDto.titre,
-      exists: true,
-      existingAnimeId: createdAnime.idAnime,
-    };
-    await this.cacheService.set(cacheKey, cacheValue, 3600); // 1 hour TTL
-    console.log(`[Cache SET] Proactively cached newly created anime: "${createDto.titre}"`);
+    // Proactively cache the newly created anime using AniList URL from sources
+    // This ensures immediate cache hit on next import check
+    if (createDto.sources) {
+      try {
+        // Extract AniList URL from sources JSON
+        const sourcesJson = typeof createDto.sources === 'string'
+          ? JSON.parse(createDto.sources)
+          : createDto.sources;
+
+        const anilistUrl = sourcesJson?.anilist;
+
+        if (anilistUrl) {
+          const cacheKey = `anime_exists:${anilistUrl}`;
+          const cacheValue: SourcesExternesAnimeComparisonDto = {
+            titre: createDto.titre,
+            exists: true,
+            existingAnimeId: createdAnime.idAnime,
+          };
+          await this.cacheService.set(cacheKey, cacheValue, 3600); // 1 hour TTL
+          console.log(`[Cache SET] Proactively cached newly created anime "${createDto.titre}" using AniList URL: ${anilistUrl}`);
+        }
+      } catch (error) {
+        console.warn('Failed to cache newly created anime:', error.message);
+      }
+    }
 
     // Add image import result to response
     const result = {
