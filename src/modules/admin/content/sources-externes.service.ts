@@ -9,6 +9,7 @@ import { CreateAdminAnimeDto } from './dto/admin-anime.dto';
 import { AdminAnimesService } from './admin-animes.service';
 import { ImageKitService } from '../../media/imagekit.service';
 import { DeepLService } from '../../../shared/services/deepl.service';
+import { CacheService } from '../../../shared/services/cache.service';
 import { spawn } from 'child_process';
 import { promises as fs } from 'fs';
 import { join } from 'path';
@@ -20,6 +21,7 @@ export class SourcesExternesService {
     private adminAnimesService: AdminAnimesService,
     private imageKitService: ImageKitService,
     private deepLService: DeepLService,
+    private cacheService: CacheService,
   ) {}
 
   async importSeasonAnimes(importDto: SourcesExternesImportDto): Promise<SourcesExternesAnimeComparisonDto[]> {
@@ -97,6 +99,16 @@ export class SourcesExternesService {
     // Normalize title for better matching: remove extra spaces, special chars
     const normalizedTitle = title.trim();
 
+    // Generate cache key based on normalized title
+    const cacheKey = `anime_exists:${normalizedTitle.toLowerCase()}`;
+
+    // Check cache first - only positive results are cached
+    const cachedResult = await this.cacheService.get<SourcesExternesAnimeComparisonDto>(cacheKey);
+    if (cachedResult) {
+      console.log(`[Cache HIT] Found cached result for "${title}"`);
+      return cachedResult;
+    }
+
     console.log(`[Title Matching Debug] Original title: "${title}"`);
 
     // Create variations of the title for better matching
@@ -166,6 +178,13 @@ export class SourcesExternesService {
       exists: !!existingAnime,
       existingAnimeId: existingAnime?.idAnime,
     };
+
+    // ONLY cache when anime IS found (positive result)
+    // Don't cache negative results - allows newly created anime to be found on next check
+    if (existingAnime) {
+      await this.cacheService.set(cacheKey, comparison, 3600); // 1 hour TTL
+      console.log(`[Cache SET] Cached positive result for "${title}"`);
+    }
 
     // If anime doesn't exist, try to scrape additional data
     if (!existingAnime) {
@@ -379,6 +398,16 @@ export class SourcesExternesService {
 
     // Create the anime
     const createdAnime = await this.adminAnimesService.create(adminDto);
+
+    // Proactively cache the newly created anime to avoid "manquant" status on refresh
+    const cacheKey = `anime_exists:${createDto.titre.trim().toLowerCase()}`;
+    const cacheValue: SourcesExternesAnimeComparisonDto = {
+      titre: createDto.titre,
+      exists: true,
+      existingAnimeId: createdAnime.idAnime,
+    };
+    await this.cacheService.set(cacheKey, cacheValue, 3600); // 1 hour TTL
+    console.log(`[Cache SET] Proactively cached newly created anime: "${createDto.titre}"`);
 
     // Add image import result to response
     const result = {
