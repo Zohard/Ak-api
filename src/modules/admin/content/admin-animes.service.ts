@@ -422,26 +422,43 @@ export class AdminAnimesService {
       titles.push(...altTitles);
     }
 
-    // Invalidate cache for each title variation
+    // Invalidate cache for each title variation (using MD5 hash like anime-external.service)
+    const crypto = require('crypto');
     for (const title of titles) {
-      const cacheKey = `anime_exists:${this.hashQuery(title)}`;
+      const hashedTitle = crypto.createHash('md5').update(title).digest('hex');
+      const cacheKey = `anime_exists:${hashedTitle}`;
       await this.cacheService.del(cacheKey);
     }
 
     // Invalidate cache for source URLs (if provided)
+    // Sources is stored as JSON: {"myanimelist":"...", "anilist":"...", "nautiljon":"..."}
     if (anime.sources) {
-      const sourceUrls = anime.sources
-        .split('\n')
-        .map((url: string) => url.trim())
-        .filter(Boolean);
+      try {
+        // Parse sources as JSON
+        const sourcesJson = typeof anime.sources === 'string'
+          ? JSON.parse(anime.sources)
+          : anime.sources;
 
-      for (const url of sourceUrls) {
-        const cacheKey = `anime_exists_url:${this.hashQuery(url)}`;
-        await this.cacheService.del(cacheKey);
+        // Invalidate cache for AniList URL (used by sources-externes)
+        if (sourcesJson.anilist) {
+          const anilistCacheKey = `anime_exists:${sourcesJson.anilist}`;
+          await this.cacheService.del(anilistCacheKey);
+          console.log(`Invalidated AniList URL cache: ${sourcesJson.anilist}`);
+        }
+
+        // Invalidate cache for other source URLs (if needed)
+        const sourceUrls = Object.values(sourcesJson).filter(Boolean) as string[];
+        for (const url of sourceUrls) {
+          const hashedUrl = crypto.createHash('md5').update(url.toLowerCase()).digest('hex');
+          const cacheKey = `anime_exists_url:${hashedUrl}`;
+          await this.cacheService.del(cacheKey);
+        }
+      } catch (error) {
+        console.warn('Failed to parse sources JSON for cache invalidation:', error.message);
       }
     }
 
-    console.log(`Invalidated anime_exists cache for ${titles.length} titles and ${anime.sources ? anime.sources.split('\n').length : 0} source URLs`);
+    console.log(`Invalidated anime_exists cache for ${titles.length} titles`);
   }
 
   /**
