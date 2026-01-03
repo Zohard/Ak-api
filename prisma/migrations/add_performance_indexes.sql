@@ -46,9 +46,9 @@ ON ak_critique(id_manga, statut)
 WHERE id_manga > 0;
 
 -- Index for review filtering by jeu video and status
-CREATE INDEX IF NOT EXISTS idx_critique_jeuvideo_statut
-ON ak_critique(id_jeu_video, statut)
-WHERE id_jeu_video > 0;
+CREATE INDEX IF NOT EXISTS idx_critique_jeu_statut
+ON ak_critique(id_jeu, statut)
+WHERE id_jeu > 0;
 
 -- ============================================================================
 -- SCREENSHOT INDEXES (MEDIUM PRIORITY)
@@ -56,7 +56,7 @@ WHERE id_jeu_video > 0;
 
 -- Index for screenshot lookups by title ID and type
 CREATE INDEX IF NOT EXISTS idx_screenshot_titre_type
-ON ak_screenshot(id_titre, type);
+ON ak_screenshots(id_titre, type);
 
 -- ============================================================================
 -- SEARCH AND FILTERING INDEXES (MEDIUM PRIORITY)
@@ -85,6 +85,6 @@ ON ak_mangas USING gin(to_tsvector('french', titre));
 ANALYZE collection_animes;
 ANALYZE collection_mangas;
 ANALYZE ak_critique;
-ANALYZE ak_screenshot;
+ANALYZE ak_screenshots;
 ANALYZE ak_animes;
 ANALYZE ak_mangas;
