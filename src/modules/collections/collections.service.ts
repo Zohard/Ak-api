@@ -400,6 +400,10 @@ export class CollectionsService {
       // Invalidate user's collection cache after any add operation
       await this.invalidateUserCollectionCache(userId);
 
+      // OPTIMIZATION: Invalidate collection check cache
+      const cacheKey = `user_collection_check:${userId}:${mediaType}:${mediaId}`;
+      await this.cacheService.del(cacheKey);
+
       // Invalidate anime/manga cache as ratings may have changed
       if (mediaType === 'anime') {
         await this.cacheService.invalidateAnime(mediaId);
@@ -681,6 +685,10 @@ export class CollectionsService {
     // Invalidate user's collection cache after removal
     await this.invalidateUserCollectionCache(userId);
 
+    // OPTIMIZATION: Invalidate collection check cache
+    const cacheKey = `user_collection_check:${userId}:${mediaType}:${mediaId}`;
+    await this.cacheService.del(cacheKey);
+
     // Invalidate anime/manga cache as ratings may have changed
     if (mediaType === 'anime') {
       await this.cacheService.invalidateAnime(mediaId);
@@ -738,6 +746,11 @@ export class CollectionsService {
     // Invalidate user's collection cache after update
     await this.invalidateUserCollectionCache(userId);
 
+    // OPTIMIZATION: Invalidate collection check cache
+    const normalizedMediaType = mediaType === 'game' ? 'jeu-video' : mediaType;
+    const cacheKey = `user_collection_check:${userId}:${normalizedMediaType}:${mediaId}`;
+    await this.cacheService.del(cacheKey);
+
     // Invalidate anime/manga cache as ratings may have changed
     if (mediaType === 'anime') {
       await this.cacheService.invalidateAnime(mediaId);
@@ -749,8 +762,16 @@ export class CollectionsService {
   }
 
   async isInCollection(userId: number, mediaId: number, mediaType: 'anime' | 'manga' | 'jeu-video') {
+    // OPTIMIZATION: Cache collection check to avoid DB query on every page load
+    const cacheKey = `user_collection_check:${userId}:${mediaType}:${mediaId}`;
+    const cached = await this.cacheService.get(cacheKey);
+    if (cached !== null) {
+      console.log(`🔍 [isInCollection] Cache HIT for ${cacheKey}`);
+      return cached;
+    }
+
     return await this.prisma.executeWithRetry(async () => {
-      console.log(`🔍 [isInCollection] Using RAW SQL - userId: ${userId}, mediaId: ${mediaId}, mediaType: ${mediaType}`);
+      console.log(`🔍 [isInCollection] Cache MISS - Using RAW SQL - userId: ${userId}, mediaId: ${mediaId}, mediaType: ${mediaType}`);
       let inCollection = false;
       let collections: any[] = [];
 
@@ -782,7 +803,7 @@ export class CollectionsService {
 
       console.log(`🔍 [isInCollection] Final result - inCollection: ${inCollection}, count: ${collections.length}`);
 
-      return {
+      const result = {
         inCollection,
         collections: collections.map(c => {
           // Convert rating: database stores Decimal(3,1), may contain 0-10 scale ratings
@@ -804,6 +825,12 @@ export class CollectionsService {
           };
         }),
       };
+
+      // Cache for 5 minutes (balance between freshness and performance)
+      await this.cacheService.set(cacheKey, result, 300);
+      console.log(`🔍 [isInCollection] Cached result for ${cacheKey}`);
+
+      return result;
     });
   }
 
@@ -1022,47 +1049,52 @@ export class CollectionsService {
         return animeCount > 0 || mangaCount > 0;
       });
 
-    const sampleImages = await Promise.all(
-      typesWithItems.map(async (type) => {
-        // Get anime sample image
-        const animeItem = await this.prisma.collectionAnime.findFirst({
-          where: {
-            idMembre: userId,
-            type,
-            ...(isOwnCollection ? {} : { isPublic: true }),
-            anime: {
-              image: {
-                not: null
-              }
+    // OPTIMIZATION: Batch fetch all sample images at once instead of per type
+    const [animeSamples, mangaSamples] = await Promise.all([
+      this.prisma.collectionAnime.findMany({
+        where: {
+          idMembre: userId,
+          type: { in: typesWithItems },
+          ...(isOwnCollection ? {} : { isPublic: true }),
+          anime: {
+            image: {
+              not: null
             }
-          },
-          include: { anime: { select: { image: true } } },
-          orderBy: { idCollection: 'desc' }
-        });
-
-        // Get manga sample image
-        const mangaItem = await this.prisma.collectionManga.findFirst({
-          where: {
-            idMembre: userId,
-            type,
-            ...(isOwnCollection ? {} : { isPublic: true }),
-            manga: {
-              image: {
-                not: null
-              }
+          }
+        },
+        include: { anime: { select: { image: true } } },
+        orderBy: { idCollection: 'desc' },
+        // Get one sample per type by taking first N items
+        take: typesWithItems.length * 2 // Allow up to 2 per type to ensure we get one for each
+      }),
+      this.prisma.collectionManga.findMany({
+        where: {
+          idMembre: userId,
+          type: { in: typesWithItems },
+          ...(isOwnCollection ? {} : { isPublic: true }),
+          manga: {
+            image: {
+              not: null
             }
-          },
-          include: { manga: { select: { image: true } } },
-          orderBy: { idCollection: 'desc' }
-        });
-
-        return {
-          type,
-          animeImage: animeItem?.anime?.image || null,
-          mangaImage: mangaItem?.manga?.image || null
-        };
+          }
+        },
+        include: { manga: { select: { image: true } } },
+        orderBy: { idCollection: 'desc' },
+        take: typesWithItems.length * 2
       })
-    );
+    ]);
+
+    // Map samples by type (get first anime and manga for each type)
+    const sampleImages = typesWithItems.map((type) => {
+      const animeItem = animeSamples.find(item => item.type === type);
+      const mangaItem = mangaSamples.find(item => item.type === type);
+
+      return {
+        type,
+        animeImage: animeItem?.anime?.image || null,
+        mangaImage: mangaItem?.manga?.image || null
+      };
+    });
 
     const animeImageMap = new Map(sampleImages.map(item => [item.type, item.animeImage]));
     const mangaImageMap = new Map(sampleImages.map(item => [item.type, item.mangaImage]));
@@ -1212,65 +1244,88 @@ export class CollectionsService {
     });
 
     // Transform data to include collection summaries
-    const users = await Promise.all(
-      usersWithPublicCollections.map(async (user: any) => {
-        // Get collection type counts
-        const animeCounts = await this.prisma.collectionAnime.groupBy({
-          by: ['type'],
-          where: {
-            idMembre: user.id,
-            isPublic: true
-          },
-          _count: {
-            type: true
-          }
-        });
+    // OPTIMIZED: Batch query all user collection counts at once to avoid N+1
+    const userIds = usersWithPublicCollections.map(u => u.idMember);
 
-        const mangaCounts = await this.prisma.collectionManga.groupBy({
-          by: ['type'],
-          where: {
-            idMembre: user.id,
-            isPublic: true
-          },
-          _count: {
-            type: true
-          }
-        });
+    // Batch fetch all anime and manga counts for all users in parallel
+    const [animeCountsAll, mangaCountsAll] = await Promise.all([
+      this.prisma.collectionAnime.groupBy({
+        by: ['idMembre', 'type'],
+        where: {
+          idMembre: { in: userIds },
+          isPublic: true
+        },
+        _count: {
+          type: true
+        }
+      }),
+      this.prisma.collectionManga.groupBy({
+        by: ['idMembre', 'type'],
+        where: {
+          idMembre: { in: userIds },
+          isPublic: true
+        },
+        _count: {
+          type: true
+        }
+      })
+    ]);
 
-        const collectionTypes = [
-          { type: 1, name: 'Terminé' },
-          { type: 2, name: 'En cours' },
-          { type: 3, name: 'Planifié' },
-          { type: 4, name: 'Abandonné' }
-        ];
+    // Create lookup maps for O(1) access
+    const animeCountMap = new Map<number, Map<number, number>>();
+    animeCountsAll.forEach(item => {
+      if (!animeCountMap.has(item.idMembre)) {
+        animeCountMap.set(item.idMembre, new Map());
+      }
+      animeCountMap.get(item.idMembre)!.set(item.type, item._count.type);
+    });
 
-        const collections = collectionTypes.map(collectionType => {
-          const animeCount = animeCounts.find(ac => ac.type === collectionType.type)?._count?.type || 0;
-          const mangaCount = mangaCounts.find(mc => mc.type === collectionType.type)?._count?.type || 0;
-          const totalCount = animeCount + mangaCount;
+    const mangaCountMap = new Map<number, Map<number, number>>();
+    mangaCountsAll.forEach(item => {
+      if (!mangaCountMap.has(item.idMembre)) {
+        mangaCountMap.set(item.idMembre, new Map());
+      }
+      mangaCountMap.get(item.idMembre)!.set(item.type, item._count.type);
+    });
 
-          return {
-            type: collectionType.type,
-            name: collectionType.name,
-            animeCount,
-            mangaCount,
-            totalCount,
-            hasItems: totalCount > 0
-          };
-        }).filter(c => c.hasItems); // Only include collections with items
+    const collectionTypes = [
+      { type: 1, name: 'Terminé' },
+      { type: 2, name: 'En cours' },
+      { type: 3, name: 'Planifié' },
+      { type: 4, name: 'Abandonné' }
+    ];
+
+    // Map users with their collection data (now O(n) instead of O(n²))
+    const users = usersWithPublicCollections.map((user: any) => {
+      const userAnimeCounts = animeCountMap.get(user.idMember) || new Map();
+      const userMangaCounts = mangaCountMap.get(user.idMember) || new Map();
+
+      const collections = collectionTypes.map(collectionType => {
+        const animeCount = userAnimeCounts.get(collectionType.type) || 0;
+        const mangaCount = userMangaCounts.get(collectionType.type) || 0;
+        const totalCount = animeCount + mangaCount;
 
         return {
-          id: user.idMember,
-          username: user.memberName,
-          avatarUrl: user.avatar,
-          joinedAt: user.dateRegistered ? new Date(user.dateRegistered * 1000).toISOString() : new Date().toISOString(),
-          collections,
-          totalPublicAnimes: user._count.animeCollections,
-          totalPublicMangas: user._count.mangaCollections,
-          totalPublicItems: user._count.animeCollections + user._count.mangaCollections
+          type: collectionType.type,
+          name: collectionType.name,
+          animeCount,
+          mangaCount,
+          totalCount,
+          hasItems: totalCount > 0
         };
-      })
-    );
+      }).filter(c => c.hasItems); // Only include collections with items
+
+      return {
+        id: user.idMember,
+        username: user.memberName,
+        avatarUrl: user.avatar,
+        joinedAt: user.dateRegistered ? new Date(user.dateRegistered * 1000).toISOString() : new Date().toISOString(),
+        collections,
+        totalPublicAnimes: user._count.animeCollections,
+        totalPublicMangas: user._count.mangaCollections,
+        totalPublicItems: user._count.animeCollections + user._count.mangaCollections
+      };
+    });
 
     // Sort by total items if requested
     if (sortBy === 'totalItems') {
