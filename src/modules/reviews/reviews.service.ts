@@ -1114,6 +1114,7 @@ export class ReviewsService {
   }
 
   async rateReview(reviewId: number, userId: number, ratingType: 'c' | 'a' | 'o' | 'y' | 'n' | 'yes' | 'no') {
+    // OPTIMIZATION: Fetch review once with all needed fields to avoid redundant query later
     const review = await this.prisma.akCritique.findUnique({
       where: { idCritique: reviewId },
       select: {
@@ -1126,6 +1127,26 @@ export class ReviewsService {
         notation: true,
         nbCarac: true,
         dateCritique: true,
+        titre: true,
+        niceUrl: true,
+        membre: {
+          select: {
+            idMember: true,
+            memberName: true,
+          },
+        },
+        anime: {
+          select: {
+            idAnime: true,
+            titre: true,
+          },
+        },
+        manga: {
+          select: {
+            idManga: true,
+            titre: true,
+          },
+        },
       },
     });
 
@@ -1186,35 +1207,7 @@ export class ReviewsService {
 
     if (isPositiveReaction && isNewReaction) {
       try {
-        // Get review details with author and anime/manga info
-        const reviewDetails = await this.prisma.akCritique.findUnique({
-          where: { idCritique: reviewId },
-          select: {
-            idCritique: true,
-            titre: true,
-            niceUrl: true,
-            idMembre: true,
-            membre: {
-              select: {
-                idMember: true,
-                memberName: true,
-              },
-            },
-            anime: {
-              select: {
-                idAnime: true,
-                titre: true,
-              },
-            },
-            manga: {
-              select: {
-                idManga: true,
-                titre: true,
-              },
-            },
-          },
-        });
-
+        // OPTIMIZATION: Reuse review data already fetched above (no redundant query)
         // Get the reactor's information
         const reactor = await this.prisma.smfMember.findUnique({
           where: { idMember: userId },
@@ -1224,8 +1217,8 @@ export class ReviewsService {
           },
         });
 
-        if (reviewDetails && reactor) {
-          const contentTitle = reviewDetails.anime?.titre || reviewDetails.manga?.titre || 'votre contenu';
+        if (review && reactor) {
+          const contentTitle = review.anime?.titre || review.manga?.titre || 'votre contenu';
 
           // Map reaction types to French labels
           const reactionLabels = {
@@ -1239,20 +1232,20 @@ export class ReviewsService {
 
           // Send notification to review author
           await this.notificationsService.sendNotification({
-            userId: reviewDetails.idMembre,
+            userId: review.idMembre,
             type: 'review_liked',
             title: contentTitle,
             message: `${reactor.memberName} ${reactionMessage} sur "${contentTitle}"`,
             data: {
-              reviewId: reviewDetails.idCritique,
-              reviewSlug: reviewDetails.niceUrl,
-              reviewTitle: reviewDetails.titre,
+              reviewId: review.idCritique,
+              reviewSlug: review.niceUrl,
+              reviewTitle: review.titre,
               likerName: reactor.memberName,
               likerId: reactor.idMember,
               reactionType: normalizedRatingType,
               reactionLabel: reactionLabels[normalizedRatingType],
-              animeId: reviewDetails.anime?.idAnime,
-              mangaId: reviewDetails.manga?.idManga,
+              animeId: review.anime?.idAnime,
+              mangaId: review.manga?.idManga,
             },
             priority: 'low',
           });
