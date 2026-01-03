@@ -745,12 +745,7 @@ export class CollectionsService {
 
     // Invalidate user's collection cache after update
     await this.invalidateUserCollectionCache(userId);
-
-    // OPTIMIZATION: Invalidate collection check cache
-    const normalizedMediaType = mediaType === 'game' ? 'jeu-video' : mediaType;
-    const cacheKey = `user_collection_check:${userId}:${normalizedMediaType}:${mediaId}`;
-    await this.cacheService.del(cacheKey);
-
+    
     // Invalidate anime/manga cache as ratings may have changed
     if (mediaType === 'anime') {
       await this.cacheService.invalidateAnime(mediaId);
