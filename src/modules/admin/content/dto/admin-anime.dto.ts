@@ -73,6 +73,11 @@ export class CreateAdminAnimeDto {
   @IsString()
   image?: string;
 
+  @ApiPropertyOptional({ description: 'URL de l\'image à importer (AniList, MAL, etc.)' })
+  @IsOptional()
+  @IsString()
+  imageUrl?: string;
+
   @ApiPropertyOptional({ description: 'Statut', enum: [0, 1, 2], default: 0 })
   @IsOptional()
   @IsInt()

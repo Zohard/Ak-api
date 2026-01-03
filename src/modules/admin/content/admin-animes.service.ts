@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../../shared/services/prisma.service';
 import { AdminLoggingService } from '../logging/admin-logging.service';
 import { CacheService } from '../../../shared/services/cache.service';
+import { ImageKitService } from '../../media/imagekit.service';
 import {
   AdminAnimeListQueryDto,
   CreateAdminAnimeDto,
@@ -14,6 +15,7 @@ export class AdminAnimesService {
     private prisma: PrismaService,
     private adminLogging: AdminLoggingService,
     private cacheService: CacheService,
+    private imageKitService: ImageKitService,
   ) {}
 
   async getOne(id: number) {
@@ -154,6 +156,23 @@ export class AdminAnimesService {
   }
 
   async create(dto: CreateAdminAnimeDto, username?: string) {
+    // Import image from URL if provided (e.g., from AniList)
+    let importedImageFilename: string | null = null;
+    if (dto.imageUrl && !dto.image) {
+      try {
+        console.log(`[Image Import] Downloading image from: ${dto.imageUrl}`);
+        const imageResult = await this.importAnimeImage(dto.imageUrl, dto.titre);
+        if (imageResult.success && imageResult.filename) {
+          importedImageFilename = imageResult.filename;
+          console.log(`[Image Import] Successfully imported image: ${importedImageFilename}`);
+        } else {
+          console.warn(`[Image Import] Failed to import image: ${imageResult.error}`);
+        }
+      } catch (error) {
+        console.warn('[Image Import] Error importing image:', error.message);
+      }
+    }
+
     // Normalize legacy fields
     const titreOrig = dto.titreOrig ?? dto.titre_orig ?? null;
     const normalizeFormat = (val?: string | null) => {
@@ -181,7 +200,7 @@ export class AdminAnimesService {
       studio: dto.studio || null,
       realisateur: dto.realisateur || null,
       synopsis: dto.synopsis || null,
-      image: dto.image || null,
+      image: importedImageFilename || dto.image || null,
       statut: dto.statut ?? 0,
       dateAjout: new Date(),
     };
@@ -472,5 +491,43 @@ export class AdminAnimesService {
       hash = hash & hash; // Convert to 32-bit integer
     }
     return Math.abs(hash).toString(36);
+  }
+
+  /**
+   * Import anime image from URL (e.g., AniList, MAL) to ImageKit
+   */
+  private async importAnimeImage(
+    imageUrl: string,
+    animeTitle: string
+  ): Promise<{ success: boolean; imageKitUrl?: string; filename?: string; error?: string }> {
+    try {
+      if (!imageUrl || !imageUrl.trim()) {
+        return { success: false, error: 'No image URL provided' };
+      }
+
+      // Generate a clean filename using the ImageKit helper (sanitized title + timestamp + cover number)
+      const baseFilename = this.imageKitService.createSafeFileName(animeTitle, 'anime');
+      const filename = `${baseFilename}-cover-1`;
+      const folder = this.imageKitService.getFolderForMediaType('anime');
+
+      // Use ImageKit service to upload from URL
+      const result = await this.imageKitService.uploadImageFromUrl(
+        imageUrl,
+        filename,
+        folder
+      );
+
+      return {
+        success: true,
+        imageKitUrl: result.url,
+        filename: result.filename, // Store the filename for database
+      };
+    } catch (error) {
+      console.warn('Failed to import anime image:', error.message);
+      return {
+        success: false,
+        error: error.message,
+      };
+    }
   }
 }
