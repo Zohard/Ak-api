@@ -218,6 +218,8 @@ export class CollectionsService {
     // Normalize rating to 0-5 range (supports 0.5 increments for half-stars)
     const normalizedRating = Math.max(0, Math.min(5, rating ?? 0));
 
+    let result: any;
+
     try {
       if (mediaType === 'anime') {
         // Verify media exists
@@ -247,7 +249,7 @@ export class CollectionsService {
               },
             })
           );
-          return await this.prisma.executeWithRetry(() =>
+          result = await this.prisma.executeWithRetry(() =>
             this.prisma.collectionAnime.findFirst({
               where: { idMembre: userId, idAnime: mediaId },
               include: {
@@ -257,25 +259,25 @@ export class CollectionsService {
               },
             })
           );
-        }
-
-        return await this.prisma.executeWithRetry(() =>
-          this.prisma.collectionAnime.create({
-            data: {
-              idMembre: userId,
-              idAnime: mediaId,
-              type: collectionType,
-              evaluation: normalizedRating,
-              notes: notes || null,
-              isPublic: true,
-            },
-            include: {
-              anime: {
-                select: { idAnime: true, titre: true, image: true, annee: true, moyenneNotes: true, nbEp: true },
+        } else {
+          result = await this.prisma.executeWithRetry(() =>
+            this.prisma.collectionAnime.create({
+              data: {
+                idMembre: userId,
+                idAnime: mediaId,
+                type: collectionType,
+                evaluation: normalizedRating,
+                notes: notes || null,
+                isPublic: true,
               },
-            },
-          })
-        );
+              include: {
+                anime: {
+                  select: { idAnime: true, titre: true, image: true, annee: true, moyenneNotes: true, nbEp: true },
+                },
+              },
+            })
+          );
+        }
       }
 
       // mediaType === 'manga'
@@ -304,7 +306,7 @@ export class CollectionsService {
             },
           })
         );
-        return await this.prisma.executeWithRetry(() =>
+        result = await this.prisma.executeWithRetry(() =>
           this.prisma.collectionManga.findFirst({
             where: { idMembre: userId, idManga: mediaId },
             include: {
@@ -314,25 +316,25 @@ export class CollectionsService {
             },
           })
         );
-      }
-
-      return await this.prisma.executeWithRetry(() =>
-        this.prisma.collectionManga.create({
-          data: {
-            idMembre: userId,
-            idManga: mediaId,
-            type: collectionType,
-            evaluation: normalizedRating,
-            notes: notes || null,
-            isPublic: true,
-          },
-          include: {
-            manga: {
-              select: { idManga: true, titre: true, image: true, annee: true, moyenneNotes: true, nbVol: true },
+      } else {
+        result = await this.prisma.executeWithRetry(() =>
+          this.prisma.collectionManga.create({
+            data: {
+              idMembre: userId,
+              idManga: mediaId,
+              type: collectionType,
+              evaluation: normalizedRating,
+              notes: notes || null,
+              isPublic: true,
             },
-          },
-        })
-      );
+            include: {
+              manga: {
+                select: { idManga: true, titre: true, image: true, annee: true, moyenneNotes: true, nbVol: true },
+              },
+            },
+          })
+        );
+      }
     } catch (err: any) {
       // Map known Prisma errors to proper HTTP errors; log for debugging
       const code = err?.code;
@@ -353,7 +355,7 @@ export class CollectionsService {
               updatedAt: new Date(),
             },
           });
-          return await this.prisma.collectionAnime.findFirst({
+          result = await this.prisma.collectionAnime.findFirst({
             where: { idMembre: userId, idAnime: mediaId },
             include: {
               anime: {
@@ -372,7 +374,7 @@ export class CollectionsService {
               updatedAt: new Date(),
             },
           });
-          return await this.prisma.collectionManga.findFirst({
+          result = await this.prisma.collectionManga.findFirst({
             where: { idMembre: userId, idManga: mediaId },
             include: {
               manga: {
@@ -397,6 +399,10 @@ export class CollectionsService {
       });
       throw new BadRequestException('Unable to add to collection');
     } finally {
+      // CRITICAL: Invalidate cache BEFORE returning response to prevent race condition
+      // where client checks collection status before cache is invalidated
+      console.log(`🗑️ [addToCollection] Starting cache invalidation for userId=${userId}, ${mediaType}=${mediaId}`);
+
       // Invalidate user's collection cache after any add operation
       await this.invalidateUserCollectionCache(userId);
 
@@ -415,7 +421,11 @@ export class CollectionsService {
       } else if (mediaType === 'manga') {
         await this.cacheService.invalidateManga(mediaId);
       }
+
+      console.log(`✅ [addToCollection] All cache invalidation complete for userId=${userId}, ${mediaType}=${mediaId}`);
     }
+
+    return result;
   }
 
   async getCollectionItems(userId: number, query: CollectionQueryDto) {
