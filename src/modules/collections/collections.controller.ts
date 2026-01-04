@@ -170,6 +170,57 @@ export class CollectionsController {
     );
   }
 
+  @Get('check-nocache/:mediaType/:mediaId')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: '[DEBUG] Vérifier collection sans cache' })
+  @ApiParam({
+    name: 'mediaType',
+    enum: ['anime', 'manga', 'jeu-video'],
+    description: 'Type de média',
+  })
+  @ApiParam({
+    name: 'mediaId',
+    type: 'number',
+    description: 'ID du média',
+  })
+  @ApiResponse({ status: 200, description: 'Statut de présence (direct DB query)' })
+  async checkInCollectionNoCache(
+    @Param('mediaType') mediaType: 'anime' | 'manga' | 'jeu-video',
+    @Param('mediaId', ParseIntPipe) mediaId: number,
+    @Request() req,
+  ) {
+    console.log(`🔍 [checkInCollectionNoCache] NOCACHE query - userId: ${req.user.id}, mediaType: ${mediaType}, mediaId: ${mediaId}`);
+
+    // Bypass cache and query database directly
+    let collections: any[] = [];
+    if (mediaType === 'anime') {
+      collections = await this.collectionsService['prisma'].$queryRaw<any[]>`
+        SELECT type, evaluation, notes, NULL as id_collection
+        FROM collection_animes
+        WHERE id_membre = ${req.user.id} AND id_anime = ${mediaId}
+      `;
+    } else if (mediaType === 'manga') {
+      collections = await this.collectionsService['prisma'].$queryRaw<any[]>`
+        SELECT type, evaluation, notes, NULL as id_collection
+        FROM collection_mangas
+        WHERE id_membre = ${req.user.id} AND id_manga = ${mediaId}
+      `;
+    }
+
+    console.log(`🔍 [checkInCollectionNoCache] Direct SQL returned ${collections.length} rows:`, JSON.stringify(collections));
+
+    return {
+      debug: true,
+      userId: req.user.id,
+      mediaType,
+      mediaId,
+      inCollection: collections.length > 0,
+      collections,
+      rawCollections: collections
+    };
+  }
+
   @Post('import/mal')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
