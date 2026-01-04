@@ -524,6 +524,7 @@ export class CacheService implements OnModuleInit {
       rankings: 'rankings:*',
       lists: 'lists*',
       collections: 'user_collections:*',
+      media_collections: 'media_collections_users:*',
       top: 'top:*',
       events: 'events:*',
       forums: 'forums:*'
@@ -611,6 +612,7 @@ export class CacheService implements OnModuleInit {
       rankings: 'rankings:*',
       lists: 'lists*',
       collections: 'user_collections:*',
+      media_collections: 'media_collections_users:*',
       top: 'top:*',
       events: 'events:*',
       forums: 'forums:*',

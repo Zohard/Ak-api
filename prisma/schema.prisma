@@ -59,6 +59,7 @@ model SmfMember {
   instantMessages  Int      @default(0) @map("instant_messages")
   unreadMessages   Int      @default(0) @map("unread_messages")
   newPm            Int      @default(0) @map("new_pm")
+  buddyList        String?  @map("buddy_list") @db.Text
 
   // Email verification
   emailVerified    Boolean  @default(false) @map("email_verified")

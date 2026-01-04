@@ -509,4 +509,25 @@ export class CollectionsController {
     const currentUserId = req.user?.id;
     return this.collectionsService.getJeuxVideoCollection(userId, type, currentUserId, page, limit);
   }
+
+  @Get('media/:mediaType/:mediaId/users')
+  @ApiOperation({ summary: 'Get users who have this anime/manga in their collection with their evaluations' })
+  @ApiParam({ name: 'mediaType', enum: ['anime', 'manga'], description: 'Type of media' })
+  @ApiParam({ name: 'mediaId', type: 'number', description: 'Media ID' })
+  @ApiQuery({ name: 'page', required: false, type: 'number', description: 'Page number (default: 1)' })
+  @ApiQuery({ name: 'limit', required: false, type: 'number', description: 'Items per page (default: 20)' })
+  @ApiQuery({ name: 'friendsOnly', required: false, type: 'boolean', description: 'Show only friends (default: false)' })
+  @ApiResponse({ status: 200, description: 'Users with collections retrieved successfully' })
+  getUsersWithMedia(
+    @Param('mediaType') mediaType: 'anime' | 'manga',
+    @Param('mediaId', ParseIntPipe) mediaId: number,
+    @Query('page', new ParseIntPipe({ optional: true })) page: number = 1,
+    @Query('limit', new ParseIntPipe({ optional: true })) limit: number = 20,
+    @Query('friendsOnly') friendsOnly: string = 'false',
+    @Request() req,
+  ) {
+    const currentUserId = req.user?.id;
+    const friendsOnlyBool = friendsOnly === 'true';
+    return this.collectionsService.getUsersWithMedia(mediaType, mediaId, page, limit, currentUserId, friendsOnlyBool);
+  }
 }

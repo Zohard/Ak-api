@@ -404,6 +404,9 @@ export class CollectionsService {
       const cacheKey = `user_collection_check:${userId}:${mediaType}:${mediaId}`;
       await this.cacheService.del(cacheKey);
 
+      // OPTIMIZATION: Invalidate media collections users cache
+      await this.cacheService.delByPattern(`media_collections_users:${mediaType}:${mediaId}:*`);
+
       // Invalidate anime/manga cache as ratings may have changed
       if (mediaType === 'anime') {
         await this.cacheService.invalidateAnime(mediaId);
@@ -689,6 +692,9 @@ export class CollectionsService {
     const cacheKey = `user_collection_check:${userId}:${mediaType}:${mediaId}`;
     await this.cacheService.del(cacheKey);
 
+    // OPTIMIZATION: Invalidate media collections users cache
+    await this.cacheService.delByPattern(`media_collections_users:${mediaType}:${mediaId}:*`);
+
     // Invalidate anime/manga cache as ratings may have changed
     if (mediaType === 'anime') {
       await this.cacheService.invalidateAnime(mediaId);
@@ -745,7 +751,14 @@ export class CollectionsService {
 
     // Invalidate user's collection cache after update
     await this.invalidateUserCollectionCache(userId);
-    
+
+    // OPTIMIZATION: Invalidate collection check cache
+    const cacheKey = `user_collection_check:${userId}:${mediaType}:${mediaId}`;
+    await this.cacheService.del(cacheKey);
+
+    // OPTIMIZATION: Invalidate media collections users cache
+    await this.cacheService.delByPattern(`media_collections_users:${mediaType}:${mediaId}:*`);
+
     // Invalidate anime/manga cache as ratings may have changed
     if (mediaType === 'anime') {
       await this.cacheService.invalidateAnime(mediaId);
@@ -2604,5 +2617,166 @@ export class CollectionsService {
         hasMore: skip + collection.length < totalCount
       }
     };
+  }
+
+  /**
+   * Get users who have this anime/manga in their collection with their evaluations
+   */
+  async getUsersWithMedia(
+    mediaType: 'anime' | 'manga',
+    mediaId: number,
+    page: number = 1,
+    limit: number = 20,
+    currentUserId?: number,
+    friendsOnly: boolean = false
+  ) {
+    // OPTIMIZATION: Cache users with media to reduce DB load
+    const cacheKey = `media_collections_users:${mediaType}:${mediaId}:${page}:${limit}:${friendsOnly ? 'friends' : 'all'}${currentUserId ? `:user${currentUserId}` : ''}`;
+    const cached = await this.cacheService.get(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
+    const skip = (page - 1) * limit;
+
+    // Get current user's friends list if friendsOnly is true
+    let friendIds: number[] = [];
+    if (friendsOnly && currentUserId) {
+      const currentUser = await this.prisma.smfMember.findUnique({
+        where: { idMember: currentUserId },
+        select: { buddyList: true }
+      });
+
+      if (currentUser?.buddyList) {
+        // Parse comma-separated buddy list
+        friendIds = currentUser.buddyList
+          .split(',')
+          .map(id => parseInt(id.trim()))
+          .filter(id => !isNaN(id));
+      }
+    }
+
+    // If friends only but no friends, return empty
+    if (friendsOnly && friendIds.length === 0) {
+      return {
+        data: [],
+        meta: {
+          totalCount: 0,
+          page,
+          limit,
+          hasMore: false
+        }
+      };
+    }
+
+    // Query based on media type (separate queries for TypeScript type safety)
+    let collections: any[];
+    let totalCount: number;
+
+    if (mediaType === 'anime') {
+      const where: any = {
+        idAnime: mediaId,
+        isPublic: true,
+      };
+      if (friendsOnly && friendIds.length > 0) {
+        where.idMembre = { in: friendIds };
+      }
+
+      [collections, totalCount] = await Promise.all([
+        this.prisma.collectionAnime.findMany({
+          where,
+          skip,
+          take: limit,
+          select: {
+            idMembre: true,
+            type: true,
+            evaluation: true,
+            user: {
+              select: {
+                idMember: true,
+                memberName: true,
+                avatar: true,
+              }
+            }
+          },
+          orderBy: [
+            { evaluation: 'desc' },
+            { user: { memberName: 'asc' } }
+          ]
+        }),
+        this.prisma.collectionAnime.count({ where })
+      ]);
+    } else {
+      const where: any = {
+        idManga: mediaId,
+        isPublic: true,
+      };
+      if (friendsOnly && friendIds.length > 0) {
+        where.idMembre = { in: friendIds };
+      }
+
+      [collections, totalCount] = await Promise.all([
+        this.prisma.collectionManga.findMany({
+          where,
+          skip,
+          take: limit,
+          select: {
+            idMembre: true,
+            type: true,
+            evaluation: true,
+            user: {
+              select: {
+                idMember: true,
+                memberName: true,
+                avatar: true,
+              }
+            }
+          },
+          orderBy: [
+            { evaluation: 'desc' },
+            { user: { memberName: 'asc' } }
+          ]
+        }),
+        this.prisma.collectionManga.count({ where })
+      ]);
+    }
+
+    // Map collection type to status label
+    const getStatusLabel = (type: number): string => {
+      const statusMap = {
+        1: 'Terminé',
+        2: 'En cours',
+        3: 'Wishlist',
+        4: 'Abandonné',
+        5: 'En pause'
+      };
+      return statusMap[type] || 'Inconnu';
+    };
+
+    // Format the response
+    const users = collections.map(collection => ({
+      userId: collection.idMembre,
+      pseudo: collection.user.memberName,
+      avatar: collection.user.avatar,
+      status: getStatusLabel(collection.type),
+      statusCode: collection.type,
+      evaluation: collection.evaluation || 0,
+      isCurrentUser: currentUserId === collection.idMembre
+    }));
+
+    const result = {
+      data: users,
+      meta: {
+        totalCount,
+        page,
+        limit,
+        hasMore: skip + collections.length < totalCount
+      }
+    };
+
+    // OPTIMIZATION: Cache for 5 minutes
+    await this.cacheService.set(cacheKey, result, 300);
+
+    return result;
   }
 }
