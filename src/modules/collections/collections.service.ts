@@ -784,11 +784,26 @@ export class CollectionsService {
   async isInCollection(userId: number, mediaId: number, mediaType: 'anime' | 'manga' | 'jeu-video') {
     // OPTIMIZATION: Cache collection check to avoid DB query on every page load
     const cacheKey = `user_collection_check:${userId}:${mediaType}:${mediaId}`;
-    const cached = await this.cacheService.get(cacheKey);
-    if (cached !== null) {
-      console.log(`🔍 [isInCollection] Cache HIT for ${cacheKey}`);
-      return cached;
+
+    console.log(`🔍 [isInCollection] Starting check for ${cacheKey}`);
+
+    try {
+      // Add timeout to cache get to prevent hanging
+      const cached = await Promise.race([
+        this.cacheService.get(cacheKey),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Cache get timeout')), 5000))
+      ]);
+
+      if (cached !== null) {
+        console.log(`🔍 [isInCollection] Cache HIT for ${cacheKey}`);
+        return cached;
+      }
+    } catch (error) {
+      console.error(`⚠️ [isInCollection] Cache get failed or timed out for ${cacheKey}:`, error.message);
+      // Continue to database query
     }
+
+    console.log(`🔍 [isInCollection] Cache MISS, querying database for ${cacheKey}`);
 
     return await this.prisma.executeWithRetry(async () => {
       console.log(`🔍 [isInCollection] Cache MISS - Using RAW SQL - userId: ${userId}, mediaId: ${mediaId}, mediaType: ${mediaType}`);
