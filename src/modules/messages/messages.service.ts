@@ -1,6 +1,7 @@
 import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../shared/services/prisma.service';
 import { EmailService } from '../../shared/services/email.service';
+import { EncryptionService } from '../../shared/services/encryption.service';
 import { CreateMessageDto } from './dto/create-message.dto';
 import { GetMessagesDto, SearchMessagesDto, MarkReadDto } from './dto/get-messages.dto';
 import { SmfMessage, MessageUser, MessageResponse, ConversationMessage } from './interfaces/message.interface';
@@ -12,10 +13,14 @@ export class MessagesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly emailService: EmailService,
+    private readonly encryptionService: EncryptionService,
   ) {}
 
   async sendMessage(createMessageDto: CreateMessageDto): Promise<MessageResponse> {
     const { senderId, recipientId, subject, message, threadId, bccRecipientIds } = createMessageDto;
+
+    // Encrypt message body before storing
+    const encryptedMessage = this.encryptionService.encrypt(message);
 
     try {
       const result = await this.prisma.$transaction(async (prisma) => {
@@ -58,7 +63,7 @@ export class MessagesService {
               fromName: senderName,
               msgtime: msgTime,
               subject,
-              body: message,
+              body: encryptedMessage, // Store encrypted message
               deletedBySender: 0
             }
           });
@@ -73,7 +78,7 @@ export class MessagesService {
               fromName: senderName,
               msgtime: msgTime,
               subject,
-              body: message,
+              body: encryptedMessage, // Store encrypted message
               deletedBySender: 0
             }
           });
@@ -311,7 +316,7 @@ export class MessagesService {
         sender_name: message.fromName,
         sender_username: message.sender.memberName,
         subject: message.subject,
-        message: message.body,
+        message: this.encryptionService.decrypt(message.body), // Decrypt message body
         created_at: new Date(message.msgtime * 1000).toISOString(),
         timestamp: message.msgtime,
         is_read: recipient?.isRead || 0,
@@ -351,7 +356,7 @@ export class MessagesService {
       sender_id: message.idMemberFrom,
       sender_name: message.fromName,
       subject: message.subject,
-      message: message.body,
+      message: this.encryptionService.decrypt(message.body), // Decrypt message body
       created_at: new Date(message.msgtime * 1000).toISOString(),
       timestamp: message.msgtime,
       is_read: message.recipients[0]?.isRead || 0,
@@ -408,7 +413,7 @@ export class MessagesService {
         sender_name: message.fromName,
         sender_username: message.sender.memberName,
         subject: message.subject,
-        message: message.body,
+        message: this.encryptionService.decrypt(message.body), // Decrypt message body
         created_at: new Date(message.msgtime * 1000).toISOString(),
         is_read: message.recipients.find(r => r.idMember === userId)?.isRead || 0,
         recipient_id: message.recipients[0]?.idMember || 0,
@@ -542,7 +547,7 @@ export class MessagesService {
         sender_id: message.idMemberFrom,
         sender_name: message.fromName,
         subject: message.subject,
-        message: message.body,
+        message: this.encryptionService.decrypt(message.body), // Decrypt message body
         created_at: new Date(message.msgtime * 1000).toISOString(),
         timestamp: message.msgtime,
         is_read: message.recipients[0]?.isRead || 0,
