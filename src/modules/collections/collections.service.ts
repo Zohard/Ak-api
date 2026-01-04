@@ -510,8 +510,11 @@ export class CollectionsService {
           return this.getStatusCounts(userId, 'anime', collectionType);
         });
 
+        // Enrich anime data with season information
+        const enrichedAnimes = await this.enrichAnimesWithSeasons(animes);
+
         return {
-          data: animes.map(a => ({
+          data: enrichedAnimes.map(a => ({
             ...a,
             mediaType: 'anime',
           })),
@@ -2301,6 +2304,87 @@ export class CollectionsService {
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&apos;');
+  }
+
+  /**
+   * Enrich anime collection items with season information
+   */
+  private async enrichAnimesWithSeasons(animes: any[]) {
+    if (!animes || animes.length === 0) {
+      return animes;
+    }
+
+    // Extract anime IDs from the collection items
+    const animeIds = animes
+      .filter(a => a.anime?.idAnime)
+      .map(a => a.anime.idAnime);
+
+    if (animeIds.length === 0) {
+      return animes;
+    }
+
+    // Fetch all seasons
+    const seasons = await this.prisma.akAnimesSaisons.findMany({
+      select: {
+        idSaison: true,
+        saison: true,
+        annee: true,
+        jsonData: true,
+      },
+    });
+
+    // Build a map of animeId -> season info
+    const animeSeasonMap = new Map<number, { season: number; year: number; id: number }>();
+
+    for (const season of seasons) {
+      try {
+        const jsonData = typeof season.jsonData === 'string'
+          ? JSON.parse(season.jsonData)
+          : season.jsonData;
+
+        let seasonAnimeIds: number[] = [];
+
+        // Handle different possible JSON structures
+        if (Array.isArray(jsonData)) {
+          seasonAnimeIds = jsonData;
+        } else if (jsonData.animes && Array.isArray(jsonData.animes)) {
+          seasonAnimeIds = jsonData.animes;
+        } else if (jsonData.anime_ids && Array.isArray(jsonData.anime_ids)) {
+          seasonAnimeIds = jsonData.anime_ids;
+        }
+
+        // Map each anime ID in this season to the season info
+        for (const animeId of seasonAnimeIds) {
+          if (animeIds.includes(animeId)) {
+            animeSeasonMap.set(animeId, {
+              season: season.saison,
+              year: season.annee,
+              id: season.idSaison,
+            });
+          }
+        }
+      } catch (error) {
+        // Skip seasons with invalid JSON
+        continue;
+      }
+    }
+
+    // Enrich the anime data with season information
+    return animes.map(item => {
+      if (item.anime?.idAnime) {
+        const seasonInfo = animeSeasonMap.get(item.anime.idAnime);
+        if (seasonInfo) {
+          return {
+            ...item,
+            anime: {
+              ...item.anime,
+              season: seasonInfo,
+            },
+          };
+        }
+      }
+      return item;
+    });
   }
 
   private async getStatusCounts(
