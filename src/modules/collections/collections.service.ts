@@ -794,8 +794,9 @@ export class CollectionsService {
         new Promise((_, reject) => setTimeout(() => reject(new Error('Cache get timeout')), 5000))
       ]);
 
-      if (cached !== null) {
-        console.log(`🔍 [isInCollection] Cache HIT for ${cacheKey}`);
+      // Check for both null and undefined - cache.get() returns undefined when key doesn't exist
+      if (cached !== null && cached !== undefined) {
+        console.log(`🔍 [isInCollection] Cache HIT for ${cacheKey}`, cached);
         return cached;
       }
     } catch (error) {
