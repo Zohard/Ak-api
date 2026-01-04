@@ -39,4 +39,5 @@ export interface ConversationMessage {
   message: string;
   created_at: string;
   is_read: number;
+  conversation_url?: string;
 }

@@ -31,4 +31,9 @@ export class CreateMessageDto {
   @IsInt({ each: true })
   @Type(() => Number)
   bccRecipientIds?: number[];
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  conversationUrl?: string;
 }

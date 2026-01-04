@@ -986,6 +986,7 @@ model SmfPersonalMessage {
   subject         String   @db.VarChar(255)
   body            String   @db.Text
   deletedBySender Int      @default(0) @map("deleted_by_sender")
+  conversationUrl String?  @map("conversation_url") @db.VarChar(500)
 
   // Relations
   sender          SmfMember @relation("SentMessages", fields: [idMemberFrom], references: [idMember], onDelete: Cascade)

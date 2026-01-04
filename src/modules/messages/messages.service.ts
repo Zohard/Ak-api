@@ -17,7 +17,7 @@ export class MessagesService {
   ) {}
 
   async sendMessage(createMessageDto: CreateMessageDto): Promise<MessageResponse> {
-    const { senderId, recipientId, subject, message, threadId, bccRecipientIds } = createMessageDto;
+    const { senderId, recipientId, subject, message, threadId, bccRecipientIds, conversationUrl } = createMessageDto;
 
     // Encrypt message body before storing
     const encryptedMessage = this.encryptionService.encrypt(message);
@@ -79,7 +79,8 @@ export class MessagesService {
               msgtime: msgTime,
               subject,
               body: encryptedMessage, // Store encrypted message
-              deletedBySender: 0
+              deletedBySender: 0,
+              conversationUrl: conversationUrl || null
             }
           });
 
@@ -417,7 +418,8 @@ export class MessagesService {
         created_at: new Date(message.msgtime * 1000).toISOString(),
         is_read: message.recipients.find(r => r.idMember === userId)?.isRead || 0,
         recipient_id: message.recipients[0]?.idMember || 0,
-        recipient_username: message.recipients[0]?.member.memberName || ''
+        recipient_username: message.recipients[0]?.member.memberName || '',
+        conversation_url: message.conversationUrl || undefined
       }));
     } catch (error) {
       this.logger.error('Failed to get conversation thread:', error);
