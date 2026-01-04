@@ -63,12 +63,18 @@ export class CacheService implements OnModuleInit {
 
   // Delete specific key
   async del(key: string): Promise<void> {
-    if (!this.redis) return;
-    
+    if (!this.redis) {
+      console.log(`⚠️ [CacheService] Redis not available, cannot delete key: ${key}`);
+      return;
+    }
+
     try {
-      await this.redis.del(key);
-      this.logger.debug(`Cache deleted for key: ${key}`);
+      console.log(`🗑️ [CacheService] Deleting cache key: ${key}`);
+      const result = await this.redis.del(key);
+      console.log(`✅ [CacheService] Cache deleted for key: ${key}, result: ${result}`);
+      this.logger.debug(`Cache deleted for key: ${key}, result: ${result}`);
     } catch (error) {
+      console.error(`❌ [CacheService] Cache delete error for key ${key}:`, error);
       this.logger.error(`Cache delete error for key ${key}:`, error);
     }
   }

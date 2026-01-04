@@ -402,7 +402,9 @@ export class CollectionsService {
 
       // OPTIMIZATION: Invalidate collection check cache
       const cacheKey = `user_collection_check:${userId}:${mediaType}:${mediaId}`;
+      console.log(`🗑️ [addToCollection] Invalidating cache key: ${cacheKey}`);
       await this.cacheService.del(cacheKey);
+      console.log(`✅ [addToCollection] Cache invalidated for key: ${cacheKey}`);
 
       // OPTIMIZATION: Invalidate media collections users cache
       await this.cacheService.delByPattern(`media_collections_users:${mediaType}:${mediaId}:*`);
