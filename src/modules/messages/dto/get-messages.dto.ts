@@ -51,3 +51,13 @@ export class MarkReadDto {
   @Type(() => Number)
   userId: number;
 }
+
+export class DeleteMessageDto {
+  @IsInt()
+  @Type(() => Number)
+  messageId: number;
+
+  @IsInt()
+  @Type(() => Number)
+  userId: number;
+}

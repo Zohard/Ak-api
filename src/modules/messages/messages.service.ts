@@ -3,7 +3,7 @@ import { PrismaService } from '../../shared/services/prisma.service';
 import { EmailService } from '../../shared/services/email.service';
 import { EncryptionService } from '../../shared/services/encryption.service';
 import { CreateMessageDto } from './dto/create-message.dto';
-import { GetMessagesDto, SearchMessagesDto, MarkReadDto } from './dto/get-messages.dto';
+import { GetMessagesDto, SearchMessagesDto, MarkReadDto, DeleteMessageDto } from './dto/get-messages.dto';
 import { SmfMessage, MessageUser, MessageResponse, ConversationMessage } from './interfaces/message.interface';
 
 @Injectable()
@@ -559,6 +559,81 @@ export class MessagesService {
     } catch (error) {
       this.logger.error('Failed to search messages:', error);
       throw new BadRequestException('Failed to search messages');
+    }
+  }
+
+  async deleteMessage(deleteMessageDto: DeleteMessageDto): Promise<void> {
+    const { messageId, userId } = deleteMessageDto;
+
+    try {
+      await this.prisma.$transaction(async (prisma) => {
+        // Get the message to check if user is sender
+        const message = await prisma.smfPersonalMessage.findUnique({
+          where: { idPm: messageId },
+          select: { idMemberFrom: true }
+        });
+
+        if (!message) {
+          throw new NotFoundException('Message not found');
+        }
+
+        const isSender = message.idMemberFrom === userId;
+
+        if (isSender) {
+          // User is the sender - mark message as deleted by sender
+          await prisma.smfPersonalMessage.update({
+            where: { idPm: messageId },
+            data: { deletedBySender: 1 }
+          });
+        } else {
+          // User is a recipient - mark as deleted for this specific recipient
+          const recipient = await prisma.smfPmRecipient.findUnique({
+            where: {
+              idPm_idMember: {
+                idPm: messageId,
+                idMember: userId
+              }
+            }
+          });
+
+          if (!recipient) {
+            throw new NotFoundException('You are not a recipient of this message');
+          }
+
+          await prisma.smfPmRecipient.update({
+            where: {
+              idPm_idMember: {
+                idPm: messageId,
+                idMember: userId
+              }
+            },
+            data: { deleted: 1 }
+          });
+
+          // If message was unread, decrement unread count
+          if (recipient.isRead === 0) {
+            const user = await prisma.smfMember.findUnique({
+              where: { idMember: userId },
+              select: { unreadMessages: true }
+            });
+
+            if (user && user.unreadMessages > 0) {
+              await prisma.smfMember.update({
+                where: { idMember: userId },
+                data: { unreadMessages: { decrement: 1 } }
+              });
+            }
+          }
+        }
+      });
+
+      this.logger.log(`Message ${messageId} deleted by user ${userId}`);
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      this.logger.error('Failed to delete message:', error);
+      throw new BadRequestException('Failed to delete message');
     }
   }
 

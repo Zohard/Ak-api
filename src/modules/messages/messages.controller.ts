@@ -14,7 +14,7 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { MessagesService } from './messages.service';
 import { CreateMessageDto } from './dto/create-message.dto';
-import { GetMessagesDto, SearchMessagesDto, MarkReadDto } from './dto/get-messages.dto';
+import { GetMessagesDto, SearchMessagesDto, MarkReadDto, DeleteMessageDto } from './dto/get-messages.dto';
 import { SmfMessage, MessageUser, MessageResponse, ConversationMessage } from './interfaces/message.interface';
 
 @Controller('messages')
@@ -52,6 +52,13 @@ export class MessagesController {
   @HttpCode(HttpStatus.OK)
   async markAsRead(@Body() markReadDto: MarkReadDto): Promise<{ success: boolean }> {
     await this.messagesService.markAsRead(markReadDto);
+    return { success: true };
+  }
+
+  @Post('delete')
+  @HttpCode(HttpStatus.OK)
+  async deleteMessage(@Body() deleteMessageDto: DeleteMessageDto): Promise<{ success: boolean }> {
+    await this.messagesService.deleteMessage(deleteMessageDto);
     return { success: true };
   }
 
