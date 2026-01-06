@@ -3,7 +3,7 @@ import { PrismaService } from '../../../shared/services/prisma.service';
 import { IgdbService } from '../../../shared/services/igdb.service';
 import { DeepLService } from '../../../shared/services/deepl.service';
 import { AdminLoggingService } from '../logging/admin-logging.service';
-import { ImageKitService } from '../../media/imagekit.service';
+import { R2Service } from '../../media/r2.service';
 import { AdminJeuxVideoListQueryDto, CreateAdminJeuxVideoDto, UpdateAdminJeuxVideoDto } from './dto/admin-jeux-video.dto';
 import { CreateJeuVideoTrailerDto } from './dto/create-jeu-video-trailer.dto';
 import { UpdateJeuVideoTrailerDto } from './dto/update-jeu-video-trailer.dto';
@@ -14,7 +14,7 @@ export class AdminJeuxVideoService {
     private prisma: PrismaService,
     private adminLogging: AdminLoggingService,
     private igdbService: IgdbService,
-    private imagekitService: ImageKitService,
+    private imagekitService: R2Service,
     private deepLService: DeepLService,
   ) {}
 
@@ -438,7 +438,7 @@ export class AdminJeuxVideoService {
       try {
         const imageBuffer = await this.igdbService.downloadCoverImage(igdbGame.cover.image_id);
         if (imageBuffer) {
-          // Upload to ImageKit with sanitized title + timestamp + cover number
+          // Upload to R2 with sanitized title + timestamp + cover number
           const baseFilename = this.imagekitService.createSafeFileName(igdbGame.name, 'jeu-video');
           const filename = `${baseFilename}-cover-1`;
           const uploadResult = await this.imagekitService.uploadImage(
@@ -556,7 +556,7 @@ export class AdminJeuxVideoService {
             try {
               const imageBuffer = await this.igdbService.downloadCoverImage(ic.company.logo.image_id, 'cover_small');
               if (imageBuffer) {
-                // Upload to ImageKit in business folder with sanitized title + timestamp + logo number
+                // Upload to R2 in business folder with sanitized title + timestamp + logo number
                 const baseFilename = this.imagekitService.createSafeFileName(ic.company.name, 'business');
                 const filename = `${baseFilename}-logo-1`;
                 const uploadResult = await this.imagekitService.uploadImage(
@@ -704,7 +704,7 @@ export class AdminJeuxVideoService {
       try {
         const imageBuffer = await this.igdbService.downloadCoverImage(igdbGame.cover.image_id);
         if (imageBuffer) {
-          // Upload to ImageKit with sanitized title + timestamp + cover number
+          // Upload to R2 with sanitized title + timestamp + cover number
           const baseFilename = this.imagekitService.createSafeFileName(igdbGame.name, 'jeu-video');
           const filename = `${baseFilename}-cover-1`;
           const uploadResult = await this.imagekitService.uploadImage(
@@ -1139,7 +1139,7 @@ export class AdminJeuxVideoService {
         );
 
         if (imageBuffer) {
-          // Upload to ImageKit with sanitized title + timestamp + screenshot number
+          // Upload to R2 with sanitized title + timestamp + screenshot number
           const baseFilename = this.imagekitService.createSafeFileName(gameTitle, 'jeu-video');
           const filename = `${baseFilename}-screenshot-${screenshotNumber}`;
           const uploadResult = await this.imagekitService.uploadImage(

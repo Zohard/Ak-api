@@ -4,7 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../../shared/services/prisma.service';
-import { ImageKitService } from './imagekit.service';
+import { R2Service } from './r2.service';
 import { slugify } from '../../shared/utils/text.util';
 import sharp from 'sharp';
 import * as path from 'path';
@@ -16,7 +16,7 @@ import * as cheerio from 'cheerio';
 export class MediaService {
   constructor(
     private prisma: PrismaService,
-    private imagekitService: ImageKitService,
+    private r2Service: R2Service,
   ) {}
 
   private readonly allowedMimeTypes = [
@@ -98,7 +98,7 @@ export class MediaService {
       // Process image with Sharp
       const processedImage = await this.processImage(file.buffer, type);
 
-      // Upload to ImageKit
+      // Upload to R2
       // For screenshots, upload to screenshots/ subfolder
       // Handle special cases for folder names
       let typeFolder: string;
@@ -113,7 +113,7 @@ export class MediaService {
         ? `images/${typeFolder}/screenshots`
         : `images/${typeFolder}`;
 
-      uploadResult = await this.imagekitService.uploadImage(
+      uploadResult = await this.r2Service.uploadImage(
         processedImage,
         filename,
         folderPath
@@ -161,8 +161,8 @@ export class MediaService {
             imagekitFileId: uploadResult.fileId,
           };
         } catch (dbError) {
-          // Database save failed - delete the uploaded file from ImageKit to prevent orphaned files
-        console.error('[MediaService] Database save failed, deleting ImageKit file:', {
+          // Database save failed - delete the uploaded file from R2 to prevent orphaned files
+        console.error('[MediaService] Database save failed, deleting R2 file:', {
           fileId: uploadResult.fileId,
           filename: uploadResult.name,
           folder: folderPath,
@@ -170,8 +170,8 @@ export class MediaService {
         });
 
         try {
-          await this.imagekitService.deleteImage(uploadResult.fileId);
-          console.log('[MediaService] Successfully deleted orphaned ImageKit file:', uploadResult.fileId);
+          await this.r2Service.deleteImage(uploadResult.fileId);
+          console.log('[MediaService] Successfully deleted orphaned R2 file:', uploadResult.fileId);
         } catch (deleteError) {
           console.error('[MediaService] ⚠️ ORPHANED FILE - Manual cleanup needed:', {
             fileId: uploadResult.fileId,
@@ -206,10 +206,10 @@ export class MediaService {
       // If we have an uploadResult but something else failed, try to clean up
       if (uploadResult && uploadResult.fileId) {
         try {
-          await this.imagekitService.deleteImage(uploadResult.fileId);
-          console.log('[MediaService] Cleaned up ImageKit file after upload error:', uploadResult.fileId);
+          await this.r2Service.deleteImage(uploadResult.fileId);
+          console.log('[MediaService] Cleaned up R2 file after upload error:', uploadResult.fileId);
         } catch (deleteError) {
-          console.error('[MediaService] Failed to cleanup ImageKit file:', deleteError);
+          console.error('[MediaService] Failed to cleanup R2 file:', deleteError);
         }
       }
 
@@ -310,7 +310,7 @@ export class MediaService {
       // Process image with Sharp
       const processedImage = await this.processImage(Buffer.from(response.data), type);
 
-      // Upload to ImageKit
+      // Upload to R2
       let typeFolder: string;
       if (type === 'game') {
         typeFolder = 'games';
@@ -321,7 +321,7 @@ export class MediaService {
       }
       const folderPath = `images/${typeFolder}`;
 
-      const uploadResult = await this.imagekitService.uploadImage(
+      const uploadResult = await this.r2Service.uploadImage(
         processedImage,
         filename,
         folderPath
@@ -367,17 +367,17 @@ export class MediaService {
             imagekitFileId: uploadResult.fileId,
           };
         } catch (dbError) {
-          // Database save failed - delete the uploaded file from ImageKit
-          console.error('[MediaService] Database save failed, deleting ImageKit file:', {
+          // Database save failed - delete the uploaded file from R2
+          console.error('[MediaService] Database save failed, deleting R2 file:', {
             fileId: uploadResult.fileId,
             filename: uploadResult.name,
             dbError: dbError.message,
           });
 
           try {
-            await this.imagekitService.deleteImage(uploadResult.fileId);
+            await this.r2Service.deleteImage(uploadResult.fileId);
           } catch (deleteError) {
-            console.error('[MediaService] Failed to cleanup ImageKit file:', deleteError);
+            console.error('[MediaService] Failed to cleanup R2 file:', deleteError);
           }
 
           throw new BadRequestException(`Failed to save image metadata: ${dbError.message}`);
@@ -431,12 +431,12 @@ export class MediaService {
     const result = (media as any[])[0];
     const typeName = this.getTypeName(result.type);
 
-    // Check if it's an ImageKit URL or filename
+    // Check if it's an R2 URL or filename
     let url: string;
     if (result.filename.startsWith('https://ik.imagekit.io/')) {
       url = result.filename;
     } else {
-      // Generate ImageKit URL from filename
+      // Generate R2 URL from filename
       // Database stores: "screenshots/filename.jpg" or just "filename.jpg"
       // For screenshots, ensure they're in the screenshots subfolder
       let imagePath = result.filename;
@@ -446,9 +446,9 @@ export class MediaService {
         imagePath = `screenshots/${imagePath}`;
       }
 
-      // ImageKit path should be: "/images/animes/screenshots/filename.jpg"
+      // R2 path should be: "/images/animes/screenshots/filename.jpg"
       const fullPath = `/images/${typeName}s/${imagePath}`;
-      url = this.imagekitService.getImageUrl(fullPath);
+      url = this.r2Service.getImageUrl(fullPath);
     }
 
     return {
@@ -512,18 +512,18 @@ export class MediaService {
       ` as any[];
     }
 
-    // Convert database results to use ImageKit URLs
+    // Convert database results to use R2 URLs
     const processedMedia: any[] = [];
 
     for (const item of media) {
       try {
         let url: string;
 
-        // Check if it's already an ImageKit URL
+        // Check if it's already an R2 URL
         if (item.filename && item.filename.startsWith('https://ik.imagekit.io/')) {
           url = item.filename;
         } else if (item.filename) {
-          // Generate ImageKit URL from filename
+          // Generate R2 URL from filename
           // Database stores: "screenshots/filename.jpg" or just "filename.jpg"
           // For screenshots, ensure they're in the screenshots subfolder
           let imagePath = item.filename;
@@ -534,7 +534,7 @@ export class MediaService {
           }
 
           // For games from ak_jeux_video_screenshots, they're already in images/games/screenshots/
-          // ImageKit path should be: "/images/games/screenshots/filename.jpg"
+          // R2 path should be: "/images/games/screenshots/filename.jpg"
           let fullPath: string;
           if (type === 'game') {
             // Check if filename already includes full path
@@ -548,7 +548,7 @@ export class MediaService {
             fullPath = `/images/${type}s/${imagePath}`;
           }
 
-          url = this.imagekitService.getImageUrl(fullPath);
+          url = this.r2Service.getImageUrl(fullPath);
         } else {
           // Skip items without filename
           continue;
@@ -572,7 +572,7 @@ export class MediaService {
   async deleteMedia(id: number, userId: number) {
     const media = await this.getMediaById(id);
 
-    // Delete from ImageKit
+    // Delete from R2
     try {
       // Extract filename from the stored path
       // filename could be like "screenshots/filename.webp" or just "filename.webp"
@@ -595,16 +595,16 @@ export class MediaService {
           folderPath = `images/${typeName}s/screenshots`;
         }
 
-        console.log(`Attempting to delete from ImageKit: ${cleanFilename} in folder: ${folderPath}`);
+        console.log(`Attempting to delete from R2: ${cleanFilename} in folder: ${folderPath}`);
 
-        // Try to delete from ImageKit
-        await this.imagekitService.deleteExistingImage(cleanFilename, folderPath);
-        console.log(`Successfully deleted from ImageKit: ${cleanFilename}`);
+        // Try to delete from R2
+        await this.r2Service.deleteExistingImage(cleanFilename, folderPath);
+        console.log(`Successfully deleted from R2: ${cleanFilename}`);
       }
     } catch (error) {
-      // Log error but don't fail the entire deletion if ImageKit delete fails
-      console.warn(`Failed to delete from ImageKit (ID: ${id}):`, error.message);
-      // Continue to delete from database even if ImageKit deletion fails
+      // Log error but don't fail the entire deletion if R2 delete fails
+      console.warn(`Failed to delete from R2 (ID: ${id}):`, error.message);
+      // Continue to delete from database even if R2 deletion fails
     }
 
     // Delete from database
@@ -736,9 +736,9 @@ export class MediaService {
   }
 
   async serveImage(type: string, filename: string) {
-    // Generate ImageKit URL and return redirect information
+    // Generate R2 URL and return redirect information
     const folderPath = `images/${type}s`;
-    const imageUrl = this.imagekitService.getImageUrl(`${folderPath}/${filename}`);
+    const imageUrl = this.r2Service.getImageUrl(`${folderPath}/${filename}`);
 
     return {
       redirect: true,

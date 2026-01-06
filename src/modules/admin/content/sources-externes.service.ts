@@ -7,7 +7,7 @@ import {
 } from './dto/sources-externes.dto';
 import { CreateAdminAnimeDto } from './dto/admin-anime.dto';
 import { AdminAnimesService } from './admin-animes.service';
-import { ImageKitService } from '../../media/imagekit.service';
+import { R2Service } from '../../media/r2.service';
 import { DeepLService } from '../../../shared/services/deepl.service';
 import { CacheService } from '../../../shared/services/cache.service';
 import { spawn } from 'child_process';
@@ -19,7 +19,7 @@ export class SourcesExternesService {
   constructor(
     private prisma: PrismaService,
     private adminAnimesService: AdminAnimesService,
-    private imageKitService: ImageKitService,
+    private r2Service: R2Service,
     private deepLService: DeepLService,
     private cacheService: CacheService,
   ) {}
@@ -337,13 +337,13 @@ export class SourcesExternesService {
         return { success: false, error: 'No image URL provided' };
       }
 
-      // Generate a clean filename using the ImageKit helper (sanitized title + timestamp + cover number)
-      const baseFilename = this.imageKitService.createSafeFileName(animeTitle, 'anime');
+      // Generate a clean filename using the R2 helper (sanitized title + timestamp + cover number)
+      const baseFilename = this.r2Service.createSafeFileName(animeTitle, 'anime');
       const filename = `${baseFilename}-cover-1`;
-      const folder = this.imageKitService.getFolderForMediaType('anime');
+      const folder = this.r2Service.getFolderForMediaType('anime');
 
-      // Use ImageKit service to upload from URL
-      const result = await this.imageKitService.uploadImageFromUrl(
+      // Use R2 service to upload from URL
+      const result = await this.r2Service.uploadImageFromUrl(
         imageUrl,
         filename,
         folder

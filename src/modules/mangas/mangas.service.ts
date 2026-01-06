@@ -12,7 +12,7 @@ import { UpdateMangaDto } from './dto/update-manga.dto';
 import { MangaQueryDto } from './dto/manga-query.dto';
 import { AddMediaRelationDto, MediaRelationType } from './dto/add-media-relation.dto';
 import { RelatedContentItem, RelationsResponse } from '../shared/types/relations.types';
-import { ImageKitService } from '../media/imagekit.service';
+import { R2Service } from '../media/r2.service';
 import { MediaService } from '../media/media.service';
 import { AniListService, AniListManga } from '../anilist/anilist.service';
 import { OpenLibraryService } from '../books/openlibrary.service';
@@ -30,7 +30,7 @@ export class MangasService extends BaseContentService<
   constructor(
     prisma: PrismaService,
     private readonly cacheService: CacheService,
-    private readonly imageKitService: ImageKitService,
+    private readonly r2Service: R2Service,
     private readonly mediaService: MediaService,
     private readonly aniListService: AniListService,
     private readonly openLibraryService: OpenLibraryService,
@@ -75,14 +75,14 @@ export class MangasService extends BaseContentService<
   }
 
   /**
-   * Upload external image URL to ImageKit
-   * Returns the full ImageKit URL if successful
+   * Upload external image URL to R2
+   * Returns the full R2 URL if successful
    * Throws BadRequestException if upload fails
    * @param imageUrl - The external image URL to upload
    * @param title - Optional title for filename generation (format: titre-timestamp.ext)
    */
-  private async uploadExternalImageToImageKit(imageUrl: string, title?: string): Promise<string> {
-    // Only process external URLs (not already ImageKit URLs)
+  private async uploadExternalImageToR2(imageUrl: string, title?: string): Promise<string> {
+    // Only process external URLs (not already R2 URLs)
     if (!imageUrl || !imageUrl.startsWith('http') || imageUrl.includes('imagekit.io')) {
       return imageUrl;
     }
@@ -95,17 +95,17 @@ export class MangasService extends BaseContentService<
         false, // saveAsScreenshot
         title // title for filename generation
       );
-      // Return the full ImageKit URL
+      // Return the full R2 URL
       return result.url;
     } catch (error) {
-      console.error('[MangasService] Failed to upload external image to ImageKit:', {
+      console.error('[MangasService] Failed to upload external image to R2:', {
         imageUrl,
         title,
         error: error.message,
         stack: error.stack
       });
       // Throw error instead of silently falling back to prevent saving external URLs
-      throw new BadRequestException(`Failed to upload image to ImageKit: ${error.message}`);
+      throw new BadRequestException(`Failed to upload image to R2: ${error.message}`);
     }
   }
 
@@ -135,9 +135,9 @@ export class MangasService extends BaseContentService<
 
     delete (data as any).anilistId;
 
-    // Upload external image to ImageKit if present
+    // Upload external image to R2 if present
     if (data.image && data.image.startsWith('http')) {
-      data.image = await this.uploadExternalImageToImageKit(data.image, data.titre);
+      data.image = await this.uploadExternalImageToR2(data.image, data.titre);
     }
 
     // Map nbVolumes (string) to nbVol (int) if valid number
@@ -570,7 +570,7 @@ export class MangasService extends BaseContentService<
       );
     }
 
-    // If replacing image and previous image is an ImageKit URL, attempt deletion in IK
+    // If replacing image and previous image is an R2 URL, attempt deletion in IK
     let updateData: any = { ...updateMangaDto };
 
     // Normalize empty string to null for image field
@@ -578,9 +578,9 @@ export class MangasService extends BaseContentService<
       updateData.image = null;
     }
 
-    // Upload external image to ImageKit if present
+    // Upload external image to R2 if present
     if (updateData.image && updateData.image.startsWith('http')) {
-      updateData.image = await this.uploadExternalImageToImageKit(updateData.image, updateData.titre || manga.titre);
+      updateData.image = await this.uploadExternalImageToR2(updateData.image, updateData.titre || manga.titre);
     }
 
     // Map nbVolumes (string) to nbVol (int) if valid number
@@ -597,7 +597,7 @@ export class MangasService extends BaseContentService<
       }
     }
 
-    // If replacing or deleting image and previous image is an ImageKit URL, attempt deletion in IK
+    // If replacing or deleting image and previous image is an R2 URL, attempt deletion in IK
     try {
       const isImageBeingRemoved = updateData.image === null || updateData.image === '';
       const isImageBeingReplaced = typeof updateData.image === 'string' && updateData.image && updateData.image !== manga.image;
@@ -608,11 +608,11 @@ export class MangasService extends BaseContentService<
         manga.image &&
         /imagekit\.io/.test(manga.image)
       ) {
-        await this.imageKitService.deleteImageByUrl(manga.image);
-        console.log(`Deleted ImageKit image (manga): ${manga.image}`);
+        await this.r2Service.deleteImageByUrl(manga.image);
+        console.log(`Deleted R2 image (manga): ${manga.image}`);
       }
     } catch (e) {
-      console.warn('Failed to delete previous ImageKit image (manga):', (e as Error).message);
+      console.warn('Failed to delete previous R2 image (manga):', (e as Error).message);
     }
 
     const updatedManga = await this.prisma.akManga.update({
@@ -2428,7 +2428,7 @@ export class MangasService extends BaseContentService<
       };
     }
 
-    // Try to fetch cover from AniList and upload to ImageKit
+    // Try to fetch cover from AniList and upload to R2
     let coverImagePath = bookData?.coverImage;
     try {
       // Search AniList using manga title (prefer original title, fallback to French)
@@ -2450,8 +2450,8 @@ export class MangasService extends BaseContentService<
 
           const filename = `${sanitizedTitle}-tome-${nextVolumeNumber}.jpg`;
 
-          // Upload to ImageKit
-          const uploadResult = await this.imageKitService.uploadImageFromUrl(
+          // Upload to R2
+          const uploadResult = await this.r2Service.uploadImageFromUrl(
             coverUrl,
             filename,
             'images/mangas/covers',
@@ -2874,7 +2874,7 @@ export class MangasService extends BaseContentService<
       throw new BadRequestException('No image found in Jikan response');
     }
 
-    // Download and upload to ImageKit
+    // Download and upload to R2
     return this.updateMangaImageFromUrl(mangaId, imageUrl);
   }
 
@@ -2898,9 +2898,9 @@ export class MangasService extends BaseContentService<
 
     const buffer = Buffer.from(await imageResponse.arrayBuffer());
 
-    // Upload to ImageKit
+    // Upload to R2
     const filename = `manga_${mangaId}_${Date.now()}.jpg`;
-    const uploadResult = await this.imageKitService.uploadImage(
+    const uploadResult = await this.r2Service.uploadImage(
       buffer,
       filename,
       '/images/mangas',

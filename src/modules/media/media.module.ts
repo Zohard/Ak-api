@@ -2,8 +2,7 @@ import { Module } from '@nestjs/common';
 import { MulterModule } from '@nestjs/platform-express';
 import { MediaController } from './media.controller';
 import { MediaService } from './media.service';
-import { ImageKitController } from './imagekit.controller';
-import { ImageKitService } from './imagekit.service';
+import { R2Service } from './r2.service';
 import { PrismaService } from '../../shared/services/prisma.service';
 
 @Module({
@@ -29,8 +28,8 @@ import { PrismaService } from '../../shared/services/prisma.service';
       },
     }),
   ],
-  controllers: [MediaController, ImageKitController],
-  providers: [MediaService, ImageKitService, PrismaService],
-  exports: [MediaService, ImageKitService],
+  controllers: [MediaController],
+  providers: [MediaService, R2Service, PrismaService],
+  exports: [MediaService, R2Service],
 })
 export class MediaModule {}

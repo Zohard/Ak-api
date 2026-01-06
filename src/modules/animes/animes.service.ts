@@ -12,7 +12,7 @@ import { CreateAnimeDto } from './dto/create-anime.dto';
 import { UpdateAnimeDto } from './dto/update-anime.dto';
 import { AnimeQueryDto } from './dto/anime-query.dto';
 import { RelatedContentItem, RelationsResponse } from '../shared/types/relations.types';
-import { ImageKitService } from '../media/imagekit.service';
+import { R2Service } from '../media/r2.service';
 import { AniListService } from '../anilist/anilist.service';
 import { Prisma } from '@prisma/client';
 import { hasAdminAccess } from '../../shared/constants/rbac.constants';
@@ -33,7 +33,7 @@ export class AnimesService extends BaseContentService<
   constructor(
     prisma: PrismaService,
     private readonly cacheService: CacheService,
-    private readonly imageKitService: ImageKitService,
+    private readonly r2Service: R2Service,
     private readonly aniListService: AniListService,
     private readonly adminLoggingService: AdminLoggingService,
     private readonly animeRelationsService: AnimeRelationsService,
@@ -613,7 +613,7 @@ export class AnimesService extends BaseContentService<
       }
     }
 
-    // If replacing or deleting image and previous image is an ImageKit URL, attempt deletion in IK
+    // If replacing or deleting image and previous image is an R2 URL, attempt deletion in IK
     try {
       const isImageBeingRemoved = updateData.image === null || updateData.image === '';
       const isImageBeingReplaced = typeof updateData.image === 'string' && updateData.image && updateData.image !== anime.image;
@@ -624,12 +624,12 @@ export class AnimesService extends BaseContentService<
         anime.image &&
         /imagekit\.io/.test(anime.image)
       ) {
-        await this.imageKitService.deleteImageByUrl(anime.image);
-        console.log(`Deleted ImageKit image: ${anime.image}`);
+        await this.r2Service.deleteImageByUrl(anime.image);
+        console.log(`Deleted R2 image: ${anime.image}`);
       }
     } catch (e) {
       // Non-blocking: log and continue update
-      console.warn('Failed to delete previous ImageKit image:', (e as Error).message);
+      console.warn('Failed to delete previous R2 image:', (e as Error).message);
     }
 
     // Normalize incoming payload for update (handle legacy alias)

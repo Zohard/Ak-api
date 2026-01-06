@@ -1,7 +1,7 @@
 import { Injectable, Logger, BadRequestException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../../shared/services/prisma.service';
 import { JikanService } from '../../jikan/jikan.service';
-import { ImageKitService } from '../../media/imagekit.service';
+import { R2Service } from '../../media/r2.service';
 import axios from 'axios';
 import * as crypto from 'crypto';
 
@@ -28,7 +28,7 @@ export class AnimeImageService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly jikanService: JikanService,
-    private readonly imageKitService: ImageKitService,
+    private readonly r2Service: R2Service,
   ) {}
 
   /**
@@ -185,7 +185,7 @@ export class AnimeImageService {
   }
 
   /**
-   * Fetch image from Jikan and upload to ImageKit
+   * Fetch image from Jikan and upload to R2
    */
   async updateImageFromJikan(animeId: number): Promise<ImageUpdateResult> {
     // Get anime details
@@ -241,18 +241,18 @@ export class AnimeImageService {
     this.logger.log(`Found anime on MAL: ${jikanAnime.title} (ID: ${jikanAnime.mal_id})`);
     this.logger.log(`Image URL: ${imageUrl}`);
 
-    // Download image and upload to ImageKit
-    const uploadedUrl = await this.downloadAndUploadToImageKit(
+    // Download image and upload to R2
+    const uploadedUrl = await this.downloadAndUploadToR2(
       imageUrl,
       `anime_${animeId}_${Date.now()}`,
       'anime'
     );
 
-    // Delete old ImageKit image if exists
+    // Delete old R2 image if exists
     if (anime.image && typeof anime.image === 'string' && /imagekit\.io/.test(anime.image)) {
       try {
-        await this.imageKitService.deleteImageByUrl(anime.image);
-        this.logger.log(`Deleted old ImageKit image: ${anime.image}`);
+        await this.r2Service.deleteImageByUrl(anime.image);
+        this.logger.log(`Deleted old R2 image: ${anime.image}`);
       } catch (error) {
         this.logger.warn(`Failed to delete old image: ${error.message}`);
       }
@@ -292,18 +292,18 @@ export class AnimeImageService {
 
     this.logger.log(`Downloading image from URL: ${imageUrl}`);
 
-    // Download and upload to ImageKit
-    const uploadedUrl = await this.downloadAndUploadToImageKit(
+    // Download and upload to R2
+    const uploadedUrl = await this.downloadAndUploadToR2(
       imageUrl,
       `anime_${animeId}_${Date.now()}`,
       'anime'
     );
 
-    // Delete old ImageKit image if exists
+    // Delete old R2 image if exists
     if (anime.image && typeof anime.image === 'string' && /imagekit\.io/.test(anime.image)) {
       try {
-        await this.imageKitService.deleteImageByUrl(anime.image);
-        this.logger.log(`Deleted old ImageKit image: ${anime.image}`);
+        await this.r2Service.deleteImageByUrl(anime.image);
+        this.logger.log(`Deleted old R2 image: ${anime.image}`);
       } catch (error) {
         this.logger.warn(`Failed to delete old image: ${error.message}`);
       }
@@ -353,19 +353,19 @@ export class AnimeImageService {
 
     this.logger.log(`Uploading file: ${file.originalname} (${file.size} bytes)`);
 
-    // Upload to ImageKit
+    // Upload to R2
     const fileName = `anime_${animeId}_${Date.now()}_${file.originalname}`;
-    const uploadedUrl = await this.imageKitService.uploadImage(
+    const uploadedUrl = await this.r2Service.uploadImage(
       file.buffer,
       fileName,
       'anime'
     );
 
-    // Delete old ImageKit image if exists
+    // Delete old R2 image if exists
     if (anime.image && typeof anime.image === 'string' && /imagekit\.io/.test(anime.image)) {
       try {
-        await this.imageKitService.deleteImageByUrl(anime.image);
-        this.logger.log(`Deleted old ImageKit image: ${anime.image}`);
+        await this.r2Service.deleteImageByUrl(anime.image);
+        this.logger.log(`Deleted old R2 image: ${anime.image}`);
       } catch (error) {
         this.logger.warn(`Failed to delete old image: ${error.message}`);
       }
@@ -386,9 +386,9 @@ export class AnimeImageService {
   }
 
   /**
-   * Helper: Download image from URL and upload to ImageKit
+   * Helper: Download image from URL and upload to R2
    */
-  private async downloadAndUploadToImageKit(
+  private async downloadAndUploadToR2(
     imageUrl: string,
     fileName: string,
     folder: string
@@ -430,10 +430,10 @@ export class AnimeImageService {
 
       const finalFileName = `${fileName}${extension}`;
 
-      // Upload to ImageKit
-      const uploadedUrl = await this.imageKitService.uploadImage(buffer, finalFileName, folder);
+      // Upload to R2
+      const uploadedUrl = await this.r2Service.uploadImage(buffer, finalFileName, folder);
 
-      this.logger.log(`Successfully uploaded image to ImageKit: ${uploadedUrl}`);
+      this.logger.log(`Successfully uploaded image to R2: ${uploadedUrl}`);
 
       return uploadedUrl;
     } catch (error: any) {

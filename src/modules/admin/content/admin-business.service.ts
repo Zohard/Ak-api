@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../../shared/services/prisma.service';
 import { AdminLoggingService } from '../logging/admin-logging.service';
-import { ImageKitService } from '../../media/imagekit.service';
+import { R2Service } from '../../media/r2.service';
 import { AdminBusinessListQueryDto, CreateAdminBusinessDto, UpdateAdminBusinessDto } from './dto/admin-business.dto';
 
 @Injectable()
@@ -9,7 +9,7 @@ export class AdminBusinessService {
   constructor(
     private prisma: PrismaService,
     private adminLogging: AdminLoggingService,
-    private imageKitService: ImageKitService,
+    private r2Service: R2Service,
   ) {}
 
   async list(query: AdminBusinessListQueryDto) {
@@ -114,13 +114,13 @@ export class AdminBusinessService {
         return { success: false, error: 'No image URL provided' };
       }
 
-      // Generate a clean filename using the ImageKit helper (sanitized title + timestamp + logo number)
-      const baseFilename = this.imageKitService.createSafeFileName(businessName, 'business');
+      // Generate a clean filename using the R2 helper (sanitized title + timestamp + logo number)
+      const baseFilename = this.r2Service.createSafeFileName(businessName, 'business');
       const filename = `${baseFilename}-logo-1`;
-      const folder = this.imageKitService.getFolderForMediaType('business');
+      const folder = this.r2Service.getFolderForMediaType('business');
 
-      // Use ImageKit service to upload from URL
-      const result = await this.imageKitService.uploadImageFromUrl(
+      // Use R2 service to upload from URL
+      const result = await this.r2Service.uploadImageFromUrl(
         imageUrl,
         filename,
         folder

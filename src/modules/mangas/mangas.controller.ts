@@ -36,7 +36,7 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { OptionalJwtAuthGuard } from '../../common/guards/optional-jwt-auth.guard';
 import { AdminGuard } from '../../common/guards/admin.guard';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { ImageKitService } from '../media/imagekit.service';
+import { R2Service } from '../media/r2.service';
 import { ScrapeService } from '../scrape/scrape.service';
 
 @ApiTags('Mangas')
@@ -44,7 +44,7 @@ import { ScrapeService } from '../scrape/scrape.service';
 export class MangasController {
   constructor(
     private readonly mangasService: MangasService,
-    private readonly imageKitService: ImageKitService,
+    private readonly r2Service: R2Service,
     private readonly googleBooksService: GoogleBooksService,
     private readonly scrapeService: ScrapeService,
   ) {}
@@ -427,7 +427,7 @@ export class MangasController {
   @ApiBearerAuth()
   @UseInterceptors(FileInterceptor('file'))
   @ApiConsumes('multipart/form-data')
-  @ApiOperation({ summary: 'Upload cover image to ImageKit and set it (Admin)' })
+  @ApiOperation({ summary: 'Upload cover image to R2 and set it (Admin)' })
   @ApiResponse({ status: 200, description: 'Image uploaded and manga updated' })
   async uploadImage(
     @Param('id', ParseIntPipe) id: number,
@@ -439,13 +439,13 @@ export class MangasController {
     }
 
     const folder = '/images/mangas';
-    const result = await this.imageKitService.uploadImage(
+    const result = await this.r2Service.uploadImage(
       file.buffer,
       file.originalname,
       folder,
     );
 
-    // Update manga image with the ImageKit URL
+    // Update manga image with the R2 URL
     const updated = await this.mangasService.update(
       id,
       { image: result.url } as UpdateMangaDto,

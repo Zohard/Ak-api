@@ -2,7 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../../shared/services/prisma.service';
 import { AdminLoggingService } from '../logging/admin-logging.service';
 import { CacheService } from '../../../shared/services/cache.service';
-import { ImageKitService } from '../../media/imagekit.service';
+import { R2Service } from '../../media/r2.service';
 import {
   AdminAnimeListQueryDto,
   CreateAdminAnimeDto,
@@ -15,7 +15,7 @@ export class AdminAnimesService {
     private prisma: PrismaService,
     private adminLogging: AdminLoggingService,
     private cacheService: CacheService,
-    private imageKitService: ImageKitService,
+    private r2Service: R2Service,
   ) {}
 
   async getOne(id: number) {
@@ -494,7 +494,7 @@ export class AdminAnimesService {
   }
 
   /**
-   * Import anime image from URL (e.g., AniList, MAL) to ImageKit
+   * Import anime image from URL (e.g., AniList, MAL) to R2
    */
   private async importAnimeImage(
     imageUrl: string,
@@ -505,13 +505,13 @@ export class AdminAnimesService {
         return { success: false, error: 'No image URL provided' };
       }
 
-      // Generate a clean filename using the ImageKit helper (sanitized title + timestamp + cover number)
-      const baseFilename = this.imageKitService.createSafeFileName(animeTitle, 'anime');
+      // Generate a clean filename using the R2 helper (sanitized title + timestamp + cover number)
+      const baseFilename = this.r2Service.createSafeFileName(animeTitle, 'anime');
       const filename = `${baseFilename}-cover-1`;
-      const folder = this.imageKitService.getFolderForMediaType('anime');
+      const folder = this.r2Service.getFolderForMediaType('anime');
 
-      // Use ImageKit service to upload from URL
-      const result = await this.imageKitService.uploadImageFromUrl(
+      // Use R2 service to upload from URL
+      const result = await this.r2Service.uploadImageFromUrl(
         imageUrl,
         filename,
         folder

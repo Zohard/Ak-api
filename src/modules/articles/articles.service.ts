@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../shared/services/prisma.service';
 import { CacheService } from '../../shared/services/cache.service';
-import { ImageKitService } from '../media/imagekit.service';
+import { R2Service } from '../media/r2.service';
 import { CreateArticleDto } from './dto/create-article.dto';
 import { UpdateArticleDto } from './dto/update-article.dto';
 import { ArticleQueryDto } from './dto/article-query.dto';
@@ -18,7 +18,7 @@ export class ArticlesService {
   constructor(
     private prisma: PrismaService,
     private cacheService: CacheService,
-    private imagekitService: ImageKitService,
+    private imagekitService: R2Service,
   ) {}
 
   private serializeBigInt(obj: any): any {
@@ -1207,7 +1207,7 @@ export class ArticlesService {
       return imageUrl;
     }
 
-    // If it's an ImageKit path, generate the full URL
+    // If it's an R2 path, generate the full URL
     return this.imagekitService.getImageUrl(imageUrl);
   }
 
@@ -1253,7 +1253,7 @@ export class ArticlesService {
       });
 
       return {
-        message: 'Image imported and uploaded to ImageKit successfully',
+        message: 'Image imported and uploaded to R2 successfully',
         image: {
           id: image.idImg,
           filename: image.urlImg,
@@ -1267,7 +1267,7 @@ export class ArticlesService {
     }
   }
 
-  async importImageKitFile(articleId: number, imagePath: string): Promise<any> {
+  async importR2File(articleId: number, imagePath: string): Promise<any> {
     const article = await this.prisma.wpPost.findUnique({
       where: { ID: BigInt(articleId) },
     });
@@ -1284,7 +1284,7 @@ export class ArticlesService {
     });
 
     return {
-      message: 'ImageKit file associated with article successfully',
+      message: 'R2 file associated with article successfully',
       image: {
         id: image.idImg,
         filename: image.urlImg,
@@ -1355,7 +1355,7 @@ export class ArticlesService {
     };
   }
 
-  async bulkImportImageKitFiles(articleId: number, imagePaths: string[]): Promise<any> {
+  async bulkImportR2Files(articleId: number, imagePaths: string[]): Promise<any> {
     const article = await this.prisma.wpPost.findUnique({
       where: { ID: BigInt(articleId) },
     });
@@ -1400,7 +1400,7 @@ export class ArticlesService {
     }
 
     return {
-      message: 'Bulk ImageKit files association completed',
+      message: 'Bulk R2 files association completed',
       results,
     };
   }

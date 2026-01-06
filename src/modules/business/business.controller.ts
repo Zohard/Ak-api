@@ -32,7 +32,7 @@ import { BusinessSearchDto } from './dto/business-search.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { AdminGuard } from '../../common/guards/admin.guard';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { ImageKitService } from '../media/imagekit.service';
+import { R2Service } from '../media/r2.service';
 import { AniListService } from '../anilist/anilist.service';
 
 @ApiTags('Business')
@@ -40,7 +40,7 @@ import { AniListService } from '../anilist/anilist.service';
 export class BusinessController {
   constructor(
     private readonly businessService: BusinessService,
-    private readonly imageKitService: ImageKitService,
+    private readonly r2Service: R2Service,
     private readonly aniListService: AniListService,
   ) {}
 
@@ -345,7 +345,7 @@ export class BusinessController {
   @ApiBearerAuth()
   @UseInterceptors(FileInterceptor('file'))
   @ApiConsumes('multipart/form-data')
-  @ApiOperation({ summary: 'Upload business image to ImageKit (Admin only)' })
+  @ApiOperation({ summary: 'Upload business image to R2 (Admin only)' })
   @ApiResponse({ status: 200, description: 'Image uploaded and business updated' })
   async uploadImage(
     @Param('id', ParseIntPipe) id: number,
@@ -356,7 +356,7 @@ export class BusinessController {
     }
 
     const folder = '/images/business';
-    const result = await this.imageKitService.uploadImage(
+    const result = await this.r2Service.uploadImage(
       file.buffer,
       file.originalname,
       folder,
@@ -370,7 +370,7 @@ export class BusinessController {
   @Post('upload-image-from-url')
   @UseGuards(JwtAuthGuard, AdminGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Upload business image from URL to ImageKit (Admin only)' })
+  @ApiOperation({ summary: 'Upload business image from URL to R2 (Admin only)' })
   @ApiResponse({ status: 200, description: 'Image uploaded from URL' })
   @ApiResponse({ status: 400, description: 'Invalid URL or upload failed' })
   async uploadImageFromUrl(

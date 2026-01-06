@@ -4,13 +4,13 @@ import { CreateBusinessDto } from './dto/create-business.dto';
 import { UpdateBusinessDto } from './dto/update-business.dto';
 import { BusinessQueryDto } from './dto/business-query.dto';
 import { BusinessSearchDto } from './dto/business-search.dto';
-import { ImageKitService } from '../media/imagekit.service';
+import { R2Service } from '../media/r2.service';
 import { decodeHTMLEntities } from '../../shared/utils/text.util';
 import axios from 'axios';
 
 @Injectable()
 export class BusinessService {
-  constructor(private readonly prisma: PrismaService, private readonly imageKitService: ImageKitService) {}
+  constructor(private readonly prisma: PrismaService, private readonly r2Service: R2Service) {}
 
   async create(createBusinessDto: CreateBusinessDto) {
     // Check if denomination already exists
@@ -129,7 +129,7 @@ export class BusinessService {
       }
     }
 
-    // Attempt to delete old ImageKit image if being replaced
+    // Attempt to delete old R2 image if being replaced
     try {
       if (
         typeof updateBusinessDto.image === 'string' &&
@@ -139,10 +139,10 @@ export class BusinessService {
         existingBusiness.image &&
         /imagekit\.io/.test(existingBusiness.image)
       ) {
-        await this.imageKitService.deleteImageByUrl(existingBusiness.image);
+        await this.r2Service.deleteImageByUrl(existingBusiness.image);
       }
     } catch (e) {
-      console.warn('Failed to delete previous ImageKit image (business):', (e as Error).message);
+      console.warn('Failed to delete previous R2 image (business):', (e as Error).message);
     }
 
     const business = await this.prisma.akBusiness.update({
@@ -738,9 +738,9 @@ export class BusinessService {
       const extension = contentType.split('/')[1]?.replace('jpeg', 'jpg') || 'jpg';
       const filename = `business_${Date.now()}_${Math.random().toString(36).substring(7)}.${extension}`;
 
-      // Upload to ImageKit
+      // Upload to R2
       const folder = '/images/business';
-      const uploadResult = await this.imageKitService.uploadImage(
+      const uploadResult = await this.r2Service.uploadImage(
         Buffer.from(response.data),
         filename,
         folder,

@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../../shared/services/prisma.service';
-import { ImageKitService } from '../../media/imagekit.service';
+import { R2Service } from '../../media/r2.service';
 import { MediaService } from '../../media/media.service';
 import { AdminLoggingService } from '../logging/admin-logging.service';
 import {
@@ -13,18 +13,18 @@ import {
 export class AdminMangasService {
   constructor(
     private prisma: PrismaService,
-    private imageKitService: ImageKitService,
+    private r2Service: R2Service,
     private mediaService: MediaService,
     private adminLogging: AdminLoggingService,
   ) {}
 
   /**
-   * Upload external image URL to ImageKit
-   * Returns the full ImageKit URL if successful, null if upload fails
+   * Upload external image URL to R2
+   * Returns the full R2 URL if successful, null if upload fails
    * Does NOT throw - allows manga creation to continue even if image upload fails
    */
-  private async uploadExternalImageToImageKit(imageUrl: string, title?: string): Promise<string | null> {
-    // Only process external URLs (not already ImageKit URLs)
+  private async uploadExternalImageToR2(imageUrl: string, title?: string): Promise<string | null> {
+    // Only process external URLs (not already R2 URLs)
     if (!imageUrl || !imageUrl.startsWith('http') || imageUrl.includes('imagekit.io')) {
       return imageUrl;
     }
@@ -37,10 +37,10 @@ export class AdminMangasService {
         false, // saveAsScreenshot
         title // title for filename generation
       );
-      // Return the full ImageKit URL
+      // Return the full R2 URL
       return result.url;
     } catch (error) {
-      console.error('[AdminMangasService] Failed to upload external image to ImageKit (non-blocking):', {
+      console.error('[AdminMangasService] Failed to upload external image to R2 (non-blocking):', {
         imageUrl,
         title,
         error: error.message,
@@ -209,9 +209,9 @@ export class AdminMangasService {
     const data: any = { ...dto };
     if (!data.niceUrl && data.titre) data.niceUrl = this.slugify(data.titre);
 
-    // Upload external image to ImageKit if present
+    // Upload external image to R2 if present
     if (data.image && data.image.startsWith('http')) {
-      const uploadedUrl = await this.uploadExternalImageToImageKit(data.image, data.titre);
+      const uploadedUrl = await this.uploadExternalImageToR2(data.image, data.titre);
       // If upload failed (returns null), set image to null to avoid storing broken external URL
       data.image = uploadedUrl;
     }
@@ -241,9 +241,9 @@ export class AdminMangasService {
     const data: any = { ...rest };
     if (dto.titre && !dto.niceUrl) data.niceUrl = this.slugify(dto.titre);
 
-    // Upload external image to ImageKit if present
+    // Upload external image to R2 if present
     if (data.image && data.image.startsWith('http')) {
-      const uploadedUrl = await this.uploadExternalImageToImageKit(data.image, data.titre || existing.titre);
+      const uploadedUrl = await this.uploadExternalImageToR2(data.image, data.titre || existing.titre);
       // If upload failed (returns null), set image to null to avoid storing broken external URL
       data.image = uploadedUrl;
     }
@@ -322,13 +322,13 @@ export class AdminMangasService {
         return { success: false, error: 'No image URL provided' };
       }
 
-      // Generate a clean filename using the ImageKit helper (sanitized title + timestamp + cover number)
-      const baseFilename = this.imageKitService.createSafeFileName(mangaTitle, 'manga');
+      // Generate a clean filename using the R2 helper (sanitized title + timestamp + cover number)
+      const baseFilename = this.r2Service.createSafeFileName(mangaTitle, 'manga');
       const filename = `${baseFilename}-cover-1`;
-      const folder = this.imageKitService.getFolderForMediaType('manga');
+      const folder = this.r2Service.getFolderForMediaType('manga');
 
-      // Use ImageKit service to upload from URL
-      const result = await this.imageKitService.uploadImageFromUrl(
+      // Use R2 service to upload from URL
+      const result = await this.r2Service.uploadImageFromUrl(
         imageUrl,
         filename,
         folder
