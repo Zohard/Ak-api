@@ -171,6 +171,36 @@ export class R2Service {
   }
 
   /**
+   * Delete image by URL (extracts path from R2 URL)
+   */
+  async deleteImageByUrl(imageUrl: string): Promise<any> {
+    try {
+      if (!imageUrl || !imageUrl.trim()) {
+        console.warn('No image URL provided for deletion');
+        return { success: false, message: 'No URL provided' };
+      }
+
+      // If it's an R2 URL, extract the path
+      if (imageUrl.includes(this.publicUrl)) {
+        const filePath = imageUrl.replace(this.publicUrl, '');
+        return this.deleteImage(filePath);
+      }
+
+      // If it's just a path (not a full URL), delete directly
+      if (!imageUrl.startsWith('http')) {
+        return this.deleteImage(imageUrl);
+      }
+
+      // If it's an external URL (e.g., ImageKit), we can't delete it
+      console.warn('Cannot delete external URL:', imageUrl);
+      return { success: false, message: 'Cannot delete external URL' };
+    } catch (error) {
+      console.error('Error deleting image by URL:', error);
+      throw new Error(`R2 delete by URL failed: ${error.message}`);
+    }
+  }
+
+  /**
    * Get image URL (for compatibility with ImageKit service)
    */
   getImageUrl(path: string, transformations: any[] = []): string {

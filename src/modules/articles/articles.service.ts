@@ -1355,6 +1355,37 @@ export class ArticlesService {
     };
   }
 
+  async importImageKitFile(articleId: number, imagePath: string): Promise<any> {
+    const article = await this.prisma.wpPost.findUnique({
+      where: { ID: BigInt(articleId) },
+    });
+
+    if (!article) {
+      throw new NotFoundException('Article not found');
+    }
+
+    const image = await this.prisma.akWebzineImg.create({
+      data: {
+        idArt: BigInt(articleId),
+        urlImg: imagePath,
+      },
+    });
+
+    return {
+      message: 'R2 file associated successfully',
+      data: {
+        id: image.idImg,
+        filename: image.urlImg,
+        articleId: Number(image.idArt),
+        imagekitUrl: this.imagekitService.getImageUrl(imagePath),
+      },
+    };
+  }
+
+  async bulkImportImageKitFiles(articleId: number, imagePaths: string[]): Promise<any> {
+    return this.bulkImportR2Files(articleId, imagePaths);
+  }
+
   async bulkImportR2Files(articleId: number, imagePaths: string[]): Promise<any> {
     const article = await this.prisma.wpPost.findUnique({
       where: { ID: BigInt(articleId) },
