@@ -67,7 +67,8 @@ export class AdminStaffAkService {
         wu.user_status,
         (SELECT COUNT(*) FROM wp_posts WHERE post_author = wu."ID") as article_count
       FROM wp_users wu
-      LEFT JOIN ak_user_roles ur ON wu."ID" = ur.user_id AND ur.is_active = true
+      LEFT JOIN smf_members sm ON wu.user_login = sm.member_name
+      LEFT JOIN ak_user_roles ur ON sm.id_member = ur.id_member AND ur.is_active = true
       ${whereClause}
       ORDER BY wu.${sortField} ${sortOrder}
       LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
@@ -78,7 +79,8 @@ export class AdminStaffAkService {
     const countQuery = `
       SELECT COUNT(DISTINCT wu."ID") as total
       FROM wp_users wu
-      LEFT JOIN ak_user_roles ur ON wu."ID" = ur.user_id AND ur.is_active = true
+      LEFT JOIN smf_members sm ON wu.user_login = sm.member_name
+      LEFT JOIN ak_user_roles ur ON sm.id_member = ur.id_member AND ur.is_active = true
       ${whereClause}
     `;
 
