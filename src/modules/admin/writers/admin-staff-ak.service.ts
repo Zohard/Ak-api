@@ -367,24 +367,30 @@ export class AdminStaffAkService {
   }
 
   async getStaffAkStats() {
-    const stats = await this.prisma.$queryRaw`
+    // Get staff AK counts
+    const staffStats = await this.prisma.$queryRaw`
       SELECT
         COUNT(DISTINCT wu."ID") as total_staff_ak,
-        COUNT(DISTINCT sm.id_member) as total_smf_members,
         COUNT(DISTINCT CASE WHEN wu.user_registered > NOW() - interval '30 days' THEN wu."ID" END) as staff_ak_added_this_month,
         COUNT(DISTINCT CASE WHEN wp.post_date > NOW() - interval '30 days' THEN wp.ID END) as articles_this_month
       FROM wp_users wu
-      CROSS JOIN smf_members sm
       LEFT JOIN wp_posts wp ON wu."ID" = wp.post_author AND wp.post_type = 'post' AND wp.post_status = 'publish'
     `;
 
-    const result = (stats as any[])[0];
+    // Get SMF members count separately
+    const smfStats = await this.prisma.$queryRaw`
+      SELECT COUNT(*) as total_smf_members
+      FROM smf_members
+    `;
+
+    const staffResult = (staffStats as any[])[0];
+    const smfResult = (smfStats as any[])[0];
 
     return {
-      total_staff_ak: Number(result.total_staff_ak),
-      total_smf_members: Number(result.total_smf_members),
-      staff_ak_added_this_month: Number(result.staff_ak_added_this_month),
-      articles_this_month: Number(result.articles_this_month),
+      total_staff_ak: Number(staffResult.total_staff_ak),
+      total_smf_members: Number(smfResult.total_smf_members),
+      staff_ak_added_this_month: Number(staffResult.staff_ak_added_this_month),
+      articles_this_month: Number(staffResult.articles_this_month),
     };
   }
 
