@@ -36,7 +36,7 @@ export class AdminStaffAkService {
       paramIndex++;
     }
 
-    // Add filter for users without roles
+    // Add filter for users without roles (joined through smf_members)
     if (withoutRole) {
       whereConditions.push(`ur.id_user_role IS NULL`);
     }
