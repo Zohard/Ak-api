@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
-import { IsOptional, IsInt, Min, IsString, IsIn } from 'class-validator';
+import { Type, Transform } from 'class-transformer';
+import { IsOptional, IsInt, Min, IsString, IsIn, IsBoolean } from 'class-validator';
 
 export class StaffAkQueryDto {
   @ApiProperty({
@@ -32,6 +32,15 @@ export class StaffAkQueryDto {
   @IsOptional()
   @IsString()
   search?: string;
+
+  @ApiProperty({
+    description: 'Filter users without assigned roles',
+    required: false,
+  })
+  @IsOptional()
+  @Transform(({ value }) => value === 'true' || value === true)
+  @IsBoolean()
+  withoutRole?: boolean;
 
   @ApiProperty({
     description: 'Field to sort by',

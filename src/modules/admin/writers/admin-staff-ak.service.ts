@@ -18,6 +18,7 @@ export class AdminStaffAkService {
       page = 1,
       limit = 20,
       search,
+      withoutRole,
       sort = 'user_registered',
       order = 'DESC',
     } = query;
@@ -29,10 +30,15 @@ export class AdminStaffAkService {
 
     if (search) {
       whereConditions.push(
-        `(user_login ILIKE $${paramIndex} OR user_email ILIKE $${paramIndex} OR display_name ILIKE $${paramIndex})`,
+        `(wu.user_login ILIKE $${paramIndex} OR wu.user_email ILIKE $${paramIndex} OR wu.display_name ILIKE $${paramIndex})`,
       );
       params.push(`%${search}%`);
       paramIndex++;
+    }
+
+    // Add filter for users without roles
+    if (withoutRole) {
+      whereConditions.push(`ur.id_user_role IS NULL`);
     }
 
     const whereClause =
@@ -52,25 +58,27 @@ export class AdminStaffAkService {
 
     const staffAkQuery = `
       SELECT
-        "ID",
-        user_login,
-        user_nicename,
-        user_email,
-        user_registered,
-        display_name,
-        user_status,
-        (SELECT COUNT(*) FROM wp_posts WHERE post_author = wp_users."ID") as article_count
-      FROM wp_users
+        wu."ID",
+        wu.user_login,
+        wu.user_nicename,
+        wu.user_email,
+        wu.user_registered,
+        wu.display_name,
+        wu.user_status,
+        (SELECT COUNT(*) FROM wp_posts WHERE post_author = wu."ID") as article_count
+      FROM wp_users wu
+      LEFT JOIN ak_user_roles ur ON wu."ID" = ur.user_id AND ur.is_active = true
       ${whereClause}
-      ORDER BY ${sortField} ${sortOrder}
+      ORDER BY wu.${sortField} ${sortOrder}
       LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
     `;
 
     params.push(limit, offset);
 
     const countQuery = `
-      SELECT COUNT(*) as total
-      FROM wp_users
+      SELECT COUNT(DISTINCT wu."ID") as total
+      FROM wp_users wu
+      LEFT JOIN ak_user_roles ur ON wu."ID" = ur.user_id AND ur.is_active = true
       ${whereClause}
     `;
 
