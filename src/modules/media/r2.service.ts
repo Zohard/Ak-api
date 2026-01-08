@@ -134,17 +134,34 @@ export class R2Service {
     try {
       const fileKey = folder ? `${folder}/${fileName}` : fileName;
 
+      console.log('[R2Service] Deleting from R2:', {
+        bucket: this.bucketName,
+        fileKey,
+        fileName,
+        folder,
+      });
+
       const command = new DeleteObjectCommand({
         Bucket: this.bucketName,
         Key: fileKey,
       });
 
-      await this.r2Client.send(command);
-      console.log(`Deleted existing image: ${fileKey}`);
+      const result = await this.r2Client.send(command);
+      console.log(`[R2Service] Successfully deleted from R2: ${fileKey}`, result);
     } catch (error) {
       // Ignore errors if file doesn't exist
       if (error.name !== 'NoSuchKey') {
-        console.warn(`Failed to delete existing image ${fileName}:`, error.message);
+        console.error(`[R2Service] Failed to delete existing image:`, {
+          fileName,
+          folder,
+          fileKey: folder ? `${folder}/${fileName}` : fileName,
+          errorName: error.name,
+          errorMessage: error.message,
+          bucket: this.bucketName,
+        });
+        throw error;
+      } else {
+        console.warn(`[R2Service] File not found in R2 (NoSuchKey): ${folder ? `${folder}/${fileName}` : fileName}`);
       }
     }
   }

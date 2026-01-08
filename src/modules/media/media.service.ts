@@ -572,11 +572,19 @@ export class MediaService {
   async deleteMedia(id: number, userId: number) {
     const media = await this.getMediaById(id);
 
+    console.log('[MediaService] Delete media called:', {
+      id,
+      userId,
+      media,
+    });
+
     // Delete from R2
     try {
       // Extract filename from the stored path
       // filename could be like "screenshots/filename.webp" or just "filename.webp"
       let filename = (media as any).filename;
+
+      console.log('[MediaService] Original filename from DB:', filename);
 
       if (filename) {
         // Remove "screenshots/" prefix if present
@@ -585,6 +593,12 @@ export class MediaService {
         // Determine the media type and folder path
         const type = (media as any).type;
         const typeName = this.getTypeName(type);
+
+        console.log('[MediaService] Type info:', {
+          type,
+          typeName,
+          cleanFilename,
+        });
 
         // Build the folder path based on type
         let folderPath: string;
@@ -595,15 +609,21 @@ export class MediaService {
           folderPath = `images/${typeName}s/screenshots`;
         }
 
-        console.log(`Attempting to delete from R2: ${cleanFilename} in folder: ${folderPath}`);
+        console.log(`[MediaService] Attempting to delete from R2: ${cleanFilename} in folder: ${folderPath}`);
+        console.log(`[MediaService] Full R2 path would be: ${folderPath}/${cleanFilename}`);
 
         // Try to delete from R2
         await this.r2Service.deleteExistingImage(cleanFilename, folderPath);
-        console.log(`Successfully deleted from R2: ${cleanFilename}`);
+        console.log(`[MediaService] Successfully deleted from R2: ${cleanFilename}`);
+      } else {
+        console.warn('[MediaService] No filename found in media record');
       }
     } catch (error) {
       // Log error but don't fail the entire deletion if R2 delete fails
-      console.warn(`Failed to delete from R2 (ID: ${id}):`, error.message);
+      console.error(`[MediaService] Failed to delete from R2 (ID: ${id}):`, {
+        message: error.message,
+        stack: error.stack,
+      });
       // Continue to delete from database even if R2 deletion fails
     }
 
