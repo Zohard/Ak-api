@@ -52,7 +52,7 @@ export class AdminMangasService {
   }
 
   async list(query: AdminMangaListQueryDto) {
-    const { page = 1, limit = 20, search, annee, ficheComplete, statut } = query;
+    const { page = 1, limit = 20, search, annee, ficheComplete, statut, sortBy = 'dateAjout', sortOrder = 'desc' } = query;
     const skip = (page - 1) * limit;
     const where: any = {};
     if (search) {
@@ -67,8 +67,12 @@ export class AdminMangasService {
     if (ficheComplete !== undefined) where.ficheComplete = ficheComplete;
     if (statut !== undefined) where.statut = statut;
 
+    // Build orderBy based on sortBy and sortOrder
+    const orderBy: any = {};
+    orderBy[sortBy] = sortOrder;
+
     const [items, total] = await Promise.all([
-      this.prisma.akManga.findMany({ where, skip, take: limit, orderBy: { dateAjout: 'desc' } }),
+      this.prisma.akManga.findMany({ where, skip, take: limit, orderBy }),
       this.prisma.akManga.count({ where }),
     ]);
 

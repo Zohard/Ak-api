@@ -165,5 +165,15 @@ export class AdminMangaListQueryDto {
   @IsInt()
   @IsIn([0, 1, 2])
   statut?: number;
+
+  @ApiPropertyOptional({ description: 'Champ de tri', enum: ['dateAjout', 'titre', 'annee'] })
+  @IsOptional()
+  @IsString()
+  sortBy?: 'dateAjout' | 'titre' | 'annee' = 'dateAjout';
+
+  @ApiPropertyOptional({ description: 'Ordre de tri', enum: ['asc', 'desc'] })
+  @IsOptional()
+  @IsString()
+  sortOrder?: 'asc' | 'desc' = 'desc';
 }
 
