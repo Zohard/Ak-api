@@ -99,7 +99,7 @@ export interface AniListManga {
   description?: string;
   startDate?: { year?: number; month?: number; day?: number };
   endDate?: { year?: number; month?: number; day?: number };
-  coverImage: { large: string; medium: string };
+  coverImage: { extraLarge?: string; large: string; medium: string };
   bannerImage?: string;
   genres: string[];
   chapters?: number;
@@ -219,6 +219,7 @@ export class AniListService {
               day
             }
             coverImage {
+              extraLarge
               large
               medium
             }
@@ -448,7 +449,7 @@ export class AniListService {
     )?.url || '';
 
     // Try to fetch better quality image from Jikan/MyAnimeList
-    let imageUrl = anilistAnime.coverImage?.large || anilistAnime.coverImage?.medium;
+    let imageUrl = anilistAnime.coverImage?.extraLarge || anilistAnime.coverImage?.large || anilistAnime.coverImage?.medium;
     try {
       const title = anilistAnime.title.romaji || anilistAnime.title.english || anilistAnime.title.native;
       const year = anilistAnime.seasonYear || anilistAnime.startDate?.year;
@@ -560,6 +561,7 @@ export class AniListService {
               day
             }
             coverImage {
+              extraLarge
               large
               medium
             }
@@ -911,7 +913,7 @@ export class AniListService {
         .filter((title, index, arr) => arr.indexOf(title) === index)
         .join('\n'),
       annee: anilistManga.startDate?.year ? String(anilistManga.startDate.year) : undefined,
-      image: anilistManga.coverImage?.large || anilistManga.coverImage?.medium,
+      image: anilistManga.coverImage?.extraLarge || anilistManga.coverImage?.large || anilistManga.coverImage?.medium,
       nbVolumes: anilistManga.volumes ? String(anilistManga.volumes) : undefined,
       siteOfficiel: officialWebsite,
       statut: 0,

@@ -2437,7 +2437,7 @@ export class MangasService extends BaseContentService<
 
       if (anilistResults && anilistResults.length > 0) {
         const anilistManga = anilistResults[0];
-        const coverUrl = anilistManga.coverImage?.large || anilistManga.coverImage?.medium;
+        const coverUrl = anilistManga.coverImage?.extraLarge || anilistManga.coverImage?.large || anilistManga.coverImage?.medium;
 
         if (coverUrl) {
           // Generate filename: sanitize manga title + tome number
