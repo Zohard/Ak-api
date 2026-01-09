@@ -709,7 +709,7 @@ export class BusinessService {
       });
   }
 
-  async uploadImageFromUrl(imageUrl: string) {
+  async uploadImageFromUrl(imageUrl: string, customFileName?: string) {
     try {
       // Download the image from the URL
       const response = await axios.get(imageUrl, {
@@ -736,7 +736,16 @@ export class BusinessService {
 
       // Generate filename
       const extension = contentType.split('/')[1]?.replace('jpeg', 'jpg') || 'jpg';
-      const filename = `business_${Date.now()}_${Math.random().toString(36).substring(7)}.${extension}`;
+      let filename: string;
+
+      if (customFileName && customFileName.trim()) {
+        // Use custom filename with safe characters and timestamp
+        const safeName = this.r2Service.createSafeFileName(customFileName);
+        filename = `${safeName}.${extension}`;
+      } else {
+        // Default filename
+        filename = `business_${Date.now()}_${Math.random().toString(36).substring(7)}.${extension}`;
+      }
 
       // Upload to R2
       const folder = '/images/business';

@@ -375,12 +375,13 @@ export class BusinessController {
   @ApiResponse({ status: 400, description: 'Invalid URL or upload failed' })
   async uploadImageFromUrl(
     @Body('imageUrl') imageUrl: string,
+    @Body('fileName') fileName?: string,
   ) {
     if (!imageUrl || !imageUrl.trim()) {
       throw new BadRequestException('Image URL is required');
     }
 
-    return this.businessService.uploadImageFromUrl(imageUrl);
+    return this.businessService.uploadImageFromUrl(imageUrl, fileName);
   }
 
   @Get('anilist/staff/search')
