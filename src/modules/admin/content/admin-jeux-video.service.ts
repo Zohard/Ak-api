@@ -166,7 +166,7 @@ export class AdminJeuxVideoService {
     // Map idJeu to idJeuVideo and presentation to description for frontend consistency
     return {
       ...item,
-      idJeu:item.idJeu,
+      idJeuVideo: item.idJeu,
       description: item.presentation,
       platformIds: item.platforms.map(p => p.idPlatform),
       genreIds: item.genres.map(g => g.idGenre),
