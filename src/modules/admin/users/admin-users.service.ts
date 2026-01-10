@@ -407,6 +407,89 @@ export class AdminUsersService {
     `;
   }
 
+  async anonymizeUser(id: number, adminId: number) {
+    // Check if user exists
+    const user = await this.findOne(id);
+
+    if (!user) {
+      throw new NotFoundException(`User with ID ${id} not found`);
+    }
+
+    // Don't allow anonymization of admin users
+    if (user.user.id_group === 1) {
+      throw new BadRequestException('Cannot anonymize administrator users');
+    }
+
+    // Check if user is already anonymized
+    const anonymizedPattern = await this.prisma.$queryRaw<any[]>`
+      SELECT member_name
+      FROM smf_members
+      WHERE id_member = ${id}
+      AND member_name LIKE 'anonymized_%'
+    `;
+
+    if (anonymizedPattern.length > 0) {
+      throw new BadRequestException('User is already anonymized');
+    }
+
+    // Generate anonymized data
+    const anonymizedName = `anonymized_${id}_${Date.now()}`;
+    const anonymizedEmail = `anonymized_${id}@deleted.local`;
+
+    // Anonymize user personal data while keeping contributions
+    await this.prisma.$executeRaw`
+      UPDATE smf_members
+      SET
+        member_name = ${anonymizedName},
+        real_name = 'Utilisateur anonymisé',
+        email_address = ${anonymizedEmail},
+        passwd = '',
+        password_salt = '',
+        personal_text = '',
+        avatar = '',
+        signature = '',
+        website_url = '',
+        location = '',
+        birthdate = '0001-01-01',
+        gender = 0,
+        show_online = 0,
+        time_format = '',
+        time_offset = 0,
+        buddy_list = '',
+        pm_ignore_list = '',
+        message_labels = '',
+        lngfile = '',
+        secret_question = '',
+        secret_answer = '',
+        validation_code = '',
+        additional_groups = '',
+        smiley_set = '',
+        member_ip = '',
+        member_ip2 = ''
+      WHERE id_member = ${id}
+    `;
+
+    // Log the anonymization
+    await this.logUserAction(
+      {
+        action: 'anonymize',
+        target_user_id: id,
+        reason: 'User anonymized for GDPR compliance',
+        metadata: {
+          anonymized_by: adminId,
+          original_username: user.user.member_name,
+          anonymized_username: anonymizedName,
+        },
+      },
+      adminId,
+    );
+
+    return {
+      message: 'User anonymized successfully',
+      anonymizedUsername: anonymizedName,
+    };
+  }
+
   private async logUserAction(actionLog: UserActionLogDto, adminId: number) {
     // Simple audit logging without request context
     try {

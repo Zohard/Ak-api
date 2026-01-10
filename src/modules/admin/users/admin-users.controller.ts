@@ -235,4 +235,32 @@ export class AdminUsersController {
   async remove(@Param('id', ParseIntPipe) id: number, @Request() req: any) {
     return this.adminUsersService.deleteUser(id, req.user.id);
   }
+
+  @Post(':id/anonymize')
+  @AuditLog(AuditActions.USER_UPDATE, AuditTargets.USER)
+  @ApiOperation({ summary: 'Anonymize a user for GDPR compliance (super admin only)' })
+  @ApiParam({ name: 'id', description: 'User ID' })
+  @ApiResponse({
+    status: 200,
+    description: 'User anonymized successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        message: { type: 'string' },
+        anonymizedUsername: { type: 'string' },
+      },
+    },
+  })
+  @ApiResponse({ status: 404, description: 'User not found' })
+  @ApiResponse({
+    status: 400,
+    description: 'Cannot anonymize administrator users or user already anonymized',
+  })
+  @HttpCode(HttpStatus.OK)
+  async anonymizeUser(
+    @Param('id', ParseIntPipe) id: number,
+    @Request() req: any,
+  ) {
+    return this.adminUsersService.anonymizeUser(id, req.user.id);
+  }
 }
