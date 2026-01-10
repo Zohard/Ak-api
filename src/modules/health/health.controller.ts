@@ -17,10 +17,15 @@ export class HealthController {
   @ApiResponse({ status: 200, description: 'Service is healthy' })
   async check() {
     return {
-      status: 'healthy',
+      status: 'ok',
+      service: 'api',
       timestamp: new Date().toISOString(),
       uptime: process.uptime(),
       environment: process.env.NODE_ENV || 'development',
+      railway: {
+        service: process.env.RAILWAY_SERVICE_NAME,
+        environment: process.env.RAILWAY_ENVIRONMENT_NAME,
+      },
     };
   }
 

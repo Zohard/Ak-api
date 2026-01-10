@@ -6,15 +6,61 @@ import * as express from 'express';
 import cookieParser from 'cookie-parser';
 import { join } from 'path';
 import { setupSwagger } from './config/swagger.config';
+import * as Sentry from '@sentry/nestjs';
+import { nodeProfilingIntegration } from '@sentry/profiling-node';
+import { Logger } from 'nestjs-pino';
 
 async function bootstrap() {
+  // Initialize Sentry for error tracking and performance monitoring
+  if (process.env.SENTRY_DSN) {
+    Sentry.init({
+      dsn: process.env.SENTRY_DSN,
+      environment: process.env.RAILWAY_ENVIRONMENT_NAME || process.env.NODE_ENV || 'development',
+      integrations: [
+        nodeProfilingIntegration(),
+      ],
+      // Performance Monitoring
+      tracesSampleRate: process.env.NODE_ENV === 'production' ? 0.2 : 1.0, // Railway-friendly
+      // Profiling
+      profilesSampleRate: process.env.NODE_ENV === 'production' ? 0.2 : 1.0,
+      // Send default PII (IP address, user context)
+      sendDefaultPii: true,
+      // Add Railway context
+      beforeSend(event) {
+        if (event.request) {
+          event.contexts = event.contexts || {};
+          event.contexts.railway = {
+            service: process.env.RAILWAY_SERVICE_NAME,
+            environment: process.env.RAILWAY_ENVIRONMENT_NAME,
+            deployment_id: process.env.RAILWAY_DEPLOYMENT_ID,
+          };
+        }
+        return event;
+      },
+    });
+    console.log('✅ Sentry initialized for environment:', process.env.NODE_ENV || 'development');
+  } else {
+    console.warn('⚠️  SENTRY_DSN not configured - error tracking disabled');
+    console.warn('   Add SENTRY_DSN to your .env file or Railway environment variables');
+  }
+
   // Fix BigInt serialization globally
   (BigInt.prototype as any).toJSON = function () {
     return Number(this);
   };
 
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, {
+    bufferLogs: true, // Buffer logs until logger is ready
+  });
   const configService = app.get(ConfigService);
+
+  // Use Pino logger for structured logging (Railway-friendly)
+  app.useLogger(app.get(Logger));
+
+  // Sentry exception filter (must be first filter)
+  if (process.env.SENTRY_DSN) {
+    app.useGlobalFilters(new Sentry.SentryGlobalFilter());
+  }
 
   // Global validation pipe
   app.useGlobalPipes(

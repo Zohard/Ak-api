@@ -1,6 +1,7 @@
 import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
+import { LoggerModule } from 'nestjs-pino';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './modules/auth/auth.module';
@@ -50,6 +51,30 @@ import jwtConfig from './config/jwt.config';
       isGlobal: true,
       load: [databaseConfig, jwtConfig],
       envFilePath: '.env',
+    }),
+    LoggerModule.forRoot({
+      pinoHttp: {
+        level: process.env.NODE_ENV === 'production' ? 'info' : 'debug',
+        transport:
+          process.env.NODE_ENV !== 'production'
+            ? {
+                target: 'pino-pretty',
+                options: {
+                  colorize: true,
+                  singleLine: true,
+                  translateTime: 'HH:MM:ss Z',
+                  ignore: 'pid,hostname',
+                },
+              }
+            : undefined, // Use JSON logs in production (Railway-friendly)
+        redact: ['req.headers.authorization'], // Don't log sensitive data
+        customProps: () => ({
+          railway: {
+            service: process.env.RAILWAY_SERVICE_NAME,
+            environment: process.env.RAILWAY_ENVIRONMENT_NAME,
+          },
+        }),
+      },
     }),
     JwtModule.registerAsync({
       inject: [ConfigService],

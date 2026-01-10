@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../shared/services/prisma.service';
+import { LogClientErrorDto, GetClientErrorsQueryDto } from './dto/client-error.dto';
 
 @Injectable()
 export class AdminLoggingService {
@@ -242,5 +243,170 @@ export class AdminLoggingService {
     const minutes = String(date.getMinutes()).padStart(2, '0');
 
     return `${day}-${month}-${year} à ${hours}:${minutes}`;
+  }
+
+  /**
+   * Log a client-side error
+   */
+  async logClientError(errorData: LogClientErrorDto): Promise<void> {
+    try {
+      await this.prisma.$executeRaw`
+        INSERT INTO client_error_logs (
+          message,
+          stack,
+          status_code,
+          endpoint,
+          url,
+          user_agent,
+          user_id,
+          context,
+          created_at
+        ) VALUES (
+          ${errorData.message},
+          ${errorData.stack || null},
+          ${errorData.statusCode || null},
+          ${errorData.endpoint || null},
+          ${errorData.url || null},
+          ${errorData.userAgent || null},
+          ${errorData.userId || null},
+          ${errorData.context ? JSON.stringify(errorData.context) : null}::jsonb,
+          NOW()
+        )
+      `;
+    } catch (error) {
+      // Log to console but don't throw - error logging failures shouldn't break the app
+      console.error('Failed to log client error:', error);
+    }
+  }
+
+  /**
+   * Get client errors with optional filters
+   */
+  async getClientErrors(query: GetClientErrorsQueryDto): Promise<any[]> {
+    try {
+      const { limit = 100, statusCode, endpoint } = query;
+
+      let whereClause = '';
+      const params: any[] = [];
+      let paramIndex = 1;
+
+      const conditions: string[] = [];
+
+      if (statusCode) {
+        conditions.push(`status_code = $${paramIndex}`);
+        params.push(statusCode);
+        paramIndex++;
+      }
+
+      if (endpoint) {
+        conditions.push(`endpoint LIKE $${paramIndex}`);
+        params.push(`%${endpoint}%`);
+        paramIndex++;
+      }
+
+      if (conditions.length > 0) {
+        whereClause = `WHERE ${conditions.join(' AND ')}`;
+      }
+
+      params.push(limit);
+
+      const errors = await this.prisma.$queryRawUnsafe<any[]>(
+        `
+        SELECT
+          id,
+          message,
+          stack,
+          status_code,
+          endpoint,
+          url,
+          user_agent,
+          user_id,
+          context,
+          created_at,
+          (SELECT member_name FROM smf_members WHERE id_member = user_id) as username
+        FROM client_error_logs
+        ${whereClause}
+        ORDER BY created_at DESC
+        LIMIT $${paramIndex}
+      `,
+        ...params,
+      );
+
+      return errors.map((error) => ({
+        ...error,
+        context: error.context ? JSON.parse(error.context) : null,
+      }));
+    } catch (error) {
+      console.error('Failed to get client errors:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Get error statistics
+   */
+  async getClientErrorStats(): Promise<any> {
+    try {
+      const stats = await this.prisma.$queryRaw<any[]>`
+        SELECT
+          COUNT(*) as total_errors,
+          COUNT(DISTINCT endpoint) as unique_endpoints,
+          COUNT(DISTINCT user_id) as affected_users,
+          COUNT(CASE WHEN created_at > NOW() - INTERVAL '24 hours' THEN 1 END) as errors_last_24h,
+          COUNT(CASE WHEN created_at > NOW() - INTERVAL '1 hour' THEN 1 END) as errors_last_hour,
+          COUNT(CASE WHEN status_code = 502 THEN 1 END) as errors_502,
+          COUNT(CASE WHEN status_code = 503 THEN 1 END) as errors_503,
+          COUNT(CASE WHEN status_code = 504 THEN 1 END) as errors_504
+        FROM client_error_logs
+        WHERE created_at > NOW() - INTERVAL '7 days'
+      `;
+
+      const topEndpoints = await this.prisma.$queryRaw<any[]>`
+        SELECT
+          endpoint,
+          COUNT(*) as error_count,
+          MAX(created_at) as last_occurrence
+        FROM client_error_logs
+        WHERE created_at > NOW() - INTERVAL '7 days'
+          AND endpoint IS NOT NULL
+        GROUP BY endpoint
+        ORDER BY error_count DESC
+        LIMIT 10
+      `;
+
+      return {
+        ...stats[0],
+        top_endpoints: topEndpoints,
+      };
+    } catch (error) {
+      console.error('Failed to get client error stats:', error);
+      return {
+        total_errors: 0,
+        unique_endpoints: 0,
+        affected_users: 0,
+        errors_last_24h: 0,
+        errors_last_hour: 0,
+        errors_502: 0,
+        errors_503: 0,
+        errors_504: 0,
+        top_endpoints: [],
+      };
+    }
+  }
+
+  /**
+   * Clear old client errors (older than 30 days)
+   */
+  async cleanupOldClientErrors(): Promise<number> {
+    try {
+      const result = await this.prisma.$executeRaw`
+        DELETE FROM client_error_logs
+        WHERE created_at < NOW() - INTERVAL '30 days'
+      `;
+      return Number(result);
+    } catch (error) {
+      console.error('Failed to cleanup old client errors:', error);
+      return 0;
+    }
   }
 }

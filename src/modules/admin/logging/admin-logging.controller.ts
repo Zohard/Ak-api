@@ -1,9 +1,14 @@
 import {
   Controller,
   Get,
+  Post,
+  Body,
   Query,
   ParseIntPipe,
   UseGuards,
+  Req,
+  HttpCode,
+  HttpStatus,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -15,6 +20,10 @@ import {
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { AdminGuard } from '../../../common/guards/admin.guard';
 import { AdminLoggingService } from './admin-logging.service';
+import {
+  LogClientErrorDto,
+  GetClientErrorsQueryDto,
+} from './dto/client-error.dto';
 
 @ApiTags('Admin - Logging')
 @ApiBearerAuth()
@@ -53,5 +62,55 @@ export class AdminLoggingController {
   })
   async getRecentLogs(@Query('limit', ParseIntPipe) limit = 100) {
     return this.adminLoggingService.getRecentLogs(limit);
+  }
+
+  @Get('client-errors')
+  @ApiOperation({ summary: 'Get client-side errors (admin only)' })
+  @ApiResponse({
+    status: 200,
+    description: 'Client errors retrieved successfully',
+  })
+  async getClientErrors(@Query() query: GetClientErrorsQueryDto) {
+    return this.adminLoggingService.getClientErrors(query);
+  }
+
+  @Get('client-errors/stats')
+  @ApiOperation({ summary: 'Get client error statistics (admin only)' })
+  @ApiResponse({
+    status: 200,
+    description: 'Client error statistics retrieved successfully',
+  })
+  async getClientErrorStats() {
+    return this.adminLoggingService.getClientErrorStats();
+  }
+}
+
+// Public controller for logging client errors (no auth required)
+@ApiTags('Client Error Logging')
+@Controller('client-errors')
+export class ClientErrorLoggingController {
+  constructor(private readonly adminLoggingService: AdminLoggingService) {}
+
+  @Post('log')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Log a client-side error (public endpoint)' })
+  @ApiResponse({
+    status: 201,
+    description: 'Error logged successfully',
+  })
+  async logError(@Body() errorDto: LogClientErrorDto, @Req() req: any) {
+    // Optionally extract user ID from JWT if present
+    const userId = req.user?.id || req.user?.id_member || null;
+
+    // Extract user agent from request
+    const userAgent = req.headers['user-agent'] || '';
+
+    await this.adminLoggingService.logClientError({
+      ...errorDto,
+      userId,
+      userAgent,
+    });
+
+    return { success: true, message: 'Error logged successfully' };
   }
 }
