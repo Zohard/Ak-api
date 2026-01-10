@@ -4,11 +4,13 @@ import {
   AdminLoggingController,
   ClientErrorLoggingController,
 } from './admin-logging.controller';
+import { SentryController } from './sentry.controller';
+import { SentryService } from './sentry.service';
 import { PrismaService } from '../../../shared/services/prisma.service';
 
 @Module({
-  controllers: [AdminLoggingController, ClientErrorLoggingController],
-  providers: [AdminLoggingService, PrismaService],
-  exports: [AdminLoggingService],
+  controllers: [AdminLoggingController, ClientErrorLoggingController, SentryController],
+  providers: [AdminLoggingService, SentryService, PrismaService],
+  exports: [AdminLoggingService, SentryService],
 })
 export class AdminLoggingModule {}
