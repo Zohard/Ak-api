@@ -7,7 +7,6 @@ import cookieParser from 'cookie-parser';
 import { join } from 'path';
 import { setupSwagger } from './config/swagger.config';
 import * as Sentry from '@sentry/nestjs';
-import { nodeProfilingIntegration } from '@sentry/profiling-node';
 import { Logger } from 'nestjs-pino';
 
 async function bootstrap() {
@@ -16,13 +15,8 @@ async function bootstrap() {
     Sentry.init({
       dsn: process.env.SENTRY_DSN,
       environment: process.env.RAILWAY_ENVIRONMENT_NAME || process.env.NODE_ENV || 'development',
-      integrations: [
-        nodeProfilingIntegration(),
-      ],
       // Performance Monitoring
       tracesSampleRate: process.env.NODE_ENV === 'production' ? 0.2 : 1.0, // Railway-friendly
-      // Profiling
-      profilesSampleRate: process.env.NODE_ENV === 'production' ? 0.2 : 1.0,
       // Send default PII (IP address, user context)
       sendDefaultPii: true,
       // Add Railway context
@@ -56,11 +50,6 @@ async function bootstrap() {
 
   // Use Pino logger for structured logging (Railway-friendly)
   app.useLogger(app.get(Logger));
-
-  // Sentry exception filter (must be first filter)
-  if (process.env.SENTRY_DSN) {
-    app.useGlobalFilters(new Sentry.SentryGlobalFilter());
-  }
 
   // Global validation pipe
   app.useGlobalPipes(
