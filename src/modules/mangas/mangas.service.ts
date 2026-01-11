@@ -300,6 +300,11 @@ export class MangasService extends BaseContentService<
       where.NOT.push({ annee: null });
     }
 
+    // Exclude unranked manga (classement = 0 or null) when sorting by popularity
+    if (sortBy === 'classementPopularite') {
+      where.classementPopularite = { gt: 0 };
+    }
+
     // Build order by clause with secondary sort by idManga for stable pagination
     const orderBy: any = [
       { [sortBy || 'dateAjout']: sortOrder || 'desc' },

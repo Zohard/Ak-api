@@ -344,6 +344,11 @@ export class AnimesService extends BaseContentService<
       where.NOT.push({ annee: null });
     }
 
+    // Exclude unranked anime (classement = 0 or null) when sorting by popularity
+    if (sortBy === 'classementPopularite') {
+      where.classementPopularite = { gt: 0 };
+    }
+
     // Build order by clause with secondary sort by idAnime for stable pagination
     const orderBy: any = [
       { [sortBy || 'dateAjout']: sortOrder || 'desc' },
