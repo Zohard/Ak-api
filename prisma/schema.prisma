@@ -203,6 +203,16 @@ model AkAnime {
   sources      String?   @db.Text
   lienForum    Int?      @default(0) @map("lienforum")
 
+  // Popularity ranking
+  classementPopularite Int?     @default(0) @map("classement_popularite")
+  variationPopularite  String?  @default("") @map("variation_popularite") @db.Text
+
+  // Stats
+  nbClics      Int?      @default(0) @map("nb_clics")
+  nbClicsDay   Int?      @default(0) @map("nb_clics_day")
+  nbClicsWeek  Int?      @default(0) @map("nb_clics_week")
+  nbClicsMonth Int?      @default(0) @map("nb_clics_month")
+
   // Relations
   reviews      AkCritique[]
   episodes     AkAnimesEpisode[]
