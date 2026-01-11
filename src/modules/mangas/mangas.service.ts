@@ -487,39 +487,9 @@ export class MangasService extends BaseContentService<
     `;
     const usersInCollection = Number(usersInCollectionResult[0]?.count || 0);
 
-    // Calculate popularity score
-    // Formula: (usersInCollection * 10) + (avgReviewScore * 5) + (views / 100) + (collectionScore * 2)
-    const avgReviewScore = manga.moyenneNotes || 0;
-    const views = manga.nbClics || 0;
-    const popularityScore =
-      (usersInCollection * 10) +
-      (avgReviewScore * 5) +
-      (views / 100) +
-      ((collectionScore || 0) * 2);
-
-    // Get popularity rank (position among all manga)
-    const rankResult = await this.prisma.$queryRaw<Array<{ rank: bigint }>>`
-      WITH manga_scores AS (
-        SELECT
-          m.id_manga,
-          (
-            (SELECT COUNT(DISTINCT id_membre) FROM collection_mangas WHERE id_manga = m.id_manga) * 10 +
-            COALESCE(m.moyennenotes, 0) * 5 +
-            COALESCE(m.nb_clics, 0) / 100.0 +
-            COALESCE((
-              SELECT AVG(evaluation)
-              FROM collection_mangas
-              WHERE id_manga = m.id_manga AND evaluation > 0.0
-            ), 0) * 2
-          ) as score
-        FROM ak_mangas m
-        WHERE m.statut = 1
-      )
-      SELECT COUNT(*) + 1 as rank
-      FROM manga_scores
-      WHERE score > ${popularityScore}
-    `;
-    const popularityRank = Number(rankResult[0]?.rank || 0);
+    // Use pre-calculated popularity rank from database (updated by cron job)
+    // This avoids expensive real-time calculations on every page load
+    const popularityRank = manga.classementPopularite || 0;
 
     const formattedManga = {
       ...this.formatManga(enrichedManga),
@@ -527,7 +497,6 @@ export class MangasService extends BaseContentService<
       collectionScore,
       collectionEvaluationsCount,
       usersInCollection,
-      popularityScore: Math.round(popularityScore * 100) / 100, // Round to 2 decimals
       popularityRank,
     };
 
