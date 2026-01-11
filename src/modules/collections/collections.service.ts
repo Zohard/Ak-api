@@ -710,11 +710,13 @@ export class CollectionsService {
     // OPTIMIZATION: Invalidate media collections users cache
     await this.cacheService.delByPattern(`media_collections_users:${mediaType}:${mediaId}:*`);
 
-    // Invalidate anime/manga cache as ratings may have changed
+    // Invalidate anime/manga/game cache as ratings may have changed
     if (mediaType === 'anime') {
       await this.cacheService.invalidateAnime(mediaId);
     } else if (mediaType === 'manga') {
       await this.cacheService.invalidateManga(mediaId);
+    } else if (mediaType === 'game') {
+      await this.cacheService.invalidateGame(mediaId);
     }
 
     return { success: true };
@@ -760,8 +762,19 @@ export class CollectionsService {
         throw new NotFoundException('Manga not found in any collection');
       }
     } else if (mediaType === 'game') {
-      // For now, games are not supported in collections
-      throw new NotFoundException('Game collections are not yet supported');
+      const updated = await this.prisma.collectionJeuxVideo.updateMany({
+        where: {
+          idMembre: userId,
+          idJeu: mediaId,
+        },
+        data: {
+          evaluation: rating,
+        },
+      });
+
+      if (updated.count === 0) {
+        throw new NotFoundException('Game not found in any collection');
+      }
     }
 
     // Invalidate user's collection cache after update
@@ -774,11 +787,13 @@ export class CollectionsService {
     // OPTIMIZATION: Invalidate media collections users cache
     await this.cacheService.delByPattern(`media_collections_users:${mediaType}:${mediaId}:*`);
 
-    // Invalidate anime/manga cache as ratings may have changed
+    // Invalidate anime/manga/game cache as ratings may have changed
     if (mediaType === 'anime') {
       await this.cacheService.invalidateAnime(mediaId);
     } else if (mediaType === 'manga') {
       await this.cacheService.invalidateManga(mediaId);
+    } else if (mediaType === 'game') {
+      await this.cacheService.invalidateGame(mediaId);
     }
 
     return { success: true, rating };
