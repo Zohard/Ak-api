@@ -117,6 +117,12 @@ Thumbs.db
 backups/
 scripts/*
 !scripts/cleanup-orphaned-images.ts
+!scripts/update-anime-popularity.ts
+!scripts/cron-update-anime-popularity.sh
+!scripts/cron-update-anime-popularity-http.sh
+!scripts/ANIME_POPULARITY_README.md
+!scripts/CRON_HTTP_ENDPOINT_README.md
+!scripts/CRON_QUICK_START.md
 *.sql
 !prisma/*.sql
 IMAGE_MIGRATION_README.md

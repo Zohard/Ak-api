@@ -16,6 +16,7 @@
     "fix-sequences": "npx prisma db execute --file ./prisma/fix-sequences.sql --schema ./prisma/schema.prisma",
     "cleanup-images": "ts-node -r tsconfig-paths/register scripts/cleanup-orphaned-images.ts",
     "cleanup-images:dry-run": "npm run cleanup-images -- --dry-run",
+    "update-anime-popularity": "ts-node -r tsconfig-paths/register scripts/update-anime-popularity.ts",
     "start": "nest start",
     "start:dev": "nest start --watch",
     "start:prod:dev": "nest start",
