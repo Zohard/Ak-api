@@ -36,10 +36,16 @@ export class SentryService {
   constructor(private readonly configService: ConfigService) {}
 
   /**
-   * Get access token using OAuth client credentials
+   * Get access token using OAuth client credentials or auth token
    */
   private async getAccessToken(): Promise<string> {
-    // Return cached token if still valid
+    // Check if using auth token instead of OAuth
+    const authToken = this.configService.get<string>('SENTRY_AUTH_TOKEN');
+    if (authToken) {
+      return authToken;
+    }
+
+    // Return cached OAuth token if still valid
     if (this.accessToken && this.tokenExpiry && this.tokenExpiry > new Date()) {
       return this.accessToken;
     }
@@ -48,7 +54,7 @@ export class SentryService {
     const clientSecret = this.configService.get<string>('SENTRY_CLIENT_SECRET');
 
     if (!clientId || !clientSecret) {
-      throw new UnauthorizedException('Sentry OAuth credentials not configured');
+      throw new UnauthorizedException('Sentry credentials not configured. Set either SENTRY_AUTH_TOKEN or SENTRY_CLIENT_ID/SENTRY_CLIENT_SECRET');
     }
 
     try {
@@ -205,6 +211,10 @@ export class SentryService {
    * Check if Sentry integration is configured
    */
   isConfigured(): boolean {
+    const authToken = this.configService.get<string>('SENTRY_AUTH_TOKEN');
+    if (authToken) {
+      return true;
+    }
     const clientId = this.configService.get<string>('SENTRY_CLIENT_ID');
     const clientSecret = this.configService.get<string>('SENTRY_CLIENT_SECRET');
     return !!(clientId && clientSecret);
