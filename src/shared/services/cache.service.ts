@@ -249,6 +249,13 @@ export class CacheService implements OnModuleInit {
     ]);
   }
 
+  async invalidateGame(id: number): Promise<void> {
+    await Promise.all([
+      this.del(`game:${id}`),
+      this.del(`reviews:game:${id}`),
+    ]);
+  }
+
   async invalidateSearchCache(): Promise<void> {
     // In a full Redis implementation, we'd use SCAN to find and delete search:* keys
     this.logger.debug('Search cache invalidation requested');
