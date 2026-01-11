@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../shared/services/prisma.service';
+import { CacheService } from '../../shared/services/cache.service';
 
 interface MediaScore {
   id: number;
@@ -19,7 +20,10 @@ interface MediaRanking {
 export class CronService {
   private readonly logger = new Logger(CronService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly cacheService: CacheService,
+  ) {}
 
   /**
    * Calculate variation text (e.g., "+5", "-3", "NEW", "=")
@@ -118,6 +122,11 @@ export class CronService {
         });
 
         await Promise.all(promises);
+
+        // Clear cache for updated animes to ensure fresh data on next request
+        await Promise.all(
+          batch.map((anime) => this.cacheService.invalidateAnime(anime.id)),
+        );
       }
 
       // Step 5: Get top 10 with details
@@ -302,6 +311,11 @@ export class CronService {
         });
 
         await Promise.all(promises);
+
+        // Clear cache for updated mangas to ensure fresh data on next request
+        await Promise.all(
+          batch.map((manga) => this.cacheService.invalidateManga(manga.id)),
+        );
       }
 
       // Step 5: Get top 10 with details
