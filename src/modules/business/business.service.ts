@@ -748,7 +748,7 @@ export class BusinessService {
       }
 
       // Upload to R2
-      const folder = '/images/business';
+      const folder = 'images/business';
       const uploadResult = await this.r2Service.uploadImage(
         Buffer.from(response.data),
         filename,

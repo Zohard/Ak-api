@@ -355,10 +355,20 @@ export class BusinessController {
       throw new BadRequestException('No file uploaded');
     }
 
-    const folder = '/images/business';
+    // Get business to use denomination in filename
+    const business = await this.businessService.findOne(id);
+
+    // Get file extension from original filename
+    const extension = file.originalname.split('.').pop()?.toLowerCase() || 'jpg';
+
+    // Create filename with denomination and timestamp
+    const safeName = this.r2Service.createSafeFileName(business.denomination || 'business');
+    const filename = `${safeName}.${extension}`;
+
+    const folder = 'images/business';
     const result = await this.r2Service.uploadImage(
       file.buffer,
-      file.originalname,
+      filename,
       folder,
     );
 
