@@ -1,8 +1,8 @@
 import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
-import { JwtAuthGuard } from '../../../auth/jwt-auth.guard';
-import { RolesGuard } from '../../../auth/roles.guard';
-import { Roles } from '../../../auth/roles.decorator';
-import { SentryService } from './sentry.service';
+import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
+import { RolesGuard } from '../../../common/guards/roles.guard';
+import { Roles } from '../../../common/decorators/roles.decorator';
+import { SentryService, SentryIssue, SentryStats } from './sentry.service';
 
 @Controller('admin/sentry')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -30,7 +30,7 @@ export class SentryController {
     @Query('query') query?: string,
     @Query('statsPeriod') statsPeriod?: string,
     @Query('status') status?: string,
-  ) {
+  ): Promise<{ success: boolean; data: SentryIssue[]; meta: { count: number; timestamp: string } }> {
     const issues = await this.sentryService.getIssues({
       limit: limit ? Number(limit) : 25,
       query,
@@ -52,7 +52,7 @@ export class SentryController {
    * Get issue statistics
    */
   @Get('stats')
-  async getStats() {
+  async getStats(): Promise<{ success: boolean; data: SentryStats; timestamp: string }> {
     const stats = await this.sentryService.getStats();
     return {
       success: true,

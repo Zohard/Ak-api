@@ -1,7 +1,7 @@
 import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
-interface SentryIssue {
+export interface SentryIssue {
   id: string;
   shortId: string;
   title: string;
@@ -21,7 +21,7 @@ interface SentryIssue {
   };
 }
 
-interface SentryStats {
+export interface SentryStats {
   totalIssues: number;
   newToday: number;
   resolvedToday: number;
