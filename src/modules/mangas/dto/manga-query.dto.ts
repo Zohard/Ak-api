@@ -7,6 +7,7 @@ import {
   Max,
   IsBoolean,
   IsArray,
+  IsIn,
 } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
 
@@ -119,10 +120,10 @@ export class MangaQueryDto {
   @ApiPropertyOptional({
     description: 'Champ pour le tri',
     example: 'dateAjout',
-    enum: ['titre', 'dateAjout', 'annee'],
+    enum: ['titre', 'dateAjout', 'annee', 'classementPopularite'],
   })
   @IsOptional()
-  @IsString()
+  @IsIn(['titre', 'dateAjout', 'annee', 'classementPopularite'])
   sortBy?: string = 'dateAjout';
 
   @ApiPropertyOptional({

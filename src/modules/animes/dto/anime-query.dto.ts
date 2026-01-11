@@ -136,11 +136,11 @@ export class AnimeQueryDto {
 
   @ApiPropertyOptional({
     description: 'Trier par',
-    enum: ['dateAjout', 'titre', 'annee', 'moyenneNotes'],
+    enum: ['dateAjout', 'titre', 'annee', 'moyenneNotes', 'classementPopularite'],
     example: 'dateAjout',
   })
   @IsOptional()
-  @IsIn(['dateAjout', 'titre', 'annee', 'moyenneNotes'])
+  @IsIn(['dateAjout', 'titre', 'annee', 'moyenneNotes', 'classementPopularite'])
   sortBy?: string = 'dateAjout';
 
   @ApiPropertyOptional({
