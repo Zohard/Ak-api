@@ -404,8 +404,29 @@ export class AnimesService extends BaseContentService<
       ),
     ]);
 
+    // For popularity rankings, fetch users in collection count
+    let formattedAnimes = animes.map(this.formatAnime);
+    if (sortBy === 'classementPopularite' && animes.length > 0) {
+      const animeIds = animes.map(a => a.idAnime);
+      const collectionCounts = await this.prisma.$queryRaw<Array<{ id_anime: number; count: bigint }>>`
+        SELECT id_anime, COUNT(DISTINCT id_utilisateur) as count
+        FROM collection_animes
+        WHERE id_anime IN (${this.prisma.raw(animeIds.join(','))})
+        GROUP BY id_anime
+      `;
+
+      const countsMap = new Map(
+        collectionCounts.map(c => [Number(c.id_anime), Number(c.count)])
+      );
+
+      formattedAnimes = formattedAnimes.map(anime => ({
+        ...anime,
+        usersInCollection: countsMap.get(anime.id) || 0,
+      }));
+    }
+
     const result = {
-      animes: animes.map(this.formatAnime),
+      animes: formattedAnimes,
       pagination: {
         page,
         limit,

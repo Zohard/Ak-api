@@ -373,8 +373,29 @@ export class MangasService extends BaseContentService<
       };
     });
 
+    // For popularity rankings, fetch users in collection count
+    let formattedMangas = enrichedMangas.map(this.formatManga);
+    if (sortBy === 'classementPopularite' && mangas.length > 0) {
+      const mangaIds = mangas.map(m => m.idManga);
+      const collectionCounts = await this.prisma.$queryRaw<Array<{ id_manga: number; count: bigint }>>`
+        SELECT id_manga, COUNT(DISTINCT id_membre) as count
+        FROM collection_mangas
+        WHERE id_manga IN (${this.prisma.raw(mangaIds.join(','))})
+        GROUP BY id_manga
+      `;
+
+      const countsMap = new Map(
+        collectionCounts.map(c => [Number(c.id_manga), Number(c.count)])
+      );
+
+      formattedMangas = formattedMangas.map(manga => ({
+        ...manga,
+        usersInCollection: countsMap.get(manga.id) || 0,
+      }));
+    }
+
     const result = {
-      mangas: enrichedMangas.map(this.formatManga),
+      mangas: formattedMangas,
       pagination: {
         page,
         limit,
