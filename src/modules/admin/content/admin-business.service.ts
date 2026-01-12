@@ -13,15 +13,32 @@ export class AdminBusinessService {
   ) {}
 
   async list(query: AdminBusinessListQueryDto) {
-    const { page = 1, statut, search, type } = query;
+    const {
+      page = 1,
+      statut,
+      search,
+      type,
+      annee,
+      ficheComplete,
+      sortBy = 'dateAjout',
+      sortOrder = 'desc'
+    } = query;
     const limit = 20;
     const skip = (page - 1) * limit;
     const where: any = {};
+
     if (statut !== undefined) where.statut = statut;
     if (type) where.type = { contains: type, mode: 'insensitive' };
     if (search) where.denomination = { contains: search, mode: 'insensitive' };
+    if (annee !== undefined) where.annee = annee;
+    if (ficheComplete !== undefined) where.ficheComplete = ficheComplete;
+
+    // Build dynamic orderBy
+    const orderBy: any = {};
+    orderBy[sortBy] = sortOrder;
+
     const [items, total] = await Promise.all([
-      this.prisma.akBusiness.findMany({ where, skip, take: limit, orderBy: { dateAjout: 'desc' } }),
+      this.prisma.akBusiness.findMany({ where, skip, take: limit, orderBy }),
       this.prisma.akBusiness.count({ where }),
     ]);
     return { items, pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } };
