@@ -14,7 +14,7 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { MessagesService } from './messages.service';
 import { CreateMessageDto } from './dto/create-message.dto';
-import { GetMessagesDto, SearchMessagesDto, MarkReadDto, DeleteMessageDto } from './dto/get-messages.dto';
+import { GetMessagesDto, SearchMessagesDto, MarkReadDto, DeleteMessageDto, BulkDeleteMessagesDto, BulkMarkImportantDto, GetMessagesWithFilterDto } from './dto/get-messages.dto';
 import { SmfMessage, MessageUser, MessageResponse, ConversationMessage } from './interfaces/message.interface';
 
 @Controller('messages')
@@ -81,5 +81,19 @@ export class MessagesController {
   ): Promise<{ users: MessageUser[] }> {
     const users = await this.messagesService.getUsers(searchTerm, limit);
     return { users };
+  }
+
+  @Post('bulk-delete')
+  @HttpCode(HttpStatus.OK)
+  async bulkDeleteMessages(@Body() bulkDeleteDto: BulkDeleteMessagesDto): Promise<{ success: boolean; deletedCount: number }> {
+    const deletedCount = await this.messagesService.bulkDeleteMessages(bulkDeleteDto);
+    return { success: true, deletedCount };
+  }
+
+  @Post('mark-important')
+  @HttpCode(HttpStatus.OK)
+  async markImportant(@Body() markImportantDto: BulkMarkImportantDto): Promise<{ success: boolean; updatedCount: number }> {
+    const updatedCount = await this.messagesService.bulkMarkImportant(markImportantDto);
+    return { success: true, updatedCount };
   }
 }

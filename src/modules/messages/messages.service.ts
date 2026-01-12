@@ -258,8 +258,8 @@ export class MessagesService {
     }
   }
 
-  async getMessages(getMessagesDto: GetMessagesDto): Promise<SmfMessage[]> {
-    const { userId, type, limit = 20, offset = 0 } = getMessagesDto;
+  async getMessages(getMessagesDto: GetMessagesDto & { importantOnly?: boolean }): Promise<SmfMessage[]> {
+    const { userId, type, limit = 20, offset = 0, importantOnly = false } = getMessagesDto;
 
     // userId should always be provided at this point from the controller
     if (!userId) {
@@ -268,7 +268,7 @@ export class MessagesService {
 
     try {
       if (type === 'inbox') {
-        return await this.getInboxMessages(userId, limit, offset);
+        return await this.getInboxMessages(userId, limit, offset, importantOnly);
       } else {
         return await this.getSentMessages(userId, limit, offset);
       }
@@ -278,14 +278,20 @@ export class MessagesService {
     }
   }
 
-  private async getInboxMessages(userId: number, limit: number, offset: number): Promise<SmfMessage[]> {
+  private async getInboxMessages(userId: number, limit: number, offset: number, importantOnly: boolean = false): Promise<SmfMessage[]> {
+    const recipientFilter: any = {
+      idMember: userId,
+      deleted: 0
+    };
+
+    if (importantOnly) {
+      recipientFilter.isImportant = 1;
+    }
+
     const messages = await this.prisma.smfPersonalMessage.findMany({
       where: {
         recipients: {
-          some: {
-            idMember: userId,
-            deleted: 0
-          }
+          some: recipientFilter
         }
       },
       include: {
@@ -322,7 +328,8 @@ export class MessagesService {
         timestamp: message.msgtime,
         is_read: recipient?.isRead || 0,
         is_new: recipient?.isNew || 0,
-        bcc: recipient?.bcc || 0
+        bcc: recipient?.bcc || 0,
+        is_important: recipient?.isImportant || 0
       };
     });
   }
@@ -671,6 +678,67 @@ export class MessagesService {
     } catch (error) {
       this.logger.error('Failed to get users:', error);
       throw new BadRequestException('Failed to retrieve users');
+    }
+  }
+
+  /**
+   * Bulk delete messages for a user
+   */
+  async bulkDeleteMessages(data: { messageIds: number[]; userId: number }): Promise<number> {
+    const { messageIds, userId } = data;
+
+    if (!messageIds || messageIds.length === 0) {
+      return 0;
+    }
+
+    try {
+      // Mark messages as deleted for this user
+      const result = await this.prisma.smfPmRecipient.updateMany({
+        where: {
+          idPm: { in: messageIds },
+          idMember: userId,
+        },
+        data: {
+          deleted: 1,
+        },
+      });
+
+      return result.count;
+    } catch (error) {
+      this.logger.error('Failed to bulk delete messages:', error);
+      throw new BadRequestException('Failed to delete messages');
+    }
+  }
+
+  /**
+   * Bulk mark messages as important/unimportant
+   */
+  async bulkMarkImportant(data: {
+    messageIds: number[];
+    userId: number;
+    isImportant: boolean;
+  }): Promise<number> {
+    const { messageIds, userId, isImportant } = data;
+
+    if (!messageIds || messageIds.length === 0) {
+      return 0;
+    }
+
+    try {
+      const result = await this.prisma.smfPmRecipient.updateMany({
+        where: {
+          idPm: { in: messageIds },
+          idMember: userId,
+        },
+        data: {
+          isImportant: isImportant ? 1 : 0,
+        },
+      });
+
+      return result.count;
+    } catch (error) {
+      this.logger.error('Failed to mark messages as important:', error);
+      throw new BadRequestException('Failed to update message importance');
     }
   }
 }

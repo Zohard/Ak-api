@@ -1,4 +1,4 @@
-import { IsOptional, IsString, IsInt, IsIn } from 'class-validator';
+import { IsOptional, IsString, IsInt, IsIn, IsArray, IsBoolean } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class GetMessagesDto {
@@ -60,4 +60,36 @@ export class DeleteMessageDto {
   @IsInt()
   @Type(() => Number)
   userId: number;
+}
+
+export class BulkDeleteMessagesDto {
+  @IsArray()
+  @IsInt({ each: true })
+  @Type(() => Number)
+  messageIds: number[];
+
+  @IsInt()
+  @Type(() => Number)
+  userId: number;
+}
+
+export class BulkMarkImportantDto {
+  @IsArray()
+  @IsInt({ each: true })
+  @Type(() => Number)
+  messageIds: number[];
+
+  @IsInt()
+  @Type(() => Number)
+  userId: number;
+
+  @IsBoolean()
+  isImportant: boolean;
+}
+
+export class GetMessagesWithFilterDto extends GetMessagesDto {
+  @IsOptional()
+  @IsBoolean()
+  @Type(() => Boolean)
+  importantOnly?: boolean = false;
 }

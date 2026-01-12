@@ -12,6 +12,7 @@ export interface SmfMessage {
   is_new: number;
   bcc?: number;
   recipients?: string;
+  is_important?: number;
 }
 
 export interface MessageUser {

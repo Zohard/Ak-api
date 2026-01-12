@@ -1007,18 +1007,20 @@ model SmfPersonalMessage {
 
 // SMF PM Recipients
 model SmfPmRecipient {
-  idPm      Int  @map("id_pm")
-  idMember  Int  @map("id_member")
-  bcc       Int  @default(0)
-  isRead    Int  @default(0) @map("is_read")
-  isNew     Int  @default(1) @map("is_new")
-  deleted   Int  @default(0)
+  idPm        Int  @map("id_pm")
+  idMember    Int  @map("id_member")
+  bcc         Int  @default(0)
+  isRead      Int  @default(0) @map("is_read")
+  isNew       Int  @default(1) @map("is_new")
+  deleted     Int  @default(0)
+  isImportant Int  @default(0) @map("is_important")
 
   // Relations
   message   SmfPersonalMessage @relation(fields: [idPm], references: [idPm], onDelete: Cascade)
   member    SmfMember @relation("ReceivedMessages", fields: [idMember], references: [idMember], onDelete: Cascade)
 
   @@id([idPm, idMember])
+  @@index([isImportant])
   @@map("smf_pm_recipients")
 }
 
