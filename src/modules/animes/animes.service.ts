@@ -409,7 +409,7 @@ export class AnimesService extends BaseContentService<
     if (sortBy === 'classementPopularite' && animes.length > 0) {
       const animeIds = animes.map(a => a.idAnime);
       const collectionCounts = await this.prisma.$queryRaw<Array<{ id_anime: number; count: bigint }>>`
-        SELECT id_anime, COUNT(DISTINCT id_utilisateur) as count
+        SELECT id_anime, COUNT(DISTINCT id_membre) as count
         FROM collection_animes
         WHERE id_anime IN (${Prisma.join(animeIds)})
         GROUP BY id_anime
@@ -547,7 +547,7 @@ export class AnimesService extends BaseContentService<
 
     // Get users in collection count
     const usersInCollectionResult = await this.prisma.$queryRaw<Array<{ count: bigint }>>`
-      SELECT COUNT(DISTINCT id_utilisateur) as count
+      SELECT COUNT(DISTINCT id_membre) as count
       FROM collection_animes
       WHERE id_anime = ${id}
     `;
