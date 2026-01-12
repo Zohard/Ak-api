@@ -30,7 +30,7 @@ import {
 @UseGuards(JwtAuthGuard, AdminGuard)
 @Controller('admin/logs')
 export class AdminLoggingController {
-  constructor(private readonly adminLoggingService: AdminLoggingService) {}
+  constructor(private readonly adminLoggingService: AdminLoggingService) { }
 
   @Get('activities')
   @ApiOperation({ summary: 'Get recent admin activities grouped by content' })
@@ -100,13 +100,28 @@ export class AdminLoggingController {
       deletedCount,
     };
   }
+
+  @Post('client-errors/purge-all')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Purge ALL client errors (admin only)' })
+  @ApiResponse({
+    status: 200,
+    description: 'All client errors purged successfully',
+  })
+  async purgeClientErrorLogs() {
+    await this.adminLoggingService.purgeClientErrorLogs();
+    return {
+      success: true,
+      message: 'All client error logs have been purged',
+    };
+  }
 }
 
 // Public controller for logging client errors (no auth required)
 @ApiTags('Client Error Logging')
 @Controller('client-errors')
 export class ClientErrorLoggingController {
-  constructor(private readonly adminLoggingService: AdminLoggingService) {}
+  constructor(private readonly adminLoggingService: AdminLoggingService) { }
 
   @Post('log')
   @HttpCode(HttpStatus.CREATED)

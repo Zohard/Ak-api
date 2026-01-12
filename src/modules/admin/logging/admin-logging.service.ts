@@ -395,18 +395,33 @@ export class AdminLoggingService {
   }
 
   /**
-   * Clear old client errors (older than 30 days)
+   * Clear old client errors (older than specified days)
    */
-  async cleanupOldClientErrors(): Promise<number> {
+  async purgeOldClientErrors(days = 30): Promise<number> {
     try {
+      // Validate days to prevent SQL injection
+      const validDays = Math.max(1, Math.min(365, parseInt(String(days))));
+
       const result = await this.prisma.$executeRaw`
         DELETE FROM client_error_logs
-        WHERE created_at < NOW() - INTERVAL '30 days'
+        WHERE created_at < NOW() - INTERVAL '1 day' * ${validDays}
       `;
       return Number(result);
     } catch (error) {
-      console.error('Failed to cleanup old client errors:', error);
+      console.error('Failed to purge old client errors:', error);
       return 0;
+    }
+  }
+
+  /**
+   * Purge ALL client errors (truncate table)
+   */
+  async purgeClientErrorLogs(): Promise<void> {
+    try {
+      await this.prisma.$executeRaw`TRUNCATE TABLE client_error_logs`;
+    } catch (error) {
+      console.error('Failed to purge client error logs:', error);
+      throw error;
     }
   }
 }
