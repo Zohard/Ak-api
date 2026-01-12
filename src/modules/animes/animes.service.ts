@@ -411,7 +411,7 @@ export class AnimesService extends BaseContentService<
       const collectionCounts = await this.prisma.$queryRaw<Array<{ id_anime: number; count: bigint }>>`
         SELECT id_anime, COUNT(DISTINCT id_utilisateur) as count
         FROM collection_animes
-        WHERE id_anime IN (${this.prisma.raw(animeIds.join(','))})
+        WHERE id_anime IN (${Prisma.join(animeIds)})
         GROUP BY id_anime
       `;
 

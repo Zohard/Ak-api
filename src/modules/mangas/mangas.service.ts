@@ -380,7 +380,7 @@ export class MangasService extends BaseContentService<
       const collectionCounts = await this.prisma.$queryRaw<Array<{ id_manga: number; count: bigint }>>`
         SELECT id_manga, COUNT(DISTINCT id_membre) as count
         FROM collection_mangas
-        WHERE id_manga IN (${this.prisma.raw(mangaIds.join(','))})
+        WHERE id_manga IN (${Prisma.join(mangaIds)})
         GROUP BY id_manga
       `;
 
