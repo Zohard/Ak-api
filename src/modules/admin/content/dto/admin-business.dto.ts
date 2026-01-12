@@ -81,16 +81,6 @@ export class AdminBusinessListQueryDto {
   @IsOptional()
   @IsString()
   type?: string;
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsInt()
-  @Type(() => Number)
-  annee?: number;
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsInt()
-  @Type(() => Number)
-  ficheComplete?: number;
   @ApiPropertyOptional({ default: 'dateAjout' })
   @IsOptional()
   @IsString()

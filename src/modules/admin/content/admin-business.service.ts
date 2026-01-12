@@ -18,8 +18,6 @@ export class AdminBusinessService {
       statut,
       search,
       type,
-      annee,
-      ficheComplete,
       sortBy = 'dateAjout',
       sortOrder = 'desc'
     } = query;
@@ -30,12 +28,14 @@ export class AdminBusinessService {
     if (statut !== undefined) where.statut = statut;
     if (type) where.type = { contains: type, mode: 'insensitive' };
     if (search) where.denomination = { contains: search, mode: 'insensitive' };
-    if (annee !== undefined) where.annee = annee;
-    if (ficheComplete !== undefined) where.ficheComplete = ficheComplete;
+
+    // Validate sortBy to prevent Prisma errors - only allow valid columns
+    const validSortFields = ['dateAjout', 'denomination', 'type', 'statut', 'nbClics', 'origine', 'date', 'idBusiness'];
+    const safeSortBy = validSortFields.includes(sortBy) ? sortBy : 'dateAjout';
 
     // Build dynamic orderBy
     const orderBy: any = {};
-    orderBy[sortBy] = sortOrder;
+    orderBy[safeSortBy] = sortOrder;
 
     const [items, total] = await Promise.all([
       this.prisma.akBusiness.findMany({ where, skip, take: limit, orderBy }),

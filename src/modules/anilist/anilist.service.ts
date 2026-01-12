@@ -153,6 +153,35 @@ export interface AniListStudio {
   isAnimationStudio: boolean;
   favourites: number;
   siteUrl: string;
+  media?: {
+    nodes: Array<{
+      id: number;
+      title: {
+        romaji: string;
+        english?: string;
+        native: string;
+      };
+      coverImage: {
+        large: string;
+        medium: string;
+      };
+      type: string;
+      format?: string;
+      status?: string;
+      season?: string;
+      seasonYear?: number;
+      averageScore?: number;
+      popularity: number;
+      episodes?: number;
+    }>;
+    pageInfo: {
+      total: number;
+      perPage: number;
+      currentPage: number;
+      lastPage: number;
+      hasNextPage: boolean;
+    };
+  };
 }
 
 export interface AniListStaffSearchResult {
@@ -709,6 +738,35 @@ export class AniListService {
             isAnimationStudio
             favourites
             siteUrl
+            media(sort: POPULARITY_DESC, page: 1, perPage: 10, isMain: true) {
+              nodes {
+                id
+                title {
+                  romaji
+                  english
+                  native
+                }
+                coverImage {
+                  large
+                  medium
+                }
+                type
+                format
+                status
+                season
+                seasonYear
+                averageScore
+                popularity
+                episodes
+              }
+              pageInfo {
+                total
+                perPage
+                currentPage
+                lastPage
+                hasNextPage
+              }
+            }
           }
         }
       }
