@@ -524,11 +524,25 @@ export class AnimesService extends BaseContentService<
     const collectionScore = collectionStats[0]?.avg ? Number(collectionStats[0].avg) : null;
     const collectionEvaluationsCount = collectionStats[0]?.count ? Number(collectionStats[0].count) : 0;
 
+    // Get users in collection count
+    const usersInCollectionResult = await this.prisma.$queryRaw<Array<{ count: bigint }>>`
+      SELECT COUNT(DISTINCT id_utilisateur) as count
+      FROM collection_animes
+      WHERE id_anime = ${id}
+    `;
+    const usersInCollection = Number(usersInCollectionResult[0]?.count || 0);
+
+    // Use pre-calculated popularity rank from database (updated by cron job)
+    // This avoids expensive real-time calculations on every page load
+    const popularityRank = anime.classementPopularite || 0;
+
     const formattedAnime = {
       ...this.formatAnime(anime, season, tags),
       articlesCount,
       collectionScore,
       collectionEvaluationsCount,
+      usersInCollection,
+      popularityRank,
     };
 
     // Cache the result

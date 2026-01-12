@@ -103,17 +103,23 @@ export class SentryService {
     const token = await this.getAccessToken();
     const orgSlug = this.configService.get<string>('SENTRY_ORG_SLUG') || 'anime-kun';
 
+    // Build the query filter by combining query and status
+    const queryFilters: string[] = [];
+    if (params.query) {
+      queryFilters.push(params.query);
+    }
+    if (params.status) {
+      queryFilters.push(`is:${params.status}`);
+    }
+
     const queryParams = new URLSearchParams({
       limit: String(params.limit || 25),
       statsPeriod: params.statsPeriod || '24h',
     });
 
-    if (params.query) {
-      queryParams.append('query', params.query);
-    }
-
-    if (params.status) {
-      queryParams.append('query', `is:${params.status}`);
+    // Add combined query filter if any filters exist
+    if (queryFilters.length > 0) {
+      queryParams.set('query', queryFilters.join(' '));
     }
 
     try {
@@ -136,7 +142,8 @@ export class SentryService {
       const issues = await response.json();
       return issues;
     } catch (error) {
-      this.logger.error('Error fetching Sentry issues:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(`Error fetching Sentry issues: ${errorMessage}`, error);
       throw error;
     }
   }
@@ -167,7 +174,8 @@ export class SentryService {
         resolvedToday,
       };
     } catch (error) {
-      this.logger.error('Error fetching Sentry stats:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(`Error fetching Sentry stats: ${errorMessage}`, error);
       return {
         totalIssues: 0,
         newToday: 0,
@@ -202,7 +210,8 @@ export class SentryService {
 
       return await response.json();
     } catch (error) {
-      this.logger.error('Error fetching Sentry issue details:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.error(`Error fetching Sentry issue details: ${errorMessage}`, error);
       throw error;
     }
   }
