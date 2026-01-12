@@ -100,51 +100,58 @@ export class SentryService {
     statsPeriod?: string;
     status?: string;
   }): Promise<SentryIssue[]> {
-    const token = await this.getAccessToken();
-    const orgSlug = this.configService.get<string>('SENTRY_ORG_SLUG') || 'anime-kun';
-
-    // Build the query filter by combining query and status
-    const queryFilters: string[] = [];
-    if (params.query) {
-      queryFilters.push(params.query);
-    }
-    if (params.status) {
-      queryFilters.push(`is:${params.status}`);
-    }
-
-    const queryParams = new URLSearchParams({
-      limit: String(params.limit || 25),
-      statsPeriod: params.statsPeriod || '24h',
-    });
-
-    // Add combined query filter if any filters exist
-    if (queryFilters.length > 0) {
-      queryParams.set('query', queryFilters.join(' '));
-    }
-
     try {
-      const response = await fetch(
-        `https://sentry.io/api/0/organizations/${orgSlug}/issues/?${queryParams}`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        }
-      );
+      const token = await this.getAccessToken();
+      const orgSlug = this.configService.get<string>('SENTRY_ORG_SLUG') || 'anime-kun';
+
+      this.logger.log(`Fetching Sentry issues for org: ${orgSlug}`);
+
+      // Build the query filter by combining query and status
+      const queryFilters: string[] = [];
+      if (params.query) {
+        queryFilters.push(params.query);
+      }
+      if (params.status) {
+        queryFilters.push(`is:${params.status}`);
+      }
+
+      const queryParams = new URLSearchParams({
+        limit: String(params.limit || 25),
+        statsPeriod: params.statsPeriod || '24h',
+      });
+
+      // Add combined query filter if any filters exist
+      if (queryFilters.length > 0) {
+        queryParams.set('query', queryFilters.join(' '));
+      }
+
+      const url = `https://sentry.io/api/0/organizations/${orgSlug}/issues/?${queryParams}`;
+      this.logger.log(`Making request to: ${url}`);
+
+      const response = await fetch(url, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
 
       if (!response.ok) {
-        const error = await response.text();
-        this.logger.error(`Failed to fetch Sentry issues: ${response.status} ${error}`);
-        throw new Error('Failed to fetch issues from Sentry');
+        const errorText = await response.text();
+        this.logger.error(`Sentry API error - Status: ${response.status}, Body: ${errorText}`);
+
+        // Return empty array instead of throwing for better UX
+        return [];
       }
 
       const issues = await response.json();
+      this.logger.log(`Successfully fetched ${issues.length} issues from Sentry`);
       return issues;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       this.logger.error(`Error fetching Sentry issues: ${errorMessage}`, error);
-      throw error;
+
+      // Return empty array instead of throwing to prevent 500 errors
+      return [];
     }
   }
 
@@ -155,17 +162,34 @@ export class SentryService {
     try {
       const allIssues = await this.getIssues({ limit: 100, statsPeriod: '24h' });
 
+      if (!allIssues || allIssues.length === 0) {
+        this.logger.log('No issues found in Sentry');
+        return {
+          totalIssues: 0,
+          newToday: 0,
+          resolvedToday: 0,
+        };
+      }
+
       const now = new Date();
       const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
       const newToday = allIssues.filter(issue => {
-        const firstSeen = new Date(issue.firstSeen);
-        return firstSeen >= today;
+        try {
+          const firstSeen = new Date(issue.firstSeen);
+          return firstSeen >= today;
+        } catch {
+          return false;
+        }
       }).length;
 
       const resolvedToday = allIssues.filter(issue => {
-        const lastSeen = new Date(issue.lastSeen);
-        return issue.status === 'resolved' && lastSeen >= today;
+        try {
+          const lastSeen = new Date(issue.lastSeen);
+          return issue.status === 'resolved' && lastSeen >= today;
+        } catch {
+          return false;
+        }
       }).length;
 
       return {
