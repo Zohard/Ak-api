@@ -83,6 +83,23 @@ export class AdminLoggingController {
   async getClientErrorStats() {
     return this.adminLoggingService.getClientErrorStats();
   }
+
+  @Post('client-errors/purge')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Purge old client errors (admin only)' })
+  @ApiResponse({
+    status: 200,
+    description: 'Old client errors purged successfully',
+  })
+  async purgeOldClientErrors(@Query('days') days?: number) {
+    const daysToKeep = days ? parseInt(String(days)) : 30;
+    const deletedCount = await this.adminLoggingService.purgeOldClientErrors(daysToKeep);
+    return {
+      success: true,
+      message: `${deletedCount} old error(s) deleted`,
+      deletedCount,
+    };
+  }
 }
 
 // Public controller for logging client errors (no auth required)

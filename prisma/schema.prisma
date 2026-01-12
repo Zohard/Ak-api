@@ -1385,3 +1385,23 @@ model AkRoleAuditLog {
   @@index([createdAt])
   @@map("ak_role_audit_logs")
 }
+
+// Client-side error logs
+model ClientErrorLog {
+  id         Int       @id @default(autoincrement())
+  message    String    @db.Text
+  stack      String?   @db.Text
+  statusCode Int?      @map("status_code")
+  endpoint   String?   @db.VarChar(500)
+  url        String?   @db.Text
+  userAgent  String?   @map("user_agent") @db.Text
+  userId     Int?      @map("user_id")
+  context    Json?     @db.JsonB
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamp
+
+  @@index([statusCode])
+  @@index([endpoint])
+  @@index([userId])
+  @@index([createdAt])
+  @@map("client_error_logs")
+}
