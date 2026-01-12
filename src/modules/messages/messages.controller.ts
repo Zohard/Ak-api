@@ -30,7 +30,7 @@ export class MessagesController {
 
   @Get()
   async getMessages(
-    @Query() getMessagesDto: GetMessagesDto,
+    @Query() getMessagesDto: GetMessagesWithFilterDto,
     @CurrentUser() user: any,
   ): Promise<{ messages: SmfMessage[] }> {
     // Use authenticated user's ID if not provided in query

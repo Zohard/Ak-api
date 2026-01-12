@@ -1,5 +1,5 @@
 import { IsOptional, IsString, IsInt, IsIn, IsArray, IsBoolean } from 'class-validator';
-import { Type } from 'class-transformer';
+import { Type, Transform } from 'class-transformer';
 
 export class GetMessagesDto {
   @IsOptional()
@@ -83,13 +83,22 @@ export class BulkMarkImportantDto {
   @Type(() => Number)
   userId: number;
 
+  @Transform(({ value }) => {
+    if (value === 'true' || value === true) return true;
+    if (value === 'false' || value === false) return false;
+    return false;
+  })
   @IsBoolean()
   isImportant: boolean;
 }
 
 export class GetMessagesWithFilterDto extends GetMessagesDto {
   @IsOptional()
+  @Transform(({ value }) => {
+    if (value === 'true' || value === true) return true;
+    if (value === 'false' || value === false) return false;
+    return false;
+  })
   @IsBoolean()
-  @Type(() => Boolean)
   importantOnly?: boolean = false;
 }
