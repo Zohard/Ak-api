@@ -73,9 +73,9 @@ export class AnimesController {
   @ApiQuery({
     name: 'type',
     required: false,
-    description: 'Type de classement (reviews-based only)',
+    description: 'Type de classement (reviews ou collection)',
     example: 'reviews-bayes',
-    enum: ['reviews-bayes', 'reviews-avg'],
+    enum: ['reviews-bayes', 'reviews-avg', 'collection-bayes', 'collection-avg'],
   })
   @ApiResponse({ status: 200, description: 'Liste des meilleurs animes' })
   async getTopAnimes(
@@ -98,9 +98,9 @@ export class AnimesController {
   @ApiQuery({
     name: 'type',
     required: false,
-    description: 'Type de classement (reviews-based only)',
+    description: 'Type de classement (reviews ou collection)',
     example: 'reviews-bayes',
-    enum: ['reviews-bayes', 'reviews-avg'],
+    enum: ['reviews-bayes', 'reviews-avg', 'collection-bayes', 'collection-avg'],
   })
   @ApiResponse({ status: 200, description: 'Liste des pires animes' })
   async getFlopAnimes(
