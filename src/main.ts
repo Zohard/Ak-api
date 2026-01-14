@@ -65,12 +65,13 @@ async function bootstrap() {
   app.use(cookieParser());
 
   // CORS configuration
+  const corsOriginEnv = configService.get('CORS_ORIGIN') || '';
   const corsOrigins = [
     'http://localhost:3000', // Nuxt frontend dev
     'http://localhost:3001', // AI orchestrator dev
     'http://localhost:3003', // Frontend dev alternate port
     configService.get('FRONTEND_URL'), // Production frontend
-    configService.get('CORS_ORIGIN'), // Additional CORS origins
+    ...corsOriginEnv.split(',').map((o: string) => o.trim()), // Additional CORS origins (comma-separated)
     configService.get('AI_ORCHESTRATOR_URL'), // Production AI orchestrator
   ].filter(Boolean);
 
