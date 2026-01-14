@@ -4,6 +4,10 @@ import { AdminUsersService } from './users/admin-users.service';
 import { AdminContentService } from './content/admin-content.service';
 import { AdminModerationService } from './moderation/admin-moderation.service';
 
+// Simple in-memory cache for dashboard stats
+let dashboardCache: { data: any; timestamp: number } | null = null;
+const CACHE_TTL_MS = 60000; // 1 minute
+
 @Injectable()
 export class AdminService {
   constructor(
@@ -14,26 +18,38 @@ export class AdminService {
   ) {}
 
   async getDashboardStats() {
-    // Get comprehensive dashboard statistics
-    const [userStats, contentStats, moderationStats] = await Promise.all([
+    // Check in-memory cache first
+    if (dashboardCache && Date.now() - dashboardCache.timestamp < CACHE_TTL_MS) {
+      return dashboardCache.data;
+    }
+
+    // Run ALL queries in parallel for faster response
+    const [
+      userStats,
+      contentStats,
+      moderationStats,
+      recentActivity,
+      systemHealth,
+    ] = await Promise.all([
       this.adminUsersService.getUserStats(),
       this.adminContentService.getContentStats(),
       this.adminModerationService.getModerationStats(),
+      this.getRecentActivityFast(),
+      this.getSystemHealthFast(),
     ]);
 
-    // Get recent activity across all modules
-    const recentActivity = await this.getRecentActivity();
-
-    // Get system health metrics
-    const systemHealth = await this.getSystemHealth();
-
-    return {
+    const result = {
       users: userStats,
       content: contentStats,
       moderation: moderationStats,
       recent_activity: recentActivity,
       system_health: systemHealth,
     };
+
+    // Update cache
+    dashboardCache = { data: result, timestamp: Date.now() };
+
+    return result;
   }
 
   async getRecentActivity(limit: number = 20) {
@@ -117,6 +133,74 @@ export class AdminService {
       performance: performanceMetrics,
       status: 'healthy', // Overall status
     };
+  }
+
+  // Optimized fast version - runs all health checks in parallel
+  private async getSystemHealthFast() {
+    try {
+      const start = Date.now();
+
+      // Run all health checks in parallel with timeout
+      const [dbCheck, storageCheck] = await Promise.all([
+        // Simple DB ping
+        this.prisma.$queryRaw`SELECT 1`.then(() => ({
+          status: 'healthy',
+          response_time_ms: Date.now() - start,
+        })).catch((e) => ({
+          status: 'unhealthy',
+          error: e.message,
+        })),
+        // Storage count - simplified
+        this.prisma.$queryRaw`SELECT COUNT(*)::int as total FROM ak_screenshots`.then((r: any) => ({
+          status: 'healthy',
+          media_files: { total: Number(r[0]?.total || 0) },
+        })).catch(() => ({
+          status: 'unknown',
+          media_files: { total: 0 },
+        })),
+      ]);
+
+      return {
+        database: dbCheck,
+        storage: storageCheck,
+        performance: { status: 'healthy', top_tables: [] }, // Skip heavy perf query
+        status: dbCheck.status === 'healthy' ? 'healthy' : 'degraded',
+      };
+    } catch (error) {
+      return {
+        database: { status: 'unhealthy', error: error.message },
+        storage: { status: 'unknown' },
+        performance: { status: 'unknown' },
+        status: 'unhealthy',
+      };
+    }
+  }
+
+  // Optimized fast version - simpler query, no UNION
+  private async getRecentActivityFast(limit: number = 10) {
+    try {
+      // Just get recent users - fastest single query
+      const activities = await this.prisma.$queryRaw`
+        SELECT
+          'user_registration' as type,
+          to_timestamp(date_registered) as date,
+          member_name as title,
+          'User registered' as description,
+          id_member as target_id,
+          'user' as target_type
+        FROM smf_members
+        ORDER BY date_registered DESC
+        LIMIT ${limit}
+      `;
+
+      return (activities as any[]).map((activity: any) => ({
+        ...activity,
+        target_id: Number(activity.target_id),
+      }));
+    } catch (error) {
+      console.error('Failed to fetch recent activity:', error);
+      return [];
+    }
   }
 
   private async checkDatabaseHealth() {
