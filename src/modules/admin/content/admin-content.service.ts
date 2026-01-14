@@ -467,6 +467,25 @@ export class AdminContentService {
     return relationshipsWithTags;
   }
 
+  // Lightweight check if content exists (no heavy data loading)
+  private async contentExists(id: number, type: string): Promise<boolean> {
+    const columnMap: Record<string, { table: string; id: string }> = {
+      anime: { table: 'ak_animes', id: 'id_anime' },
+      manga: { table: 'ak_mangas', id: 'id_manga' },
+      'jeu-video': { table: 'ak_jeux_video', id: 'id_jeu' },
+      business: { table: 'ak_business', id: 'id_business' },
+    };
+
+    const config = columnMap[type];
+    if (!config) return false;
+
+    const result = await this.prisma.$queryRawUnsafe(
+      `SELECT 1 FROM ${config.table} WHERE ${config.id} = $1 LIMIT 1`,
+      id,
+    );
+    return (result as any[]).length > 0;
+  }
+
   async createContentRelationship(
     id: number,
     type: string,
@@ -475,9 +494,18 @@ export class AdminContentService {
     const { related_id, related_type, relation_type, description } =
       relationshipDto;
 
-    // Check if content exists
-    await this.getContentById(id, type);
-    await this.getContentById(related_id, related_type);
+    // Lightweight existence check (parallel)
+    const [sourceExists, targetExists] = await Promise.all([
+      this.contentExists(id, type),
+      this.contentExists(related_id, related_type),
+    ]);
+
+    if (!sourceExists) {
+      throw new NotFoundException(`${type} with ID ${id} not found`);
+    }
+    if (!targetExists) {
+      throw new NotFoundException(`${related_type} with ID ${related_id} not found`);
+    }
 
     // Create relationship following actual schema:
     // - id_fiche_depart stores the source as 'anime<ID>', 'manga<ID>', or 'jeu<ID>'
