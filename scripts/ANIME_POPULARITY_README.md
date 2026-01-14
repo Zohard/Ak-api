@@ -147,7 +147,7 @@ psql 'postgresql://neondb_owner:npg_Vlut8bsZv9kU@ep-tiny-glade-abx9qg4a-pooler.e
 ### View Current Top 10
 
 ```bash
-psql 'postgresql://neondb_owner:npg_Vlut8bsZv9kU@ep-tiny-glade-abx9qg4a-pooler.eu-west-2.aws.neon.tech/neondb?sslmode=require' -c "
+psql 'postgresql://user:password@ep-tiny-glade-abx9qg4a-pooler.eu-west-2.aws.neon.tech/neondb?sslmode=require' -c "
   SELECT classement_popularite as rank,
          titre,
          annee,
@@ -229,3 +229,4 @@ The script will display:
 - Rankings are calculated fresh each time (not incremental)
 - Previous rank is preserved to calculate variation indicators
 - New animes get "NEW" as their variation indicator
+
