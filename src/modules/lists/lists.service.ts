@@ -11,6 +11,18 @@ export class ListsService {
     private cacheService: CacheService,
   ) { }
 
+  private generateSlug(title: string): string {
+    return title
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '') // Remove accents
+      .replace(/[^a-z0-9\s-]/g, '') // Remove special characters
+      .replace(/\s+/g, '-') // Replace spaces with hyphens
+      .replace(/-+/g, '-') // Replace multiple hyphens with single
+      .replace(/^-|-$/g, '') // Remove leading/trailing hyphens
+      .substring(0, 100); // Limit length
+  }
+
   private calculatePopularity(jaime?: string | null, jaimepas?: string | null, nb_clics = 0): number {
     const likes = (jaime || '')
       .split(',')
@@ -130,6 +142,10 @@ export class ListsService {
 
   async createList(userId: number, dto: CreateListDto) {
     const now = new Date();
+    const baseSlug = this.generateSlug(dto.titre);
+    const timestamp = Date.now();
+    const niceUrl = `${baseSlug}-${timestamp}`;
+
     const list = await this.prisma.akListesTop.create({
       data: {
         titre: dto.titre,
@@ -145,6 +161,7 @@ export class ListsService {
         jaime: '',
         jaimepas: '',
         popularite: 0,
+        niceUrl: niceUrl,
       },
     });
 
