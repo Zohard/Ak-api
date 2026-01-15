@@ -149,7 +149,7 @@ export class ListsService {
     const list = await this.prisma.akListesTop.create({
       data: {
         titre: dto.titre,
-        presentation: dto.presentation,
+        presentation: dto.presentation || '',
         type: dto.type,
         animeOrManga: dto.animeOrManga,
         jsonData: dto.jsonData || '[]',
@@ -157,6 +157,7 @@ export class ListsService {
         statut: dto.statut ?? 0,
         idMembre: userId,
         dateCreation: now,
+        dateModification: now,
         nbClics: 0,
         nbClicsDay: 0,
         nbClicsWeek: 0,
@@ -164,7 +165,6 @@ export class ListsService {
         jaime: '',
         jaimepas: '',
         popularite: 0,
-        classementPopularite: 0,
         variationPopularite: 'NEW',
         score: 0,
         niceUrl: niceUrl,
@@ -194,6 +194,7 @@ export class ListsService {
         jsonData: dto.jsonData ?? existing.jsonData,
         jsonDataCom: dto.jsonDataCom ?? existing.jsonDataCom,
         statut: dto.statut ?? existing.statut,
+        dateModification: new Date(),
       },
     });
 

@@ -354,11 +354,9 @@ model AkBusiness {
   notes                 String?   @db.Text
   relations             Int?      @default(-1)
   nbClics               Int?      @default(0) @map("nb_clics")
-  nbClicsDay            Int?      @default(0) @map("nb_clics_day")
-  nbClicsWeek           Int?      @default(0) @map("nb_clics_week")
-  nbClicsMonth          Int?      @default(0) @map("nb_clics_month")
-  classementPopularite  Int?      @default(0) @map("classement_popularite")
-  variationPopularite   String?   @default("") @map("variation_popularite") @db.Text
+  nbClicsDay            Int?      @map("nb_clics_day")
+  nbClicsWeek           Int?      @map("nb_clics_week")
+  nbClicsMonth          Int?      @map("nb_clics_month")
   statut                Int       @default(1)
   dateAjout             DateTime? @map("date_ajout") @db.Timestamptz
   dateModification      Int?      @map("date_modification")
@@ -399,11 +397,9 @@ model AkJeuxVideo {
   nbReviews         Int       @default(0) @map("nb_reviews")
   moyenneNotes      Float     @default(0) @map("moyenne_notes") @db.Real
   nbClics           Int       @default(0) @map("nb_clics")
-  nbClicsDay        Int?      @default(0) @map("nb_clics_day")
-  nbClicsWeek       Int?      @default(0) @map("nb_clics_week")
-  nbClicsMonth      Int?      @default(0) @map("nb_clics_month")
-  classementPopularite Int?   @default(0) @map("classement_popularite")
-  variationPopularite  String? @default("") @map("variation_popularite") @db.Text
+  nbClicsDay        Int       @map("nb_clics_day")
+  nbClicsWeek       Int       @map("nb_clics_week")
+  nbClicsMonth      Int       @map("nb_clics_month")
   lienForum         Int       @default(0) @map("lienforum")
   statut            Int       @default(1)
   playasia          String?   @db.Text
@@ -604,25 +600,25 @@ model AkBusinessToBusiness {
 model AkListesTop {
   idListe       Int       @id @default(autoincrement()) @map("id_liste")
   niceUrl       String    @map("nice_url") @db.VarChar(255)
-  titre         String?   @db.Text
-  presentation  String?   @db.Text
-  type          String?   @db.VarChar(10) // 'liste' | 'top'
-  animeOrManga  String?   @map("anime_or_manga") @db.VarChar(10) // 'anime' | 'manga' | 'jeu-video'
-  jsonData      String?   @map("json_data") @db.Text // JSON string of IDs e.g. ["173","65",...]
-  jsonDataCom   String?   @map("json_data_com") @db.Text // Comments per item
-  jaime         String?   @db.Text // CSV user IDs
-  jaimepas      String?   @db.Text // CSV user IDs
-  popularite    Float?    @db.Real
-  classementPopularite Int?     @default(0) @map("classement_popularite")
-  variationPopularite  String?  @default("") @map("variation_popularite") @db.Text
-  nbClicsDay           Int?     @default(0) @map("nb_clics_day")
-  nbClicsWeek          Int?     @default(0) @map("nb_clics_week")
-  nbClicsMonth         Int?     @default(0) @map("nb_clics_month")
-  score         Int       @default(0)
+  titre         String    @db.Text
+  presentation  String    @db.Text
+  type          String    @db.VarChar(255) // 'liste' | 'top'
+  animeOrManga  String    @map("anime_or_manga") @db.VarChar(255) // 'anime' | 'manga' | 'jeu-video'
+  jsonData      String    @map("json_data") @db.Text // JSON string of IDs e.g. ["173","65",...]
+  jsonDataCom   String    @map("json_data_com") @db.Text // Comments per item
+  jaime         String    @db.Text // CSV user IDs
+  jaimepas      String    @db.Text // CSV user IDs
+  popularite    Float     @db.DoublePrecision
+  variationPopularite String @map("variation_popularite") @db.Text
+  nbClicsDay    Int       @default(0) @map("nb_clics_day")
+  nbClicsWeek   Int       @default(0) @map("nb_clics_week")
+  nbClicsMonth  Int       @default(0) @map("nb_clics_month")
   nbClics       Int       @default(0) @map("nb_clics")
-  statut        Int       @default(0) // 0=draft,1=published
+  score         Int       @default(0)
   idMembre      Int       @map("id_membre")
-  dateCreation  DateTime? @map("date_creation") @db.Timestamp
+  dateCreation  DateTime  @default(now()) @map("date_creation") @db.Timestamp
+  dateModification DateTime @default(now()) @map("date_modification") @db.Timestamp
+  statut        Int       @default(0) @db.SmallInt // 0=draft,1=published
 
   // Relations
   membre        SmfMember @relation(fields: [idMembre], references: [idMember], onDelete: Cascade)
