@@ -114,63 +114,58 @@ export class AdminMangasService {
   }
 
   async getMangasWithoutScreenshots(search?: string, sortBy: string = 'year') {
-    // Get all manga IDs that have screenshots (type = 2 for manga)
-    const mangasWithScreenshots = await this.prisma.akScreenshot.findMany({
-      where: { type: 2 },
-      select: { idTitre: true },
-      distinct: ['idTitre'],
-    });
-
-    const idsWithScreenshots = mangasWithScreenshots.map(s => s.idTitre);
-
-    // Build where clause to exclude mangas with screenshots
-    const where: any = {
-      idManga: {
-        notIn: idsWithScreenshots,
-      },
-    };
-
-    // Add search filter if provided
-    if (search) {
-      where.OR = [
-        { titre: { contains: search, mode: 'insensitive' } },
-        { titreOrig: { contains: search, mode: 'insensitive' } },
-        { titreFr: { contains: search, mode: 'insensitive' } },
-      ];
-    }
-
     // Determine sort order
-    let orderBy: any;
+    let orderByClause: string;
     switch (sortBy) {
       case 'year':
-        orderBy = { annee: 'desc' };
+        orderByClause = 'm.annee DESC NULLS LAST';
         break;
       case 'date_ajout':
-        orderBy = { dateAjout: 'desc' };
+        orderByClause = 'm.date_ajout DESC';
         break;
       case 'last_modified':
-        orderBy = { dateModification: 'desc' };
+        orderByClause = 'm.date_modification DESC NULLS LAST';
         break;
       case 'title':
-        orderBy = { titre: 'asc' };
+        orderByClause = 'm.titre ASC';
         break;
       default:
-        orderBy = { annee: 'desc' };
+        orderByClause = 'm.annee DESC NULLS LAST';
     }
 
-    const mangas = await this.prisma.akManga.findMany({
-      where,
-      select: {
-        idManga: true,
-        titre: true,
-        titreOrig: true,
-        annee: true,
-        dateAjout: true,
-        dateModification: true,
-      },
-      orderBy,
-      take: 500, // Limit to 500 results for performance
-    });
+    // Build search condition
+    let searchCondition = '';
+    const params: any[] = [];
+
+    if (search) {
+      searchCondition = `AND (
+        m.titre ILIKE $1
+        OR m.titre_orig ILIKE $1
+        OR m.titre_fr ILIKE $1
+      )`;
+      params.push(`%${search}%`);
+    }
+
+    // Use NOT EXISTS - much faster than NOT IN with thousands of IDs
+    const query = `
+      SELECT
+        m.id_manga as "idManga",
+        m.titre,
+        m.titre_orig as "titreOrig",
+        m.annee,
+        m.date_ajout as "dateAjout",
+        m.date_modification as "dateModification"
+      FROM ak_mangas m
+      WHERE NOT EXISTS (
+        SELECT 1 FROM ak_screenshots s
+        WHERE s.id_titre = m.id_manga AND s.type = 2
+      )
+      ${searchCondition}
+      ORDER BY ${orderByClause}
+      LIMIT 500
+    `;
+
+    const mangas = await this.prisma.$queryRawUnsafe<any[]>(query, ...params);
 
     // Map to frontend-expected format
     return mangas.map(manga => ({
@@ -178,7 +173,7 @@ export class AdminMangasService {
       titre: manga.titre,
       titreOrig: manga.titreOrig,
       annee: manga.annee,
-      format: null, // Manga model doesn't have format field
+      format: null,
       date_ajout: manga.dateAjout,
       last_modified: manga.dateModification ? new Date(manga.dateModification * 1000) : manga.dateAjout,
     }));

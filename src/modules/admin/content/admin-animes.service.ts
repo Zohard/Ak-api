@@ -85,63 +85,58 @@ export class AdminAnimesService {
   }
 
   async getAnimesWithoutScreenshots(search?: string, sortBy: string = 'year') {
-    // Get all anime IDs that have screenshots (type = 1 for anime)
-    const animesWithScreenshots = await this.prisma.akScreenshot.findMany({
-      where: { type: 1 },
-      select: { idTitre: true },
-      distinct: ['idTitre'],
-    });
-
-    const idsWithScreenshots = animesWithScreenshots.map(s => s.idTitre);
-
-    // Build where clause to exclude animes with screenshots
-    const where: any = {
-      idAnime: {
-        notIn: idsWithScreenshots,
-      },
-    };
-
-    // Add search filter if provided
-    if (search) {
-      where.OR = [
-        { titre: { contains: search, mode: 'insensitive' } },
-        { titreOrig: { contains: search, mode: 'insensitive' } },
-        { titreFr: { contains: search, mode: 'insensitive' } },
-      ];
-    }
-
     // Determine sort order
-    let orderBy: any;
+    let orderByClause: string;
     switch (sortBy) {
       case 'year':
-        orderBy = { annee: 'desc' };
+        orderByClause = 'a.annee DESC NULLS LAST';
         break;
       case 'date_ajout':
-        orderBy = { dateAjout: 'desc' };
+        orderByClause = 'a.date_ajout DESC';
         break;
       case 'last_modified':
-        orderBy = { dateAjout: 'desc' }; // Use dateAjout as fallback
+        orderByClause = 'a.date_ajout DESC';
         break;
       case 'title':
-        orderBy = { titre: 'asc' };
+        orderByClause = 'a.titre ASC';
         break;
       default:
-        orderBy = { annee: 'desc' };
+        orderByClause = 'a.annee DESC NULLS LAST';
     }
 
-    const animes = await this.prisma.akAnime.findMany({
-      where,
-      select: {
-        idAnime: true,
-        titre: true,
-        titreOrig: true,
-        annee: true,
-        format: true,
-        dateAjout: true,
-      },
-      orderBy,
-      take: 500, // Limit to 500 results for performance
-    });
+    // Build search condition
+    let searchCondition = '';
+    const params: any[] = [];
+
+    if (search) {
+      searchCondition = `AND (
+        a.titre ILIKE $1
+        OR a.titre_orig ILIKE $1
+        OR a.titre_fr ILIKE $1
+      )`;
+      params.push(`%${search}%`);
+    }
+
+    // Use NOT EXISTS - much faster than NOT IN with thousands of IDs
+    const query = `
+      SELECT
+        a.id_anime as "idAnime",
+        a.titre,
+        a.titre_orig as "titreOrig",
+        a.annee,
+        a.format,
+        a.date_ajout as "dateAjout"
+      FROM ak_animes a
+      WHERE NOT EXISTS (
+        SELECT 1 FROM ak_screenshots s
+        WHERE s.id_titre = a.id_anime AND s.type = 1
+      )
+      ${searchCondition}
+      ORDER BY ${orderByClause}
+      LIMIT 500
+    `;
+
+    const animes = await this.prisma.$queryRawUnsafe<any[]>(query, ...params);
 
     // Map to frontend-expected format
     return animes.map(anime => ({
@@ -151,7 +146,7 @@ export class AdminAnimesService {
       annee: anime.annee,
       format: anime.format,
       date_ajout: anime.dateAjout,
-      last_modified: anime.dateAjout, // Use dateAjout as fallback
+      last_modified: anime.dateAjout,
     }));
   }
 
