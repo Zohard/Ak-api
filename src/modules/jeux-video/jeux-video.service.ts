@@ -668,4 +668,70 @@ export class JeuxVideoService {
     const rows = await this.prisma.$queryRawUnsafe(sql, sourceKey, id);
     return rows;
   }
+
+  async findByIds(ids: number[]) {
+    if (!ids || ids.length === 0) {
+      return [];
+    }
+
+    const items = await this.prisma.akJeuxVideo.findMany({
+      where: {
+        idJeu: { in: ids },
+        statut: 1, // Only return published games
+      },
+      select: {
+        idJeu: true,
+        titre: true,
+        niceUrl: true,
+        plateforme: true,
+        genre: true,
+        editeur: true,
+        annee: true,
+        image: true,
+        moyenneNotes: true,
+        nbReviews: true,
+        dateAjout: true,
+        dateSortieJapon: true,
+        dateSortieUsa: true,
+        dateSortieEurope: true,
+        dateSortieWorldwide: true,
+        platforms: {
+          select: {
+            platform: {
+              select: {
+                name: true,
+                shortName: true,
+                manufacturer: true,
+              }
+            }
+          }
+        },
+        genres: {
+          select: {
+            genre: {
+              select: {
+                name: true,
+                nameFr: true,
+                slug: true,
+              }
+            }
+          }
+        }
+      },
+    });
+
+    // Map idJeu to id for frontend consistency
+    const mappedItems = items.map(item => ({
+      ...item,
+      id: item.idJeu,
+    }));
+
+    // Create a map for quick lookup
+    const itemMap = new Map(mappedItems.map(item => [item.idJeu, item]));
+
+    // Return items in the same order as the input IDs
+    return ids
+      .map(id => itemMap.get(id))
+      .filter(Boolean);
+  }
 }

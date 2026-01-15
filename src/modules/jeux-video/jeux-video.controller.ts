@@ -1,4 +1,4 @@
-import { Controller, Get, Param, ParseIntPipe, Query } from '@nestjs/common';
+import { Controller, Get, Param, ParseIntPipe, Query, BadRequestException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
 import { JeuxVideoService } from './jeux-video.service';
 import { JeuVideoQueryDto } from './dto/jeu-video-query.dto';
@@ -6,7 +6,7 @@ import { JeuVideoQueryDto } from './dto/jeu-video-query.dto';
 @ApiTags('Jeux Vidéo')
 @Controller('jeux-video')
 export class JeuxVideoController {
-  constructor(private readonly jeuxVideoService: JeuxVideoService) {}
+  constructor(private readonly jeuxVideoService: JeuxVideoService) { }
 
   @Get()
   @ApiOperation({ summary: 'Liste des jeux vidéo avec pagination et filtres' })
@@ -25,6 +25,21 @@ export class JeuxVideoController {
   ) {
     const parsedLimit = limit ? parseInt(limit) : 10;
     return this.jeuxVideoService.autocomplete(query, exclude, parsedLimit);
+  }
+
+  @Get('bulk')
+  @ApiOperation({ summary: 'Récupérer plusieurs jeux vidéo par IDs (bulk fetch)' })
+  @ApiResponse({ status: 200, description: 'Liste des jeux vidéo' })
+  @ApiResponse({ status: 400, description: 'IDs invalides' })
+  async findByIds(@Query('ids') ids: string) {
+    if (!ids) {
+      throw new BadRequestException('Required query parameter ids is missing');
+    }
+    const idArray = ids.split(',').map(id => parseInt(id.trim())).filter(id => !isNaN(id));
+    if (idArray.length === 0) {
+      throw new BadRequestException('No valid IDs provided');
+    }
+    return this.jeuxVideoService.findByIds(idArray);
   }
 
   @Get('platforms')
