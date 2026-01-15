@@ -161,6 +161,7 @@ export class ListsService {
         jaime: '',
         jaimepas: '',
         popularite: 0,
+        score: 0,
         niceUrl: niceUrl,
       },
     });

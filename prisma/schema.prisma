@@ -609,6 +609,7 @@ model AkListesTop {
   jaime         String?   @db.Text // CSV user IDs
   jaimepas      String?   @db.Text // CSV user IDs
   popularite    Float?    @db.Real
+  score         Int       @default(0)
   nbClics       Int       @default(0) @map("nb_clics")
   statut        Int       @default(0) // 0=draft,1=published
   idMembre      Int       @map("id_membre")
