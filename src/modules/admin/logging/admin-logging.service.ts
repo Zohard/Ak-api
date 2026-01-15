@@ -126,8 +126,14 @@ export class AdminLoggingService {
    * Get formatted activities grouped by content
    * Optimized: Single query with JOINs instead of N+1 queries
    */
-  async getFormattedActivities(limit = 50): Promise<any[]> {
+  async getFormattedActivities(limit = 20, offset = 0): Promise<{ items: any[]; hasMore: boolean; total: number }> {
     try {
+      // Get total count for pagination
+      const countResult = await this.prisma.$queryRaw<any[]>`
+        SELECT COUNT(*)::int as total FROM ak_logs_admin
+      `;
+      const total = countResult[0]?.total || 0;
+
       // Single optimized query with LEFT JOINs to fetch titles
       const logs = await this.prisma.$queryRaw<any[]>`
         SELECT
@@ -152,6 +158,7 @@ export class AdminLoggingService {
         LEFT JOIN ak_jeux_video j ON l.jeu_video = j.id_jeu AND l.jeu_video > 0
         ORDER BY l.last_mod DESC
         LIMIT ${limit}
+        OFFSET ${offset}
       `;
 
       // Format each log entry (no additional queries needed)
@@ -217,10 +224,14 @@ export class AdminLoggingService {
         };
       });
 
-      return formattedLogs;
+      return {
+        items: formattedLogs,
+        hasMore: offset + logs.length < total,
+        total,
+      };
     } catch (error) {
       console.error('Failed to get formatted activities:', error);
-      return [];
+      return { items: [], hasMore: false, total: 0 };
     }
   }
 

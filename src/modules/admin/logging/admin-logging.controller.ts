@@ -38,14 +38,25 @@ export class AdminLoggingController {
     name: 'limit',
     required: false,
     description: 'Number of content items to return',
-    example: 50,
+    example: 20,
+  })
+  @ApiQuery({
+    name: 'offset',
+    required: false,
+    description: 'Number of items to skip (for pagination)',
+    example: 0,
   })
   @ApiResponse({
     status: 200,
     description: 'Admin activities retrieved successfully',
   })
-  async getActivities(@Query('limit', ParseIntPipe) limit = 50) {
-    return this.adminLoggingService.getFormattedActivities(limit);
+  async getActivities(
+    @Query('limit') limit?: string,
+    @Query('offset') offset?: string,
+  ) {
+    const parsedLimit = limit ? parseInt(limit, 10) : 20;
+    const parsedOffset = offset ? parseInt(offset, 10) : 0;
+    return this.adminLoggingService.getFormattedActivities(parsedLimit, parsedOffset);
   }
 
   @Get('recent')
