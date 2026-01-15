@@ -3,6 +3,7 @@ import {
   NotFoundException,
   BadRequestException,
   ForbiddenException,
+  Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../../shared/services/prisma.service';
 import { CacheService } from '../../shared/services/cache.service';
@@ -20,6 +21,8 @@ export class ArticlesService {
     private cacheService: CacheService,
     private imagekitService: R2Service,
   ) { }
+
+  private readonly logger = new Logger(ArticlesService.name);
 
   private serializeBigInt(obj: any): any {
     return JSON.parse(JSON.stringify(obj, (key, value) =>
