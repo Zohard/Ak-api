@@ -168,11 +168,11 @@ export class CacheService implements OnModuleInit {
     return this.get(`rankings:${mediaType}:${rankingType}:${type}:${limit}`);
   }
 
-  async setRankings(mediaType: 'anime' | 'manga', rankingType: 'top' | 'flop', type: string, limit: number, content: any, ttl = 3600): Promise<void> {
+  async setRankings(mediaType: 'anime' | 'manga' | 'jeu-video', rankingType: 'top' | 'flop', type: string, limit: number, content: any, ttl = 3600): Promise<void> {
     await this.set(`rankings:${mediaType}:${rankingType}:${type}:${limit}`, content, ttl); // 1 hour
   }
 
-  async invalidateRankings(mediaType: 'anime' | 'manga'): Promise<void> {
+  async invalidateRankings(mediaType: 'anime' | 'manga' | 'jeu-video'): Promise<void> {
     await this.delByPattern(`rankings:${mediaType}:*`);
     this.logger.debug(`Invalidated rankings cache for ${mediaType}`);
   }
@@ -273,7 +273,7 @@ export class CacheService implements OnModuleInit {
     await this.set(key, lists, ttl); // 5 minutes
   }
 
-  async invalidatePublicLists(mediaType: 'anime' | 'manga'): Promise<void> {
+  async invalidatePublicLists(mediaType: 'anime' | 'manga' | 'jeu-video'): Promise<void> {
     // Invalidate all cached public lists for this media type
     await Promise.all([
       this.delByPattern(`lists:${mediaType}:*`),

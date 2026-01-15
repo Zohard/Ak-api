@@ -23,18 +23,18 @@ import { UpdateItemsDto } from './dto/update-items.dto';
 @ApiTags('lists')
 @Controller('lists')
 export class ListsController {
-  constructor(private readonly listsService: ListsService) {}
+  constructor(private readonly listsService: ListsService) { }
 
   // GET /lists/:userId
   @Get(':userId')
   @ApiOperation({ summary: "Listes d'un utilisateur" })
   @ApiParam({ name: 'userId', type: 'number' })
   @ApiQuery({ name: 'type', required: false, enum: ['liste', 'top'] })
-  @ApiQuery({ name: 'mediaType', required: false, enum: ['anime', 'manga'] })
+  @ApiQuery({ name: 'mediaType', required: false, enum: ['anime', 'manga', 'jeu-video'] })
   getUserLists(
     @Param('userId', ParseIntPipe) userId: number,
     @Query('type') type?: 'liste' | 'top',
-    @Query('mediaType') mediaType?: 'anime' | 'manga',
+    @Query('mediaType') mediaType?: 'anime' | 'manga' | 'jeu-video',
   ) {
     return this.listsService.getUserLists(userId, type, mediaType);
   }
@@ -88,10 +88,10 @@ export class ListsController {
   // GET /lists/public/recent/:mediaType
   @Get('public/recent/:mediaType')
   @ApiOperation({ summary: 'Listes récentes publiques' })
-  @ApiParam({ name: 'mediaType', enum: ['anime', 'manga'] })
+  @ApiParam({ name: 'mediaType', enum: ['anime', 'manga', 'jeu-video'] })
   @ApiQuery({ name: 'limit', required: false, type: Number })
   getRecent(
-    @Param('mediaType') mediaType: 'anime' | 'manga',
+    @Param('mediaType') mediaType: 'anime' | 'manga' | 'jeu-video',
     @Query('limit') limit = '10',
   ) {
     return this.listsService.getPublicLists(mediaType, 'recent', parseInt(limit));
@@ -100,10 +100,10 @@ export class ListsController {
   // GET /lists/public/popular/:mediaType
   @Get('public/popular/:mediaType')
   @ApiOperation({ summary: 'Listes populaires publiques' })
-  @ApiParam({ name: 'mediaType', enum: ['anime', 'manga'] })
+  @ApiParam({ name: 'mediaType', enum: ['anime', 'manga', 'jeu-video'] })
   @ApiQuery({ name: 'limit', required: false, type: Number })
   getPopular(
-    @Param('mediaType') mediaType: 'anime' | 'manga',
+    @Param('mediaType') mediaType: 'anime' | 'manga' | 'jeu-video',
     @Query('limit') limit = '10',
   ) {
     return this.listsService.getPublicLists(mediaType, 'popular', parseInt(limit));
@@ -170,13 +170,13 @@ export class ListsController {
   }
   @Get('public/browse/:mediaType')
   @ApiOperation({ summary: 'Parcourir les listes publiques avec pagination' })
-  @ApiParam({ name: 'mediaType', enum: ['anime', 'manga'] })
+  @ApiParam({ name: 'mediaType', enum: ['anime', 'manga', 'jeu-video'] })
   @ApiQuery({ name: 'sort', required: false, enum: ['recent', 'popular'] })
   @ApiQuery({ name: 'type', required: false, enum: ['liste', 'top'] })
   @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'limit', required: false, type: Number })
   browsePublic(
-    @Param('mediaType') mediaType: 'anime' | 'manga',
+    @Param('mediaType') mediaType: 'anime' | 'manga' | 'jeu-video',
     @Query('sort') sort: 'recent' | 'popular' = 'recent',
     @Query('type') type?: 'liste' | 'top',
     @Query('page') page = '1',

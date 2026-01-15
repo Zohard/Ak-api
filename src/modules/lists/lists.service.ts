@@ -9,7 +9,7 @@ export class ListsService {
   constructor(
     private prisma: PrismaService,
     private cacheService: CacheService,
-  ) {}
+  ) { }
 
   private calculatePopularity(jaime?: string | null, jaimepas?: string | null, nb_clics = 0): number {
     const likes = (jaime || '')
@@ -30,7 +30,8 @@ export class ListsService {
     // Extract first item IDs and batch fetch their images
     const animeIds: number[] = [];
     const mangaIds: number[] = [];
-    const listFirstItemMap = new Map<number, { id: number; type: 'anime' | 'manga' }>();
+    const gameIds: number[] = [];
+    const listFirstItemMap = new Map<number, { id: number; type: 'anime' | 'manga' | 'jeu-video' }>();
 
     for (const row of rows) {
       try {
@@ -38,11 +39,13 @@ export class ListsService {
         if (Array.isArray(jsonData) && jsonData.length > 0) {
           const firstId = parseInt(String(jsonData[0]), 10);
           if (!isNaN(firstId)) {
-            listFirstItemMap.set(row.idListe, { id: firstId, type: row.animeOrManga as 'anime' | 'manga' });
+            listFirstItemMap.set(row.idListe, { id: firstId, type: row.animeOrManga as 'anime' | 'manga' | 'jeu-video' });
             if (row.animeOrManga === 'anime') {
               animeIds.push(firstId);
-            } else {
+            } else if (row.animeOrManga === 'manga') {
               mangaIds.push(firstId);
+            } else if (row.animeOrManga === 'jeu-video') {
+              gameIds.push(firstId);
             }
           }
         }
@@ -54,6 +57,7 @@ export class ListsService {
     // Batch fetch anime and manga images
     const animeImages = new Map<number, string>();
     const mangaImages = new Map<number, string>();
+    const gameImages = new Map<number, string>();
 
     if (animeIds.length > 0) {
       const animes = await this.prisma.akAnime.findMany({
@@ -75,10 +79,24 @@ export class ListsService {
       }
     }
 
+    if (gameIds.length > 0) {
+      const games = await this.prisma.akJeuxVideo.findMany({
+        where: { idJeu: { in: gameIds } },
+        select: { idJeu: true, image: true }
+      });
+      for (const game of games) {
+        if (game.image) gameImages.set(game.idJeu, game.image);
+      }
+    }
+
     // Map images back to lists
     const resultMap = new Map<number, string>();
     for (const [listId, firstItem] of listFirstItemMap.entries()) {
-      const imageMap = firstItem.type === 'anime' ? animeImages : mangaImages;
+      let imageMap: Map<number, string>;
+      if (firstItem.type === 'anime') imageMap = animeImages;
+      else if (firstItem.type === 'manga') imageMap = mangaImages;
+      else imageMap = gameImages;
+
       const image = imageMap.get(firstItem.id);
       if (image) {
         resultMap.set(listId, image);
@@ -88,7 +106,7 @@ export class ListsService {
     return resultMap;
   }
 
-  async getUserLists(userId: number, type?: 'liste' | 'top' | 'top1', mediaType?: 'anime' | 'manga') {
+  async getUserLists(userId: number, type?: 'liste' | 'top' | 'top1', mediaType?: 'anime' | 'manga' | 'jeu-video') {
     const rows = await this.prisma.akListesTop.findMany({
       where: {
         idMembre: userId,
@@ -129,12 +147,12 @@ export class ListsService {
         popularite: 0,
       },
     });
-    
+
     // Invalidate cache when a new public list is created
     if (list.statut === 1) {
       await this.cacheService.invalidatePublicLists(dto.animeOrManga);
     }
-    
+
     return this.formatList(list);
   }
 
@@ -155,12 +173,12 @@ export class ListsService {
         statut: dto.statut ?? existing.statut,
       },
     });
-    
+
     // Invalidate cache if the list is public or was made public/private
     if ((existing.statut === 1 || updated.statut === 1) && updated.animeOrManga) {
-      await this.cacheService.invalidatePublicLists(updated.animeOrManga as 'anime' | 'manga');
+      await this.cacheService.invalidatePublicLists(updated.animeOrManga as 'anime' | 'manga' | 'jeu-video');
     }
-    
+
     return this.formatList(updated);
   }
 
@@ -170,12 +188,12 @@ export class ListsService {
     if (existing.idMembre !== userId) throw new ForbiddenException('Not your list');
 
     await this.prisma.akListesTop.delete({ where: { idListe: id } });
-    
+
     // Invalidate cache when a public list is deleted
     if (existing.statut === 1 && existing.animeOrManga) {
-      await this.cacheService.invalidatePublicLists(existing.animeOrManga as 'anime' | 'manga');
+      await this.cacheService.invalidatePublicLists(existing.animeOrManga as 'anime' | 'manga' | 'jeu-video');
     }
-    
+
     return { success: true };
   }
 
@@ -193,7 +211,7 @@ export class ListsService {
     return this.formatList(updated);
   }
 
-  async getPublicLists(mediaType: 'anime' | 'manga', sort: 'recent' | 'popular' = 'recent', limit = 10) {
+  async getPublicLists(mediaType: 'anime' | 'manga' | 'jeu-video', sort: 'recent' | 'popular' = 'recent', limit = 10) {
     // Check cache first
     const cachedLists = await this.cacheService.getPublicLists(mediaType, sort, limit);
     if (cachedLists) {
@@ -234,10 +252,10 @@ export class ListsService {
 
     // Cache the result for 4 hours
     await this.cacheService.setPublicLists(mediaType, sort, limit, result);
-    
+
     return result;
   }
-  async getPublicListsPaged(mediaType: 'anime' | 'manga', sort: 'recent' | 'popular' = 'recent', type?: 'liste' | 'top', page = 1, limit = 30) {
+  async getPublicListsPaged(mediaType: 'anime' | 'manga' | 'jeu-video', sort: 'recent' | 'popular' = 'recent', type?: 'liste' | 'top', page = 1, limit = 30) {
     // Check cache first
     const cachedResult = await this.cacheService.getPublicListsPaged(mediaType, sort, type || '', page, limit);
     if (cachedResult) {

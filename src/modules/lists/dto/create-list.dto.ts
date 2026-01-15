@@ -15,8 +15,8 @@ export class CreateListDto {
   type: 'liste' | 'top' | 'top1';
 
   @IsString()
-  @IsIn(['anime', 'manga'])
-  animeOrManga: 'anime' | 'manga';
+  @IsIn(['anime', 'manga', 'jeu-video'])
+  animeOrManga: 'anime' | 'manga' | 'jeu-video';
 
   @IsOptional()
   @IsString()
