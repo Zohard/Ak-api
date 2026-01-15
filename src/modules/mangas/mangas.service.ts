@@ -3,6 +3,7 @@ import {
   NotFoundException,
   ForbiddenException,
   BadRequestException,
+  Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../../shared/services/prisma.service';
 import { CacheService } from '../../shared/services/cache.service';
@@ -41,6 +42,7 @@ export class MangasService extends BaseContentService<
   protected get model() {
     return this.prisma.akManga;
   }
+  private readonly logger = new Logger(MangasService.name);
 
   protected get idField() {
     return 'idManga';
@@ -220,7 +222,7 @@ export class MangasService extends BaseContentService<
 
     // Create cache key from query parameters
     const cacheKey = this.createCacheKey(query);
-    
+
     // Try to get from cache first
     const cached = await this.cacheService.getMangaList(cacheKey);
     if (cached) {
@@ -649,7 +651,7 @@ export class MangasService extends BaseContentService<
         /imagekit\.io/.test(manga.image)
       ) {
         await this.r2Service.deleteImageByUrl(manga.image);
-        console.log(`Deleted R2 image (manga): ${manga.image}`);
+        // Log removed
       }
     } catch (e) {
       console.warn('Failed to delete previous R2 image (manga):', (e as Error).message);
@@ -1301,7 +1303,7 @@ export class MangasService extends BaseContentService<
 
       // Strategy 1: Try Google Books API first (best for French ISBNs)
       try {
-        console.log(`Trying Google Books API for ISBN ${isbn}`);
+        this.logger.debug(`Trying Google Books API for ISBN ${isbn}`);
         const cleanIsbn = isbn.replace(/[-\s]/g, '');
         const apiKey = process.env.GOOGLE_BOOKS_API_KEY || '';
         const googleBooksUrl = apiKey
@@ -1327,16 +1329,16 @@ export class MangasService extends BaseContentService<
             language: volumeInfo.language,
           };
           bookSource = 'google';
-          console.log(`✓ Found in Google Books: ${rawTitle}`);
+          this.logger.debug(`✓ Found in Google Books: ${rawTitle}`);
         }
       } catch (googleError) {
-        console.log(`Google Books API failed or no results for ISBN ${isbn}`);
+        this.logger.debug(`Google Books API failed or no results for ISBN ${isbn}`);
       }
 
       // Strategy 2: If Google Books failed, try OpenLibrary
       if (!bookInfo) {
         try {
-          console.log(`Trying OpenLibrary API for ISBN ${isbn}`);
+          this.logger.debug(`Trying OpenLibrary API for ISBN ${isbn}`);
           const openLibraryBook = await this.openLibraryService.getBookByIsbn(isbn);
           rawTitle = openLibraryBook.title || '';
           authors = openLibraryBook.authors?.join(', ') || '';
@@ -1356,17 +1358,17 @@ export class MangasService extends BaseContentService<
             openLibraryUrl: openLibraryBook.openLibraryUrl,
           };
           bookSource = 'openlibrary';
-          console.log(`✓ Found in OpenLibrary: ${rawTitle}`);
+          this.logger.debug(`✓ Found in OpenLibrary: ${rawTitle}`);
         } catch (openLibraryError) {
-          console.log(`OpenLibrary API failed or no results for ISBN ${isbn}`);
+          this.logger.debug(`OpenLibrary API failed or no results for ISBN ${isbn}`);
         }
       }
 
       // If we found book info, log the source
       if (bookInfo) {
-        console.log(`Book metadata source: ${bookSource}`);
+        this.logger.debug(`Book metadata source: ${bookSource}`);
       } else {
-        console.log(`No book metadata found in Google Books or OpenLibrary, will search local database only`);
+        this.logger.debug(`No book metadata found in Google Books or OpenLibrary, will search local database only`);
       }
 
       // Clean the title for better matching
@@ -1387,8 +1389,8 @@ export class MangasService extends BaseContentService<
         .replace(/[,\-:\s]+$/, '')
         .trim();
 
-      console.log('ISBN lookup - Raw title:', rawTitle);
-      console.log('ISBN lookup - Cleaned title:', cleanedTitle);
+      this.logger.debug('ISBN lookup - Raw title:', rawTitle);
+      this.logger.debug('ISBN lookup - Cleaned title:', cleanedTitle);
 
       // Search local ak_mangas database
       let mangaResults: any[] = [];
@@ -1484,7 +1486,7 @@ export class MangasService extends BaseContentService<
           `;
         } catch (similarityError: any) {
           // Fallback to ILIKE if pg_trgm extension is not available
-          console.log('SIMILARITY function not available, using ILIKE fallback');
+          this.logger.debug('SIMILARITY function not available, using ILIKE fallback');
           const searchPattern = `%${searchTitle}%`;
           mangaResults = await this.prisma.$queryRaw<Array<{
             id_manga: number;
@@ -1527,7 +1529,7 @@ export class MangasService extends BaseContentService<
         }
       }
 
-      console.log('ISBN lookup - Found', mangaResults.length, 'local manga matches');
+      this.logger.debug('ISBN lookup - Found', mangaResults.length, 'local manga matches');
 
       // Check if this ISBN already has a volume registered
       const existingVolume = await this.prisma.mangaVolume.findFirst({
@@ -1782,10 +1784,10 @@ export class MangasService extends BaseContentService<
         const imgMeta = articleRel.wpPost.postMeta.find(meta => meta.metaKey === 'img');
 
         const coverImage = imgunebigMeta?.metaValue ||
-                          imgunebig2Meta?.metaValue ||
-                          akImgMeta?.metaValue ||
-                          imgMeta?.metaValue ||
-                          null;
+          imgunebig2Meta?.metaValue ||
+          akImgMeta?.metaValue ||
+          imgMeta?.metaValue ||
+          null;
 
         relatedContent.push({
           id: Number(articleRel.wpPost.ID),
@@ -1870,10 +1872,10 @@ export class MangasService extends BaseContentService<
         const imgMeta = post.postMeta.find(meta => meta.metaKey === 'img');
 
         const coverImage = imgunebigMeta?.metaValue ||
-                          imgunebig2Meta?.metaValue ||
-                          akImgMeta?.metaValue ||
-                          imgMeta?.metaValue ||
-                          null;
+          imgunebig2Meta?.metaValue ||
+          akImgMeta?.metaValue ||
+          imgMeta?.metaValue ||
+          null;
 
         return {
           id: post.ID,
@@ -2028,7 +2030,7 @@ export class MangasService extends BaseContentService<
 
   async getMostPopularMangaTags(limit = 20) {
     const cacheKey = `popular_manga_tags:${limit}`;
-    
+
     const cached = await this.cacheService.get(cacheKey);
     if (cached) {
       return cached;
@@ -2065,7 +2067,7 @@ export class MangasService extends BaseContentService<
     };
 
     await this.cacheService.set(cacheKey, result, 86400); // 24 hours
-    
+
     return result;
   }
 
@@ -2908,7 +2910,7 @@ export class MangasService extends BaseContentService<
 
     const jikanManga = data.data[0];
     const imageUrl = jikanManga.images?.jpg?.large_image_url ||
-                     jikanManga.images?.jpg?.image_url;
+      jikanManga.images?.jpg?.image_url;
 
     if (!imageUrl) {
       throw new BadRequestException('No image found in Jikan response');

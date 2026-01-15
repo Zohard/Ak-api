@@ -18,10 +18,7 @@ export class EmailService {
 
     this.resend = new Resend(apiKey);
 
-    console.log('📧 Initializing email service with Resend API:', {
-      fromEmail: this.fromEmail,
-      apiKeyLength: apiKey.length,
-    });
+
   }
 
   async sendEmailVerification(email: string, username: string, verificationToken: string): Promise<void> {
@@ -40,7 +37,7 @@ export class EmailService {
         throw error;
       }
 
-      console.log(`✅ Verification email sent to ${email} (Message ID: ${data?.id})`);
+
     } catch (error) {
       console.error('❌ Error sending verification email to', email, ':', error);
       throw error;
@@ -63,7 +60,7 @@ export class EmailService {
         throw error;
       }
 
-      console.log(`✅ Password reset email sent to ${email} (Message ID: ${data?.id})`);
+
     } catch (error) {
       console.error('❌ Error sending password reset email to', email, ':', error);
       throw error;
@@ -93,7 +90,7 @@ export class EmailService {
         return;
       }
 
-      console.log(`✅ PM notification email sent to ${recipientEmail} (Message ID: ${data?.id})`);
+
     } catch (error) {
       console.error('❌ Error sending PM notification email to', recipientEmail, ':', error);
       // Don't throw - we don't want to fail the PM send if email fails
@@ -123,7 +120,7 @@ export class EmailService {
         return;
       }
 
-      console.log(`✅ Review rejection email sent to ${recipientEmail} (Message ID: ${data?.id})`);
+
     } catch (error) {
       console.error('❌ Error sending review rejection email to', recipientEmail, ':', error);
       // Don't throw - we don't want to fail the moderation if email fails

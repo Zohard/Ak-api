@@ -8,7 +8,7 @@ export class CacheService implements OnModuleInit {
 
   async onModuleInit() {
     const redisUrl = process.env.REDIS_URL;
-    
+
     if (redisUrl) {
       this.logger.log('🔧 Initializing Redis connection');
       this.redis = new Redis(redisUrl, {
@@ -17,10 +17,10 @@ export class CacheService implements OnModuleInit {
         connectTimeout: 10000,
         lazyConnect: true
       });
-      
+
       this.redis.on('connect', () => this.logger.log('✅ Redis connected'));
       this.redis.on('error', (err) => this.logger.error('❌ Redis error:', err));
-      
+
       this.logger.log('🚀 CacheService initialized with Redis');
     } else {
       this.logger.warn('⚠️  No REDIS_URL found - caching disabled');
@@ -30,7 +30,7 @@ export class CacheService implements OnModuleInit {
   // Generic get method
   async get<T>(key: string): Promise<T | undefined> {
     if (!this.redis) return undefined;
-    
+
     try {
       this.logger.log(`🔍 Checking cache for key: ${key}`);
       const value = await this.redis.get(key);
@@ -50,7 +50,7 @@ export class CacheService implements OnModuleInit {
   // Generic set method
   async set<T>(key: string, value: T, ttl: number = 300): Promise<void> {
     if (!this.redis) return;
-    
+
     try {
       this.logger.log(`💾 Attempting to cache key: ${key}, TTL: ${ttl}s`);
       const serialized = JSON.stringify(value);
@@ -64,17 +64,18 @@ export class CacheService implements OnModuleInit {
   // Delete specific key
   async del(key: string): Promise<void> {
     if (!this.redis) {
-      console.log(`⚠️ [CacheService] Redis not available, cannot delete key: ${key}`);
+      // Log removed
       return;
     }
 
     try {
-      console.log(`🗑️ [CacheService] Deleting cache key: ${key}`);
+      // Log removed
       const result = await this.redis.del(key);
-      console.log(`✅ [CacheService] Cache deleted for key: ${key}, result: ${result}`);
+      // Log removed
       this.logger.debug(`Cache deleted for key: ${key}, result: ${result}`);
     } catch (error) {
-      console.error(`❌ [CacheService] Cache delete error for key ${key}:`, error);
+      // Error log replaced with logger
+      this.logger.error(`❌ [CacheService] Cache delete error for key ${key}:`, error);
       this.logger.error(`Cache delete error for key ${key}:`, error);
     }
   }
@@ -82,7 +83,7 @@ export class CacheService implements OnModuleInit {
   // Clear cache by pattern (useful for invalidating related keys)
   async delByPattern(pattern: string): Promise<void> {
     if (!this.redis) return;
-    
+
     try {
       this.logger.debug(`Cache pattern delete requested for: ${pattern}`);
       const keys = await this.redis.keys(pattern);

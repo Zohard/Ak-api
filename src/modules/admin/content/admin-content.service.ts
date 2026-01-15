@@ -17,7 +17,7 @@ export class AdminContentService {
   constructor(
     private prisma: PrismaService,
     private adminLogging: AdminLoggingService,
-  ) {}
+  ) { }
 
   async getAllContent(query: ContentAdminQueryDto) {
     const {
@@ -246,7 +246,7 @@ export class AdminContentService {
     );
 
     // Log admin action
-    console.log(`Admin ${adminId} updated ${type} ${id} status to ${status}`);
+    // Log removed
 
     return { message: `${type} status updated successfully` };
   }
@@ -336,7 +336,7 @@ export class AdminContentService {
     );
 
     // Log admin action
-    console.log(`Admin ${adminId} deleted ${type} ${id}`);
+    // Log removed
 
     return { message: `${type} deleted successfully` };
   }
@@ -776,7 +776,7 @@ export class AdminContentService {
 
   async getStaffRoleTypes(type: string, query?: string) {
     let table: string;
-    
+
     if (type === 'anime') {
       table = 'ak_business_to_animes';
     } else if (type === 'manga') {

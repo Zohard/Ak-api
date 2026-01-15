@@ -12,6 +12,7 @@ import {
   ParseIntPipe,
   HttpCode,
   HttpStatus,
+  Logger,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -32,7 +33,8 @@ import { AdminGuard } from '../../common/guards/admin.guard';
 @ApiTags('Users')
 @Controller('users')
 export class UsersController {
-  constructor(private readonly usersService: UsersService) {}
+  constructor(private readonly usersService: UsersService) { }
+  private readonly logger = new Logger(UsersController.name);
 
   @Get()
   @UseGuards(JwtAuthGuard)
@@ -288,7 +290,7 @@ export class UsersController {
     // Support both 'genre' and 'genres' parameters for backward compatibility
     const genresParam = genres || genre;
 
-    console.log('📊 Media-specific recommendations request:', {
+    this.logger.debug('📊 Media-specific recommendations request:', {
       userId: id,
       media,
       limit: limit || 12,
@@ -358,7 +360,7 @@ export class UsersController {
     // Support both 'genre' and 'genres' parameters for backward compatibility
     const genresParam = genres || genre;
 
-    console.log('📊 Recommendations request:', {
+    this.logger.debug('📊 Recommendations request:', {
       userId: id,
       limit: limit || 12,
       page: page || 1,

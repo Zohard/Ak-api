@@ -15,7 +15,7 @@ export class AdminService {
     private adminUsersService: AdminUsersService,
     private adminContentService: AdminContentService,
     private adminModerationService: AdminModerationService,
-  ) {}
+  ) { }
 
   async getDashboardStats() {
     // Check in-memory cache first
@@ -379,7 +379,7 @@ export class AdminService {
   async updateSystemSettings(settings: Record<string, any>) {
     // Update system-wide settings
     // This would typically be stored in a settings table
-    console.log('Updating system settings:', settings);
+    // Log removed
 
     return {
       message: 'System settings updated successfully',

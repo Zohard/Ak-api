@@ -1,5 +1,5 @@
 import { NestFactory } from '@nestjs/core';
-import { ValidationPipe } from '@nestjs/common';
+import { ValidationPipe, Logger as NestLogger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AppModule } from './app.module';
 import * as express from 'express';
@@ -32,7 +32,8 @@ async function bootstrap() {
         return event;
       },
     });
-    console.log('✅ Sentry initialized for environment:', process.env.NODE_ENV || 'development');
+    const logger = new NestLogger('Sentry');
+    logger.log(`Sentry initialized for environment: ${process.env.NODE_ENV || 'development'}`);
   } else {
     console.warn('⚠️  SENTRY_DSN not configured - error tracking disabled');
     console.warn('   Add SENTRY_DSN to your .env file or Railway environment variables');
@@ -76,7 +77,8 @@ async function bootstrap() {
   ].filter(Boolean);
 
   // Log CORS origins for debugging
-  console.log('🔒 CORS Origins:', corsOrigins);
+  const logger = new NestLogger('Bootstrap');
+  logger.log(`CORS Origins: ${JSON.stringify(corsOrigins)}`);
 
   app.enableCors({
     origin: corsOrigins.length > 3 ? corsOrigins : true, // Fallback to allow all if env vars missing
@@ -106,31 +108,31 @@ async function bootstrap() {
   setupSwagger(app);
 
   const port = process.env.PORT || configService.get('PORT') || 3003;
-  console.log(`🔌 PORT from env: ${process.env.PORT}`);
-  console.log(`🔌 PORT from config: ${configService.get('PORT')}`);
-  console.log(`🔌 Using PORT: ${port}`);
+  logger.log(`🔌 PORT from env: ${process.env.PORT}`);
+  logger.log(`🔌 PORT from config: ${configService.get('PORT')}`);
+  logger.log(`🔌 Using PORT: ${port}`);
   await app.listen(port, '0.0.0.0');
 
   // Graceful shutdown handling
   process.on('SIGTERM', async () => {
-    console.log('SIGTERM received, shutting down gracefully...');
+    logger.log('SIGTERM received, shutting down gracefully...');
     await app.close();
     process.exit(0);
   });
 
   process.on('SIGINT', async () => {
-    console.log('SIGINT received, shutting down gracefully...');
+    logger.log('SIGINT received, shutting down gracefully...');
     await app.close();
     process.exit(0);
   });
 
-  console.log(
+  logger.log(
     `🚀 Anime-Kun NestJS API v3.0 running on http://localhost:${port}`,
   );
-  console.log(`📊 Health check at http://localhost:${port}/api`);
-  console.log(`📚 API documentation at http://localhost:${port}/docs`);
-  console.log(`💾 Database: PostgreSQL with Prisma`);
-  console.log(
+  logger.log(`📊 Health check at http://localhost:${port}/api`);
+  logger.log(`📚 API documentation at http://localhost:${port}/docs`);
+  logger.log(`💾 Database: PostgreSQL with Prisma`);
+  logger.log(
     `🌍 Environment: ${configService.get('NODE_ENV') || 'development'}`,
   );
 }

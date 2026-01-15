@@ -8,7 +8,7 @@ export class AnimeRelationsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly cacheService: CacheService,
-  ) {}
+  ) { }
 
   async getAnimeRelations(id: number): Promise<RelationsResponse> {
     // Try to get from cache first (15 minutes TTL)
@@ -19,7 +19,7 @@ export class AnimeRelationsService {
     }
 
     try {
-      console.log(`Starting getAnimeRelations for anime ID: ${id}`);
+
 
       // First check if anime exists
       const anime = await this.prisma.akAnime.findUnique({
@@ -30,7 +30,7 @@ export class AnimeRelationsService {
       if (!anime) {
         throw new NotFoundException('Anime introuvable');
       }
-      console.log(`Anime ${id} exists and is validated`);
+
 
       // Get BIDIRECTIONAL relations: where anime is source OR target
       const relations = await this.prisma.$queryRaw`
@@ -39,7 +39,7 @@ export class AnimeRelationsService {
         WHERE id_fiche_depart = ${`anime${id}`} OR id_anime = ${id}
       ` as any[];
 
-      console.log(`Found ${relations.length} relations:`, relations);
+
 
       const relatedContent: RelatedContentItem[] = [];
 
@@ -203,10 +203,10 @@ export class AnimeRelationsService {
           const imgMeta = articleRel.wpPost.postMeta.find(meta => meta.metaKey === 'img');
 
           const coverImage = imgunebigMeta?.metaValue ||
-                            imgunebig2Meta?.metaValue ||
-                            akImgMeta?.metaValue ||
-                            imgMeta?.metaValue ||
-                            null;
+            imgunebig2Meta?.metaValue ||
+            akImgMeta?.metaValue ||
+            imgMeta?.metaValue ||
+            null;
 
           relatedContent.push({
             id: Number(articleRel.wpPost.ID),
@@ -306,10 +306,10 @@ export class AnimeRelationsService {
         const imgMeta = post.postMeta.find(meta => meta.metaKey === 'img');
 
         const coverImage = imgunebigMeta?.metaValue ||
-                          imgunebig2Meta?.metaValue ||
-                          akImgMeta?.metaValue ||
-                          imgMeta?.metaValue ||
-                          null;
+          imgunebig2Meta?.metaValue ||
+          akImgMeta?.metaValue ||
+          imgMeta?.metaValue ||
+          null;
 
         return {
           id: post.ID,

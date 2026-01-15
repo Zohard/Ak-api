@@ -16,7 +16,7 @@ export class AdminJeuxVideoService {
     private igdbService: IgdbService,
     private imagekitService: R2Service,
     private deepLService: DeepLService,
-  ) {}
+  ) { }
 
   async list(query: AdminJeuxVideoListQueryDto) {
     const { page = 1, statut, search, plateforme } = query;
@@ -226,7 +226,7 @@ export class AdminJeuxVideoService {
 
     return {
       ...created,
-      idJeu:created.idJeu,
+      idJeu: created.idJeu,
       description: created.presentation,
       platformIds,
       genreIds,
@@ -308,7 +308,7 @@ export class AdminJeuxVideoService {
 
     return {
       ...updated,
-      idJeu:updated.idJeu,
+      idJeu: updated.idJeu,
       description: updated.presentation,
       platformIds,
       genreIds,
@@ -331,7 +331,7 @@ export class AdminJeuxVideoService {
 
     return {
       ...updated,
-      idJeu:updated.idJeu,
+      idJeu: updated.idJeu,
     };
   }
 
@@ -386,15 +386,15 @@ export class AdminJeuxVideoService {
     const platformIds = await this.mapIgdbPlatforms(igdbGame.platforms || []);
 
     // Map regional release dates
-    console.log('IGDB release_dates raw data:', JSON.stringify(igdbGame.release_dates, null, 2));
+
     const releaseDates = this.mapIgdbReleaseDates(igdbGame.release_dates || []);
-    console.log('Mapped release dates:', releaseDates);
+
 
     // Fallback: If no regional dates found but first_release_date is available,
     // use it as the worldwide release date
     if (!releaseDates.japon && !releaseDates.usa && !releaseDates.europe && !releaseDates.worldwide && igdbGame.first_release_date) {
       releaseDates.worldwide = new Date(igdbGame.first_release_date * 1000);
-      console.log('No regional dates found. Using first_release_date as worldwide:', releaseDates.worldwide);
+
     }
 
     // Translate summary to French if available
@@ -451,7 +451,7 @@ export class AdminJeuxVideoService {
           if (uploadResult && uploadResult.name) {
             // Store just the filename (not the full URL)
             gameData.image = uploadResult.name;
-            console.log(`Successfully uploaded cover image for IGDB ID ${igdbId}: ${uploadResult.name}`);
+
           }
         }
       } catch (error) {
@@ -507,7 +507,7 @@ export class AdminJeuxVideoService {
 
     return {
       ...created,
-      idJeu:created.idJeu,
+      idJeu: created.idJeu,
       description: created.presentation,
       platformIds,
       genreIds,
@@ -568,7 +568,7 @@ export class AdminJeuxVideoService {
 
                 if (uploadResult && uploadResult.name) {
                   businessData.image = uploadResult.name;
-                  console.log(`Successfully uploaded logo for company ${ic.company.name}: ${uploadResult.name}`);
+
                 }
               }
             } catch (error) {
@@ -581,7 +581,7 @@ export class AdminJeuxVideoService {
           business = await this.prisma.akBusiness.create({
             data: businessData
           });
-          console.log(`Created new business entity: ${ic.company.name}`);
+
         } else if (!business.image && ic.company.logo?.image_id) {
           // Business exists but has no image - update it with logo from IGDB
           try {
@@ -604,7 +604,7 @@ export class AdminJeuxVideoService {
                     dateModification: Math.floor(Date.now() / 1000)
                   }
                 });
-                console.log(`Updated existing business with logo: ${ic.company.name} -> ${uploadResult.name}`);
+
               }
             }
           } catch (error) {
@@ -632,7 +632,7 @@ export class AdminJeuxVideoService {
                 type: role
               }
             });
-            console.log(`Created business relation: ${ic.company.name} - ${role}`);
+
           }
         }
       } catch (error) {
@@ -675,7 +675,7 @@ export class AdminJeuxVideoService {
     // use it as the worldwide release date
     if (!releaseDates.japon && !releaseDates.usa && !releaseDates.europe && !releaseDates.worldwide && igdbGame.first_release_date) {
       releaseDates.worldwide = new Date(igdbGame.first_release_date * 1000);
-      console.log('No regional dates found. Using first_release_date as worldwide:', releaseDates.worldwide);
+
     }
 
     // Helper function to format Date to YYYY-MM-DD for HTML date inputs
@@ -717,7 +717,7 @@ export class AdminJeuxVideoService {
           if (uploadResult && uploadResult.name) {
             // Store just the filename (not the full URL)
             imageName = uploadResult.name;
-            console.log(`Successfully uploaded cover image for IGDB ID ${igdbId}: ${uploadResult.name}`);
+
           }
         }
       } catch (error) {
@@ -976,28 +976,28 @@ export class AdminJeuxVideoService {
       worldwide: null as Date | null,
     };
 
-    console.log(`Processing ${releaseDates.length} release dates`);
+
 
     for (const release of releaseDates) {
-      console.log('Processing release:', { date: release.date, region: release.region });
+
 
       if (!release.date) {
-        console.log('Skipping release - no date');
+
         continue;
       }
 
       const date = new Date(release.date * 1000);
       const region = this.igdbService.mapRegion(release.region);
 
-      console.log(`Converted: region code ${release.region} -> ${region}, date: ${date.toISOString()}`);
+
 
       if (region && !result[region]) {
         result[region] = date;
-        console.log(`Set ${region} to ${date.toISOString()}`);
+
       }
     }
 
-    console.log('Final result:', result);
+
     return result;
   }
 
@@ -1161,7 +1161,7 @@ export class AdminJeuxVideoService {
             });
             importedCount++;
             screenshotNumber++;
-            console.log(`Successfully imported screenshot ${screenshotNumber - 1} for game ${idJeu}`);
+
           }
         }
       } catch (error) {
@@ -1171,7 +1171,7 @@ export class AdminJeuxVideoService {
     }
 
     if (importedCount > 0) {
-      console.log(`Successfully imported ${importedCount} screenshot(s) for IGDB ID ${igdbId}`);
+
     }
 
     return importedCount;
@@ -1256,7 +1256,7 @@ export class AdminJeuxVideoService {
         });
 
         if (existingTrailer) {
-          console.log(`Trailer ${video.video_id} already exists for game ${idJeu}, skipping`);
+
           continue;
         }
 
@@ -1277,7 +1277,7 @@ export class AdminJeuxVideoService {
         });
 
         importedCount++;
-        console.log(`Successfully imported trailer ${video.video_id} for game ${idJeu}`);
+
       } catch (error) {
         console.error(`Failed to import trailer ${video.video_id}:`, error);
         continue;

@@ -13,7 +13,7 @@ import * as bcrypt from 'bcryptjs';
 
 @Injectable()
 export class UsersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) { }
 
   async findAll(query: UserQueryDto) {
     const { page, limit, search, sortBy, sortOrder } = query;
@@ -711,27 +711,22 @@ export class UsersService {
         ? genre.split(',').map(g => g.trim()).filter(Boolean)
         : topGenres;
 
-      console.log('🎯 Genre filtering:', {
-        genreParam: genre,
-        topGenresFromUser: topGenres,
-        genresToUse,
-        requireAllGenres: genre && genresToUse.length > 1
-      });
+
 
       // Skip if no genres to filter by
       if (genresToUse.length === 0) {
-        console.log('⚠️ No genres to filter by, skipping genre-based recommendations');
+
       } else {
         const animeOrderBy = buildOrderBy('anime');
 
-      // If tags parameter is provided (includeAllTags=true), require ALL tags
-      // If multiple genres/tags are selected, require ALL of them (AND logic)
-      // Otherwise, match ANY tag (user preferences)
-      const requireAllTags = tags && tags.trim().length > 0;
-      const requireAllGenres = genre && genresToUse.length > 1;
+        // If tags parameter is provided (includeAllTags=true), require ALL tags
+        // If multiple genres/tags are selected, require ALL of them (AND logic)
+        // Otherwise, match ANY tag (user preferences)
+        const requireAllTags = tags && tags.trim().length > 0;
+        const requireAllGenres = genre && genresToUse.length > 1;
 
-      const animeRecs = (requireAllTags || requireAllGenres)
-        ? await this.prisma.$queryRawUnsafe(`
+        const animeRecs = (requireAllTags || requireAllGenres)
+          ? await this.prisma.$queryRawUnsafe(`
           SELECT
             a.id_anime as id,
             a.titre,
@@ -764,7 +759,7 @@ export class UsersService {
           ORDER BY ${similarTo && originalMediaTitle ? 'pertinence DESC,' : ''} ${animeOrderBy}
           LIMIT ${Math.ceil(limit / 2)} OFFSET ${offset}
         `)
-        : await this.prisma.$queryRawUnsafe(`
+          : await this.prisma.$queryRawUnsafe(`
           SELECT
             a.id_anime as id,
             a.titre,
@@ -797,11 +792,11 @@ export class UsersService {
           LIMIT ${Math.ceil(limit / 2)} OFFSET ${offset}
         `);
 
-      // Get manga recommendations based on favorite genres or specific genre filter
-      const mangaOrderBy = buildOrderBy('manga');
+        // Get manga recommendations based on favorite genres or specific genre filter
+        const mangaOrderBy = buildOrderBy('manga');
 
-      const mangaRecs = (requireAllTags || requireAllGenres)
-        ? await this.prisma.$queryRawUnsafe(`
+        const mangaRecs = (requireAllTags || requireAllGenres)
+          ? await this.prisma.$queryRawUnsafe(`
           SELECT
             m.id_manga as id,
             m.titre,
@@ -834,7 +829,7 @@ export class UsersService {
           ORDER BY ${similarTo && originalMediaTitle ? 'pertinence DESC,' : ''} ${mangaOrderBy}
           LIMIT ${Math.floor(limit / 2)} OFFSET ${offset}
         `)
-        : await this.prisma.$queryRawUnsafe(`
+          : await this.prisma.$queryRawUnsafe(`
           SELECT
             m.id_manga as id,
             m.titre,
@@ -867,10 +862,10 @@ export class UsersService {
           LIMIT ${Math.floor(limit / 2)} OFFSET ${offset}
         `);
 
-      recommendations = [
-        ...(animeRecs as any[]),
-        ...(mangaRecs as any[])
-      ];
+        recommendations = [
+          ...(animeRecs as any[]),
+          ...(mangaRecs as any[])
+        ];
       }
     }
 
@@ -958,11 +953,7 @@ export class UsersService {
 
     const finalResults = recommendations.slice(0, limit);
 
-    console.log('✅ Returning recommendations:', {
-      totalFound: recommendations.length,
-      returning: finalResults.length,
-      firstThreeTitles: finalResults.slice(0, 3).map((r: any) => `${r.titre} (${r.type})`)
-    });
+
 
     return {
       items: finalResults,
@@ -1776,7 +1767,7 @@ export class UsersService {
       ...(recentReviews as any[]),
       ...(recentCollections as any[])
     ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-     .slice(0, limit);
+      .slice(0, limit);
 
     const activities = allActivities;
 

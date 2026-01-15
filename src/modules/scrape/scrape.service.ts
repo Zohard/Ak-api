@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException, Logger } from '@nestjs/common';
 import { load } from 'cheerio';
 import { PrismaService } from '../../shared/services/prisma.service';
 import { AniListService } from '../anilist/anilist.service';
@@ -10,125 +10,127 @@ export class ScrapeService {
   constructor(
     private prisma: PrismaService,
     private anilistService: AniListService,
-  ) {}
+  ) { }
+  private readonly logger = new Logger(ScrapeService.name);
+
 
   // Add these at the top of your ScrapeService class:
-private requestCache = new Map<string, { data: any; timestamp: number }>();
-private readonly CACHE_TTL = 10 * 60 * 1000; // 10 minutes (increased from 5)
-private lastRequestTime = 0;
-private readonly MIN_REQUEST_DELAY = 1000; // 1 second between requests
+  private requestCache = new Map<string, { data: any; timestamp: number }>();
+  private readonly CACHE_TTL = 10 * 60 * 1000; // 10 minutes (increased from 5)
+  private lastRequestTime = 0;
+  private readonly MIN_REQUEST_DELAY = 1000; // 1 second between requests
 
-/**
- * Clear old cache entries to prevent memory leaks
- * Call this periodically or when cache gets too large
- */
-private clearOldCache() {
-  const now = Date.now();
-  const keysToDelete: string[] = [];
+  /**
+   * Clear old cache entries to prevent memory leaks
+   * Call this periodically or when cache gets too large
+   */
+  private clearOldCache() {
+    const now = Date.now();
+    const keysToDelete: string[] = [];
 
-  this.requestCache.forEach((value, key) => {
-    if (now - value.timestamp > this.CACHE_TTL) {
-      keysToDelete.push(key);
-    }
-  });
-
-  keysToDelete.forEach(key => this.requestCache.delete(key));
-
-  if (keysToDelete.length > 0) {
-    console.log(`Cleared ${keysToDelete.length} old cache entries`);
-  }
-}
-
-// Replace your fetchHtml method with this improved version:
-private async fetchHtml(url: string) {
-  // Clear old cache entries periodically (every 100 requests)
-  if (this.requestCache.size > 100) {
-    this.clearOldCache();
-  }
-
-  // Check cache first
-  const cached = this.requestCache.get(url);
-  if (cached && Date.now() - cached.timestamp < this.CACHE_TTL) {
-    console.log(`Using cached response for ${url}`);
-    return load(cached.data);
-  }
-
-  // Rate limiting
-  const now = Date.now();
-  const timeSinceLastRequest = now - this.lastRequestTime;
-  if (timeSinceLastRequest < this.MIN_REQUEST_DELAY) {
-    await new Promise(resolve => setTimeout(resolve, this.MIN_REQUEST_DELAY - timeSinceLastRequest));
-  }
-  this.lastRequestTime = Date.now();
-
-  // Fetch with timeout and retries
-  let lastError;
-  for (let attempt = 1; attempt <= 3; attempt++) {
-    try {
-      const controller = new AbortController();
-      // Increase timeout to 30 seconds for slower sites
-      const timeoutId = setTimeout(() => controller.abort(), 30000);
-
-      const res = await fetch(url, {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-          'Accept-Language': 'fr-FR,fr;q=0.9',
-        },
-        signal: controller.signal
-      });
-
-      clearTimeout(timeoutId);
-
-      if (!res.ok) {
-        if (res.status === 429 && attempt < 3) {
-          // Exponential backoff for rate limiting: 3s, 6s, 9s
-          const delay = 3000 * attempt;
-          console.log(`Rate limited (429), retrying in ${delay}ms (attempt ${attempt}/3)`);
-          await new Promise(resolve => setTimeout(resolve, delay));
-          continue;
-        }
-        if (res.status >= 500 && attempt < 3) {
-          // Server error, retry with exponential backoff
-          const delay = 2000 * Math.pow(2, attempt - 1); // 2s, 4s, 8s
-          console.log(`Server error (${res.status}), retrying in ${delay}ms (attempt ${attempt}/3)`);
-          await new Promise(resolve => setTimeout(resolve, delay));
-          continue;
-        }
-        throw new BadRequestException(`Fetch failed ${res.status}`);
+    this.requestCache.forEach((value, key) => {
+      if (now - value.timestamp > this.CACHE_TTL) {
+        keysToDelete.push(key);
       }
+    });
 
-      const html = await res.text();
-      
-      // Cache the result
-      this.requestCache.set(url, { data: html, timestamp: Date.now() });
-      
-      return load(html);
+    keysToDelete.forEach(key => this.requestCache.delete(key));
 
-    } catch (error) {
-      lastError = error;
-      if (error.name === 'AbortError' && attempt < 3) {
-        // Exponential backoff for timeouts: 2s, 4s, 8s
-        const delay = 2000 * Math.pow(2, attempt - 1);
-        console.log(`Request timeout, retrying in ${delay}ms (attempt ${attempt}/3)`);
-        await new Promise(resolve => setTimeout(resolve, delay));
-        continue;
-      }
-      // Network errors, DNS errors, etc
-      if ((error.code === 'ENOTFOUND' || error.code === 'ECONNREFUSED' || error.code === 'ETIMEDOUT') && attempt < 3) {
-        const delay = 2000 * Math.pow(2, attempt - 1);
-        console.log(`Network error (${error.code}), retrying in ${delay}ms (attempt ${attempt}/3)`);
-        await new Promise(resolve => setTimeout(resolve, delay));
-        continue;
-      }
-      if (attempt === 3) break;
+    if (keysToDelete.length > 0) {
+
     }
   }
 
-  const errorMsg = lastError?.message || 'Failed to fetch after retries';
-  console.error(`Scraping failed for ${url}: ${errorMsg}`);
-  throw lastError || new BadRequestException(errorMsg);
-}
+  // Replace your fetchHtml method with this improved version:
+  private async fetchHtml(url: string) {
+    // Clear old cache entries periodically (every 100 requests)
+    if (this.requestCache.size > 100) {
+      this.clearOldCache();
+    }
+
+    // Check cache first
+    const cached = this.requestCache.get(url);
+    if (cached && Date.now() - cached.timestamp < this.CACHE_TTL) {
+
+      return load(cached.data);
+    }
+
+    // Rate limiting
+    const now = Date.now();
+    const timeSinceLastRequest = now - this.lastRequestTime;
+    if (timeSinceLastRequest < this.MIN_REQUEST_DELAY) {
+      await new Promise(resolve => setTimeout(resolve, this.MIN_REQUEST_DELAY - timeSinceLastRequest));
+    }
+    this.lastRequestTime = Date.now();
+
+    // Fetch with timeout and retries
+    let lastError;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        const controller = new AbortController();
+        // Increase timeout to 30 seconds for slower sites
+        const timeoutId = setTimeout(() => controller.abort(), 30000);
+
+        const res = await fetch(url, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Accept-Language': 'fr-FR,fr;q=0.9',
+          },
+          signal: controller.signal
+        });
+
+        clearTimeout(timeoutId);
+
+        if (!res.ok) {
+          if (res.status === 429 && attempt < 3) {
+            // Exponential backoff for rate limiting: 3s, 6s, 9s
+            const delay = 3000 * attempt;
+
+            await new Promise(resolve => setTimeout(resolve, delay));
+            continue;
+          }
+          if (res.status >= 500 && attempt < 3) {
+            // Server error, retry with exponential backoff
+            const delay = 2000 * Math.pow(2, attempt - 1); // 2s, 4s, 8s
+
+            await new Promise(resolve => setTimeout(resolve, delay));
+            continue;
+          }
+          throw new BadRequestException(`Fetch failed ${res.status}`);
+        }
+
+        const html = await res.text();
+
+        // Cache the result
+        this.requestCache.set(url, { data: html, timestamp: Date.now() });
+
+        return load(html);
+
+      } catch (error) {
+        lastError = error;
+        if (error.name === 'AbortError' && attempt < 3) {
+          // Exponential backoff for timeouts: 2s, 4s, 8s
+          const delay = 2000 * Math.pow(2, attempt - 1);
+
+          await new Promise(resolve => setTimeout(resolve, delay));
+          continue;
+        }
+        // Network errors, DNS errors, etc
+        if ((error.code === 'ENOTFOUND' || error.code === 'ECONNREFUSED' || error.code === 'ETIMEDOUT') && attempt < 3) {
+          const delay = 2000 * Math.pow(2, attempt - 1);
+
+          await new Promise(resolve => setTimeout(resolve, delay));
+          continue;
+        }
+        if (attempt === 3) break;
+      }
+    }
+
+    const errorMsg = lastError?.message || 'Failed to fetch after retries';
+    console.error(`Scraping failed for ${url}: ${errorMsg}`);
+    throw lastError || new BadRequestException(errorMsg);
+  }
 
   /**
    * Check if an anime already exists in database by title
@@ -896,7 +898,7 @@ private async fetchHtml(url: string) {
     if (!forceRefresh) {
       const existing = await this.checkAnimeExists(q);
       if (existing) {
-        console.log(`Anime "${q}" already exists in database (ID: ${existing.idAnime})`);
+        this.logger.debug(`Anime "${q}" already exists in database (ID: ${existing.idAnime})`);
         return {
           existing: true,
           anime: existing,
@@ -928,9 +930,9 @@ private async fetchHtml(url: string) {
             ? `${anime.startDate.year}-${String(anime.startDate.month).padStart(2, '0')}-${String(anime.startDate.day).padStart(2, '0')}`
             : null,
           format: anime.format === 'TV' ? 'Série TV' :
-                  anime.format === 'MOVIE' ? 'Film' :
-                  anime.format === 'OVA' ? 'OAV' :
-                  anime.format === 'ONA' ? 'ONA' :
+            anime.format === 'MOVIE' ? 'Film' :
+              anime.format === 'OVA' ? 'OAV' :
+                anime.format === 'ONA' ? 'ONA' :
                   anime.format === 'SPECIAL' ? 'Spécial' : 'Série TV',
           nb_epduree: anime.episodes || 'NC',
           official_site: anime.externalLinks?.find((link: any) => link.site === 'Official Site')?.url || null,
@@ -971,11 +973,11 @@ private async fetchHtml(url: string) {
     } else {
       // Scrape both sources with better error handling
       const malPromise = this.scrapeMAL(q).catch(err => {
-        console.log(`MAL scraping failed: ${err.message}`);
+        this.logger.error(`MAL scraping failed: ${err.message}`);
         return null;
       });
       const njPromise = this.scrapeNautiljon(q).catch(err => {
-        console.log(`Nautiljon scraping failed: ${err.message}`);
+        this.logger.error(`Nautiljon scraping failed: ${err.message}`);
         return null;
       });
 
@@ -998,7 +1000,7 @@ private async fetchHtml(url: string) {
     if (allPeopleNames.length > 0) {
       const existingPeople = await this.batchCheckPeopleExist(allPeopleNames);
       result.existingPeople = Object.fromEntries(existingPeople);
-      console.log(`Found ${existingPeople.size} existing people out of ${allPeopleNames.length} total`);
+      this.logger.debug(`Found ${existingPeople.size} existing people out of ${allPeopleNames.length} total`);
     }
 
     return result;

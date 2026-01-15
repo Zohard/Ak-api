@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Delete, Query, Param, ParseIntPipe, UseGuards, Request, Body, NotFoundException } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Query, Param, ParseIntPipe, UseGuards, Request, Body, NotFoundException, Logger } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiQuery, ApiResponse, ApiParam, ApiBearerAuth } from '@nestjs/swagger';
 import { ForumsService } from './forums.service';
 import { ForumMessageQueryDto } from './dto/forum-message.dto';
@@ -18,7 +18,8 @@ export class ForumsController {
   constructor(
     private readonly forumsService: ForumsService,
     private readonly activityTracker: ActivityTrackerService
-  ) {}
+  ) { }
+  private readonly logger = new Logger(ForumsController.name);
 
   @Get('categories')
   @UseGuards(OptionalJwtAuthGuard)
@@ -26,8 +27,8 @@ export class ForumsController {
   @ApiResponse({ status: 200, description: 'Forum categories retrieved successfully' })
   async getCategories(@Request() req) {
     const userId = req?.user?.id || null;
-    console.log('🔥 CATEGORIES ENDPOINT - req.user:', req?.user);
-    console.log('🔥 CATEGORIES ENDPOINT - userId extracted:', userId);
+    this.logger.debug('🔥 CATEGORIES ENDPOINT - req.user:', req?.user);
+    this.logger.debug('🔥 CATEGORIES ENDPOINT - userId extracted:', userId);
     return this.forumsService.getCategories(userId);
   }
 
@@ -208,7 +209,7 @@ export class ForumsController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Update user activity timestamp' })
   @ApiResponse({ status: 200, description: 'Activity updated successfully' })
-  async updateUserActivity(@Request() req, @Body() body?: { action?: string; topicId?: number; boardId?: number; [key: string]: any }) {
+  async updateUserActivity(@Request() req, @Body() body?: { action?: string; topicId?: number; boardId?: number;[key: string]: any }) {
     const userId = req.user.id;
     await this.forumsService.updateUserActivity(userId, body);
     return { success: true };

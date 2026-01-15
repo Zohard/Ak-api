@@ -2,6 +2,7 @@ import {
   Injectable,
   BadRequestException,
   NotFoundException,
+  Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../../shared/services/prisma.service';
 import { R2Service } from './r2.service';
@@ -17,7 +18,8 @@ export class MediaService {
   constructor(
     private prisma: PrismaService,
     private r2Service: R2Service,
-  ) {}
+  ) { }
+  private readonly logger = new Logger(MediaService.name);
 
   private readonly allowedMimeTypes = [
     'image/jpeg',
@@ -162,26 +164,26 @@ export class MediaService {
           };
         } catch (dbError) {
           // Database save failed - delete the uploaded file from R2 to prevent orphaned files
-        console.error('[MediaService] Database save failed, deleting R2 file:', {
-          fileId: uploadResult.fileId,
-          filename: uploadResult.name,
-          folder: folderPath,
-          dbError: dbError.message,
-        });
-
-        try {
-          await this.r2Service.deleteImage(uploadResult.fileId);
-          console.log('[MediaService] Successfully deleted orphaned R2 file:', uploadResult.fileId);
-        } catch (deleteError) {
-          console.error('[MediaService] ⚠️ ORPHANED FILE - Manual cleanup needed:', {
+          console.error('[MediaService] Database save failed, deleting R2 file:', {
             fileId: uploadResult.fileId,
             filename: uploadResult.name,
             folder: folderPath,
-            deleteError: deleteError.message,
+            dbError: dbError.message,
           });
-          console.error('[MediaService] Run: npm run cleanup-images:dry-run');
-          // Log this for manual cleanup but don't fail the operation
-        }
+
+          try {
+            await this.r2Service.deleteImage(uploadResult.fileId);
+            this.logger.debug('[MediaService] Successfully deleted orphaned R2 file:', uploadResult.fileId);
+          } catch (deleteError) {
+            console.error('[MediaService] ⚠️ ORPHANED FILE - Manual cleanup needed:', {
+              fileId: uploadResult.fileId,
+              filename: uploadResult.name,
+              folder: folderPath,
+              deleteError: deleteError.message,
+            });
+            console.error('[MediaService] Run: npm run cleanup-images:dry-run');
+            // Log this for manual cleanup but don't fail the operation
+          }
 
           throw new BadRequestException(`Failed to save image metadata: ${dbError.message}`);
         }
@@ -207,9 +209,9 @@ export class MediaService {
       if (uploadResult && uploadResult.fileId) {
         try {
           await this.r2Service.deleteImage(uploadResult.fileId);
-          console.log('[MediaService] Cleaned up R2 file after upload error:', uploadResult.fileId);
+          this.logger.debug('[MediaService] Cleaned up R2 file after upload error:', uploadResult.fileId);
         } catch (deleteError) {
-          console.error('[MediaService] Failed to cleanup R2 file:', deleteError);
+          this.logger.error('[MediaService] Failed to cleanup R2 file:', deleteError);
         }
       }
 
@@ -242,7 +244,7 @@ export class MediaService {
         }
       } catch (e) {
         // If URL parsing fails, continue without Referer
-        console.warn('Failed to parse image URL for Referer header:', e.message);
+        this.logger.warn('Failed to parse image URL for Referer header:', e.message);
       }
 
       // Download the image from the URL
@@ -302,7 +304,7 @@ export class MediaService {
             filename = `${safeTitle}-${timestamp}.${extension}`;
           }
         } catch (error) {
-          console.error('Failed to fetch title for filename:', error);
+          this.logger.error('Failed to fetch title for filename:', error);
           // Fall back to default filename if fetch fails
         }
       }
@@ -368,7 +370,7 @@ export class MediaService {
           };
         } catch (dbError) {
           // Database save failed - delete the uploaded file from R2
-          console.error('[MediaService] Database save failed, deleting R2 file:', {
+          this.logger.error('[MediaService] Database save failed, deleting R2 file:', {
             fileId: uploadResult.fileId,
             filename: uploadResult.name,
             dbError: dbError.message,
@@ -377,7 +379,7 @@ export class MediaService {
           try {
             await this.r2Service.deleteImage(uploadResult.fileId);
           } catch (deleteError) {
-            console.error('[MediaService] Failed to cleanup R2 file:', deleteError);
+            this.logger.error('[MediaService] Failed to cleanup R2 file:', deleteError);
           }
 
           throw new BadRequestException(`Failed to save image metadata: ${dbError.message}`);
@@ -561,7 +563,7 @@ export class MediaService {
           url: url,
         });
       } catch (error) {
-        console.error('Error processing media item:', error);
+        this.logger.error('Error processing media item:', error);
         continue;
       }
     }
@@ -572,7 +574,7 @@ export class MediaService {
   async deleteMedia(id: number, userId: number) {
     const media = await this.getMediaById(id);
 
-    console.log('[MediaService] Delete media called:', {
+    this.logger.debug('[MediaService] Delete media called:', {
       id,
       userId,
       media,
@@ -584,7 +586,7 @@ export class MediaService {
       // filename could be like "screenshots/filename.webp" or just "filename.webp"
       let filename = (media as any).filename;
 
-      console.log('[MediaService] Original filename from DB:', filename);
+      this.logger.debug('[MediaService] Original filename from DB:', filename);
 
       if (filename) {
         // Remove "screenshots/" prefix if present
@@ -594,7 +596,7 @@ export class MediaService {
         const type = (media as any).type;
         const typeName = this.getTypeName(type);
 
-        console.log('[MediaService] Type info:', {
+        this.logger.debug('[MediaService] Type info:', {
           type,
           typeName,
           cleanFilename,
@@ -609,18 +611,18 @@ export class MediaService {
           folderPath = `images/${typeName}s/screenshots`;
         }
 
-        console.log(`[MediaService] Attempting to delete from R2: ${cleanFilename} in folder: ${folderPath}`);
-        console.log(`[MediaService] Full R2 path would be: ${folderPath}/${cleanFilename}`);
+        this.logger.debug(`[MediaService] Attempting to delete from R2: ${cleanFilename} in folder: ${folderPath}`);
+        this.logger.debug(`[MediaService] Full R2 path would be: ${folderPath}/${cleanFilename}`);
 
         // Try to delete from R2
         await this.r2Service.deleteExistingImage(cleanFilename, folderPath);
-        console.log(`[MediaService] Successfully deleted from R2: ${cleanFilename}`);
+        this.logger.debug(`[MediaService] Successfully deleted from R2: ${cleanFilename}`);
       } else {
-        console.warn('[MediaService] No filename found in media record');
+        this.logger.warn('[MediaService] No filename found in media record');
       }
     } catch (error) {
       // Log error but don't fail the entire deletion if R2 delete fails
-      console.error(`[MediaService] Failed to delete from R2 (ID: ${id}):`, {
+      this.logger.error(`[MediaService] Failed to delete from R2 (ID: ${id}):`, {
         message: error.message,
         stack: error.stack,
       });
@@ -719,7 +721,7 @@ export class MediaService {
     // Generate a simple placeholder image using Sharp
     const width = type === 'anime' ? 400 : type === 'article' ? 600 : 300;
     const height = type === 'anime' ? 300 : type === 'article' ? 400 : 450;
-    
+
     // Extract title from filename (remove extension and numbers)
     const title = filename
       .replace(/\.[^/.]+$/, '') // Remove extension
@@ -860,12 +862,12 @@ export class MediaService {
   private isTwitterUrl(url: string): boolean {
     const urlObj = new URL(url);
     return urlObj.hostname === 'twitter.com' ||
-           urlObj.hostname === 'www.twitter.com' ||
-           urlObj.hostname === 'x.com' ||
-           urlObj.hostname === 'www.x.com' ||
-           urlObj.hostname === 'fxtwitter.com' ||
-           urlObj.hostname === 'vxtwitter.com' ||
-           urlObj.hostname === 'fixupx.com';
+      urlObj.hostname === 'www.twitter.com' ||
+      urlObj.hostname === 'x.com' ||
+      urlObj.hostname === 'www.x.com' ||
+      urlObj.hostname === 'fxtwitter.com' ||
+      urlObj.hostname === 'vxtwitter.com' ||
+      urlObj.hostname === 'fixupx.com';
   }
 
   private async fetchTwitterMetadata(url: string) {
@@ -929,13 +931,13 @@ export class MediaService {
           };
         }
       } catch (apiError) {
-        console.warn('FxTwitter API failed, falling back to HTML scraping:', apiError.message);
+        this.logger.warn('FxTwitter API failed, falling back to HTML scraping:', apiError.message);
       }
 
       // Fallback to HTML scraping
       let fetchUrl = url;
       if (urlObj.hostname === 'twitter.com' || urlObj.hostname === 'x.com' ||
-          urlObj.hostname === 'www.twitter.com' || urlObj.hostname === 'www.x.com') {
+        urlObj.hostname === 'www.twitter.com' || urlObj.hostname === 'www.x.com') {
         fetchUrl = url.replace(/(twitter\.com|x\.com)/, 'fxtwitter.com');
       }
 
@@ -983,7 +985,7 @@ export class MediaService {
         type: og.type || 'article',
       };
     } catch (error) {
-      console.error('Error fetching Twitter metadata:', error.message || error);
+      this.logger.error('Error fetching Twitter metadata:', error.message || error);
       // Fallback
       return {
         url,

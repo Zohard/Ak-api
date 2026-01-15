@@ -1,4 +1,4 @@
-import { Injectable, NestMiddleware } from '@nestjs/common';
+import { Injectable, NestMiddleware, Logger } from '@nestjs/common';
 import { Request, Response, NextFunction } from 'express';
 import { ActivityTrackerService, ActivityAction } from '../../shared/services/activity-tracker.service';
 import { JwtService } from '@nestjs/jwt';
@@ -8,7 +8,8 @@ export class ActivityTrackerMiddleware implements NestMiddleware {
   constructor(
     private readonly activityTracker: ActivityTrackerService,
     private readonly jwtService: JwtService
-  ) {}
+  ) { }
+  private readonly logger = new Logger('ActivityTracker');
 
   async use(req: Request, res: Response, next: NextFunction) {
     try {
@@ -35,7 +36,7 @@ export class ActivityTrackerMiddleware implements NestMiddleware {
       ];
 
       if (skipPaths.some(path => req.path === path) ||
-          skipPatterns.some(pattern => req.path.includes(pattern))) {
+        skipPatterns.some(pattern => req.path.includes(pattern))) {
         return next();
       }
 
@@ -74,7 +75,7 @@ export class ActivityTrackerMiddleware implements NestMiddleware {
 
       // Debug logging
       if (userId) {
-        console.log(`[Activity] Tracking user ${userId} - Action: ${action.action} - Session: ${sessionId.substring(0, 20)}...`);
+        this.logger.debug(`[Activity] Tracking user ${userId} - Action: ${action.action} - Session: ${sessionId.substring(0, 20)}...`);
       }
 
       // Track the activity (fire and forget)
@@ -85,12 +86,12 @@ export class ActivityTrackerMiddleware implements NestMiddleware {
         action
       }).catch((error) => {
         // Log error but don't block the request
-        console.error('Activity tracking error:', error);
+        this.logger.error('Activity tracking error:', error);
       });
 
     } catch (error) {
       // Don't let tracking errors affect the request
-      console.error('Activity tracking middleware error:', error);
+      this.logger.error('Activity tracking middleware error:', error);
     }
 
     next();

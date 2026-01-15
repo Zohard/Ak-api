@@ -19,7 +19,7 @@ export class ArticlesService {
     private prisma: PrismaService,
     private cacheService: CacheService,
     private imagekitService: R2Service,
-  ) {}
+  ) { }
 
   private serializeBigInt(obj: any): any {
     return JSON.parse(JSON.stringify(obj, (key, value) =>
@@ -45,7 +45,7 @@ export class ArticlesService {
     } = query;
 
     const key = `${page}_${limit}_${search}_${categoryId}_${authorId}_${status}_${sort}_${sortBy}_${order}_${sortOrder}_${onindex}_${tag}_${includeContent}`;
-    
+
     // Simple hash to keep key length manageable
     let hash = 0;
     for (let i = 0; i < key.length; i++) {
@@ -83,7 +83,7 @@ export class ArticlesService {
       tag,
       includeContent,
     } = query;
-    
+
     // Handle alias parameters
     const finalSort = sortBy || sort || 'postDate';
     const finalOrder = (sortOrder || order || 'desc').toLowerCase();
@@ -415,15 +415,10 @@ export class ArticlesService {
     }
 
     // Debug logging for article 3920
-    if (id === 3920) {
-      console.log('Article 3920 from database:', {
-        ID: post.ID,
-        postTitle: post.postTitle,
-        postContentLength: post.postContent ? post.postContent.length : 'null/undefined',
-        postExcerptLength: post.postExcerpt ? post.postExcerpt.length : 'null/undefined',
-        includeContent
-      });
-    }
+    // Debug logging for article 3920
+    /* if (id === 3920) {
+      // Debug logging removed
+    } */
 
     // Increment view count
     await this.incrementViewCount(id);
@@ -595,7 +590,7 @@ export class ArticlesService {
     });
 
     const result = posts.map(post => this.transformPost(post, false));
-    
+
     // Cache the featured articles for 1 hour
     await this.cacheService.setFeaturedArticles(result, 3600);
 
@@ -686,7 +681,7 @@ export class ArticlesService {
 
     // If an image is provided, create an entry in ak_webzine_img
     if (articleData.img) {
-      console.log('Creating ak_webzine_img entry for article:', article.ID, 'with image:', articleData.img);
+
       try {
         const imageEntry = await this.prisma.akWebzineImg.create({
           data: {
@@ -694,13 +689,13 @@ export class ArticlesService {
             urlImg: articleData.img,
           },
         });
-        console.log('Successfully created ak_webzine_img entry:', imageEntry);
+        // Log removed
       } catch (error) {
         console.error('Error creating ak_webzine_img entry:', error);
         throw error;
       }
     } else {
-      console.log('No image provided in articleData.img');
+      // Log removed
     }
 
     // Re-fetch the article with categories to return complete data
@@ -826,7 +821,7 @@ export class ArticlesService {
 
     // Handle image update if provided
     if (updateData.img) {
-      console.log('Updating image for article:', id, 'with image:', updateData.img);
+      this.logger.debug(`Updating image for article: ${id} with image: ${updateData.img}`);
       try {
         // First check if an image entry already exists for this article
         const existingImage = await this.prisma.akWebzineImg.findFirst({
@@ -835,29 +830,29 @@ export class ArticlesService {
 
         if (existingImage) {
           // Update existing image
-          console.log('Updating existing ak_webzine_img entry:', existingImage.idImg);
+          this.logger.debug(`Updating existing ak_webzine_img entry: ${existingImage.idImg}`);
           await this.prisma.akWebzineImg.update({
             where: { idImg: existingImage.idImg },
             data: { urlImg: updateData.img },
           });
-          console.log('Successfully updated ak_webzine_img entry');
+          this.logger.debug('Successfully updated ak_webzine_img entry');
         } else {
-          // Create new image entry
-          console.log('Creating new ak_webzine_img entry for article:', id);
+          // Create new entry
+          this.logger.debug(`Creating new ak_webzine_img entry for article: ${id}`);
           const imageEntry = await this.prisma.akWebzineImg.create({
             data: {
               idArt: BigInt(id),
               urlImg: updateData.img,
             },
           });
-          console.log('Successfully created ak_webzine_img entry:', imageEntry);
+          this.logger.debug(`Successfully created ak_webzine_img entry: ${JSON.stringify(imageEntry)}`);
         }
       } catch (error) {
         console.error('Error handling image update:', error);
         throw error;
       }
     } else {
-      console.log('No image provided in updateData.img for article:', id);
+      this.logger.debug(`No image provided in updateData.img for article: ${id}`);
     }
 
     // Re-fetch the article with updated categories
@@ -1134,7 +1129,7 @@ export class ArticlesService {
         const imgunebig2 = imgunebig2Meta?.metaValue;
         const extracted = this.extractFirstImageFromContent(post.postContent);
 
-        console.log(`Article ${post.ID} image sources:`, {
+        this.logger.debug(`Article ${post.ID} image sources:`, {
           webzineImg, akImg, img, imgunebig, imgunebig2, extracted
         });
 
@@ -1219,7 +1214,7 @@ export class ArticlesService {
     const match = content.match(imgRegex);
 
     if (match && match[1]) {
-      console.log('Extracted image from content:', match[1]);
+      this.logger.debug(`Extracted image from content: ${match[1]}`);
       return match[1];
     }
 
@@ -1523,7 +1518,7 @@ export class ArticlesService {
       },
     });
 
-    console.log(`Created wp_user entry for SMF user ${smfUserId} (${smfUser.memberName})`);
+    this.logger.debug(`Created wp_user entry for SMF user ${smfUserId} (${smfUser.memberName})`);
   }
 
   private async validateCategories(categoryIds: number[]): Promise<void> {

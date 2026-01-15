@@ -243,7 +243,7 @@ export class AnimesService extends BaseContentService<
 
     // Create cache key from query parameters
     const cacheKey = this.createCacheKey(query);
-    
+
     // Try to get from cache first
     const cached = await this.cacheService.getAnimeList(cacheKey);
     if (cached) {
@@ -665,7 +665,7 @@ export class AnimesService extends BaseContentService<
         /imagekit\.io/.test(anime.image)
       ) {
         await this.r2Service.deleteImageByUrl(anime.image);
-        console.log(`Deleted R2 image: ${anime.image}`);
+        // Log removed
       }
     } catch (e) {
       // Non-blocking: log and continue update

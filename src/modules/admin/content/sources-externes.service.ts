@@ -22,7 +22,7 @@ export class SourcesExternesService {
     private r2Service: R2Service,
     private deepLService: DeepLService,
     private cacheService: CacheService,
-  ) {}
+  ) { }
 
   async importSeasonAnimes(importDto: SourcesExternesImportDto): Promise<SourcesExternesAnimeComparisonDto[]> {
     let htmlContent: string;
@@ -44,10 +44,10 @@ export class SourcesExternesService {
 
     // Extract anime titles from HTML using the same logic as the script
     const animeList = this.extractAnimeTitlesFromHtml(htmlContent);
-    
+
     // Compare with existing database
     const comparisons: SourcesExternesAnimeComparisonDto[] = [];
-    
+
     for (const animeTitle of animeList) {
       const comparison = await this.compareAnimeWithDatabase(animeTitle);
       comparisons.push(comparison);
@@ -99,7 +99,7 @@ export class SourcesExternesService {
     // Normalize title for better matching: remove extra spaces, special chars
     const normalizedTitle = title.trim();
 
-    console.log(`[Title Matching Debug] Original title: "${title}"`);
+
 
     // First, try to scrape data to get AniList URL for reliable cache key
     let scrapedData: any = null;
@@ -120,17 +120,17 @@ export class SourcesExternesService {
 
       // Extract AniList URL for cache key
       anilistUrl = scrapedData?.merged?.source_urls?.anilist ||
-                   scrapedData?.anilist?.url ||
-                   null;
+        scrapedData?.anilist?.url ||
+        null;
 
       if (anilistUrl) {
-        console.log(`[Cache] Using AniList URL for cache key: ${anilistUrl}`);
+
 
         // Check cache using AniList URL
         const cacheKey = `anime_exists:${anilistUrl}`;
         const cachedResult = await this.cacheService.get<SourcesExternesAnimeComparisonDto>(cacheKey);
         if (cachedResult) {
-          console.log(`[Cache HIT] Found cached result for "${title}" using AniList URL`);
+
           // Add scraped data to cached result
           return {
             ...cachedResult,
@@ -147,7 +147,7 @@ export class SourcesExternesService {
     let existingAnime = null;
 
     if (anilistUrl) {
-      console.log(`[DB Search] Searching by AniList URL in sources field`);
+
       existingAnime = await this.prisma.akAnime.findFirst({
         where: {
           sources: {
@@ -168,7 +168,7 @@ export class SourcesExternesService {
 
     // Fallback to title matching if not found by AniList URL
     if (!existingAnime) {
-      console.log(`[DB Search] Searching by title variations`);
+
 
       // Create variations of the title for better matching
       const titleVariations = [
@@ -194,7 +194,7 @@ export class SourcesExternesService {
       // Remove duplicates from variations
       const uniqueVariations = [...new Set(titleVariations)];
 
-      console.log(`[Title Matching Debug] Generated ${uniqueVariations.length} variations:`, uniqueVariations.slice(0, 5));
+
 
       // Search for anime in database using multiple fields with flexible matching
       existingAnime = await this.prisma.akAnime.findFirst({
@@ -223,16 +223,7 @@ export class SourcesExternesService {
       });
     }
 
-    if (existingAnime) {
-      console.log(`[Title Matching Debug] MATCH FOUND for "${title}":`, {
-        id: existingAnime.idAnime,
-        titre: existingAnime.titre,
-        titreOrig: existingAnime.titreOrig,
-        titreFr: existingAnime.titreFr,
-      });
-    } else {
-      console.log(`[Title Matching Debug] NO MATCH for "${title}"`);
-    }
+
 
     const comparison: SourcesExternesAnimeComparisonDto = {
       titre: title,
@@ -251,7 +242,7 @@ export class SourcesExternesService {
     if (existingAnime && anilistUrl) {
       const cacheKey = `anime_exists:${anilistUrl}`;
       await this.cacheService.set(cacheKey, comparison, 3600); // 1 hour TTL
-      console.log(`[Cache SET] Cached positive result for "${title}" using AniList URL`);
+
     }
 
     return comparison;
@@ -462,7 +453,7 @@ export class SourcesExternesService {
             existingAnimeId: createdAnime.idAnime,
           };
           await this.cacheService.set(cacheKey, cacheValue, 3600); // 1 hour TTL
-          console.log(`[Cache SET] Proactively cached newly created anime "${createDto.titre}" using AniList URL: ${anilistUrl}`);
+
         }
       } catch (error) {
         console.warn('Failed to cache newly created anime:', error.message);

@@ -1,9 +1,10 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 
 // Simplified queue service without external dependencies
 @Injectable()
 export class SimpleQueueService {
   private jobs: Map<string, any> = new Map();
+  private readonly logger = new Logger(SimpleQueueService.name);
 
   async addReviewModerationJob(
     reviewId: number,
@@ -12,7 +13,7 @@ export class SimpleQueueService {
     contentType: string,
   ) {
     const jobId = `review_${reviewId}_${Date.now()}`;
-    console.log(`Adding review moderation job for review ${reviewId}`);
+    this.logger.log(`Adding review moderation job for review ${reviewId}`);
 
     // In a real implementation, this would trigger background processing
     this.jobs.set(jobId, {
@@ -34,7 +35,7 @@ export class SimpleQueueService {
     priority: 'low' | 'normal' | 'high' = 'normal',
   ) {
     const jobId = `report_${reportId}_${Date.now()}`;
-    console.log(`Adding content report job for ${contentType} ${contentId}`);
+    this.logger.log(`Adding content report job for ${contentType} ${contentId}`);
 
     this.jobs.set(jobId, {
       id: jobId,
@@ -56,7 +57,7 @@ export class SimpleQueueService {
     reason: string,
   ) {
     const jobId = `bulk_${targetType}_${Date.now()}`;
-    console.log(
+    this.logger.log(
       `Adding bulk moderation job for ${targetIds.length} ${targetType}s`,
     );
 

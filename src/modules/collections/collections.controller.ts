@@ -13,6 +13,7 @@ import {
   HttpStatus,
   Res,
   Patch,
+  Logger,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam, ApiQuery } from '@nestjs/swagger';
 import { CollectionsService } from './collections.service';
@@ -30,7 +31,8 @@ import type { Response } from 'express';
 @ApiTags('collections')
 @Controller('collections')
 export class CollectionsController {
-  constructor(private readonly collectionsService: CollectionsService) {}
+  private readonly logger = new Logger(CollectionsController.name);
+  constructor(private readonly collectionsService: CollectionsService) { }
 
   @Post()
   @UseGuards(JwtAuthGuard)
@@ -162,7 +164,7 @@ export class CollectionsController {
     @Param('mediaId', ParseIntPipe) mediaId: number,
     @Request() req,
   ) {
-    console.log(`🔍 [checkInCollection] Controller received - user: ${JSON.stringify(req.user)}, mediaType: ${mediaType}, mediaId: ${mediaId}`);
+    this.logger.debug(`🔍 [checkInCollection] Controller received - user: ${JSON.stringify(req.user)}, mediaType: ${mediaType}, mediaId: ${mediaId}`);
     return this.collectionsService.isInCollection(
       req.user.id,
       mediaId,
@@ -190,7 +192,7 @@ export class CollectionsController {
     @Param('mediaId', ParseIntPipe) mediaId: number,
     @Request() req,
   ) {
-    console.log(`🔍 [checkInCollectionNoCache] NOCACHE query - userId: ${req.user.id}, mediaType: ${mediaType}, mediaId: ${mediaId}`);
+    this.logger.debug(`🔍 [checkInCollectionNoCache] NOCACHE query - userId: ${req.user.id}, mediaType: ${mediaType}, mediaId: ${mediaId}`);
 
     // Bypass cache and query database directly
     let collections: any[] = [];
@@ -208,7 +210,7 @@ export class CollectionsController {
       `;
     }
 
-    console.log(`🔍 [checkInCollectionNoCache] Direct SQL returned ${collections.length} rows:`, JSON.stringify(collections));
+    this.logger.debug(`🔍 [checkInCollectionNoCache] Direct SQL returned ${collections.length} rows: ${JSON.stringify(collections)}`);
 
     return {
       debug: true,
@@ -511,7 +513,7 @@ export class CollectionsController {
     const currentUserId = req.user?.id;
 
     // Debug logging
-    console.log('Controller - updateJeuxVideoInCollection:', {
+    this.logger.debug('Controller - updateJeuxVideoInCollection:', {
       userId,
       userIdType: typeof userId,
       collectionId,

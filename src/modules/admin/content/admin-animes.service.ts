@@ -16,7 +16,7 @@ export class AdminAnimesService {
     private adminLogging: AdminLoggingService,
     private cacheService: CacheService,
     private r2Service: R2Service,
-  ) {}
+  ) { }
 
   async getOne(id: number) {
     const anime = await this.prisma.akAnime.findUnique({
@@ -155,11 +155,11 @@ export class AdminAnimesService {
     let importedImageFilename: string | null = null;
     if (dto.imageUrl && !dto.image) {
       try {
-        console.log(`[Image Import] Downloading image from: ${dto.imageUrl}`);
+
         const imageResult = await this.importAnimeImage(dto.imageUrl, dto.titre);
         if (imageResult.success && imageResult.filename) {
           importedImageFilename = imageResult.filename;
-          console.log(`[Image Import] Successfully imported image: ${importedImageFilename}`);
+
         } else {
           console.warn(`[Image Import] Failed to import image: ${imageResult.error}`);
         }
@@ -457,7 +457,7 @@ export class AdminAnimesService {
         if (sourcesJson.anilist) {
           const anilistCacheKey = `anime_exists:${sourcesJson.anilist}`;
           await this.cacheService.del(anilistCacheKey);
-          console.log(`Invalidated AniList URL cache: ${sourcesJson.anilist}`);
+
         }
 
         // Invalidate cache for other source URLs (if needed)
@@ -472,7 +472,7 @@ export class AdminAnimesService {
       }
     }
 
-    console.log(`Invalidated anime_exists cache for ${titles.length} titles`);
+
   }
 
   /**

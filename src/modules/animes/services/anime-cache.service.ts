@@ -8,7 +8,7 @@ export class AnimeCacheService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly cacheService: CacheService,
-  ) {}
+  ) { }
 
   createCacheKey(query: AnimeQueryDto): string {
     const {
@@ -76,7 +76,7 @@ export class AnimeCacheService {
         await Promise.all(
           Array.from(relatedAnimeIds).map(relatedId => this.cacheService.invalidateAnime(relatedId))
         );
-        console.log(`Invalidated cache for ${relatedAnimeIds.size} related animes of anime ${id}`);
+
       }
     } catch (error) {
       console.error(`Failed to invalidate related animes cache for anime ${id}:`, error);

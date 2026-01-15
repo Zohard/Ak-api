@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ForbiddenException, ConflictException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, ConflictException, BadRequestException, Logger } from '@nestjs/common';
 import { PrismaService } from '../../shared/services/prisma.service';
 import { CacheService } from '../../shared/services/cache.service';
 import { AddAnimeToCollectionDto } from './dto/add-anime-to-collection.dto';
@@ -12,10 +12,12 @@ import { ImportMalItemDto } from './dto/import-mal.dto';
 
 @Injectable()
 export class CollectionsService {
+  private readonly logger = new Logger(CollectionsService.name);
+
   constructor(
     private prisma: PrismaService,
     private cacheService: CacheService,
-  ) {}
+  ) { }
 
   async createCollection(userId: number, createCollectionDto: CreateCollectionDto) {
     // This method isn't really applicable with the existing table structure
@@ -89,11 +91,11 @@ export class CollectionsService {
       updatedAt: Date;
     }> = [];
     const typeNames = this.getCollectionTypeNames();
-    
+
     // Create maps for fast lookup
     const animeCountMap = new Map(animeCounts.map(item => [item.type, item._count.type]));
     const mangaCountMap = new Map(mangaCounts.map(item => [item.type, item._count.type]));
-    
+
     // Get all unique types from both collections
     const allTypes = new Set([
       ...animeCounts.map(c => c.type),
@@ -223,7 +225,7 @@ export class CollectionsService {
     try {
       if (mediaType === 'anime') {
         // Verify media exists
-        const anime = await this.prisma.executeWithRetry(() => 
+        const anime = await this.prisma.executeWithRetry(() =>
           this.prisma.akAnime.findUnique({ where: { idAnime: mediaId } })
         );
         if (!anime) {
@@ -389,8 +391,7 @@ export class CollectionsService {
         throw err;
       }
       // Log unexpected errors and fail gracefully instead of generic 500
-      // eslint-disable-next-line no-console
-      console.error('addToCollection unexpected error', {
+      this.logger.error('addToCollection unexpected error', {
         userId,
         mediaId,
         mediaType,
@@ -401,16 +402,16 @@ export class CollectionsService {
     } finally {
       // CRITICAL: Invalidate cache BEFORE returning response to prevent race condition
       // where client checks collection status before cache is invalidated
-      console.log(`🗑️ [addToCollection] Starting cache invalidation for userId=${userId}, ${mediaType}=${mediaId}`);
+      this.logger.debug(`🗑️ [addToCollection] Starting cache invalidation for userId=${userId}, ${mediaType}=${mediaId}`);
 
       // Invalidate user's collection cache after any add operation
       await this.invalidateUserCollectionCache(userId);
 
       // OPTIMIZATION: Invalidate collection check cache
       const cacheKey = `user_collection_check:${userId}:${mediaType}:${mediaId}`;
-      console.log(`🗑️ [addToCollection] Invalidating cache key: ${cacheKey}`);
+      this.logger.debug(`🗑️ [addToCollection] Invalidating cache key: ${cacheKey}`);
       await this.cacheService.del(cacheKey);
-      console.log(`✅ [addToCollection] Cache invalidated for key: ${cacheKey}`);
+      this.logger.debug(`✅ [addToCollection] Cache invalidated for key: ${cacheKey}`);
 
       // OPTIMIZATION: Invalidate media collections users cache
       await this.cacheService.delByPattern(`media_collections_users:${mediaType}:${mediaId}:*`);
@@ -422,7 +423,7 @@ export class CollectionsService {
         await this.cacheService.invalidateManga(mediaId);
       }
 
-      console.log(`✅ [addToCollection] All cache invalidation complete for userId=${userId}, ${mediaType}=${mediaId}`);
+      this.logger.debug(`✅ [addToCollection] All cache invalidation complete for userId=${userId}, ${mediaType}=${mediaId}`);
     }
 
     return result;
@@ -439,7 +440,7 @@ export class CollectionsService {
     // Create cache key including all relevant parameters
     const collectionType = type ? this.getCollectionTypeFromName(type) : 'all';
     const cacheKey = `collection_items:${userId}:${mediaType || 'all'}:${collectionType}:${page}:${limit}`;
-    
+
     // Try to get from cache
     const cached = await this.cacheService.get(cacheKey);
     if (cached) {
@@ -458,7 +459,7 @@ export class CollectionsService {
   private async getCollectionItemsFromDB(userId: number, query: CollectionQueryDto) {
     const { page = 1, limit = 20, mediaType, type, search } = query;
     const skip = (page - 1) * limit;
-    
+
     const collectionType = type ? this.getCollectionTypeFromName(type) : undefined;
 
     if (!mediaType || mediaType === 'anime') {
@@ -803,7 +804,7 @@ export class CollectionsService {
     // OPTIMIZATION: Cache collection check to avoid DB query on every page load
     const cacheKey = `user_collection_check:${userId}:${mediaType}:${mediaId}`;
 
-    console.log(`🔍 [isInCollection] Starting check for ${cacheKey}`);
+    this.logger.debug(`🔍 [isInCollection] Starting check for ${cacheKey}`);
 
     try {
       // Add timeout to cache get to prevent hanging
@@ -814,19 +815,19 @@ export class CollectionsService {
 
       // Check for both null and undefined - cache.get() returns undefined when key doesn't exist
       if (cached !== null && cached !== undefined) {
-        console.log(`🔍 [isInCollection] Cache HIT for ${cacheKey}`, cached);
+        this.logger.debug(`🔍 [isInCollection] Cache HIT for ${cacheKey}`, cached);
         return cached;
       }
     } catch (error) {
-      console.error(`⚠️ [isInCollection] Cache get failed or timed out for ${cacheKey}:`, error.message);
+      this.logger.error(`⚠️ [isInCollection] Cache get failed or timed out for ${cacheKey}:`, error.message);
       // Continue to database query
     }
 
-    console.log(`🔍 [isInCollection] Cache MISS, querying database for ${cacheKey}`);
+    this.logger.debug(`🔍 [isInCollection] Cache MISS, querying database for ${cacheKey}`);
 
+    // Fallback to database query
     return await this.prisma.executeWithRetry(async () => {
-      console.log(`🔍 [isInCollection] Cache MISS - Using RAW SQL - userId: ${userId}, mediaId: ${mediaId}, mediaType: ${mediaType}`);
-      let inCollection = false;
+      this.logger.debug(`🔍 [isInCollection] Cache MISS - Using RAW SQL - userId: ${userId}, mediaId: ${mediaId}, mediaType: ${mediaType}`);
       let collections: any[] = [];
 
       if (mediaType === 'anime') {
@@ -835,27 +836,25 @@ export class CollectionsService {
           FROM collection_animes
           WHERE id_membre = ${userId} AND id_anime = ${mediaId}
         `;
-        inCollection = collections.length > 0;
-        console.log(`🔍 [isInCollection] Anime RAW SQL - Found ${collections.length} rows:`, JSON.stringify(collections));
+        this.logger.debug(`🔍 [isInCollection] Anime RAW SQL - Found ${collections.length} rows: ${JSON.stringify(collections)}`);
       } else if (mediaType === 'manga') {
         collections = await this.prisma.$queryRaw<any[]>`
           SELECT type, evaluation, notes, NULL as id_collection
           FROM collection_mangas
           WHERE id_membre = ${userId} AND id_manga = ${mediaId}
         `;
-        inCollection = collections.length > 0;
-        console.log(`🔍 [isInCollection] Manga RAW SQL - Found ${collections.length} rows:`, JSON.stringify(collections));
+        this.logger.debug(`🔍 [isInCollection] Manga RAW SQL - Found ${collections.length} rows: ${JSON.stringify(collections)}`);
       } else if (mediaType === 'jeu-video') {
         collections = await this.prisma.$queryRaw<any[]>`
           SELECT id_collection, type, evaluation, notes, platform_played, started_date, finished_date
           FROM collection_jeuxvideo
           WHERE id_membre = ${userId} AND id_jeu = ${mediaId}
         `;
-        inCollection = collections.length > 0;
-        console.log(`🔍 [isInCollection] Game RAW SQL - Found ${collections.length} rows:`, JSON.stringify(collections));
+        this.logger.debug(`🔍 [isInCollection] Game RAW SQL - Found ${collections.length} rows:`, JSON.stringify(collections));
       }
 
-      console.log(`🔍 [isInCollection] Final result - inCollection: ${inCollection}, count: ${collections.length}`);
+      const inCollection = collections.length > 0;
+      this.logger.debug(`🔍 [isInCollection] Final result - inCollection: ${inCollection}, count: ${collections.length}`);
 
       const result = {
         inCollection,
@@ -882,7 +881,7 @@ export class CollectionsService {
 
       // Cache for 5 minutes (balance between freshness and performance)
       await this.cacheService.set(cacheKey, result, 300);
-      console.log(`🔍 [isInCollection] Cached result for ${cacheKey}`);
+      this.logger.debug(`🔍 [isInCollection] Cached result for ${cacheKey}`);
 
       return result;
     });
@@ -1063,7 +1062,7 @@ export class CollectionsService {
   private async findUserCollectionsFromDB(userId: number, currentUserId?: number) {
     // Only show collections if it's the current user or collections are public
     const isOwnCollection = currentUserId === userId;
-    
+
     const collectionTypes = [
       { type: 1, name: 'Terminé', description: 'Completed items' },
       { type: 2, name: 'En cours', description: 'Currently watching/reading items' },
@@ -1405,7 +1404,7 @@ export class CollectionsService {
   // Get collection details by type
   async findCollectionByType(userId: number, type: number, currentUserId?: number) {
     const isOwnCollection = currentUserId === userId;
-    
+
     const collectionTypes = {
       1: { name: 'Terminé', description: 'Completed items' },
       2: { name: 'En cours', description: 'Currently watching/reading items' },
@@ -1562,7 +1561,7 @@ export class CollectionsService {
 
     // Cache for 40 minutes
     await this.cacheService.set(cacheKey, result, 2400);
-    
+
     return result;
   }
 
@@ -1783,7 +1782,7 @@ export class CollectionsService {
 
     // Cache for 40 minutes
     await this.cacheService.set(cacheKey, result, 2400);
-    
+
     return result;
   }
 
@@ -2042,7 +2041,7 @@ export class CollectionsService {
       return { success: false, imported: 0, failed: 0, details: [], message: 'No items to import' };
     }
 
-    const results: Array<{ title: string; type: string; status: string; matchedId?: number; outcome: 'imported'|'updated'|'skipped'|'not_found'; reason?: string }>= [];
+    const results: Array<{ title: string; type: string; status: string; matchedId?: number; outcome: 'imported' | 'updated' | 'skipped' | 'not_found'; reason?: string }> = [];
 
     // Process sequentially to avoid hammering DB; could be optimized with limited concurrency
     for (const raw of items) {
@@ -2072,8 +2071,7 @@ export class CollectionsService {
 
         results.push({ title: raw.title, type, status: statusName, matchedId: matchId, outcome: 'imported' });
       } catch (err) {
-        // eslint-disable-next-line no-console
-        console.error('MAL import item failed', { title: raw.title, type, err: { message: err?.message, code: err?.code } });
+        this.logger.error('MAL import item failed', { title: raw.title, type, err: { message: err?.message, code: err?.code } });
         results.push({ title: raw.title, type, status: statusName, outcome: 'skipped', reason: 'Unexpected error' });
       }
     }
@@ -2093,7 +2091,7 @@ export class CollectionsService {
     };
   }
 
-  private normalizeMalStatus(status: string, type: 'anime'|'manga'): 'completed'|'watching'|'on-hold'|'dropped'|'plan-to-watch' {
+  private normalizeMalStatus(status: string, type: 'anime' | 'manga'): 'completed' | 'watching' | 'on-hold' | 'dropped' | 'plan-to-watch' {
     const s = (status || '').toLowerCase().replace(/\s+/g, '');
     if (s === 'completed') return 'completed';
     if (s === 'watching' || (type === 'manga' && s === 'reading')) return 'watching';
@@ -2500,7 +2498,7 @@ export class CollectionsService {
       ]);
     } catch (error) {
       // Log error but don't throw to avoid breaking the main operation
-      console.error('Cache invalidation error for user', userId, error);
+      this.logger.error('Cache invalidation error for user', userId, error);
     }
   }
 
@@ -2592,12 +2590,10 @@ export class CollectionsService {
 
   async updateJeuxVideoInCollection(userId: number, collectionId: number, dto: UpdateJeuxVideoCollectionDto, currentUserId: number) {
     // Debug logging - log all parameters
-    console.log('updateJeuxVideoInCollection called with:', {
+    this.logger.debug('updateJeuxVideoInCollection called with:', {
       userId,
-      userIdType: typeof userId,
       collectionId,
       currentUserId,
-      currentUserIdType: typeof currentUserId,
       dto
     });
 

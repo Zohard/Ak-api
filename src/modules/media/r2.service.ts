@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { S3Client, PutObjectCommand, DeleteObjectCommand, ListObjectsV2Command } from '@aws-sdk/client-s3';
 import { MediaType } from './imagekit.service';
 
@@ -9,6 +9,7 @@ export class R2Service {
   private r2Client: S3Client;
   private bucketName: string;
   public publicUrl: string;
+  private readonly logger = new Logger(R2Service.name);
 
   // Folder structure for different media types (same as ImageKit)
   public static readonly FOLDERS = {
@@ -134,7 +135,7 @@ export class R2Service {
     try {
       const fileKey = folder ? `${folder}/${fileName}` : fileName;
 
-      console.log('[R2Service] Deleting from R2:', {
+      this.logger.debug('[R2Service] Deleting from R2:', {
         bucket: this.bucketName,
         fileKey,
         fileName,
@@ -147,11 +148,11 @@ export class R2Service {
       });
 
       const result = await this.r2Client.send(command);
-      console.log(`[R2Service] Successfully deleted from R2: ${fileKey}`, result);
+      this.logger.debug(`[R2Service] Successfully deleted from R2: ${fileKey}`, result);
     } catch (error) {
       // Ignore errors if file doesn't exist
       if (error.name !== 'NoSuchKey') {
-        console.error(`[R2Service] Failed to delete existing image:`, {
+        this.logger.error(`[R2Service] Failed to delete existing image:`, {
           fileName,
           folder,
           fileKey: folder ? `${folder}/${fileName}` : fileName,
@@ -161,7 +162,7 @@ export class R2Service {
         });
         throw error;
       } else {
-        console.warn(`[R2Service] File not found in R2 (NoSuchKey): ${folder ? `${folder}/${fileName}` : fileName}`);
+        this.logger.warn(`[R2Service] File not found in R2 (NoSuchKey): ${folder ? `${folder}/${fileName}` : fileName}`);
       }
     }
   }
@@ -193,7 +194,7 @@ export class R2Service {
   async deleteImageByUrl(imageUrl: string): Promise<any> {
     try {
       if (!imageUrl || !imageUrl.trim()) {
-        console.warn('No image URL provided for deletion');
+        this.logger.warn('No image URL provided for deletion');
         return { success: false, message: 'No URL provided' };
       }
 
@@ -209,10 +210,10 @@ export class R2Service {
       }
 
       // If it's an external URL (e.g., ImageKit), we can't delete it
-      console.warn('Cannot delete external URL:', imageUrl);
+      this.logger.warn('Cannot delete external URL:', imageUrl);
       return { success: false, message: 'Cannot delete external URL' };
     } catch (error) {
-      console.error('Error deleting image by URL:', error);
+      this.logger.error('Error deleting image by URL:', error);
       throw new Error(`R2 delete by URL failed: ${error.message}`);
     }
   }
@@ -243,7 +244,7 @@ export class R2Service {
         throw new Error('Image URL is required');
       }
 
-      console.log(`Starting image upload from URL: ${imageUrl}`);
+      this.logger.debug(`Starting image upload from URL: ${imageUrl}`);
 
       // Build headers
       const headers: any = {
@@ -264,7 +265,7 @@ export class R2Service {
           headers['Referer'] = urlObj.origin;
         }
       } catch (e) {
-        console.warn('Failed to parse image URL for Referer header:', e.message);
+        this.logger.warn('Failed to parse image URL for Referer header:', e.message);
       }
 
       // Fetch the image
@@ -299,7 +300,7 @@ export class R2Service {
         throw new Error('Image data too small, likely not a valid image');
       }
 
-      console.log(`Downloaded image: ${buffer.length} bytes`);
+      this.logger.debug(`Downloaded image: ${buffer.length} bytes`);
 
       // Determine file extension
       let fileExtension = '';
@@ -336,12 +337,12 @@ export class R2Service {
       const cleanFileName = fileName.replace(/\.[^/.]+$/, '');
       const fullFileName = `${cleanFileName}.${fileExtension}`;
 
-      console.log(`Uploading to R2: ${fullFileName} to folder: ${folder}`);
+      this.logger.debug(`Uploading to R2: ${fullFileName} to folder: ${folder}`);
 
       // Upload to R2
       const result = await this.uploadImage(buffer, fullFileName, folder, true);
 
-      console.log(`Successfully uploaded to R2: ${result.url}`);
+      this.logger.debug(`Successfully uploaded to R2: ${result.url}`);
 
       return {
         ...result,
@@ -352,7 +353,7 @@ export class R2Service {
         folder,
       };
     } catch (error) {
-      console.error(`R2 upload from URL failed for ${imageUrl}:`, error);
+      this.logger.error(`R2 upload from URL failed for ${imageUrl}:`, error);
       throw new Error(`R2 upload from URL failed: ${error.message}`);
     }
   }
@@ -379,7 +380,7 @@ export class R2Service {
         lastModified: item.LastModified,
       }));
     } catch (error) {
-      console.error('Error listing R2 files:', error);
+      this.logger.error('Error listing R2 files:', error);
       return [];
     }
   }

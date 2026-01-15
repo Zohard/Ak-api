@@ -117,7 +117,7 @@ export class ImageKitService {
 
       if (Array.isArray(files) && files.length > 0 && (files[0] as any).fileId) {
         await this.imagekit.deleteFile((files[0] as any).fileId);
-        console.log(`Deleted existing image: ${fileName} from folder: ${folder}`);
+        // Log removed
       }
     } catch (error) {
       // Log the error but don't throw - we want the upload to continue even if delete fails
@@ -204,7 +204,7 @@ export class ImageKitService {
         throw new Error('Image URL is required');
       }
 
-      console.log(`Starting image upload from URL: ${imageUrl}`);
+      // Log removed
 
       // Build headers based on the image URL domain
       const headers: any = {
@@ -263,7 +263,7 @@ export class ImageKitService {
         throw new Error('Image data too small, likely not a valid image');
       }
 
-      console.log(`Downloaded image: ${buffer.length} bytes`);
+      // Log removed
 
       // Extract file extension from URL or content type
       let fileExtension = '';
@@ -275,7 +275,7 @@ export class ImageKitService {
       } else {
         // Try to get extension from content type
         const contentType = response.headers.get('content-type') || '';
-        console.log(`Content type: ${contentType}`);
+        // Log removed
 
         if (contentType.includes('jpeg') || contentType.includes('jpg')) {
           fileExtension = 'jpg';
@@ -304,7 +304,7 @@ export class ImageKitService {
       const cleanFileName = fileName.replace(/\.[^/.]+$/, ''); // Remove existing extension
       const fullFileName = `${cleanFileName}.${fileExtension}`;
 
-      console.log(`Uploading to ImageKit: ${fullFileName} (${buffer.length} bytes) to folder: ${folder}`);
+      // Log removed
 
       // Delete existing image with the same name before uploading
       await this.deleteExistingImage(fullFileName, folder);
@@ -319,7 +319,7 @@ export class ImageKitService {
         // Note: Removing transformation watermark for now as it might cause issues during import
       });
 
-      console.log(`Successfully uploaded to ImageKit: ${result.url}`);
+      // Log removed
 
       return {
         ...result,

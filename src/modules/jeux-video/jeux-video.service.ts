@@ -8,7 +8,7 @@ export class JeuxVideoService {
   constructor(
     private prisma: PrismaService,
     private cacheService: CacheService,
-  ) {}
+  ) { }
 
   async findAll(query: JeuVideoQueryDto) {
     const {
@@ -73,13 +73,13 @@ export class JeuxVideoService {
     // Sorting with secondary sort by idJeuVideo for stable pagination
     const orderBy: any = [];
     if (sortBy === 'titre') {
-      orderBy.push({ titre: sortOrder }, { idJeu:'asc' as const });
+      orderBy.push({ titre: sortOrder }, { idJeu: 'asc' as const });
     } else if (sortBy === 'annee') {
-      orderBy.push({ annee: sortOrder }, { idJeu:'asc' as const });
+      orderBy.push({ annee: sortOrder }, { idJeu: 'asc' as const });
     } else if (sortBy === 'moyenneNotes') {
-      orderBy.push({ moyenneNotes: sortOrder }, { idJeu:'asc' as const });
+      orderBy.push({ moyenneNotes: sortOrder }, { idJeu: 'asc' as const });
     } else {
-      orderBy.push({ dateAjout: sortOrder }, { idJeu:'asc' as const });
+      orderBy.push({ dateAjout: sortOrder }, { idJeu: 'asc' as const });
     }
 
     const [items, total] = await Promise.all([
@@ -328,7 +328,7 @@ export class JeuxVideoService {
     const useTitleFallback = hasGenres === 0 && !hasEditeur;
 
     if (useTitleFallback) {
-      console.log(`[Similar Games] Using title similarity fallback for game ${id} (${game.titre}) - no genres and no editeur`);
+      // Log removed
     }
 
     // Optimized query using UNION strategy for better performance
