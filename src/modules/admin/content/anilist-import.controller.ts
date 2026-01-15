@@ -17,7 +17,7 @@ import {
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { AdminGuard } from '../../../common/guards/admin.guard';
-import { AniListImportService } from './anilist-import.service';
+import { AniListImportService, ImportResult } from './anilist-import.service';
 
 class ImportTagsDto {}
 
@@ -118,7 +118,7 @@ export class AniListImportController {
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: ImportAllDto,
     @Req() req: any,
-  ) {
+  ): Promise<ImportResult> {
     const username = req.user?.pseudo || req.user?.member_name || req.user?.username || 'admin';
     return this.anilistImportService.importAll(id, dto, username);
   }

@@ -23,7 +23,7 @@ interface AniListCommentaireData {
   }>;
 }
 
-interface ImportResult {
+export interface ImportResult {
   tagsImported: number;
   tagsSkipped: number;
   staffImported: number;
