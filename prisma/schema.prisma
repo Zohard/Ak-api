@@ -599,10 +599,11 @@ model AkBusinessToBusiness {
 // User Lists/Tops
 model AkListesTop {
   idListe       Int       @id @default(autoincrement()) @map("id_liste")
+  niceUrl       String    @map("nice_url") @db.VarChar(255)
   titre         String?   @db.Text
   presentation  String?   @db.Text
   type          String?   @db.VarChar(10) // 'liste' | 'top'
-  animeOrManga  String?   @map("anime_or_manga") @db.VarChar(10) // 'anime' | 'manga'
+  animeOrManga  String?   @map("anime_or_manga") @db.VarChar(10) // 'anime' | 'manga' | 'jeu-video'
   jsonData      String?   @map("json_data") @db.Text // JSON string of IDs e.g. ["173","65",...]
   jsonDataCom   String?   @map("json_data_com") @db.Text // Comments per item
   jaime         String?   @db.Text // CSV user IDs
