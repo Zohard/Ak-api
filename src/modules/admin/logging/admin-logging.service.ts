@@ -124,105 +124,98 @@ export class AdminLoggingService {
 
   /**
    * Get formatted activities grouped by content
+   * Optimized: Single query with JOINs instead of N+1 queries
    */
   async getFormattedActivities(limit = 50): Promise<any[]> {
     try {
-      // Get recent logs
+      // Single optimized query with LEFT JOINs to fetch titles
       const logs = await this.prisma.$queryRaw<any[]>`
-        SELECT id_log, anime, manga, business, jeu_video, json_data, last_mod
-        FROM ak_logs_admin
-        ORDER BY last_mod DESC
+        SELECT
+          l.id_log,
+          l.anime,
+          l.manga,
+          l.business,
+          l.jeu_video,
+          l.json_data,
+          l.last_mod,
+          a.titre as anime_titre,
+          a.statut as anime_statut,
+          m.titre as manga_titre,
+          m.statut as manga_statut,
+          b.denomination as business_titre,
+          j.titre as jeu_titre,
+          j.statut as jeu_statut
+        FROM ak_logs_admin l
+        LEFT JOIN ak_animes a ON l.anime = a.id_anime AND l.anime > 0
+        LEFT JOIN ak_mangas m ON l.manga = m.id_manga AND l.manga > 0
+        LEFT JOIN ak_business b ON l.business = b.id_business AND l.business > 0
+        LEFT JOIN ak_jeux_video j ON l.jeu_video = j.id_jeu AND l.jeu_video > 0
+        ORDER BY l.last_mod DESC
         LIMIT ${limit}
       `;
 
-      // Format each log entry
-      const formattedLogs = await Promise.all(
-        logs.map(async (log) => {
-          const jsonData = JSON.parse(log.json_data || '{}');
+      // Format each log entry (no additional queries needed)
+      const formattedLogs = logs.map((log) => {
+        const jsonData = JSON.parse(log.json_data || '{}');
 
-          // Determine content type and ID
-          let contentType: 'anime' | 'manga' | 'business' | 'jeu_video' = 'anime';
-          let contentId = 0;
-          let title = '';
-          let status = '';
+        // Determine content type, ID, title and status from joined data
+        let contentType: 'anime' | 'manga' | 'business' | 'jeu_video' = 'anime';
+        let contentId = 0;
+        let title = '';
+        let status = '';
 
-          if (log.anime > 0) {
-            contentType = 'anime';
-            contentId = log.anime;
-            // Fetch anime title and status
-            const anime = await this.prisma.$queryRaw<any[]>`
-              SELECT titre, statut FROM ak_animes WHERE id_anime = ${contentId} LIMIT 1
-            `;
-            if (anime && anime.length > 0) {
-              title = anime[0].titre;
-              status = anime[0].statut === 1 ? '' : anime[0].statut === 0 ? 'bloqué' : 'en attente';
-            }
-          } else if (log.manga > 0) {
-            contentType = 'manga';
-            contentId = log.manga;
-            // Fetch manga title and status
-            const manga = await this.prisma.$queryRaw<any[]>`
-              SELECT titre, statut FROM ak_mangas WHERE id_manga = ${contentId} LIMIT 1
-            `;
-            if (manga && manga.length > 0) {
-              title = manga[0].titre;
-              status = manga[0].statut === 1 ? '' : manga[0].statut === 0 ? 'bloqué' : 'en attente';
-            }
-          } else if (log.business > 0) {
-            contentType = 'business';
-            contentId = log.business;
-            // Fetch business name
-            const business = await this.prisma.$queryRaw<any[]>`
-              SELECT denomination FROM ak_business WHERE id_business = ${contentId} LIMIT 1
-            `;
-            if (business && business.length > 0) {
-              title = business[0].denomination;
-            }
-          } else if (log.jeu_video > 0) {
-            contentType = 'jeu_video';
-            contentId = log.jeu_video;
-            // Fetch video game title and status
-            const game = await this.prisma.$queryRaw<any[]>`
-              SELECT titre, statut FROM ak_jeux_video WHERE id_jeu = ${contentId} LIMIT 1
-            `;
-            if (game && game.length > 0) {
-              title = game[0].titre;
-              status = game[0].statut === 1 ? '' : game[0].statut === 0 ? 'bloqué' : 'en attente';
-            }
-          }
+        if (log.anime > 0) {
+          contentType = 'anime';
+          contentId = log.anime;
+          title = log.anime_titre || '';
+          status = log.anime_statut === 1 ? '' : log.anime_statut === 0 ? 'bloqué' : 'en attente';
+        } else if (log.manga > 0) {
+          contentType = 'manga';
+          contentId = log.manga;
+          title = log.manga_titre || '';
+          status = log.manga_statut === 1 ? '' : log.manga_statut === 0 ? 'bloqué' : 'en attente';
+        } else if (log.business > 0) {
+          contentType = 'business';
+          contentId = log.business;
+          title = log.business_titre || '';
+        } else if (log.jeu_video > 0) {
+          contentType = 'jeu_video';
+          contentId = log.jeu_video;
+          title = log.jeu_titre || '';
+          status = log.jeu_statut === 1 ? '' : log.jeu_statut === 0 ? 'bloqué' : 'en attente';
+        }
 
-          // Parse activities from JSON and sort by timestamp descending
-          const activities = Object.entries(jsonData)
-            .map(([timestamp, data]: [string, any]) => {
-              const username = Object.keys(data)[0];
-              const action = data[username];
-              return {
-                timestamp: parseInt(timestamp),
-                date: this.formatDate(parseInt(timestamp)),
-                username,
-                action,
-              };
-            })
-            .sort((a, b) => b.timestamp - a.timestamp);
+        // Parse activities from JSON and sort by timestamp descending
+        const activities = Object.entries(jsonData)
+          .map(([timestamp, data]: [string, any]) => {
+            const username = Object.keys(data)[0];
+            const action = data[username];
+            return {
+              timestamp: parseInt(timestamp),
+              date: this.formatDate(parseInt(timestamp)),
+              username,
+              action,
+            };
+          })
+          .sort((a, b) => b.timestamp - a.timestamp);
 
-          return {
-            id_log: log.id_log,
-            contentType,
-            contentId,
-            title,
-            status,
-            link:
-              contentType === 'anime'
-                ? `/admin/animes/${contentId}`
-                : contentType === 'manga'
-                  ? `/admin/mangas/${contentId}`
-                  : contentType === 'jeu_video'
-                    ? `/admin/jeux-video/${contentId}`
-                    : `/admin/business/${contentId}`,
-            activities,
-          };
-        }),
-      );
+        return {
+          id_log: log.id_log,
+          contentType,
+          contentId,
+          title,
+          status,
+          link:
+            contentType === 'anime'
+              ? `/admin/animes/${contentId}`
+              : contentType === 'manga'
+                ? `/admin/mangas/${contentId}`
+                : contentType === 'jeu_video'
+                  ? `/admin/jeux-video/${contentId}`
+                  : `/admin/business/${contentId}`,
+          activities,
+        };
+      });
 
       return formattedLogs;
     } catch (error) {
