@@ -14,6 +14,8 @@ import { AdminGenresController } from './admin-genres.controller';
 import { AdminTagsController } from './admin-tags.controller';
 import { SourcesExternesController } from './sources-externes.controller';
 import { SourcesExternesService } from './sources-externes.service';
+import { AniListImportController } from './anilist-import.controller';
+import { AniListImportService } from './anilist-import.service';
 import { PrismaService } from '../../../shared/services/prisma.service';
 import { CacheService } from '../../../shared/services/cache.service';
 import { IgdbService } from '../../../shared/services/igdb.service';
@@ -23,8 +25,8 @@ import { AdminLoggingModule } from '../logging/admin-logging.module';
 
 @Module({
   imports: [MediaModule, AdminLoggingModule],
-  controllers: [AdminContentController, AdminAnimesController, AdminMangasController, AdminBusinessController, AdminJeuxVideoController, AdminPlatformsController, AdminGenresController, AdminTagsController, SourcesExternesController],
-  providers: [AdminContentService, AdminAnimesService, AdminMangasService, AdminBusinessService, AdminJeuxVideoService, SourcesExternesService, PrismaService, CacheService, IgdbService, DeepLService],
-  exports: [AdminContentService],
+  controllers: [AdminContentController, AdminAnimesController, AdminMangasController, AdminBusinessController, AdminJeuxVideoController, AdminPlatformsController, AdminGenresController, AdminTagsController, SourcesExternesController, AniListImportController],
+  providers: [AdminContentService, AdminAnimesService, AdminMangasService, AdminBusinessService, AdminJeuxVideoService, SourcesExternesService, AniListImportService, PrismaService, CacheService, IgdbService, DeepLService],
+  exports: [AdminContentService, AniListImportService],
 })
 export class AdminContentModule {}
