@@ -324,8 +324,8 @@ export class ListsService {
     const totalPages = Math.max(Math.ceil(total / limit), 1);
     const result = { items, page, limit, total, totalPages };
 
-    // Cache the result for 5 minutes
-    await this.cacheService.setPublicListsPaged(mediaType, sort, type || '', page, limit, result);
+    // Cache the result for 20 minutes (1200 seconds)
+    await this.cacheService.setPublicListsPaged(mediaType, sort, type || '', page, limit, result, 1200);
 
     return result;
   }

@@ -407,7 +407,7 @@ export class MangasService extends BaseContentService<
     };
 
     // Cache the result (TTL based on query complexity)
-    const ttl = search || genre ? 180 : 300; // 3 mins for search, 5 mins for general lists
+    const ttl = search || genre ? 180 : 1200; // 3 mins for search, 20 mins for general lists
     await this.cacheService.setMangaList(cacheKey, result, ttl);
 
     return result;

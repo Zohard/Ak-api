@@ -23,7 +23,7 @@ export class FriendsService {
   constructor(
     private prisma: PrismaService,
     private notificationsService: NotificationsService
-  ) {}
+  ) { }
 
   /**
    * Get user's friends list
@@ -87,7 +87,7 @@ export class FriendsService {
     // Process friends data
     const currentTime = Math.floor(Date.now() / 1000);
     const oneDayAgo = currentTime - (24 * 60 * 60);
-    
+
     let mutualCount = 0;
     let recentlyActiveCount = 0;
 
@@ -96,7 +96,7 @@ export class FriendsService {
       const isMutual = friend.buddy_list
         ? friend.buddy_list.split(',').includes(userId.toString())
         : false;
-      
+
       if (isMutual) mutualCount++;
 
       // Check if recently active
@@ -207,7 +207,7 @@ export class FriendsService {
       WHERE id_member = ${userId}
       LIMIT 1
     `;
-    
+
     const senderName = senderData[0]?.real_name || 'Un utilisateur';
     const targetName = targetUserData[0]?.real_name || 'Utilisateur';
 
@@ -222,7 +222,7 @@ export class FriendsService {
         priority: 'medium',
         data: { friendId: userId, friendName: senderName }
       });
-      
+
       // Also notify the sender that mutual friendship is established
       await this.notificationsService.sendNotification({
         userId: userId,
@@ -330,7 +330,7 @@ export class FriendsService {
     `;
 
     const userMap = new Map<number, string>(users.map(u => [u.id_member, u.buddy_list || '']));
-    
+
     const userBuddyList: string = userMap.get(userId) || '';
     const targetBuddyList: string = userMap.get(targetUserId) || '';
 
@@ -367,14 +367,14 @@ export class FriendsService {
     }
 
     const userMap = new Map<number, string>(users.map(u => [u.id_member, u.buddy_list || '']));
-    
+
     const userBuddyList: string = userMap.get(userId) || '';
     const targetBuddyList: string = userMap.get(targetUserId) || '';
 
     const userBuddies = userBuddyList.split(',')
       .map(id => parseInt(id.trim()))
       .filter(id => !isNaN(id) && id > 0);
-    
+
     const targetBuddies = targetBuddyList.split(',')
       .map(id => parseInt(id.trim()))
       .filter(id => !isNaN(id) && id > 0);
@@ -537,7 +537,7 @@ export class FriendsService {
         const userBuddies = (user.buddy_list || '').split(',')
           .map(id => parseInt(id.trim()))
           .filter(id => !isNaN(id) && id > 0);
-        
+
         const mutualFriendIds = userFriendIds.filter(id => userBuddies.includes(id));
         const mutualFriends = friends
           .filter(f => mutualFriendIds.includes(f.id))
@@ -636,7 +636,7 @@ export class FriendsService {
 
     // Add requester to current user's buddy list (this will make it mutual)
     const result = await this.addFriend(userId, requesterId);
-    
+
     // Note: addFriend already sends notifications, but we'll make sure the message is appropriate for acceptance
     return {
       success: true,
@@ -713,12 +713,18 @@ export class FriendsService {
     if (page < 1) page = 1;
     if (limit < 1 || limit > 50) limit = 20;
 
+    // Check cache first
+    const cachedActivity = await this.cacheService.getFriendsActivity(userId, page, limit, typeFilter, contentTypeFilter);
+    if (cachedActivity) {
+      return cachedActivity;
+    }
+
     // Get user's friends list
     const { friends } = await this.getFriends(userId);
     const friendIds = friends.map(f => f.id);
 
     if (friendIds.length === 0) {
-      return {
+      const emptyResult = {
         activities: [],
         total: 0,
         page,
@@ -726,6 +732,9 @@ export class FriendsService {
         totalPages: 0,
         hasMore: false
       };
+      // Cache the empty result too
+      await this.cacheService.setFriendsActivity(userId, page, limit, typeFilter, contentTypeFilter, emptyResult, 120);
+      return emptyResult;
     }
 
     const offset = (page - 1) * limit;
@@ -1007,7 +1016,7 @@ export class FriendsService {
       timeAgo: this.formatTimeAgo(new Date(activity.createdAt))
     }));
 
-    return {
+    const result = {
       activities: formattedActivities,
       total,
       page,
@@ -1015,6 +1024,11 @@ export class FriendsService {
       totalPages: Math.ceil(total / limit),
       hasMore: offset + limit < total
     };
+
+    // Cache the result for 2 minutes
+    await this.cacheService.setFriendsActivity(userId, page, limit, typeFilter, contentTypeFilter, result, 120);
+
+    return result;
   }
 
   /**

@@ -653,4 +653,18 @@ export class CacheService implements OnModuleInit {
       throw error;
     }
   }
+  // Friends Activity cache methods
+  async getFriendsActivity(userId: number, page: number, limit: number, type: string, contentType: string): Promise<any> {
+    const key = `friends_activity:${userId}:${page}:${limit}:${type}:${contentType}`;
+    return this.get(key);
+  }
+
+  async setFriendsActivity(userId: number, page: number, limit: number, type: string, contentType: string, data: any, ttl = 120): Promise<void> {
+    const key = `friends_activity:${userId}:${page}:${limit}:${type}:${contentType}`;
+    await this.set(key, data, ttl); // 2 minutes default
+  }
+
+  async invalidateFriendsActivity(userId: number): Promise<void> {
+    await this.delByPattern(`friends_activity:${userId}:*`);
+  }
 }

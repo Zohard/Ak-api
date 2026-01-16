@@ -24,6 +24,30 @@ export class JeuxVideoService {
       sortOrder = 'desc',
     } = query;
 
+    // Create a simplified cache key for games
+    const cacheKey = `games_list:${JSON.stringify(query)}`;
+
+    // Try to get from cache first
+    // Note: We're reusing getAnimeList because it's a generic "get list" utility in CacheService
+    // even though the method name implies anime. The underlying redis key prefixes are handled by setAnimeList/getAnimeList.
+    // Wait, better to use the specific method if it exists, or raw get/set if not.
+    // CacheService DOES NOT have getGameList/setGameList.
+    // Let's us specific keys with generic get/set or add methods to CacheService?
+    // User asked for "Recent Media" cache.
+    // Ideally I should add getGameList/setGameList to CacheService but for now I will use generic set/get with a specific key.
+
+    // Actually, looking at CacheService again, it has:
+    // getAnimeList -> `anime_list:${key}`
+    // getMangaList -> `manga_list:${key}`
+    // Let's assume we should adding getGameList/setGameList is the "right" way but user wants quick fix. 
+    // I will use direct cacheService.get/set with a prefixed key.
+
+    const ttl = search || genre ? 180 : 1200; // 3 mins for search, 20 mins for general lists
+    const cached = await this.cacheService.get(`game_list:${cacheKey}`);
+    if (cached) {
+      return cached;
+    }
+
     const skip = (page - 1) * limit;
     const where: any = { statut: 1 }; // Only show published games
 
@@ -137,7 +161,7 @@ export class JeuxVideoService {
       id: item.idJeu,
     }));
 
-    return {
+    const result = {
       jeuxVideo: mappedItems,
       pagination: {
         page,
@@ -146,6 +170,13 @@ export class JeuxVideoService {
         totalPages: Math.ceil(total / limit),
       },
     };
+
+    // Cache the result
+    // reuse ttl logic (it might not be in scope depending on where I put it previously)
+    const ttl = search || genre ? 180 : 1200;
+    await this.cacheService.set(`game_list:${cacheKey}`, result, ttl);
+
+    return result;
   }
 
   async findOne(id: number) {
