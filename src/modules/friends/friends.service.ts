@@ -18,11 +18,14 @@ export interface FriendshipStats {
   recentlyActive: number;
 }
 
+import { CacheService } from '../../shared/services/cache.service';
+
 @Injectable()
 export class FriendsService {
   constructor(
     private prisma: PrismaService,
-    private notificationsService: NotificationsService
+    private notificationsService: NotificationsService,
+    private cacheService: CacheService
   ) { }
 
   /**

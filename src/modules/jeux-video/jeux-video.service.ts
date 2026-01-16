@@ -173,7 +173,7 @@ export class JeuxVideoService {
 
     // Cache the result
     // reuse ttl logic (it might not be in scope depending on where I put it previously)
-    const ttl = search || genre ? 180 : 1200;
+    // Cache the result
     await this.cacheService.set(`game_list:${cacheKey}`, result, ttl);
 
     return result;
