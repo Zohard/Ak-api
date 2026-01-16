@@ -11,7 +11,7 @@ import { PrismaService } from '../../shared/services/prisma.service';
 @ApiTags('legacy')
 @Controller()
 export class LegacyCollectionsController {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) { }
 
   @Get('collection-animes')
   @ApiOperation({ summary: 'Legacy: Get all anime items in a user collection (all types)' })
@@ -44,6 +44,15 @@ export class LegacyCollectionsController {
       success: true,
       total: items.length,
       data: items.map((i) => ({
+        id_collection: i.idCollection,
+        id_anime: i.idAnime,
+        type: i.type,
+        evaluation: i.evaluation,
+        notes: i.notes,
+        addedAt: i.createdAt ?? null,
+        anime: i.anime,
+      })),
+      items: items.map((i) => ({
         id_collection: i.idCollection,
         id_anime: i.idAnime,
         type: i.type,
@@ -94,6 +103,62 @@ export class LegacyCollectionsController {
         addedAt: i.createdAt ?? null,
         manga: i.manga,
       })),
+      items: items.map((i) => ({
+        id_collection: i.idCollection,
+        id_manga: i.idManga,
+        type: i.type,
+        evaluation: i.evaluation,
+        notes: i.notes,
+        addedAt: i.createdAt ?? null,
+        manga: i.manga,
+      })),
+    };
+  }
+
+  @Get('collection-games')
+  @ApiOperation({ summary: 'Legacy: Get all game items in a user collection (all types)' })
+  @ApiQuery({ name: 'id_membre', required: true, type: Number, description: 'User ID (legacy param name)' })
+  @ApiResponse({ status: 200, description: 'Game collection items returned (legacy format)' })
+  async getLegacyCollectionGames(
+    @Query('id_membre', ParseIntPipe) idMembre: number,
+  ) {
+    if (!idMembre) throw new BadRequestException('id_membre is required');
+
+    const items = await this.prisma.collectionJeuxVideo.findMany({
+      where: { idMembre },
+      orderBy: { dateCreated: 'desc' },
+      include: {
+        jeuxVideo: {
+          select: {
+            idJeu: true,
+            titre: true,
+            image: true,
+            annee: true,
+            moyenneNotes: true,
+            plateforme: true,
+          },
+        },
+      },
+    });
+
+    const mappedData = items.map((i) => ({
+      id_collection: i.idCollection,
+      id_jeu: i.idJeu,
+      type: i.type,
+      evaluation: i.evaluation,
+      notes: i.notes,
+      addedAt: i.dateCreated ?? null,
+      game: {
+        ...i.jeuxVideo,
+        id: i.jeuxVideo.idJeu, // map idJeu to id for consistent frontend usage
+      },
+    }));
+
+    return {
+      success: true,
+      total: items.length,
+      data: mappedData,
+      items: mappedData,
     };
   }
 }
