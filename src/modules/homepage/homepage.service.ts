@@ -17,126 +17,157 @@ export class HomePageService {
     private readonly seasonsService: SeasonsService,
     private readonly forumsService: ForumsService,
     private readonly articlesService: ArticlesService,
-  ) {}
+  ) { }
 
   async getHomePageData() {
-    const cacheKey = 'v3'; // v3: Added screenshots for anime/manga
+    // Define cache keys
+    const keys = {
+      reviews: 'homepage:reviews',
+      articles: 'homepage:articles',
+      season: 'homepage:season',
+      forum: 'homepage:forum',
+      stats: 'homepage:stats'
+    };
 
-    // Try cache first
-    const cached = await this.cache.getHomepageData(cacheKey);
-    if (cached) {
-      this.logger.log('✅ Homepage cache HIT');
-      return cached;
+    // 1. Try to get all parts from cache in parallel
+    const [
+      cachedReviews,
+      cachedArticles,
+      cachedSeason,
+      cachedForum,
+      cachedStats
+    ] = await Promise.all([
+      this.cache.get<any>(keys.reviews),
+      this.cache.get<any>(keys.articles),
+      this.cache.get<any>(keys.season),
+      this.cache.get<any>(keys.forum),
+      this.cache.get<any>(keys.stats)
+    ]);
+
+    // 2. Prepare data fetch promises for missing parts
+    const promises: any = {};
+
+    if (!cachedReviews) {
+      this.logger.log('MISS: Reviews');
+      promises.reviews = this.reviewsService.findAll({ limit: 6, sortBy: 'dateCritique', sortOrder: 'desc', statut: 0 } as any);
     }
-    
-    this.logger.log('🏠 Homepage data cache MISS, generating fresh data');
-    
-    try {
-      this.logger.log('📊 Starting homepage data aggregation...');
-      
-      const [
-        latestReviews,
-        articles,
-        currentSeason,
-        forum,
-        animeCount,
-        mangaCount,
-        reviewsCount,
-      ] = await Promise.allSettled([
-        this.reviewsService.findAll({ limit: 6, sortBy: 'dateCritique', sortOrder: 'desc', statut: 0 } as any), // Only public reviews
-        this.articlesService.findAll({ limit: 6, sort: 'date', order: 'DESC', status: 'published' } as any),
-        this.seasonsService.findCurrent(),
-        this.forumsService.getLatestMessages({ limit: 2 } as any),
-        this.prisma.akAnime.count(),
-        this.prisma.akManga.count(),
-        this.reviewsService.getReviewsCount(),
-      ]);
 
-      // Log each result for debugging
-      this.logger.log('📝 Reviews result:', latestReviews.status === 'fulfilled' ? 'SUCCESS' : `FAILED: ${(latestReviews as any).reason?.message}`);
-      this.logger.log('📰 Articles result:', articles.status === 'fulfilled' ? 'SUCCESS' : `FAILED: ${(articles as any).reason?.message}`);
-      this.logger.log('🗓️ Season result:', currentSeason.status === 'fulfilled' ? 'SUCCESS' : `FAILED: ${(currentSeason as any).reason?.message}`);
-      this.logger.log('💬 Forum result:', forum.status === 'fulfilled' ? 'SUCCESS' : `FAILED: ${(forum as any).reason?.message}`);
-      this.logger.log('📊 Stats results:', {
-        animes: animeCount.status === 'fulfilled' ? 'SUCCESS' : 'FAILED',
-        mangas: mangaCount.status === 'fulfilled' ? 'SUCCESS' : 'FAILED',
-        reviews: reviewsCount.status === 'fulfilled' ? 'SUCCESS' : 'FAILED'
-      });
+    if (!cachedArticles) {
+      this.logger.log('MISS: Articles');
+      promises.articles = this.articlesService.findAll({ limit: 6, sort: 'date', order: 'DESC', status: 'published' } as any);
+    }
 
-      // Extract successful results or use fallbacks
-      const reviewsData = latestReviews.status === 'fulfilled' ? latestReviews.value : null;
-      const articlesData = articles.status === 'fulfilled' ? articles.value : null;
-      const seasonData = currentSeason.status === 'fulfilled' ? currentSeason.value : null;
-      const forumData = forum.status === 'fulfilled' ? forum.value : null;
-      const animeCountData = animeCount.status === 'fulfilled' ? animeCount.value : 0;
-      const mangaCountData = mangaCount.status === 'fulfilled' ? mangaCount.value : 0;
-      const reviewsCountData = reviewsCount.status === 'fulfilled' ? reviewsCount.value : { count: 0 };
-
-      let seasonAnimes: any[] = [];
-      if (seasonData && seasonData.id_saison) {
+    if (!cachedSeason) {
+      this.logger.log('MISS: Season');
+      // We need to fetch season AND season animes together to ensure consistency
+      promises.season = (async () => {
         try {
-          this.logger.log('🗓️ Loading season animes for season:', seasonData.id_saison);
-          const list = await this.seasonsService.getSeasonAnimes(seasonData.id_saison);
-          // Shuffle and take up to 10
-          seasonAnimes = (list as any[])
-            .sort(() => Math.random() - 0.5)
-            .slice(0, 10);
-          this.logger.log('🎌 Season animes loaded:', seasonAnimes.length);
+          const season = await this.seasonsService.findCurrent();
+          if (!season || !season.id_saison) return { current: null, animes: [] };
+
+          const animes = await this.seasonsService.getSeasonAnimes(season.id_saison);
+          const shuffled = (animes as any[]).sort(() => Math.random() - 0.5).slice(0, 10);
+          return { current: season, animes: shuffled };
         } catch (e) {
-          this.logger.warn('Failed loading season animes, skipping:', e);
+          this.logger.warn('Error fetching season data', e);
+          return { current: null, animes: [] };
         }
-      }
-
-      const payload = {
-        hero: {
-          // Hand off raw data; UI builds image URLs and links
-          reviews: Array.isArray((reviewsData as any)?.reviews) ? (reviewsData as any).reviews : 
-                  Array.isArray((reviewsData as any)?.data) ? (reviewsData as any).data : 
-                  Array.isArray(reviewsData) ? reviewsData : [],
-          articles: Array.isArray((articlesData as any)?.articles) ? (articlesData as any).articles : 
-                   Array.isArray((articlesData as any)?.data) ? (articlesData as any).data : 
-                   Array.isArray(articlesData) ? articlesData : [],
-        },
-        season: {
-          current: seasonData || null,
-          animes: seasonAnimes,
-        },
-        forum: forumData || { messages: [], total: 0, limit: 2, offset: 0 },
-        stats: {
-          animes: Number(animeCountData || 0),
-          mangas: Number(mangaCountData || 0),
-          reviews: Number((reviewsCountData as any)?.count || reviewsCountData || 0),
-        },
-        generatedAt: new Date().toISOString(),
-      };
-
-      this.logger.log('📦 Final payload summary:', {
-        reviewsCount: payload.hero.reviews.length,
-        articlesCount: payload.hero.articles.length,
-        seasonAnimes: payload.season.animes.length,
-        forumMessages: payload.forum.messages?.length || 0,
-        stats: payload.stats
-      });
-
-      // Cache for 30 minutes (1800 seconds)
-      await this.cache.setHomepageData(cacheKey, payload, 1800);
-      return payload;
-    } catch (error) {
-      this.logger.error('Homepage aggregation error:', error);
-      // Do not fail the request—return a minimal fallback
-      return {
-        hero: { reviews: [], articles: [] },
-        season: { current: null, animes: [] },
-        forum: { messages: [], total: 0, limit: 2, offset: 0 },
-        stats: { animes: 0, mangas: 0, reviews: 0 },
-        generatedAt: new Date().toISOString(),
-      };
+      })();
     }
+
+    if (!cachedForum) {
+      this.logger.log('MISS: Forum');
+      promises.forum = this.forumsService.getLatestMessages({ limit: 2 } as any);
+    }
+
+    if (!cachedStats) {
+      this.logger.log('MISS: Stats');
+      promises.stats = (async () => {
+        const [animeCount, mangaCount, reviewsCount] = await Promise.all([
+          this.prisma.akAnime.count(),
+          this.prisma.akManga.count(),
+          this.reviewsService.getReviewsCount()
+        ]);
+        return {
+          animes: Number(animeCount || 0),
+          mangas: Number(mangaCount || 0),
+          reviews: Number((reviewsCount as any)?.count || reviewsCount || 0)
+        };
+      })();
+    }
+
+    // 3. Resolve all missing data
+    // We can't use Promise.allSettled on an object directly, so we map the values
+    const keysToFetch = Object.keys(promises);
+    if (keysToFetch.length > 0) {
+      this.logger.log(`Fetching missing parts: ${keysToFetch.join(', ')}`);
+
+      // Execute all promises
+      await Promise.all(
+        keysToFetch.map(async (key) => {
+          try {
+            const data = await promises[key];
+
+            // Validate and process before caching
+            let dataToCache = data;
+
+            // Standardize reviews structure
+            if (key === 'reviews') {
+              dataToCache = Array.isArray((data as any)?.reviews) ? (data as any).reviews :
+                Array.isArray((data as any)?.data) ? (data as any).data :
+                  Array.isArray(data) ? data : [];
+            }
+
+            // Standardize articles structure
+            if (key === 'articles') {
+              dataToCache = Array.isArray((data as any)?.articles) ? (data as any).articles :
+                Array.isArray((data as any)?.data) ? (data as any).data :
+                  Array.isArray(data) ? data : [];
+            }
+
+            // Cache the result
+            const cacheKey = keys[key as keyof typeof keys];
+            if (dataToCache) {
+              await this.cache.set(cacheKey, dataToCache, 7200); // 2 hours
+              this.logger.log(`✅ Cached ${key}`);
+            }
+
+            // Update the local variable so we use the fresh data
+            if (key === 'reviews') promises.reviewsResult = dataToCache;
+            if (key === 'articles') promises.articlesResult = dataToCache;
+            if (key === 'season') promises.seasonResult = dataToCache;
+            if (key === 'forum') promises.forumResult = dataToCache;
+            if (key === 'stats') promises.statsResult = dataToCache;
+
+          } catch (e) {
+            this.logger.error(`Failed to fetch ${key}`, e);
+          }
+        })
+      );
+    }
+
+    // 4. Construct final payload using cached or fresh data
+    const reviews = promises.reviewsResult || cachedReviews || [];
+    const articles = promises.articlesResult || cachedArticles || [];
+    const season = promises.seasonResult || cachedSeason || { current: null, animes: [] };
+    const forum = promises.forumResult || cachedForum || { messages: [], total: 0, limit: 2, offset: 0 };
+    const stats = promises.statsResult || cachedStats || { animes: 0, mangas: 0, reviews: 0 };
+
+    return {
+      hero: {
+        reviews,
+        articles
+      },
+      season,
+      forum,
+      stats,
+      generatedAt: new Date().toISOString(),
+    };
   }
 
   async debugDataSources() {
     this.logger.log('🔍 Starting homepage debug...');
-    
+
     const debug = {
       timestamp: new Date().toISOString(),
       sources: {} as any
@@ -149,7 +180,7 @@ export class HomePageService {
       debug.sources.reviews = {
         status: 'success',
         count: Array.isArray((reviewsResult as any)?.reviews) ? (reviewsResult as any).reviews.length :
-               Array.isArray((reviewsResult as any)?.data) ? (reviewsResult as any).data.length : 0,
+          Array.isArray((reviewsResult as any)?.data) ? (reviewsResult as any).data.length : 0,
         sampleData: reviewsResult
       };
     } catch (error) {
@@ -160,7 +191,7 @@ export class HomePageService {
       this.logger.log('🧪 Testing articles service...');
       const articlesResult = await this.articlesService.findAll({ limit: 3, sort: 'date', order: 'DESC', status: 'published' } as any);
       debug.sources.articles = {
-        status: 'success', 
+        status: 'success',
         count: Array.isArray((articlesResult as any)?.articles) ? (articlesResult as any).articles.length : 0,
         sampleData: articlesResult
       };

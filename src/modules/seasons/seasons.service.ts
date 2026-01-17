@@ -9,7 +9,7 @@ export class SeasonsService {
   constructor(
     private prisma: PrismaService,
     private readonly cacheService: CacheService,
-  ) {}
+  ) { }
 
   async findAll() {
     try {
@@ -24,10 +24,10 @@ export class SeasonsService {
         FROM ak_animes_saisons
         ORDER BY annee DESC, saison DESC, id_saison DESC
       `;
-      
+
       // Cache for 1 hour (3600 seconds) - seasons don't change often
       await this.cacheService.set('seasons:all', seasons, 3600);
-      
+
       return seasons;
     } catch (error) {
       this.logger.error('Error fetching seasons:', error);
@@ -105,12 +105,12 @@ export class SeasonsService {
         FROM ak_animes_saisons
         WHERE id_saison = ${id}
       `;
-      
+
       const result = Array.isArray(season) && season.length > 0 ? season[0] : null;
-      
+
       // Cache for 2 hours (7200 seconds) - individual seasons rarely change
       await this.cacheService.set(`season:${id}`, result, 7200);
-      
+
       return result;
     } catch (error) {
       this.logger.error(`Error fetching season with ID ${id}:`, error);
@@ -133,14 +133,14 @@ export class SeasonsService {
       }
 
       let animeIds: number[] = [];
-      
+
       // Parse json_data to get anime IDs
       if (season.json_data) {
         try {
-          const jsonData = typeof season.json_data === 'string' 
-            ? JSON.parse(season.json_data) 
+          const jsonData = typeof season.json_data === 'string'
+            ? JSON.parse(season.json_data)
             : season.json_data;
-          
+
           // Handle different possible JSON structures
           if (Array.isArray(jsonData)) {
             animeIds = jsonData;
@@ -162,7 +162,7 @@ export class SeasonsService {
 
       // Create a parameterized query with the anime IDs
       const placeholders = animeIds.map((_, index) => `$${index + 1}::integer`).join(', ');
-      
+
       const animes = await this.prisma.$queryRawUnsafe(`
         SELECT
           "id_anime" as id,
@@ -228,7 +228,7 @@ export class SeasonsService {
         if (Array.isArray(jd)) animeIds = jd
         else if (Array.isArray(jd.animes)) animeIds = jd.animes
         else if (Array.isArray(jd.anime_ids)) animeIds = jd.anime_ids
-      } catch {}
+      } catch { }
     }
     return { animes: animeIds }
   }
@@ -272,7 +272,7 @@ export class SeasonsService {
     await this.cacheService.del('seasons:all')
     await this.cacheService.del('seasons:current')
     // Invalidate homepage cache since seasonal anime changed
-    await this.cacheService.del('homepage:v1')
+    await this.cacheService.invalidateHomepageSeason()
 
     return { success: true, seasonId, animeId }
   }
@@ -297,7 +297,7 @@ export class SeasonsService {
       await this.cacheService.del('seasons:all')
       await this.cacheService.del('seasons:current')
       // Invalidate homepage cache since seasonal anime changed
-      await this.cacheService.del('homepage:v1')
+      await this.cacheService.invalidateHomepageSeason()
     }
     return { success: true, seasonId, animeId }
   }
@@ -319,7 +319,7 @@ export class SeasonsService {
     await this.cacheService.del('seasons:all')
     await this.cacheService.del('seasons:current')
     // Invalidate homepage cache since season status affects current season
-    await this.cacheService.del('homepage:v1')
+    await this.cacheService.invalidateHomepageSeason()
 
     return { success: true, seasonId, statut }
   }
@@ -339,7 +339,7 @@ export class SeasonsService {
     await this.cacheService.del(`season_animes:${seasonId}`)
     await this.cacheService.del('seasons:all')
     await this.cacheService.del('seasons:current')
-    await this.cacheService.del('homepage:v1')
+    await this.cacheService.invalidateHomepageSeason()
 
     return { success: true, seasonId }
   }

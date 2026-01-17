@@ -10,7 +10,7 @@ export class ForumsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly cacheService: CacheService,
-  ) {}
+  ) { }
 
   async getCategories(userId?: number) {
     try {
@@ -1205,6 +1205,7 @@ export class ForumsService {
       await this.cacheService.invalidateForumBoard(boardId);
       await this.cacheService.delByPattern('forums:categories:*'); // Invalidate all category caches
       await this.cacheService.delByPattern('forums:messages:latest:*'); // Invalidate latest messages
+      await this.cacheService.invalidateHomepageForum(); // Invalidate homepage forum
 
       return {
         topicId: result.topic.idTopic,
@@ -1318,6 +1319,7 @@ export class ForumsService {
       await this.cacheService.invalidateForumTopic(topicId);
       await this.cacheService.invalidateForumBoard(topic.idBoard);
       await this.cacheService.delByPattern('forums:messages:latest:*'); // Invalidate latest messages
+      await this.cacheService.invalidateHomepageForum(); // Invalidate homepage forum
 
       return {
         messageId: result.idMsg,
@@ -1431,17 +1433,17 @@ export class ForumsService {
       // Get member details
       const onlineMembers = memberIds.length > 0
         ? await this.prisma.smfMember.findMany({
-            where: {
-              idMember: {
-                in: memberIds
-              }
-            },
-            select: {
-              idMember: true,
-              memberName: true,
-              lastLogin: true
+          where: {
+            idMember: {
+              in: memberIds
             }
-          })
+          },
+          select: {
+            idMember: true,
+            memberName: true,
+            lastLogin: true
+          }
+        })
         : [];
 
       return {

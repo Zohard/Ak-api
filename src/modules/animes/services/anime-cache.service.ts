@@ -43,6 +43,8 @@ export class AnimeCacheService {
       this.cacheService.del(`anime_relations:${id}`),
       this.cacheService.del(`anime_articles:${id}`),
       this.cacheService.del(`similar_animes:${id}:6`), // Default limit is 6
+      this.cacheService.invalidateHomepageStats(), // Invalidate homepage stats (anime count)
+      this.cacheService.invalidateHomepageSeason(), // Invalidate homepage season (anime details might have changed)
     ]);
 
     // Invalidate cache of all related animes (when image changes, related pages must refresh)

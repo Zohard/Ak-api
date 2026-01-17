@@ -22,7 +22,7 @@ export class ReviewsService {
     private readonly popularityService: PopularityService,
     private readonly notificationsService: NotificationsService,
     private readonly emailService: EmailService,
-  ) {}
+  ) { }
 
   async create(createReviewDto: CreateReviewDto, userId: number) {
     const { idAnime, idManga, idJeu, ...reviewData } = createReviewDto;
@@ -104,30 +104,30 @@ export class ReviewsService {
         },
         anime: idAnime
           ? {
-              select: {
-                idAnime: true,
-                titre: true,
-                image: true,
-              },
-            }
+            select: {
+              idAnime: true,
+              titre: true,
+              image: true,
+            },
+          }
           : false,
         manga: idManga
           ? {
-              select: {
-                idManga: true,
-                titre: true,
-                image: true,
-              },
-            }
+            select: {
+              idManga: true,
+              titre: true,
+              image: true,
+            },
+          }
           : false,
         jeuxVideo: idJeu
           ? {
-              select: {
-                idJeu: true,
-                titre: true,
-                image: true,
-              },
-            }
+            select: {
+              idJeu: true,
+              titre: true,
+              image: true,
+            },
+          }
           : false,
       },
     });
@@ -290,7 +290,7 @@ export class ReviewsService {
     let orderBy: any;
     const sortField = sortBy || 'dateCritique';
     const sortDirection = sortOrder || 'desc';
-    
+
     // For fields that might have null values, add secondary sort by date
     if (sortField === 'popularite' || sortField === 'nbClics') {
       orderBy = [
@@ -300,7 +300,7 @@ export class ReviewsService {
     } else {
       orderBy = { [sortField]: sortDirection };
     }
-    
+
 
     const [reviews, total] = await Promise.all([
       this.prisma.akCritique.findMany({
@@ -362,35 +362,35 @@ export class ReviewsService {
     const [animeScreenshots, mangaScreenshots] = await Promise.all([
       animeIds.length > 0
         ? this.prisma.akScreenshot.findMany({
-            where: {
-              idTitre: { in: animeIds },
-              type: 1, // 1 = anime
-            },
-            select: {
-              idScreen: true,
-              urlScreen: true,
-              idTitre: true,
-            },
-            orderBy: {
-              uploadDate: 'desc',
-            },
-          })
+          where: {
+            idTitre: { in: animeIds },
+            type: 1, // 1 = anime
+          },
+          select: {
+            idScreen: true,
+            urlScreen: true,
+            idTitre: true,
+          },
+          orderBy: {
+            uploadDate: 'desc',
+          },
+        })
         : [],
       mangaIds.length > 0
         ? this.prisma.akScreenshot.findMany({
-            where: {
-              idTitre: { in: mangaIds },
-              type: 2, // 2 = manga
-            },
-            select: {
-              idScreen: true,
-              urlScreen: true,
-              idTitre: true,
-            },
-            orderBy: {
-              uploadDate: 'desc',
-            },
-          })
+          where: {
+            idTitre: { in: mangaIds },
+            type: 2, // 2 = manga
+          },
+          select: {
+            idScreen: true,
+            urlScreen: true,
+            idTitre: true,
+          },
+          orderBy: {
+            uploadDate: 'desc',
+          },
+        })
         : [],
     ]);
 
@@ -527,7 +527,7 @@ export class ReviewsService {
           }
         }
       }
-    } catch {}
+    } catch { }
 
     // Cache the individual review for 10 minutes
     await this.cacheService.set(`review:${id}`, formattedReview, 600);
@@ -603,7 +603,7 @@ export class ReviewsService {
       if (formatted.membre) {
         formatted = { ...formatted, membre: { ...formatted.membre, averageRating: Number(average) } }
       }
-    } catch {}
+    } catch { }
     return formatted;
   }
 
@@ -648,21 +648,21 @@ export class ReviewsService {
         },
         anime: review.idAnime
           ? {
-              select: {
-                idAnime: true,
-                titre: true,
-                image: true,
-              },
-            }
+            select: {
+              idAnime: true,
+              titre: true,
+              image: true,
+            },
+          }
           : false,
         manga: review.idManga
           ? {
-              select: {
-                idManga: true,
-                titre: true,
-                image: true,
-              },
-            }
+            select: {
+              idManga: true,
+              titre: true,
+              image: true,
+            },
+          }
           : false,
       },
     });
@@ -877,7 +877,7 @@ export class ReviewsService {
     // Try to get from cache first
     //const cached = await this.cacheService.get(cacheKey);
     //if (cached !== null) {
-      //return cached;
+    //return cached;
     //}
 
     let whereCondition: any = {
@@ -1029,11 +1029,11 @@ export class ReviewsService {
     // Map membre to frontend shape with counts
     const mappedMembre = membre
       ? {
-          id: membre.idMember,
-          pseudo: membre.memberName,
-          avatar: membre.avatar,
-          reviewsCount: (membre as any)._count?.reviews || 0,
-        }
+        id: membre.idMember,
+        pseudo: membre.memberName,
+        avatar: membre.avatar,
+        reviewsCount: (membre as any)._count?.reviews || 0,
+      }
       : null
 
     return {
@@ -1086,7 +1086,7 @@ export class ReviewsService {
     return 0;
   }
 
-  private updateQuestionsJson(questionsJson: string | null, userId: number, ratings: {c?: number, a?: number, o?: number, y?: number, n?: number}): string {
+  private updateQuestionsJson(questionsJson: string | null, userId: number, ratings: { c?: number, a?: number, o?: number, y?: number, n?: number }): string {
     const questions = this.parseQuestions(questionsJson);
     // Store in the new format (y/n) but maintain backward compatibility when reading
     questions[userId.toString()] = {
@@ -1099,9 +1099,9 @@ export class ReviewsService {
     return JSON.stringify(questions);
   }
 
-  private calculateRatingTotals(questions: any): {c: number, a: number, o: number, y: number, n: number} {
-    const totals = {c: 0, a: 0, o: 0, y: 0, n: 0};
-    
+  private calculateRatingTotals(questions: any): { c: number, a: number, o: number, y: number, n: number } {
+    const totals = { c: 0, a: 0, o: 0, y: 0, n: 0 };
+
     Object.values(questions).forEach((userRatings: any) => {
       if (userRatings.c === 1) totals.c++;
       if (userRatings.a === 1) totals.a++;
@@ -1109,7 +1109,7 @@ export class ReviewsService {
       if (userRatings.y === 1) totals.y++;
       if (userRatings.n === 1) totals.n++;
     });
-    
+
     return totals;
   }
 
@@ -1160,7 +1160,7 @@ export class ReviewsService {
     }
 
     const questions = this.parseQuestions(review.questions);
-    const userRatings = questions[userId.toString()] || {c: 0, a: 0, o: 0, y: 0, n: 0};
+    const userRatings = questions[userId.toString()] || { c: 0, a: 0, o: 0, y: 0, n: 0 };
 
     // Convert legacy yes/no to y/n for internal processing
     let normalizedRatingType = ratingType;
@@ -1181,16 +1181,16 @@ export class ReviewsService {
     const updatedQuestionsJson = this.updateQuestionsJson(review.questions, userId, userRatings);
     await this.prisma.akCritique.update({
       where: { idCritique: reviewId },
-      data: { 
+      data: {
         questions: updatedQuestionsJson
       },
     });
 
     // Calculate and update popularity
     const popularity = await this.calculateReviewPopularity(reviewId);
-    await this.prisma.akCritique.update({ 
-      where: { idCritique: reviewId }, 
-      data: { popularite: popularity } 
+    await this.prisma.akCritique.update({
+      where: { idCritique: reviewId },
+      data: { popularite: popularity }
     });
 
     // Invalidate caches
@@ -1281,10 +1281,10 @@ export class ReviewsService {
 
     const questions = this.parseQuestions(review.questions);
     const totals = this.calculateRatingTotals(questions);
-    
+
     let userRatings = null;
     if (userId) {
-      userRatings = questions[userId.toString()] || {c: 0, a: 0, o: 0, y: 0, n: 0};
+      userRatings = questions[userId.toString()] || { c: 0, a: 0, o: 0, y: 0, n: 0 };
     }
 
     return {
@@ -1385,7 +1385,7 @@ export class ReviewsService {
 
     const questions = this.parseQuestions(review.questions);
     const totals = this.calculateRatingTotals(questions);
-    const ageInDays = review.dateCritique 
+    const ageInDays = review.dateCritique
       ? Math.floor((Date.now() - new Date(review.dateCritique).getTime()) / (1000 * 60 * 60 * 24))
       : 0;
 
@@ -1408,7 +1408,7 @@ export class ReviewsService {
   private calculateTrendingScore(review: any): number {
     const questions = this.parseQuestions(review.questions);
     const totals = this.calculateRatingTotals(questions);
-    const ageInDays = review.dateCritique 
+    const ageInDays = review.dateCritique
       ? Math.floor((Date.now() - new Date(review.dateCritique).getTime()) / (1000 * 60 * 60 * 24))
       : 0;
 
@@ -1451,7 +1451,7 @@ export class ReviewsService {
     const updates = await Promise.allSettled(
       reviews.map(async (review) => {
         const popularity = await this.calculateReviewPopularity(review.idCritique);
-        
+
         return this.prisma.akCritique.update({
           where: { idCritique: review.idCritique },
           data: { popularite: popularity },
@@ -1514,6 +1514,11 @@ export class ReviewsService {
 
     // Invalidate all reviews-related caches (lists, counts, top reviews)
     await this.cacheService.invalidateAllReviews();
+
+    // Invalidate homepage reviews cache
+    await this.cacheService.invalidateHomepageReviews();
+    // Invalidate homepage stats cache (review count)
+    await this.cacheService.invalidateHomepageStats();
   }
 
   /**

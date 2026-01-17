@@ -361,6 +361,43 @@ export class CacheService implements OnModuleInit {
     return !hasAnyListItems && allStatsZero;
   }
 
+  // Homepage cache invalidation methods
+  async invalidateHomepageReviews(): Promise<void> {
+    await this.del('homepage:reviews');
+    this.logger.debug('Invalidated homepage:reviews');
+  }
+
+  async invalidateHomepageArticles(): Promise<void> {
+    await this.del('homepage:articles');
+    this.logger.debug('Invalidated homepage:articles');
+  }
+
+  async invalidateHomepageSeason(): Promise<void> {
+    await this.del('homepage:season');
+    this.logger.debug('Invalidated homepage:season');
+  }
+
+  async invalidateHomepageForum(): Promise<void> {
+    await this.del('homepage:forum');
+    this.logger.debug('Invalidated homepage:forum');
+  }
+
+  async invalidateHomepageStats(): Promise<void> {
+    await this.del('homepage:stats');
+    this.logger.debug('Invalidated homepage:stats');
+  }
+
+  async invalidateAllHomepage(): Promise<void> {
+    await Promise.all([
+      this.del('homepage:reviews'),
+      this.del('homepage:articles'),
+      this.del('homepage:season'),
+      this.del('homepage:forum'),
+      this.del('homepage:stats')
+    ]);
+    this.logger.debug('Invalidated all homepage cache');
+  }
+
   // Articles cache methods
   async getArticlesList(key: string): Promise<any> {
     return this.get(`articles_list:${key}`);
@@ -399,6 +436,7 @@ export class CacheService implements OnModuleInit {
       this.del(`article:${id}`),
       this.delByPattern(`articles_list:*`), // Invalidate all article lists
       this.del('featured_articles'), // Invalidate featured articles
+      this.invalidateHomepageArticles(), // Invalidate homepage articles
     ]);
     this.logger.debug(`Invalidated article cache for ID: ${id}`);
   }

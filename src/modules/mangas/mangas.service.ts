@@ -2238,6 +2238,8 @@ export class MangasService extends BaseContentService<
     await this.cacheService.invalidateManga(id);
     // Also invalidate related caches
     await this.cacheService.invalidateSearchCache();
+    await this.cacheService.invalidateRankings('manga');
+    await this.cacheService.invalidateHomepageStats(); // Invalidate homepage stats (manga count)
   }
 
   // Utility method to create consistent cache keys
