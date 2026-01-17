@@ -395,76 +395,72 @@ export class AdminContentService {
       whereClause = `WHERE r.id_fiche_depart = $1`;
     }
 
-    // Filter to anime/manga/jeu relationships
-    const relationships = await this.prisma.$queryRawUnsafe<any[]>(
-      `
-      SELECT
-        base.id_relation,
-        base.id_fiche_depart,
-        base.id_anime,
-        base.id_manga,
-        base.related_id,
-        base.related_type,
-        base.type_relation,
-        COALESCE(a.titre, m.titre, j.titre) as related_title
-      FROM (
+    try {
+      // Filter to anime/manga/jeu relationships
+      const relationships = await this.prisma.$queryRawUnsafe<any[]>(
+        `
         SELECT
-          r.id_relation,
-          r.id_fiche_depart,
-          r.id_anime,
-          r.id_manga,
-          CASE
-            WHEN r.id_fiche_depart = $1 THEN
-              CASE
-                WHEN r.id_anime > 0 THEN r.id_anime
-                WHEN r.id_manga > 0 THEN r.id_manga
-                WHEN r.id_jeu > 0 THEN r.id_jeu
-                ELSE NULL
-              END
-            WHEN r.id_fiche_depart ~ '^anime[0-9]+\$' THEN CAST(SUBSTRING(r.id_fiche_depart, 6) AS INTEGER)
-            WHEN r.id_fiche_depart ~ '^manga[0-9]+\$' THEN CAST(SUBSTRING(r.id_fiche_depart, 6) AS INTEGER)
-            WHEN r.id_fiche_depart ~ '^jeu[0-9]+\$' THEN CAST(SUBSTRING(r.id_fiche_depart, 4) AS INTEGER)
-            ELSE NULL
-          END as related_id,
-          'related'::text as type_relation,
-          CASE
-            WHEN r.id_fiche_depart = $1 THEN
-              CASE
-                WHEN r.id_anime > 0 THEN 'anime'::text
-                WHEN r.id_manga > 0 THEN 'manga'::text
-                WHEN r.id_jeu > 0 THEN 'jeu-video'::text
-                ELSE 'unknown'::text
-              END
-            WHEN r.id_fiche_depart ~ '^anime[0-9]+\$' THEN 'anime'::text
-            WHEN r.id_fiche_depart ~ '^manga[0-9]+\$' THEN 'manga'::text
-            WHEN r.id_fiche_depart ~ '^jeu[0-9]+\$' THEN 'jeu-video'::text
-            ELSE 'unknown'::text
-          END as related_type
-        FROM ak_fiche_to_fiche r
-        ${whereClause}
-        AND (r.id_anime > 0 OR r.id_manga > 0 OR r.id_jeu > 0 OR r.id_fiche_depart ~ '^anime[0-9]+\$' OR r.id_fiche_depart ~ '^manga[0-9]+\$' OR r.id_fiche_depart ~ '^jeu[0-9]+\$')
-      ) base
-      LEFT JOIN ak_animes a ON base.related_type = 'anime' AND base.related_id = a.id_anime
-      LEFT JOIN ak_mangas m ON base.related_type = 'manga' AND base.related_id = m.id_manga
-      LEFT JOIN ak_jeux_video j ON base.related_type = 'jeu-video' AND base.related_id = j.id_jeu
-      WHERE base.related_id IS NOT NULL
-    `,
-      sourceKey,
-      id,
-    );
+          base.id_relation,
+          base.id_fiche_depart,
+          base.id_anime,
+          base.id_manga,
+          base.related_id,
+          base.related_type,
+          base.type_relation,
+          COALESCE(a.titre, m.titre, j.titre) as related_title
+        FROM (
+          SELECT
+            r.id_relation,
+            r.id_fiche_depart,
+            r.id_anime,
+            r.id_manga,
+            CASE
+              WHEN r.id_fiche_depart = $1 THEN
+                CASE
+                  WHEN r.id_anime > 0 THEN r.id_anime
+                  WHEN r.id_manga > 0 THEN r.id_manga
+                  WHEN r.id_jeu > 0 THEN r.id_jeu
+                  ELSE NULL
+                END
+              WHEN r.id_fiche_depart ~ '^anime[0-9]+$' THEN CAST(SUBSTRING(r.id_fiche_depart, 6) AS INTEGER)
+              WHEN r.id_fiche_depart ~ '^manga[0-9]+$' THEN CAST(SUBSTRING(r.id_fiche_depart, 6) AS INTEGER)
+              WHEN r.id_fiche_depart ~ '^jeu[0-9]+$' THEN CAST(SUBSTRING(r.id_fiche_depart, 4) AS INTEGER)
+              ELSE NULL
+            END as related_id,
+            'related'::text as type_relation,
+            CASE
+              WHEN r.id_fiche_depart = $1 THEN
+                CASE
+                  WHEN r.id_anime > 0 THEN 'anime'::text
+                  WHEN r.id_manga > 0 THEN 'manga'::text
+                  WHEN r.id_jeu > 0 THEN 'jeu-video'::text
+                  ELSE 'unknown'::text
+                END
+              WHEN r.id_fiche_depart ~ '^anime[0-9]+$' THEN 'anime'::text
+              WHEN r.id_fiche_depart ~ '^manga[0-9]+$' THEN 'manga'::text
+              WHEN r.id_fiche_depart ~ '^jeu[0-9]+$' THEN 'jeu-video'::text
+              ELSE 'unknown'::text
+            END as related_type
+          FROM ak_fiche_to_fiche r
+          ${whereClause}
+          AND (r.id_anime > 0 OR r.id_manga > 0 OR r.id_jeu > 0 OR r.id_fiche_depart ~ '^anime[0-9]+$' OR r.id_fiche_depart ~ '^manga[0-9]+$' OR r.id_fiche_depart ~ '^jeu[0-9]+$')
+        ) base
+        LEFT JOIN ak_animes a ON base.related_type = 'anime' AND base.related_id = a.id_anime
+        LEFT JOIN ak_mangas m ON base.related_type = 'manga' AND base.related_id = m.id_manga
+        LEFT JOIN ak_jeux_video j ON base.related_type = 'jeu-video' AND base.related_id = j.id_jeu
+        WHERE base.related_id IS NOT NULL
+      `,
+        sourceKey,
+        id,
+      );
 
-    // Fetch tags for each related item
-    const relationshipsWithTags = await Promise.all(
-      relationships.map(async (rel: any) => {
-        if (rel.related_id && rel.related_type) {
-          const tags = await this.getContentTags(rel.related_id, rel.related_type);
-          return { ...rel, tags };
-        }
-        return { ...rel, tags: [] };
-      })
-    );
-
-    return relationshipsWithTags;
+      // Return relationships without tags to avoid performance issues
+      // Tags can be fetched separately if needed
+      return relationships;
+    } catch (error) {
+      console.error('Error fetching content relationships:', error);
+      throw new BadRequestException(`Failed to fetch relationships for ${type} with ID ${id}`);
+    }
   }
 
   // Lightweight check if content exists (no heavy data loading)

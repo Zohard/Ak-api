@@ -185,80 +185,7 @@ export class AdminContentController {
     return this.adminContentService.searchMangaByName(q.trim(), lim);
   }
 
-  @Get(':type/:id')
-  @ApiOperation({ summary: 'Get content details for admin management' })
-  @ApiParam({
-    name: 'type',
-    description: 'Content type',
-    enum: ['anime', 'manga', 'business', 'article'],
-  })
-  @ApiParam({ name: 'id', description: 'Content ID' })
-  @ApiResponse({
-    status: 200,
-    description: 'Content details retrieved successfully',
-  })
-  @ApiResponse({ status: 404, description: 'Content not found' })
-  async findOne(
-    @Param('type') type: string,
-    @Param('id', ParseIntPipe) id: number,
-  ) {
-    return this.adminContentService.getContentById(id, type);
-  }
-
-  @Put(':type/:id/status')
-  @ApiOperation({ summary: 'Update content status' })
-  @ApiParam({
-    name: 'type',
-    description: 'Content type',
-    enum: ['anime', 'manga', 'business', 'article'],
-  })
-  @ApiParam({ name: 'id', description: 'Content ID' })
-  @ApiResponse({
-    status: 200,
-    description: 'Content status updated successfully',
-  })
-  @ApiResponse({ status: 404, description: 'Content not found' })
-  async updateStatus(
-    @Param('type') type: string,
-    @Param('id', ParseIntPipe) id: number,
-    @Body('status', ParseIntPipe) status: number,
-    @Request() req: any,
-  ) {
-    return this.adminContentService.updateContentStatus(
-      id,
-      type,
-      status,
-      req.user.id,
-    );
-  }
-  @Delete('relationships/:relationshipId')
-  @ApiOperation({ summary: 'Delete content relationship' })
-  @ApiParam({ name: 'relationshipId', description: 'Relationship ID' })
-  async deleteRelationship(
-    @Param('relationshipId', ParseIntPipe) relationshipId: number,
-  ) {
-    return this.adminContentService.deleteContentRelationship(relationshipId);
-  }
-
-  @Delete(':type/:id')
-  @ApiOperation({ summary: 'Delete content (admin only)' })
-  @ApiParam({
-    name: 'type',
-    description: 'Content type',
-    enum: ['anime', 'manga', 'business', 'article'],
-  })
-  @ApiParam({ name: 'id', description: 'Content ID' })
-  @ApiResponse({ status: 200, description: 'Content deleted successfully' })
-  @ApiResponse({ status: 404, description: 'Content not found' })
-  async remove(
-    @Param('type') type: string,
-    @Param('id', ParseIntPipe) id: number,
-    @Request() req: any,
-  ) {
-    return this.adminContentService.deleteContent(id, type, req.user.id);
-  }
-
-  // Relationship management
+  // Relationship management - MUST be before :type/:id routes
   @Get(':type/:id/relationships')
   @ApiOperation({ summary: 'Get content relationships' })
   @ApiParam({
@@ -294,7 +221,7 @@ export class AdminContentController {
     );
   }
 
-  // Staff management
+  // Staff management - MUST be before :type/:id routes
   @Get(':type/:id/staff')
   @ApiOperation({ summary: 'Get content staff members' })
   @ApiParam({
@@ -350,7 +277,7 @@ export class AdminContentController {
     return this.adminContentService.removeContentStaff(id, type, businessId, role, username);
   }
 
-  // Tag management
+  // Tag management - MUST be before :type/:id routes
   @Get(':type/:id/tags')
   @ApiOperation({ summary: 'Get content tags' })
   @ApiParam({
@@ -401,6 +328,80 @@ export class AdminContentController {
   ) {
     const username = req.user?.pseudo || req.user?.member_name || 'admin';
     return this.adminContentService.removeContentTag(id, type, tagId, username);
+  }
+
+  @Put(':type/:id/status')
+  @ApiOperation({ summary: 'Update content status' })
+  @ApiParam({
+    name: 'type',
+    description: 'Content type',
+    enum: ['anime', 'manga', 'business', 'article'],
+  })
+  @ApiParam({ name: 'id', description: 'Content ID' })
+  @ApiResponse({
+    status: 200,
+    description: 'Content status updated successfully',
+  })
+  @ApiResponse({ status: 404, description: 'Content not found' })
+  async updateStatus(
+    @Param('type') type: string,
+    @Param('id', ParseIntPipe) id: number,
+    @Body('status', ParseIntPipe) status: number,
+    @Request() req: any,
+  ) {
+    return this.adminContentService.updateContentStatus(
+      id,
+      type,
+      status,
+      req.user.id,
+    );
+  }
+  @Delete('relationships/:relationshipId')
+  @ApiOperation({ summary: 'Delete content relationship' })
+  @ApiParam({ name: 'relationshipId', description: 'Relationship ID' })
+  async deleteRelationship(
+    @Param('relationshipId', ParseIntPipe) relationshipId: number,
+  ) {
+    return this.adminContentService.deleteContentRelationship(relationshipId);
+  }
+
+  @Delete(':type/:id')
+  @ApiOperation({ summary: 'Delete content (admin only)' })
+  @ApiParam({
+    name: 'type',
+    description: 'Content type',
+    enum: ['anime', 'manga', 'business', 'article'],
+  })
+  @ApiParam({ name: 'id', description: 'Content ID' })
+  @ApiResponse({ status: 200, description: 'Content deleted successfully' })
+  @ApiResponse({ status: 404, description: 'Content not found' })
+  async remove(
+    @Param('type') type: string,
+    @Param('id', ParseIntPipe) id: number,
+    @Request() req: any,
+  ) {
+    return this.adminContentService.deleteContent(id, type, req.user.id);
+  }
+
+  // Generic :type/:id route - MUST be last to avoid shadowing specific routes
+  @Get(':type/:id')
+  @ApiOperation({ summary: 'Get content details for admin management' })
+  @ApiParam({
+    name: 'type',
+    description: 'Content type',
+    enum: ['anime', 'manga', 'business', 'article'],
+  })
+  @ApiParam({ name: 'id', description: 'Content ID' })
+  @ApiResponse({
+    status: 200,
+    description: 'Content details retrieved successfully',
+  })
+  @ApiResponse({ status: 404, description: 'Content not found' })
+  async findOne(
+    @Param('type') type: string,
+    @Param('id', ParseIntPipe) id: number,
+  ) {
+    return this.adminContentService.getContentById(id, type);
   }
 
 }
