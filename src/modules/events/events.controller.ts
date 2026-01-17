@@ -217,6 +217,50 @@ export class EventsController {
     return this.eventsService.removeNominee(nomineeId);
   }
 
+  // Auto-populate category with top media
+  @Post('admin/categories/:categoryId/auto-populate')
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: '[Admin] Remplir automatiquement une catégorie avec les meilleurs médias' })
+  @ApiParam({ name: 'categoryId', description: 'ID de la catégorie' })
+  @ApiResponse({ status: 201, description: 'Nominés ajoutés automatiquement' })
+  async autoPopulateCategory(
+    @Param('categoryId', ParseIntPipe) categoryId: number,
+    @Body() body: { mediaType: 'anime' | 'manga' | 'game'; count: number; criteria: 'score' | 'popularity'; year?: number },
+  ) {
+    return this.eventsService.autoPopulateCategory(
+      categoryId,
+      body.mediaType,
+      body.count,
+      body.criteria,
+      body.year,
+    );
+  }
+
+  // Get top media preview (for ranking events)
+  @Get('admin/top-media')
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: '[Admin] Prévisualiser les meilleurs médias' })
+  @ApiQuery({ name: 'mediaType', description: 'Type de média (anime, manga, game)' })
+  @ApiQuery({ name: 'count', description: 'Nombre de résultats' })
+  @ApiQuery({ name: 'criteria', description: 'Critère (score ou popularity)' })
+  @ApiQuery({ name: 'year', required: false, description: 'Année' })
+  @ApiResponse({ status: 200, description: 'Liste des meilleurs médias' })
+  async getTopMedia(
+    @Query('mediaType') mediaType: 'anime' | 'manga' | 'game',
+    @Query('count', ParseIntPipe) count: number,
+    @Query('criteria') criteria: 'score' | 'popularity',
+    @Query('year') year?: string,
+  ) {
+    return this.eventsService.getTopMedia(
+      mediaType,
+      count,
+      criteria,
+      year ? parseInt(year) : undefined,
+    );
+  }
+
   // Cron endpoint for status updates
   @Post('admin/update-statuses')
   @UseGuards(JwtAuthGuard, AdminGuard)

@@ -10,7 +10,7 @@ export class EventsService {
   constructor(
     private prisma: PrismaService,
     private cacheService: CacheService,
-  ) {}
+  ) { }
 
   // Generate slug from title
   private generateSlug(title: string): string {
@@ -596,5 +596,148 @@ export class EventsService {
     `);
 
     return subscribers.map((s) => s.user_id);
+  }
+
+  // Get top X media by criteria (score or popularity) filtered by year
+  async getTopMedia(
+    mediaType: 'anime' | 'manga' | 'game',
+    count: number,
+    criteria: 'score' | 'popularity',
+    year?: number,
+  ) {
+    const tableConfig = {
+      anime: {
+        table: 'ak_animes',
+        idColumn: 'id_anime',
+        titleColumn: 'titre',
+        imageColumn: 'image',
+        scoreColumn: 'moyennenotes',
+        popularityColumn: 'nb_reviews',
+        yearColumn: 'annee',
+      },
+      manga: {
+        table: 'ak_mangas',
+        idColumn: 'id_manga',
+        titleColumn: 'titre',
+        imageColumn: 'image',
+        scoreColumn: 'moyennenotes',
+        popularityColumn: 'nb_reviews',
+        yearColumn: 'annee',
+      },
+      game: {
+        table: 'ak_jeux_video',
+        idColumn: 'id_jeu',
+        titleColumn: 'titre',
+        imageColumn: 'image',
+        scoreColumn: 'moyenne_notes',
+        popularityColumn: 'nb_reviews',
+        yearColumn: 'annee',
+      },
+    };
+
+    const config = tableConfig[mediaType];
+    if (!config) {
+      throw new BadRequestException('Invalid media type. Must be anime, manga, or game.');
+    }
+
+    const orderColumn = criteria === 'score' ? config.scoreColumn : config.popularityColumn;
+
+    // Build query with year filter
+    let whereClause = 'WHERE statut = 1';
+    const params: any[] = [];
+
+    if (year) {
+      // Use text cast for year comparison to handle both Int and VarChar(4) without type errors
+      whereClause += ` AND CAST(${config.yearColumn} AS TEXT) = $1`;
+      params.push(year.toString());
+    }
+
+    // Relax requirements to ensure some results even for new items or years with few data
+    if (criteria === 'score') {
+      whereClause += ` AND ${config.scoreColumn} > 0`;
+    }
+    // We no longer require popularity > 0; the ORDER BY ${orderColumn} DESC will still put most popular first
+
+    const limitParam = year ? '$2' : '$1';
+    params.push(count);
+
+    const query = `
+      SELECT
+        ${config.idColumn} as id,
+        ${config.titleColumn} as titre,
+        ${config.imageColumn} as image,
+        ${config.scoreColumn} as score,
+        ${config.popularityColumn} as popularity
+      FROM ${config.table}
+      ${whereClause}
+      ORDER BY ${orderColumn} DESC NULLS LAST
+      LIMIT ${limitParam}
+    `;
+
+    const results = await this.prisma.$queryRawUnsafe<any[]>(query, ...params);
+
+    return results.map((item) => ({
+      id: Number(item.id),
+      titre: item.titre,
+      image: item.image,
+      score: Number(item.score) || 0,
+      popularity: Number(item.popularity) || 0,
+      type: mediaType,
+    }));
+  }
+
+  // Auto-populate a category with top media
+  async autoPopulateCategory(
+    categoryId: number,
+    mediaType: 'anime' | 'manga' | 'game',
+    count: number,
+    criteria: 'score' | 'popularity',
+    year?: number,
+  ) {
+    // Check category exists
+    const [category] = await this.prisma.$queryRaw<any[]>`
+      SELECT c.*, e.event_type, e.media_type as event_media_type
+      FROM ak_event_categories c
+      JOIN ak_events e ON c.event_id = e.id
+      WHERE c.id = ${categoryId}
+    `;
+
+    if (!category) {
+      throw new NotFoundException('Catégorie non trouvée');
+    }
+
+    // Get top media
+    const topMedia = await this.getTopMedia(mediaType, count, criteria, year);
+
+    // Add each media as nominee
+    let addedCount = 0;
+    for (let i = 0; i < topMedia.length; i++) {
+      const media = topMedia[i];
+
+      // Build nominee data based on media type
+      const nomineeDto: CreateNomineeDto = {
+        position: i + 1,
+      };
+
+      if (mediaType === 'anime') {
+        nomineeDto.animeId = media.id;
+      } else if (mediaType === 'manga') {
+        nomineeDto.mangaId = media.id;
+      } else if (mediaType === 'game') {
+        nomineeDto.gameId = media.id;
+      }
+
+      await this.createNominee(categoryId, nomineeDto);
+      addedCount++;
+    }
+
+    // Invalidate events cache
+    await this.cacheService.invalidateAllEvents();
+
+    return {
+      success: true,
+      message: `${addedCount} nominés ajoutés`,
+      count: addedCount,
+    };
   }
 }
