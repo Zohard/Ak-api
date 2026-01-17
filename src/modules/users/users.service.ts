@@ -1711,22 +1711,25 @@ export class UsersService {
       SELECT
         'review' as type,
         c.date_critique as date,
-        COALESCE(a.titre, m.titre) as title,
+        COALESCE(a.titre, m.titre, g.titre) as title,
         c.id_critique as id,
         c.nice_url as "reviewSlug",
         CASE
-          WHEN c.id_anime IS NOT NULL THEN CONCAT(a.nice_url, '-', a.id_anime)
-          WHEN c.id_manga IS NOT NULL THEN CONCAT(m.nice_url, '-', m.id_manga)
+          WHEN c.id_anime IS NOT NULL AND c.id_anime > 0 THEN CONCAT(a.nice_url, '-', a.id_anime)
+          WHEN c.id_manga IS NOT NULL AND c.id_manga > 0 THEN CONCAT(m.nice_url, '-', m.id_manga)
+          WHEN c.id_jeu IS NOT NULL AND c.id_jeu > 0 THEN CONCAT(g.nice_url, '-', g.id_jeu)
           ELSE NULL
         END as "niceUrl",
         CASE
-          WHEN c.id_anime IS NOT NULL THEN 'anime'
-          WHEN c.id_manga IS NOT NULL THEN 'manga'
+          WHEN c.id_anime IS NOT NULL AND c.id_anime > 0 THEN 'anime'
+          WHEN c.id_manga IS NOT NULL AND c.id_manga > 0 THEN 'manga'
+          WHEN c.id_jeu IS NOT NULL AND c.id_jeu > 0 THEN 'game'
           ELSE NULL
         END as "mediaType"
       FROM ak_critique c
       LEFT JOIN ak_animes a ON c.id_anime = a.id_anime
       LEFT JOIN ak_mangas m ON c.id_manga = m.id_manga
+      LEFT JOIN ak_jeux_video g ON c.id_jeu = g.id_jeu
       WHERE c.id_membre = ${user.idMember} AND c.statut = 0
       ORDER BY c.date_critique DESC
       LIMIT ${limit}
