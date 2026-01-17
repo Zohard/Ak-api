@@ -511,27 +511,45 @@ export class AdminContentService {
     const targetMangaId = related_type === 'manga' ? related_id : 0;
     const targetJeuId = related_type === 'jeu-video' ? related_id : 0;
 
-    // Note: Some legacy DBs have NOT NULL without defaults on id_ost/id_jeu/id_business
-    // so we insert explicit zeros to satisfy constraints.
-    await this.prisma.$queryRaw`
-      INSERT INTO ak_fiche_to_fiche (
-        id_fiche_depart,
-        id_anime,
-        id_manga,
-        id_ost,
-        id_jeu,
-        id_business
-      ) VALUES (
-        ${sourceKey},
-        ${targetAnimeId},
-        ${targetMangaId},
-        0,
-        ${targetJeuId},
-        0
-      )
-    `;
+    try {
+      // Check if relationship already exists
+      const existing = await this.prisma.$queryRawUnsafe<any[]>(
+        `SELECT 1 FROM ak_fiche_to_fiche WHERE id_fiche_depart = $1 AND id_anime = $2 AND id_manga = $3 AND id_jeu = $4 LIMIT 1`,
+        sourceKey,
+        targetAnimeId,
+        targetMangaId,
+        targetJeuId,
+      );
 
-    return { message: 'Relationship created successfully' };
+      if (existing.length > 0) {
+        return { message: 'Relationship already exists' };
+      }
+
+      // Note: Some legacy DBs have NOT NULL without defaults on id_ost/id_jeu/id_business
+      // so we insert explicit zeros to satisfy constraints.
+      await this.prisma.$queryRaw`
+        INSERT INTO ak_fiche_to_fiche (
+          id_fiche_depart,
+          id_anime,
+          id_manga,
+          id_ost,
+          id_jeu,
+          id_business
+        ) VALUES (
+          ${sourceKey},
+          ${targetAnimeId},
+          ${targetMangaId},
+          0,
+          ${targetJeuId},
+          0
+        )
+      `;
+
+      return { message: 'Relationship created successfully' };
+    } catch (error) {
+      console.error('Error creating relationship:', error);
+      throw new BadRequestException(`Failed to create relationship: ${error.message}`);
+    }
   }
 
   async deleteContentRelationship(relationshipId: number) {
