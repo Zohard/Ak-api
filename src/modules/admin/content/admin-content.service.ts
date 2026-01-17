@@ -454,9 +454,29 @@ export class AdminContentService {
         id,
       );
 
-      // Return relationships without tags to avoid performance issues
-      // Tags can be fetched separately if needed
-      return relationships;
+      // Fetch tags for each related item (only for anime/manga)
+      const relationshipsWithTags = await Promise.all(
+        relationships.map(async (rel) => {
+          if (rel.related_type === 'anime' || rel.related_type === 'manga') {
+            try {
+              const tags = await this.prisma.$queryRawUnsafe<any[]>(
+                `SELECT t.id_tag as id, t.tag_name as nom, t.description
+                 FROM ak_tag2fiche tf
+                 JOIN ak_tags t ON tf.id_tag = t.id_tag
+                 WHERE tf.id_fiche = $1 AND tf.type = $2`,
+                rel.related_id,
+                rel.related_type,
+              );
+              return { ...rel, tags: tags || [] };
+            } catch {
+              return { ...rel, tags: [] };
+            }
+          }
+          return { ...rel, tags: [] };
+        }),
+      );
+
+      return relationshipsWithTags;
     } catch (error) {
       console.error('Error fetching content relationships:', error);
       throw new BadRequestException(`Failed to fetch relationships for ${type} with ID ${id}`);
