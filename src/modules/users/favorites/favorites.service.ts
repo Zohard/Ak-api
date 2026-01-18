@@ -6,17 +6,27 @@ import { CacheService } from '../../../shared/services/cache.service';
 
 @Injectable()
 export class FavoritesService {
+    private readonly CACHE_TTL = 3600; // 1 hour cache
+
     constructor(
         private prisma: PrismaService,
         private cacheService: CacheService,
     ) { }
 
-    async getFavorites(userId: number) {
-        // Cache key for user favorites
-        // We can cache this, but invalidation is needed on add/remove/order
-        // For now, no strict caching or short TTL
+    private getCacheKey(userId: number): string {
+        return `user:${userId}:favorites`;
+    }
 
-        return this.prisma.akUserFavorite.findMany({
+    async getFavorites(userId: number) {
+        const cacheKey = this.getCacheKey(userId);
+
+        // Try to get from cache first
+        const cached = await this.cacheService.get(cacheKey);
+        if (cached) {
+            return cached;
+        }
+
+        const favorites = await this.prisma.akUserFavorite.findMany({
             where: { userId },
             orderBy: { order: 'asc' },
             include: {
@@ -34,6 +44,16 @@ export class FavoritesService {
                 }
             }
         });
+
+        // Store in cache
+        await this.cacheService.set(cacheKey, favorites, this.CACHE_TTL);
+
+        return favorites;
+    }
+
+    private async invalidateFavoritesCache(userId: number): Promise<void> {
+        const cacheKey = this.getCacheKey(userId);
+        await this.cacheService.del(cacheKey);
     }
 
     async addFavorite(userId: number, dto: CreateFavoriteDto) {
@@ -65,7 +85,7 @@ export class FavoritesService {
         const newOrder = (maxOrder._max.order || 0) + 1;
 
         // Create
-        return this.prisma.akUserFavorite.create({
+        const favorite = await this.prisma.akUserFavorite.create({
             data: {
                 userId,
                 type,
@@ -76,6 +96,11 @@ export class FavoritesService {
                 businessId: type === 'business' ? idContent : null,
             }
         });
+
+        // Invalidate cache
+        await this.invalidateFavoritesCache(userId);
+
+        return favorite;
     }
 
     async removeFavorite(userId: number, favoriteId: number) {
@@ -88,6 +113,9 @@ export class FavoritesService {
         }
 
         await this.prisma.akUserFavorite.delete({ where: { id: favoriteId } });
+
+        // Invalidate cache
+        await this.invalidateFavoritesCache(userId);
 
         // We don't necessarily need to reorder immediately, gaps are fine for simple ordering
         return { success: true };
@@ -103,6 +131,10 @@ export class FavoritesService {
         );
 
         await this.prisma.$transaction(ops);
+
+        // Invalidate cache
+        await this.invalidateFavoritesCache(userId);
+
         return { success: true };
     }
 }
