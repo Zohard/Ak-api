@@ -12,7 +12,7 @@ export class FavoritesController {
     @Get()
     @UseGuards(AuthGuard('jwt'))
     getMyFavorites(@Req() req) {
-        return this.favoritesService.getFavorites(req.user.idMember);
+        return this.favoritesService.getFavorites(req.user.id);
     }
 
     @Get('user/:userId')
@@ -23,18 +23,18 @@ export class FavoritesController {
     @Post()
     @UseGuards(AuthGuard('jwt'))
     addFavorite(@Req() req, @Body() dto: CreateFavoriteDto) {
-        return this.favoritesService.addFavorite(req.user.idMember, dto);
+        return this.favoritesService.addFavorite(req.user.id, dto);
     }
 
     @Post('reorder')
     @UseGuards(AuthGuard('jwt'))
     reorderFavorites(@Req() req, @Body() dto: ReorderFavoritesDto) {
-        return this.favoritesService.reorderFavorites(req.user.idMember, dto);
+        return this.favoritesService.reorderFavorites(req.user.id, dto);
     }
 
     @Delete(':id')
     @UseGuards(AuthGuard('jwt'))
     removeFavorite(@Req() req, @Param('id', ParseIntPipe) id: number) {
-        return this.favoritesService.removeFavorite(req.user.idMember, id);
+        return this.favoritesService.removeFavorite(req.user.id, id);
     }
 }
