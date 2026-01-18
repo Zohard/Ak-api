@@ -1,12 +1,13 @@
 import { Module } from '@nestjs/common';
 import { FavoritesController } from './favorites.controller';
 import { FavoritesService } from './favorites.service';
-import { SharedModule } from '../../../../shared/shared.module';
+import { PrismaService } from '../../../shared/services/prisma.service';
+import { CacheService } from '../../../shared/services/cache.service';
 
 @Module({
-    imports: [SharedModule],
+    imports: [],
     controllers: [FavoritesController],
-    providers: [FavoritesService],
+    providers: [FavoritesService, PrismaService, CacheService],
     exports: [FavoritesService],
 })
 export class FavoritesModule { }

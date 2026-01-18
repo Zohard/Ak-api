@@ -1,8 +1,8 @@
 import { Injectable, BadRequestException, NotFoundException, Inject } from '@nestjs/common';
-import { PrismaService } from '../../../../shared/services/prisma.service';
+import { PrismaService } from '../../../shared/services/prisma.service';
 import { CreateFavoriteDto } from './dto/create-favorite.dto';
 import { ReorderFavoritesDto } from './dto/reorder-favorites.dto';
-import { CacheService } from '../../../../shared/services/cache.service';
+import { CacheService } from '../../../shared/services/cache.service';
 
 @Injectable()
 export class FavoritesService {
