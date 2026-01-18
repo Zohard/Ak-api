@@ -283,58 +283,58 @@ export class CollectionsService {
       } else if (mediaType === 'manga') {
         // mediaType === 'manga'
         const manga = await this.prisma.executeWithRetry(() =>
-        this.prisma.akManga.findUnique({ where: { idManga: mediaId } })
-      );
-      if (!manga) {
-        throw new NotFoundException('Manga not found');
-      }
-
-      const existingAny = await this.prisma.executeWithRetry(() =>
-        this.prisma.collectionManga.findFirst({
-          where: { idMembre: userId, idManga: mediaId },
-        })
-      );
-      if (existingAny) {
-        await this.prisma.executeWithRetry(() =>
-          this.prisma.collectionManga.updateMany({
-            where: { idMembre: userId, idManga: mediaId },
-            data: {
-              type: collectionType,
-              evaluation: normalizedRating,
-              notes: notes || null,
-              isPublic: true,
-              updatedAt: new Date(),
-            },
-          })
+          this.prisma.akManga.findUnique({ where: { idManga: mediaId } })
         );
-        result = await this.prisma.executeWithRetry(() =>
+        if (!manga) {
+          throw new NotFoundException('Manga not found');
+        }
+
+        const existingAny = await this.prisma.executeWithRetry(() =>
           this.prisma.collectionManga.findFirst({
             where: { idMembre: userId, idManga: mediaId },
-            include: {
-              manga: {
-                select: { idManga: true, titre: true, image: true, annee: true, moyenneNotes: true, nbVol: true },
-              },
-            },
           })
         );
-      } else {
-        result = await this.prisma.executeWithRetry(() =>
-          this.prisma.collectionManga.create({
-            data: {
-              idMembre: userId,
-              idManga: mediaId,
-              type: collectionType,
-              evaluation: normalizedRating,
-              notes: notes || null,
-              isPublic: true,
-            },
-            include: {
-              manga: {
-                select: { idManga: true, titre: true, image: true, annee: true, moyenneNotes: true, nbVol: true },
+        if (existingAny) {
+          await this.prisma.executeWithRetry(() =>
+            this.prisma.collectionManga.updateMany({
+              where: { idMembre: userId, idManga: mediaId },
+              data: {
+                type: collectionType,
+                evaluation: normalizedRating,
+                notes: notes || null,
+                isPublic: true,
+                updatedAt: new Date(),
               },
-            },
-          })
-        );
+            })
+          );
+          result = await this.prisma.executeWithRetry(() =>
+            this.prisma.collectionManga.findFirst({
+              where: { idMembre: userId, idManga: mediaId },
+              include: {
+                manga: {
+                  select: { idManga: true, titre: true, image: true, annee: true, moyenneNotes: true, nbVol: true },
+                },
+              },
+            })
+          );
+        } else {
+          result = await this.prisma.executeWithRetry(() =>
+            this.prisma.collectionManga.create({
+              data: {
+                idMembre: userId,
+                idManga: mediaId,
+                type: collectionType,
+                evaluation: normalizedRating,
+                notes: notes || null,
+                isPublic: true,
+              },
+              include: {
+                manga: {
+                  select: { idManga: true, titre: true, image: true, annee: true, moyenneNotes: true, nbVol: true },
+                },
+              },
+            })
+          );
         }
       }
     } catch (err: any) {
@@ -2585,6 +2585,11 @@ export class CollectionsService {
     // Invalidate cache
     await this.invalidateUserCollectionCache(userId);
 
+    // OPTIMIZATION: Invalidate collection check cache
+    const cacheKey = `user_collection_check:${userId}:jeu-video:${dto.gameId}`;
+    await this.cacheService.del(cacheKey);
+
+
     return collection;
   }
 
@@ -2662,6 +2667,13 @@ export class CollectionsService {
     // Invalidate cache
     await this.invalidateUserCollectionCache(userId);
 
+    // OPTIMIZATION: Invalidate collection check cache
+    if (existing?.idJeu) {
+      const cacheKey = `user_collection_check:${userId}:jeu-video:${existing.idJeu}`;
+      await this.cacheService.del(cacheKey);
+    }
+
+
     return updated;
   }
 
@@ -2692,6 +2704,13 @@ export class CollectionsService {
 
     // Invalidate cache
     await this.invalidateUserCollectionCache(userId);
+
+    // OPTIMIZATION: Invalidate collection check cache
+    if (existing?.idJeu) {
+      const cacheKey = `user_collection_check:${userId}:jeu-video:${existing.idJeu}`;
+      await this.cacheService.del(cacheKey);
+    }
+
 
     return { message: 'Game removed from collection' };
   }
