@@ -34,7 +34,7 @@ import {
 @UseGuards(JwtAuthGuard)
 @ApiBearerAuth()
 export class NotificationsController {
-  constructor(private readonly notificationsService: NotificationsService) {}
+  constructor(private readonly notificationsService: NotificationsService) { }
 
   @Get()
   @ApiOperation({ summary: 'Get user notifications' })
@@ -86,6 +86,7 @@ export class NotificationsController {
     @CurrentUser() user: any,
     @Body() preferences: UpdatePreferencesDto,
   ) {
+    console.log('Received preferences update:', preferences);
     const success = await this.notificationsService.updateUserPreferences(
       user.id,
       preferences,

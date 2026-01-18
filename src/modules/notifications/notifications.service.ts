@@ -12,8 +12,7 @@ export interface EmailTemplate {
 export interface NotificationPreferences {
   // Email preferences
   emailNewReview: boolean;
-  emailNewAnime: boolean;
-  emailNewManga: boolean;
+  emailNewSeasonAnime: boolean;
   emailReviewModerated: boolean;
   emailSecurityAlerts: boolean;
   emailMarketing: boolean;
@@ -24,8 +23,7 @@ export interface NotificationPreferences {
   emailEventVoting: boolean;
   // Website (in-app) preferences
   webNewReview: boolean;
-  webNewAnime: boolean;
-  webNewManga: boolean;
+  webNewSeasonAnime: boolean;
   webReviewModerated: boolean;
   webSecurityAlerts: boolean;
   webMarketing: boolean;
@@ -40,8 +38,7 @@ export interface NotificationData {
   userId: number;
   type:
   | 'new_review'
-  | 'new_anime'
-  | 'new_manga'
+  | 'new_season_anime'
   | 'review_moderated'
   | 'review_liked'
   | 'security_alert'
@@ -127,8 +124,7 @@ export class NotificationsService {
       const preferences = await this.prisma.$queryRaw`
         SELECT
           email_new_review,
-          email_new_anime,
-          email_new_manga,
+          email_new_season_anime,
           email_review_moderated,
           email_security_alerts,
           email_marketing,
@@ -138,8 +134,7 @@ export class NotificationsService {
           email_friend_accepted,
           email_event_voting,
           web_new_review,
-          web_new_anime,
-          web_new_manga,
+          web_new_season_anime,
           web_review_moderated,
           web_security_alerts,
           web_marketing,
@@ -161,8 +156,7 @@ export class NotificationsService {
       return {
         // Email preferences
         emailNewReview: prefs.email_new_review ?? false,
-        emailNewAnime: prefs.email_new_anime ?? false,
-        emailNewManga: prefs.email_new_manga ?? false,
+        emailNewSeasonAnime: prefs.email_new_season_anime ?? false,
         emailReviewModerated: prefs.email_review_moderated ?? false,
         emailSecurityAlerts: prefs.email_security_alerts ?? true,
         emailMarketing: prefs.email_marketing ?? false,
@@ -173,8 +167,7 @@ export class NotificationsService {
         emailEventVoting: prefs.email_event_voting ?? true,
         // Website (in-app) preferences - default to true
         webNewReview: prefs.web_new_review ?? true,
-        webNewAnime: prefs.web_new_anime ?? true,
-        webNewManga: prefs.web_new_manga ?? true,
+        webNewSeasonAnime: prefs.web_new_season_anime ?? true,
         webReviewModerated: prefs.web_review_moderated ?? true,
         webSecurityAlerts: prefs.web_security_alerts ?? true,
         webMarketing: prefs.web_marketing ?? true,
@@ -206,8 +199,7 @@ export class NotificationsService {
         INSERT INTO user_notification_preferences (
           user_id,
           email_new_review,
-          email_new_anime,
-          email_new_manga,
+          email_new_season_anime,
           email_review_moderated,
           email_security_alerts,
           email_marketing,
@@ -217,8 +209,7 @@ export class NotificationsService {
           email_friend_accepted,
           email_event_voting,
           web_new_review,
-          web_new_anime,
-          web_new_manga,
+          web_new_season_anime,
           web_review_moderated,
           web_security_alerts,
           web_marketing,
@@ -231,8 +222,7 @@ export class NotificationsService {
         ) VALUES (
           ${userId},
           ${merged.emailNewReview},
-          ${merged.emailNewAnime},
-          ${merged.emailNewManga},
+          ${merged.emailNewSeasonAnime},
           ${merged.emailReviewModerated},
           ${merged.emailSecurityAlerts},
           ${merged.emailMarketing},
@@ -242,8 +232,7 @@ export class NotificationsService {
           ${merged.emailFriendAccepted},
           ${merged.emailEventVoting},
           ${merged.webNewReview},
-          ${merged.webNewAnime},
-          ${merged.webNewManga},
+          ${merged.webNewSeasonAnime},
           ${merged.webReviewModerated},
           ${merged.webSecurityAlerts},
           ${merged.webMarketing},
@@ -256,8 +245,7 @@ export class NotificationsService {
         )
         ON CONFLICT (user_id) DO UPDATE SET
           email_new_review = EXCLUDED.email_new_review,
-          email_new_anime = EXCLUDED.email_new_anime,
-          email_new_manga = EXCLUDED.email_new_manga,
+          email_new_season_anime = EXCLUDED.email_new_season_anime,
           email_review_moderated = EXCLUDED.email_review_moderated,
           email_security_alerts = EXCLUDED.email_security_alerts,
           email_marketing = EXCLUDED.email_marketing,
@@ -267,8 +255,7 @@ export class NotificationsService {
           email_friend_accepted = EXCLUDED.email_friend_accepted,
           email_event_voting = EXCLUDED.email_event_voting,
           web_new_review = EXCLUDED.web_new_review,
-          web_new_anime = EXCLUDED.web_new_anime,
-          web_new_manga = EXCLUDED.web_new_manga,
+          web_new_season_anime = EXCLUDED.web_new_season_anime,
           web_review_moderated = EXCLUDED.web_review_moderated,
           web_security_alerts = EXCLUDED.web_security_alerts,
           web_marketing = EXCLUDED.web_marketing,
@@ -429,8 +416,7 @@ export class NotificationsService {
     return {
       // Email preferences - most off by default except important ones
       emailNewReview: false,
-      emailNewAnime: false,
-      emailNewManga: false,
+      emailNewSeasonAnime: false,
       emailReviewModerated: false,
       emailSecurityAlerts: true,
       emailMarketing: false,
@@ -441,8 +427,7 @@ export class NotificationsService {
       emailEventVoting: true,
       // Website (in-app) preferences - all on by default
       webNewReview: true,
-      webNewAnime: true,
-      webNewManga: true,
+      webNewSeasonAnime: true,
       webReviewModerated: true,
       webSecurityAlerts: true,
       webMarketing: true,
@@ -466,10 +451,8 @@ export class NotificationsService {
     switch (type) {
       case 'new_review':
         return preferences.webNewReview;
-      case 'new_anime':
-        return preferences.webNewAnime;
-      case 'new_manga':
-        return preferences.webNewManga;
+      case 'new_season_anime':
+        return preferences.webNewSeasonAnime;
       case 'review_moderated':
         return preferences.webReviewModerated;
       case 'review_liked':
@@ -498,10 +481,8 @@ export class NotificationsService {
     switch (type) {
       case 'new_review':
         return preferences.emailNewReview;
-      case 'new_anime':
-        return preferences.emailNewAnime;
-      case 'new_manga':
-        return preferences.emailNewManga;
+      case 'new_season_anime':
+        return preferences.emailNewSeasonAnime;
       case 'review_moderated':
         return preferences.emailReviewModerated;
       case 'review_liked':

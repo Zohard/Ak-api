@@ -10,31 +10,22 @@ import {
 
 export class UpdatePreferencesDto {
   @ApiProperty({
-    description: 'Receive email notifications for new reviews',
+    description: 'Receive email notifications for new seasons of animes',
     example: true,
     required: false,
   })
   @IsOptional()
   @IsBoolean()
-  emailNewReview?: boolean;
+  emailNewSeasonAnime?: boolean;
 
   @ApiProperty({
-    description: 'Receive email notifications for new animes',
-    example: false,
+    description: 'Receive web notifications for new seasons of animes',
+    example: true,
     required: false,
   })
   @IsOptional()
   @IsBoolean()
-  emailNewAnime?: boolean;
-
-  @ApiProperty({
-    description: 'Receive email notifications for new mangas',
-    example: false,
-    required: false,
-  })
-  @IsOptional()
-  @IsBoolean()
-  emailNewManga?: boolean;
+  webNewSeasonAnime?: boolean;
 
   @ApiProperty({
     description: 'Receive email notifications when reviews are moderated',
@@ -45,6 +36,11 @@ export class UpdatePreferencesDto {
   @IsBoolean()
   emailReviewModerated?: boolean;
 
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsBoolean()
+  webReviewModerated?: boolean;
+
   @ApiProperty({
     description: 'Receive email notifications for security alerts',
     example: true,
@@ -53,6 +49,11 @@ export class UpdatePreferencesDto {
   @IsOptional()
   @IsBoolean()
   emailSecurityAlerts?: boolean;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsBoolean()
+  webSecurityAlerts?: boolean;
 
   @ApiProperty({
     description: 'Receive email notifications for marketing',
@@ -63,6 +64,11 @@ export class UpdatePreferencesDto {
   @IsBoolean()
   emailMarketing?: boolean;
 
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsBoolean()
+  webMarketing?: boolean;
+
   @ApiProperty({
     description: 'Receive email notifications when a review is liked',
     example: true,
@@ -71,6 +77,11 @@ export class UpdatePreferencesDto {
   @IsOptional()
   @IsBoolean()
   emailReviewLiked?: boolean;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsBoolean()
+  webReviewLiked?: boolean;
 
   @ApiProperty({
     description: 'Receive email notifications when related content is added',
@@ -81,6 +92,11 @@ export class UpdatePreferencesDto {
   @IsBoolean()
   emailRelatedContent?: boolean;
 
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsBoolean()
+  webRelatedContent?: boolean;
+
   @ApiProperty({
     description: 'Receive email notifications for friend requests',
     example: true,
@@ -89,6 +105,11 @@ export class UpdatePreferencesDto {
   @IsOptional()
   @IsBoolean()
   emailFriendRequest?: boolean;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsBoolean()
+  webFriendRequest?: boolean;
 
   @ApiProperty({
     description: 'Receive email notifications when friend request is accepted',
@@ -99,6 +120,11 @@ export class UpdatePreferencesDto {
   @IsBoolean()
   emailFriendAccepted?: boolean;
 
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsBoolean()
+  webFriendAccepted?: boolean;
+
   @ApiProperty({
     description: 'Receive email notifications for event voting',
     example: true,
@@ -108,61 +134,41 @@ export class UpdatePreferencesDto {
   @IsBoolean()
   emailEventVoting?: boolean;
 
-  // Web preferences
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsBoolean()
+  webEventVoting?: boolean;
+
+  @ApiProperty({
+    description: 'Receive email notifications for new reviews',
+    example: true,
+    required: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  emailNewReview?: boolean;
+
   @ApiProperty({ required: false })
   @IsOptional()
   @IsBoolean()
   webNewReview?: boolean;
 
-  @ApiProperty({ required: false })
+  // Compatibility fields for old frontend versions or internal triggers
+  @IsOptional()
+  @IsBoolean()
+  emailNewAnime?: boolean;
+
   @IsOptional()
   @IsBoolean()
   webNewAnime?: boolean;
 
-  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsBoolean()
+  emailNewManga?: boolean;
+
   @IsOptional()
   @IsBoolean()
   webNewManga?: boolean;
-
-  @ApiProperty({ required: false })
-  @IsOptional()
-  @IsBoolean()
-  webReviewModerated?: boolean;
-
-  @ApiProperty({ required: false })
-  @IsOptional()
-  @IsBoolean()
-  webSecurityAlerts?: boolean;
-
-  @ApiProperty({ required: false })
-  @IsOptional()
-  @IsBoolean()
-  webMarketing?: boolean;
-
-  @ApiProperty({ required: false })
-  @IsOptional()
-  @IsBoolean()
-  webReviewLiked?: boolean;
-
-  @ApiProperty({ required: false })
-  @IsOptional()
-  @IsBoolean()
-  webRelatedContent?: boolean;
-
-  @ApiProperty({ required: false })
-  @IsOptional()
-  @IsBoolean()
-  webFriendRequest?: boolean;
-
-  @ApiProperty({ required: false })
-  @IsOptional()
-  @IsBoolean()
-  webFriendAccepted?: boolean;
-
-  @ApiProperty({ required: false })
-  @IsOptional()
-  @IsBoolean()
-  webEventVoting?: boolean;
 }
 
 export class SendNotificationDto {
@@ -177,8 +183,7 @@ export class SendNotificationDto {
     description: 'Notification type',
     enum: [
       'new_review',
-      'new_anime',
-      'new_manga',
+      'new_season_anime',
       'review_moderated',
       'security_alert',
       'marketing',
@@ -186,13 +191,13 @@ export class SendNotificationDto {
       'friend_accepted',
       'event_voting_started',
       'event_voting_ended',
+      'related_content_added',
     ],
     example: 'new_review',
   })
   @IsEnum([
     'new_review',
-    'new_anime',
-    'new_manga',
+    'new_season_anime',
     'review_moderated',
     'security_alert',
     'marketing',
@@ -200,18 +205,19 @@ export class SendNotificationDto {
     'friend_accepted',
     'event_voting_started',
     'event_voting_ended',
+    'related_content_added',
   ])
   type:
     | 'new_review'
-    | 'new_anime'
-    | 'new_manga'
+    | 'new_season_anime'
     | 'review_moderated'
     | 'security_alert'
     | 'marketing'
     | 'friend_request'
     | 'friend_accepted'
     | 'event_voting_started'
-    | 'event_voting_ended';
+    | 'event_voting_ended'
+    | 'related_content_added';
 
   @ApiProperty({
     description: 'Notification title',
@@ -222,7 +228,7 @@ export class SendNotificationDto {
 
   @ApiProperty({
     description: 'Notification message',
-    example: 'Une nouvelle critique a été ajoutée pour Naruto.',
+    example: 'Une nouvelle critique a été ajoutée.',
   })
   @IsString()
   message: string;
