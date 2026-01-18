@@ -581,6 +581,32 @@ export class NotificationsService {
           text: `Nouvelle critique ajoutée pour ${data.title}. ${data.message}`,
         };
 
+      case 'new_season_anime':
+        return {
+          subject: `📺 Nouvelle saison disponible : ${data.title}`,
+          html: `
+            <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden;">
+              <div style="background-color: #3b82f6; padding: 20px; text-align: center;">
+                <h1 style="color: white; margin: 0; font-size: 24px;">📺 Nouvelle Saison !</h1>
+              </div>
+              <div style="padding: 30px; line-height: 1.6; color: #374151;">
+                <h2 style="margin-top: 0;">Une nouvelle saison a été ajoutée</h2>
+                <p>Bonne nouvelle ! Une nouvelle saison pour l'anime <strong>${data.title}</strong> est maintenant disponible sur Anime-Kun.</p>
+                <div style="background-color: #f3f4f6; padding: 15px; border-radius: 8px; margin: 20px 0;">
+                  <p style="margin: 0;">${data.message}</p>
+                </div>
+                <div style="text-align: center; margin-top: 30px;">
+                  <a href="${baseUrl}/anime/${data.data?.animeSlug || data.data?.animeId}" style="background-color: #3b82f6; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">Voir la fiche</a>
+                </div>
+              </div>
+              <div style="background-color: #f9fafb; padding: 20px; text-align: center; border-top: 1px solid #e5e7eb; font-size: 12px; color: #6b7280;">
+                Vous recevez cet email car vous avez ajouté cet anime ou un lien à vos favoris.
+              </div>
+            </div>
+          `,
+          text: `Nouvelle saison disponible pour ${data.title}. ${data.message}`,
+        };
+
       case 'review_moderated':
         return {
           subject: `Votre critique a été ${data.data?.status === 'approved' ? 'approuvée' : 'rejetée'}`,
@@ -603,6 +629,61 @@ export class NotificationsService {
             <p style="color: #6c757d; font-size: 0.9em;">Si vous n'êtes pas à l'origine de cette action, veuillez contacter immédiatement notre support.</p>
             <a href="${baseUrl}/profile/security" style="background-color: #dc3545; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Vérifier mon compte</a>
           `,
+        };
+
+      case 'friend_request':
+        return {
+          subject: `🤝 Nouvelle demande d'ami de ${data.title}`,
+          html: `
+            <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden;">
+              <div style="padding: 30px; line-height: 1.6; color: #374151;">
+                <h2 style="margin-top: 0;">🤝 Nouvelle demande d'ami</h2>
+                <p><strong>${data.title}</strong> souhaite devenir votre ami sur Anime-Kun.</p>
+                <p>${data.message}</p>
+                <div style="text-align: center; margin-top: 30px;">
+                  <a href="${baseUrl}/user/${data.data?.senderUsername || data.title}" style="background-color: #6366f1; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">Voir son profil</a>
+                </div>
+              </div>
+            </div>
+          `,
+          text: `${data.title} souhaite devenir votre ami. ${data.message}`,
+        };
+
+      case 'friend_accepted':
+        return {
+          subject: `👋 Demande d'ami acceptée - ${data.title}`,
+          html: `
+            <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden;">
+              <div style="padding: 30px; line-height: 1.6; color: #374151;">
+                <h2 style="margin-top: 0;">🎉 C'est officiel !</h2>
+                <p><strong>${data.title}</strong> a accepté votre demande d'ami. Vous pouvez maintenant suivre son activité de plus près.</p>
+                <div style="text-align: center; margin-top: 30px;">
+                  <a href="${baseUrl}/user/${data.data?.username || data.title}" style="background-color: #10b981; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">Voir son profil</a>
+                </div>
+              </div>
+            </div>
+          `,
+          text: `${data.title} a accepté votre demande d'ami.`,
+        };
+
+      case 'marketing':
+        return {
+          subject: `✨ Actualités Anime-Kun : ${data.title}`,
+          html: `
+            <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden;">
+              <div style="background-color: #6366f1; padding: 20px; text-align: center;">
+                <h1 style="color: white; margin: 0; font-size: 24px;">Anime-Kun News</h1>
+              </div>
+              <div style="padding: 30px; line-height: 1.6; color: #374151;">
+                <h2 style="margin-top: 0;">${data.title}</h2>
+                <p>${data.message}</p>
+                <div style="text-align: center; margin-top: 30px;">
+                  <a href="${baseUrl}" style="background-color: #6366f1; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">Visiter le site</a>
+                </div>
+              </div>
+            </div>
+          `,
+          text: `${data.title}\n\n${data.message}`,
         };
 
       case 'review_liked':
