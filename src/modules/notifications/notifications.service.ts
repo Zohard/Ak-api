@@ -17,6 +17,7 @@ export interface NotificationPreferences {
   emailSecurityAlerts: boolean;
   emailMarketing: boolean;
   emailReviewLiked: boolean;
+  emailRelatedContent: boolean;
 }
 
 export interface NotificationData {
@@ -32,7 +33,8 @@ export interface NotificationData {
     | 'friend_request'
     | 'friend_accepted'
     | 'event_voting_started'
-    | 'event_voting_ended';
+    | 'event_voting_ended'
+    | 'related_content_added';
   title: string;
   message: string;
   data?: any;
@@ -107,14 +109,15 @@ export class NotificationsService {
   async getUserPreferences(userId: number): Promise<NotificationPreferences> {
     try {
       const preferences = await this.prisma.$queryRaw`
-        SELECT 
+        SELECT
           email_new_review,
           email_new_anime,
           email_new_manga,
           email_review_moderated,
           email_security_alerts,
-          email_marketing
-        FROM user_notification_preferences 
+          email_marketing,
+          email_related_content
+        FROM user_notification_preferences
         WHERE user_id = ${userId}
       `;
 
@@ -132,6 +135,7 @@ export class NotificationsService {
         emailSecurityAlerts: prefs.email_security_alerts || true, // Default to true for security
         emailMarketing: prefs.email_marketing || false,
         emailReviewLiked: prefs.email_review_liked !== false, // Default to true
+        emailRelatedContent: prefs.email_related_content !== false, // Default to true
       };
     } catch (error) {
       this.logger.warn(
@@ -149,13 +153,14 @@ export class NotificationsService {
     try {
       await this.prisma.$executeRaw`
         INSERT INTO user_notification_preferences (
-          user_id, 
-          email_new_review, 
-          email_new_anime, 
+          user_id,
+          email_new_review,
+          email_new_anime,
           email_new_manga,
           email_review_moderated,
           email_security_alerts,
           email_marketing,
+          email_related_content,
           updated_at
         ) VALUES (
           ${userId},
@@ -165,6 +170,7 @@ export class NotificationsService {
           ${preferences.emailReviewModerated || false},
           ${preferences.emailSecurityAlerts !== undefined ? preferences.emailSecurityAlerts : true},
           ${preferences.emailMarketing || false},
+          ${preferences.emailRelatedContent !== undefined ? preferences.emailRelatedContent : true},
           NOW()
         )
         ON CONFLICT (user_id) DO UPDATE SET
@@ -174,6 +180,7 @@ export class NotificationsService {
           email_review_moderated = EXCLUDED.email_review_moderated,
           email_security_alerts = EXCLUDED.email_security_alerts,
           email_marketing = EXCLUDED.email_marketing,
+          email_related_content = EXCLUDED.email_related_content,
           updated_at = NOW()
       `;
 
@@ -331,6 +338,7 @@ export class NotificationsService {
       emailSecurityAlerts: true, // Security alerts should be enabled by default
       emailMarketing: false,
       emailReviewLiked: true, // Default to true for review likes
+      emailRelatedContent: true, // Default to true for related content notifications
     };
   }
 
@@ -355,6 +363,8 @@ export class NotificationsService {
         return preferences.emailReviewLiked;
       case 'marketing':
         return preferences.emailMarketing;
+      case 'related_content_added':
+        return preferences.emailRelatedContent;
       case 'friend_request':
       case 'friend_accepted':
         return true; // Always send friend notifications
@@ -519,6 +529,26 @@ export class NotificationsService {
           text: `Les votes sont terminés pour ${data.title}. ${data.message}`,
         };
 
+      case 'related_content_added':
+        const contentTypeLabels: Record<string, string> = {
+          anime: 'anime',
+          manga: 'manga',
+          'jeu-video': 'jeu vidéo',
+        };
+        const typeLabel =
+          contentTypeLabels[data.data?.contentType] || data.data?.contentType;
+        const contentUrl = data.data?.url || '#';
+        return {
+          subject: `🔗 Nouveau contenu lié - ${data.title}`,
+          html: `
+            <h2>🔗 Un nouveau ${typeLabel} a été ajouté !</h2>
+            <p><strong>${data.title}</strong> est maintenant disponible et lié à un contenu de vos favoris ou collection.</p>
+            <p>${data.message}</p>
+            <a href="${baseUrl}${contentUrl}" style="background-color: #6366f1; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Découvrir</a>
+          `,
+          text: `Un nouveau ${typeLabel} "${data.title}" lié à vos favoris a été ajouté. ${data.message}`,
+        };
+
       default:
         return {
           subject: data.title,
@@ -528,6 +558,160 @@ export class NotificationsService {
           `,
           text: `${data.title}\n\n${data.message}`,
         };
+    }
+  }
+
+  /**
+   * Notify users when new content is added that is related to items in their favorites or collection.
+   * @param newContent - The newly added/related content info
+   * @param relatedTo - The existing content that the new content is related to
+   */
+  async notifyRelatedContent(
+    newContent: { id: number; type: string; title: string; niceUrl: string },
+    relatedTo: { id: number; type: string },
+  ): Promise<void> {
+    try {
+      // Get users who have the related content in their favorites
+      const favoriteUsers = await this.getUsersWithFavorite(
+        relatedTo.id,
+        relatedTo.type,
+      );
+
+      // Get users who have the related content in their collection
+      const collectionUsers = await this.getUsersWithCollection(
+        relatedTo.id,
+        relatedTo.type,
+      );
+
+      // Combine and deduplicate user IDs
+      const allUserIds = new Set([...favoriteUsers, ...collectionUsers]);
+
+      if (allUserIds.size === 0) {
+        this.logger.debug(
+          `No users to notify for related content: ${newContent.type} ${newContent.id}`,
+        );
+        return;
+      }
+
+      const contentTypeLabels: Record<string, string> = {
+        anime: 'Un anime',
+        manga: 'Un manga',
+        'jeu-video': 'Un jeu vidéo',
+      };
+
+      const typeLabel =
+        contentTypeLabels[newContent.type] || `Un ${newContent.type}`;
+
+      // Send notifications to all users in parallel (batched)
+      const batchSize = 50;
+      const userIdsArray = Array.from(allUserIds);
+
+      for (let i = 0; i < userIdsArray.length; i += batchSize) {
+        const batch = userIdsArray.slice(i, i + batchSize);
+        await Promise.all(
+          batch.map((userId) =>
+            this.sendNotification({
+              userId,
+              type: 'related_content_added',
+              title: newContent.title,
+              message: `${typeLabel} "${newContent.title}" lié à vos favoris a été ajouté.`,
+              data: {
+                contentId: newContent.id,
+                contentType: newContent.type,
+                url: newContent.niceUrl,
+                relatedToId: relatedTo.id,
+                relatedToType: relatedTo.type,
+              },
+              priority: 'low',
+            }),
+          ),
+        );
+      }
+
+      this.logger.log(
+        `Sent related content notifications to ${allUserIds.size} users for ${newContent.type} ${newContent.id}`,
+      );
+    } catch (error) {
+      this.logger.error(
+        `Failed to send related content notifications: ${error.message}`,
+      );
+    }
+  }
+
+  /**
+   * Get user IDs who have the specified content in their favorites
+   */
+  private async getUsersWithFavorite(
+    contentId: number,
+    contentType: string,
+  ): Promise<number[]> {
+    try {
+      let result: any[];
+
+      if (contentType === 'anime') {
+        result = await this.prisma.$queryRaw`
+          SELECT DISTINCT user_id FROM ak_user_favorites
+          WHERE anime_id = ${contentId} AND type = 'anime'
+        `;
+      } else if (contentType === 'manga') {
+        result = await this.prisma.$queryRaw`
+          SELECT DISTINCT user_id FROM ak_user_favorites
+          WHERE manga_id = ${contentId} AND type = 'manga'
+        `;
+      } else if (contentType === 'jeu-video') {
+        result = await this.prisma.$queryRaw`
+          SELECT DISTINCT user_id FROM ak_user_favorites
+          WHERE jeu_id = ${contentId} AND type = 'jeu-video'
+        `;
+      } else {
+        return [];
+      }
+
+      return (result || []).map((row: any) => Number(row.user_id));
+    } catch (error) {
+      this.logger.warn(
+        `Failed to get favorite users for ${contentType} ${contentId}: ${error.message}`,
+      );
+      return [];
+    }
+  }
+
+  /**
+   * Get user IDs who have the specified content in their collection
+   */
+  private async getUsersWithCollection(
+    contentId: number,
+    contentType: string,
+  ): Promise<number[]> {
+    try {
+      let result: any[];
+
+      if (contentType === 'anime') {
+        result = await this.prisma.$queryRaw`
+          SELECT DISTINCT id_membre FROM collection_animes
+          WHERE id_anime = ${contentId}
+        `;
+        return (result || []).map((row: any) => Number(row.id_membre));
+      } else if (contentType === 'manga') {
+        result = await this.prisma.$queryRaw`
+          SELECT DISTINCT id_membre FROM collection_mangas
+          WHERE id_manga = ${contentId}
+        `;
+        return (result || []).map((row: any) => Number(row.id_membre));
+      } else if (contentType === 'jeu-video') {
+        result = await this.prisma.$queryRaw`
+          SELECT DISTINCT id_membre FROM collection_jeuxvideo
+          WHERE id_jeu = ${contentId}
+        `;
+        return (result || []).map((row: any) => Number(row.id_membre));
+      } else {
+        return [];
+      }
+    } catch (error) {
+      this.logger.warn(
+        `Failed to get collection users for ${contentType} ${contentId}: ${error.message}`,
+      );
+      return [];
     }
   }
 }

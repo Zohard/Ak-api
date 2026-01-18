@@ -11,12 +11,14 @@ import {
   UpdateContentRelationshipDto,
 } from './dto/content-relationship.dto';
 import { AdminLoggingService } from '../logging/admin-logging.service';
+import { NotificationsService } from '../../notifications/notifications.service';
 
 @Injectable()
 export class AdminContentService {
   constructor(
     private prisma: PrismaService,
     private adminLogging: AdminLoggingService,
+    private notificationsService: NotificationsService,
   ) { }
 
   async getAllContent(query: ContentAdminQueryDto) {
@@ -565,10 +567,125 @@ export class AdminContentService {
         )
       `;
 
+      // Trigger notifications for related content
+      // Fire and forget - don't block the response
+      this.triggerRelatedContentNotifications(
+        { id, type },
+        { id: related_id, type: related_type },
+      ).catch((err) =>
+        console.error('Failed to trigger related content notifications:', err),
+      );
+
       return { message: 'Relationship created successfully' };
     } catch (error) {
       console.error('Error creating relationship:', error);
       throw new BadRequestException(`Failed to create relationship: ${error.message}`);
+    }
+  }
+
+  /**
+   * Trigger notifications when a content relationship is created.
+   * Notifies users who have either side of the relationship in their favorites/collection
+   * about the other side if it's "new" (status = 1/published).
+   */
+  private async triggerRelatedContentNotifications(
+    source: { id: number; type: string },
+    target: { id: number; type: string },
+  ): Promise<void> {
+    try {
+      // Fetch info about both contents in parallel
+      const [sourceInfo, targetInfo] = await Promise.all([
+        this.getContentInfoForNotification(source.id, source.type),
+        this.getContentInfoForNotification(target.id, target.type),
+      ]);
+
+      if (!sourceInfo || !targetInfo) {
+        return;
+      }
+
+      // If source is published, notify users who have target in their favorites/collection
+      if (sourceInfo.status === 1) {
+        await this.notificationsService.notifyRelatedContent(
+          {
+            id: source.id,
+            type: source.type,
+            title: sourceInfo.title,
+            niceUrl: sourceInfo.niceUrl,
+          },
+          { id: target.id, type: target.type },
+        );
+      }
+
+      // If target is published (and different from source being notified),
+      // notify users who have source in their favorites/collection
+      if (targetInfo.status === 1) {
+        await this.notificationsService.notifyRelatedContent(
+          {
+            id: target.id,
+            type: target.type,
+            title: targetInfo.title,
+            niceUrl: targetInfo.niceUrl,
+          },
+          { id: source.id, type: source.type },
+        );
+      }
+    } catch (error) {
+      console.error('Error triggering related content notifications:', error);
+    }
+  }
+
+  /**
+   * Get content info needed for notification (title, status, niceUrl)
+   */
+  private async getContentInfoForNotification(
+    id: number,
+    type: string,
+  ): Promise<{ title: string; status: number; niceUrl: string } | null> {
+    try {
+      let result: any[];
+
+      if (type === 'anime') {
+        result = await this.prisma.$queryRaw`
+          SELECT titre as title, statut as status, nice_url as "niceUrl"
+          FROM ak_animes WHERE id_anime = ${id}
+        `;
+        if (result.length > 0) {
+          return {
+            title: result[0].title,
+            status: result[0].status,
+            niceUrl: `/animes/${result[0].niceUrl || id}`,
+          };
+        }
+      } else if (type === 'manga') {
+        result = await this.prisma.$queryRaw`
+          SELECT titre as title, statut as status, nice_url as "niceUrl"
+          FROM ak_mangas WHERE id_manga = ${id}
+        `;
+        if (result.length > 0) {
+          return {
+            title: result[0].title,
+            status: result[0].status,
+            niceUrl: `/mangas/${result[0].niceUrl || id}`,
+          };
+        }
+      } else if (type === 'jeu-video') {
+        result = await this.prisma.$queryRaw`
+          SELECT titre as title, statut as status, nice_url as "niceUrl"
+          FROM ak_jeux_video WHERE id_jeu = ${id}
+        `;
+        if (result.length > 0) {
+          return {
+            title: result[0].title,
+            status: result[0].status,
+            niceUrl: `/jeux-video/${result[0].niceUrl || id}`,
+          };
+        }
+      }
+
+      return null;
+    } catch (error) {
+      console.error(`Error fetching content info for ${type} ${id}:`, error);
+      return null;
     }
   }
 

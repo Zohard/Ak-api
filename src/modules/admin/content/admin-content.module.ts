@@ -22,9 +22,10 @@ import { IgdbService } from '../../../shared/services/igdb.service';
 import { DeepLService } from '../../../shared/services/deepl.service';
 import { MediaModule } from '../../media/media.module';
 import { AdminLoggingModule } from '../logging/admin-logging.module';
+import { NotificationsModule } from '../../notifications/notifications.module';
 
 @Module({
-  imports: [MediaModule, AdminLoggingModule],
+  imports: [MediaModule, AdminLoggingModule, NotificationsModule],
   controllers: [AdminContentController, AdminAnimesController, AdminMangasController, AdminBusinessController, AdminJeuxVideoController, AdminPlatformsController, AdminGenresController, AdminTagsController, SourcesExternesController, AniListImportController],
   providers: [AdminContentService, AdminAnimesService, AdminMangasService, AdminBusinessService, AdminJeuxVideoService, SourcesExternesService, AniListImportService, PrismaService, CacheService, IgdbService, DeepLService],
   exports: [AdminContentService, AniListImportService],
