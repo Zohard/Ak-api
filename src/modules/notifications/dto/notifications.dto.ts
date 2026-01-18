@@ -62,6 +62,107 @@ export class UpdatePreferencesDto {
   @IsOptional()
   @IsBoolean()
   emailMarketing?: boolean;
+
+  @ApiProperty({
+    description: 'Receive email notifications when a review is liked',
+    example: true,
+    required: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  emailReviewLiked?: boolean;
+
+  @ApiProperty({
+    description: 'Receive email notifications when related content is added',
+    example: true,
+    required: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  emailRelatedContent?: boolean;
+
+  @ApiProperty({
+    description: 'Receive email notifications for friend requests',
+    example: true,
+    required: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  emailFriendRequest?: boolean;
+
+  @ApiProperty({
+    description: 'Receive email notifications when friend request is accepted',
+    example: true,
+    required: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  emailFriendAccepted?: boolean;
+
+  @ApiProperty({
+    description: 'Receive email notifications for event voting',
+    example: true,
+    required: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  emailEventVoting?: boolean;
+
+  // Web preferences
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsBoolean()
+  webNewReview?: boolean;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsBoolean()
+  webNewAnime?: boolean;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsBoolean()
+  webNewManga?: boolean;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsBoolean()
+  webReviewModerated?: boolean;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsBoolean()
+  webSecurityAlerts?: boolean;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsBoolean()
+  webMarketing?: boolean;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsBoolean()
+  webReviewLiked?: boolean;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsBoolean()
+  webRelatedContent?: boolean;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsBoolean()
+  webFriendRequest?: boolean;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsBoolean()
+  webFriendAccepted?: boolean;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsBoolean()
+  webEventVoting?: boolean;
 }
 
 export class SendNotificationDto {

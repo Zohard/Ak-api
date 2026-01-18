@@ -10,6 +10,7 @@ export interface EmailTemplate {
 }
 
 export interface NotificationPreferences {
+  // Email preferences
   emailNewReview: boolean;
   emailNewAnime: boolean;
   emailNewManga: boolean;
@@ -18,6 +19,21 @@ export interface NotificationPreferences {
   emailMarketing: boolean;
   emailReviewLiked: boolean;
   emailRelatedContent: boolean;
+  emailFriendRequest: boolean;
+  emailFriendAccepted: boolean;
+  emailEventVoting: boolean;
+  // Website (in-app) preferences
+  webNewReview: boolean;
+  webNewAnime: boolean;
+  webNewManga: boolean;
+  webReviewModerated: boolean;
+  webSecurityAlerts: boolean;
+  webMarketing: boolean;
+  webReviewLiked: boolean;
+  webRelatedContent: boolean;
+  webFriendRequest: boolean;
+  webFriendAccepted: boolean;
+  webEventVoting: boolean;
 }
 
 export interface NotificationData {
@@ -116,7 +132,22 @@ export class NotificationsService {
           email_review_moderated,
           email_security_alerts,
           email_marketing,
-          email_related_content
+          email_review_liked,
+          email_related_content,
+          email_friend_request,
+          email_friend_accepted,
+          email_event_voting,
+          web_new_review,
+          web_new_anime,
+          web_new_manga,
+          web_review_moderated,
+          web_security_alerts,
+          web_marketing,
+          web_review_liked,
+          web_related_content,
+          web_friend_request,
+          web_friend_accepted,
+          web_event_voting
         FROM user_notification_preferences
         WHERE user_id = ${userId}
       `;
@@ -128,14 +159,30 @@ export class NotificationsService {
 
       const prefs = (preferences as any[])[0];
       return {
-        emailNewReview: prefs.email_new_review || false,
-        emailNewAnime: prefs.email_new_anime || false,
-        emailNewManga: prefs.email_new_manga || false,
-        emailReviewModerated: prefs.email_review_moderated || false,
-        emailSecurityAlerts: prefs.email_security_alerts || true, // Default to true for security
-        emailMarketing: prefs.email_marketing || false,
-        emailReviewLiked: prefs.email_review_liked !== false, // Default to true
-        emailRelatedContent: prefs.email_related_content !== false, // Default to true
+        // Email preferences
+        emailNewReview: prefs.email_new_review ?? false,
+        emailNewAnime: prefs.email_new_anime ?? false,
+        emailNewManga: prefs.email_new_manga ?? false,
+        emailReviewModerated: prefs.email_review_moderated ?? false,
+        emailSecurityAlerts: prefs.email_security_alerts ?? true,
+        emailMarketing: prefs.email_marketing ?? false,
+        emailReviewLiked: prefs.email_review_liked ?? true,
+        emailRelatedContent: prefs.email_related_content ?? true,
+        emailFriendRequest: prefs.email_friend_request ?? true,
+        emailFriendAccepted: prefs.email_friend_accepted ?? true,
+        emailEventVoting: prefs.email_event_voting ?? true,
+        // Website (in-app) preferences - default to true
+        webNewReview: prefs.web_new_review ?? true,
+        webNewAnime: prefs.web_new_anime ?? true,
+        webNewManga: prefs.web_new_manga ?? true,
+        webReviewModerated: prefs.web_review_moderated ?? true,
+        webSecurityAlerts: prefs.web_security_alerts ?? true,
+        webMarketing: prefs.web_marketing ?? true,
+        webReviewLiked: prefs.web_review_liked ?? true,
+        webRelatedContent: prefs.web_related_content ?? true,
+        webFriendRequest: prefs.web_friend_request ?? true,
+        webFriendAccepted: prefs.web_friend_accepted ?? true,
+        webEventVoting: prefs.web_event_voting ?? true,
       };
     } catch (error) {
       this.logger.warn(
@@ -151,6 +198,10 @@ export class NotificationsService {
     preferences: Partial<NotificationPreferences>,
   ): Promise<boolean> {
     try {
+      // First get current preferences to merge with updates
+      const current = await this.getUserPreferences(userId);
+      const merged = { ...current, ...preferences };
+
       await this.prisma.$executeRaw`
         INSERT INTO user_notification_preferences (
           user_id,
@@ -160,17 +211,47 @@ export class NotificationsService {
           email_review_moderated,
           email_security_alerts,
           email_marketing,
+          email_review_liked,
           email_related_content,
+          email_friend_request,
+          email_friend_accepted,
+          email_event_voting,
+          web_new_review,
+          web_new_anime,
+          web_new_manga,
+          web_review_moderated,
+          web_security_alerts,
+          web_marketing,
+          web_review_liked,
+          web_related_content,
+          web_friend_request,
+          web_friend_accepted,
+          web_event_voting,
           updated_at
         ) VALUES (
           ${userId},
-          ${preferences.emailNewReview || false},
-          ${preferences.emailNewAnime || false},
-          ${preferences.emailNewManga || false},
-          ${preferences.emailReviewModerated || false},
-          ${preferences.emailSecurityAlerts !== undefined ? preferences.emailSecurityAlerts : true},
-          ${preferences.emailMarketing || false},
-          ${preferences.emailRelatedContent !== undefined ? preferences.emailRelatedContent : true},
+          ${merged.emailNewReview},
+          ${merged.emailNewAnime},
+          ${merged.emailNewManga},
+          ${merged.emailReviewModerated},
+          ${merged.emailSecurityAlerts},
+          ${merged.emailMarketing},
+          ${merged.emailReviewLiked},
+          ${merged.emailRelatedContent},
+          ${merged.emailFriendRequest},
+          ${merged.emailFriendAccepted},
+          ${merged.emailEventVoting},
+          ${merged.webNewReview},
+          ${merged.webNewAnime},
+          ${merged.webNewManga},
+          ${merged.webReviewModerated},
+          ${merged.webSecurityAlerts},
+          ${merged.webMarketing},
+          ${merged.webReviewLiked},
+          ${merged.webRelatedContent},
+          ${merged.webFriendRequest},
+          ${merged.webFriendAccepted},
+          ${merged.webEventVoting},
           NOW()
         )
         ON CONFLICT (user_id) DO UPDATE SET
@@ -180,7 +261,22 @@ export class NotificationsService {
           email_review_moderated = EXCLUDED.email_review_moderated,
           email_security_alerts = EXCLUDED.email_security_alerts,
           email_marketing = EXCLUDED.email_marketing,
+          email_review_liked = EXCLUDED.email_review_liked,
           email_related_content = EXCLUDED.email_related_content,
+          email_friend_request = EXCLUDED.email_friend_request,
+          email_friend_accepted = EXCLUDED.email_friend_accepted,
+          email_event_voting = EXCLUDED.email_event_voting,
+          web_new_review = EXCLUDED.web_new_review,
+          web_new_anime = EXCLUDED.web_new_anime,
+          web_new_manga = EXCLUDED.web_new_manga,
+          web_review_moderated = EXCLUDED.web_review_moderated,
+          web_security_alerts = EXCLUDED.web_security_alerts,
+          web_marketing = EXCLUDED.web_marketing,
+          web_review_liked = EXCLUDED.web_review_liked,
+          web_related_content = EXCLUDED.web_related_content,
+          web_friend_request = EXCLUDED.web_friend_request,
+          web_friend_accepted = EXCLUDED.web_friend_accepted,
+          web_event_voting = EXCLUDED.web_event_voting,
           updated_at = NOW()
       `;
 
@@ -331,25 +427,74 @@ export class NotificationsService {
   // Helper methods
   private getDefaultPreferences(): NotificationPreferences {
     return {
+      // Email preferences - most off by default except important ones
       emailNewReview: false,
       emailNewAnime: false,
       emailNewManga: false,
       emailReviewModerated: false,
-      emailSecurityAlerts: true, // Security alerts should be enabled by default
+      emailSecurityAlerts: true,
       emailMarketing: false,
-      emailReviewLiked: true, // Default to true for review likes
-      emailRelatedContent: true, // Default to true for related content notifications
+      emailReviewLiked: true,
+      emailRelatedContent: true,
+      emailFriendRequest: true,
+      emailFriendAccepted: true,
+      emailEventVoting: true,
+      // Website (in-app) preferences - all on by default
+      webNewReview: true,
+      webNewAnime: true,
+      webNewManga: true,
+      webReviewModerated: true,
+      webSecurityAlerts: true,
+      webMarketing: true,
+      webReviewLiked: true,
+      webRelatedContent: true,
+      webFriendRequest: true,
+      webFriendAccepted: true,
+      webEventVoting: true,
     };
   }
 
+  // Check if we should store the notification in the database (website notifications)
   private shouldSendNotification(
     type: string,
     preferences: NotificationPreferences,
   ): boolean {
-    // Always send security alerts
-    if (type === 'security_alert') return true;
+    // Always store security alerts
+    if (type === 'security_alert') return preferences.webSecurityAlerts;
 
-    // Check user preferences for other types
+    // Check user web preferences for other types
+    switch (type) {
+      case 'new_review':
+        return preferences.webNewReview;
+      case 'new_anime':
+        return preferences.webNewAnime;
+      case 'new_manga':
+        return preferences.webNewManga;
+      case 'review_moderated':
+        return preferences.webReviewModerated;
+      case 'review_liked':
+        return preferences.webReviewLiked;
+      case 'marketing':
+        return preferences.webMarketing;
+      case 'related_content_added':
+        return preferences.webRelatedContent;
+      case 'friend_request':
+        return preferences.webFriendRequest;
+      case 'friend_accepted':
+        return preferences.webFriendAccepted;
+      case 'event_voting_started':
+      case 'event_voting_ended':
+        return preferences.webEventVoting;
+      default:
+        return true;
+    }
+  }
+
+  // Check if we should send an email for this notification type
+  private shouldSendEmail(
+    type: string,
+    preferences: NotificationPreferences,
+  ): boolean {
     switch (type) {
       case 'new_review':
         return preferences.emailNewReview;
@@ -361,16 +506,19 @@ export class NotificationsService {
         return preferences.emailReviewModerated;
       case 'review_liked':
         return preferences.emailReviewLiked;
+      case 'security_alert':
+        return preferences.emailSecurityAlerts;
       case 'marketing':
         return preferences.emailMarketing;
       case 'related_content_added':
         return preferences.emailRelatedContent;
       case 'friend_request':
+        return preferences.emailFriendRequest;
       case 'friend_accepted':
-        return true; // Always send friend notifications
+        return preferences.emailFriendAccepted;
       case 'event_voting_started':
       case 'event_voting_ended':
-        return true; // Always send event notifications if user is subscribed
+        return preferences.emailEventVoting;
       default:
         return false;
     }
