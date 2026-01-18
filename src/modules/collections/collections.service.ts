@@ -280,10 +280,9 @@ export class CollectionsService {
             })
           );
         }
-      }
-
-      // mediaType === 'manga'
-      const manga = await this.prisma.executeWithRetry(() =>
+      } else if (mediaType === 'manga') {
+        // mediaType === 'manga'
+        const manga = await this.prisma.executeWithRetry(() =>
         this.prisma.akManga.findUnique({ where: { idManga: mediaId } })
       );
       if (!manga) {
@@ -336,6 +335,7 @@ export class CollectionsService {
             },
           })
         );
+        }
       }
     } catch (err: any) {
       // Map known Prisma errors to proper HTTP errors; log for debugging
