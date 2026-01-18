@@ -240,6 +240,10 @@ export class CacheService implements OnModuleInit {
     await Promise.all([
       this.del(`anime:${id}`),
       this.del(`reviews:anime:${id}`),
+      this.del(`anime_staff:${id}`),
+      this.del(`anime_relations:${id}`),
+      this.del(`anime_articles:${id}`),
+      this.del(`similar_animes:${id}:6`),
     ]);
   }
 
@@ -247,6 +251,10 @@ export class CacheService implements OnModuleInit {
     await Promise.all([
       this.del(`manga:${id}`),
       this.del(`reviews:manga:${id}`),
+      this.del(`manga_staff:${id}`),
+      this.del(`manga_relations:${id}`),
+      this.del(`manga_articles:${id}`),
+      this.del(`similar_mangas:${id}:6`),
     ]);
   }
 
@@ -254,6 +262,10 @@ export class CacheService implements OnModuleInit {
     await Promise.all([
       this.del(`game:${id}`),
       this.del(`reviews:game:${id}`),
+      this.del(`game_staff:${id}`),
+      this.del(`game_relations:${id}`),
+      this.del(`game_articles:${id}`),
+      this.del(`similar_games:${id}:6`),
     ]);
   }
 
