@@ -572,6 +572,7 @@ export class AdminContentService {
       this.triggerRelatedContentNotifications(
         { id, type },
         { id: related_id, type: related_type },
+        relation_type,
       ).catch((err) =>
         console.error('Failed to trigger related content notifications:', err),
       );
@@ -588,12 +589,12 @@ export class AdminContentService {
    * Notifies users who have either side of the relationship in their favorites/collection
    * about the other side if it's "new" (status = 1/published).
    */
-  private async triggerRelatedContentNotifications(
+  public async triggerRelatedContentNotifications(
     source: { id: number; type: string },
     target: { id: number; type: string },
+    relationType?: string,
   ): Promise<void> {
     try {
-      // Fetch info about both contents in parallel
       const [sourceInfo, targetInfo] = await Promise.all([
         this.getContentInfoForNotification(source.id, source.type),
         this.getContentInfoForNotification(target.id, target.type),
@@ -602,6 +603,14 @@ export class AdminContentService {
       if (!sourceInfo || !targetInfo) {
         return;
       }
+
+      // Determine if this is a "new season" or generic "related content"
+      // sequel/prequel usually indicate a new season
+      const isNewSeason =
+        relationType === 'sequel' || relationType === 'prequel';
+      const notificationType = isNewSeason
+        ? 'new_season_anime'
+        : 'related_content_added';
 
       // If source is published, notify users who have target in their favorites/collection
       if (sourceInfo.status === 1) {
@@ -613,11 +622,11 @@ export class AdminContentService {
             niceUrl: sourceInfo.niceUrl,
           },
           { id: target.id, type: target.type },
+          notificationType,
         );
       }
 
-      // If target is published (and different from source being notified),
-      // notify users who have source in their favorites/collection
+      // If target is published, notify users who have source in their favorites/collection
       if (targetInfo.status === 1) {
         await this.notificationsService.notifyRelatedContent(
           {
@@ -627,6 +636,7 @@ export class AdminContentService {
             niceUrl: targetInfo.niceUrl,
           },
           { id: source.id, type: source.type },
+          notificationType,
         );
       }
     } catch (error) {

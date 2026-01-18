@@ -3,6 +3,7 @@ import { PrismaService } from '../../../shared/services/prisma.service';
 import { AdminLoggingService } from '../logging/admin-logging.service';
 import { CacheService } from '../../../shared/services/cache.service';
 import { R2Service } from '../../media/r2.service';
+import { AdminContentService } from './admin-content.service';
 import {
   AdminAnimeListQueryDto,
   CreateAdminAnimeDto,
@@ -16,6 +17,7 @@ export class AdminAnimesService {
     private adminLogging: AdminLoggingService,
     private cacheService: CacheService,
     private r2Service: R2Service,
+    private adminContentService: AdminContentService,
   ) { }
 
   async getOne(id: number) {
@@ -311,10 +313,47 @@ export class AdminAnimesService {
       await this.adminLogging.addLog(id, 'anime', username, `Modification statut (${statut})`);
     }
 
+    // Trigger notifications if status changed to published (1)
+    if (statut === 1 && existing.statut !== 1) {
+      this.triggerStatusPublishedNotifications(id).catch((err) =>
+        console.error('Failed to trigger status published notifications:', err),
+      );
+    }
+
     // Invalidate cache
     await this.cacheService.invalidateAnime(id);
 
     return updated;
+  }
+
+  /**
+   * Trigger notifications for all relationships when an anime is published.
+   */
+  private async triggerStatusPublishedNotifications(id: number): Promise<void> {
+    try {
+      // Get all existing relationships for this anime
+      const relations = await this.adminContentService.getContentRelationships(
+        id,
+        'anime',
+      );
+
+      // Trigger notifications for each relationship
+      for (const rel of relations) {
+        // Only trigger if it's a content relationship (anime/manga/jeu-video)
+        if (rel.related_id && rel.related_type) {
+          // Re-trigger the logic in AdminContentService
+          // This will check if BOTH sides are published (now 'id' is published)
+          // it will notify users who have the OTHER side in favorites
+          await this.adminContentService.triggerRelatedContentNotifications(
+            { id, type: 'anime' },
+            { id: rel.related_id, type: rel.related_type },
+            rel.relation_type,
+          );
+        }
+      }
+    } catch (error) {
+      console.error('Error triggering status published notifications:', error);
+    }
   }
 
   async remove(id: number) {

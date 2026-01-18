@@ -3,6 +3,7 @@ import { PrismaService } from '../../../shared/services/prisma.service';
 import { R2Service } from '../../media/r2.service';
 import { MediaService } from '../../media/media.service';
 import { AdminLoggingService } from '../logging/admin-logging.service';
+import { AdminContentService } from './admin-content.service';
 import {
   AdminMangaListQueryDto,
   CreateAdminMangaDto,
@@ -16,7 +17,8 @@ export class AdminMangasService {
     private r2Service: R2Service,
     private mediaService: MediaService,
     private adminLogging: AdminLoggingService,
-  ) {}
+    private adminContentService: AdminContentService,
+  ) { }
 
   /**
    * Upload external image URL to R2
@@ -288,21 +290,61 @@ export class AdminMangasService {
       await this.adminLogging.addLog(id, 'manga', username, 'Modification infos principales');
     }
 
-    return updated;
-  }
+  async updateStatus(id: number, statut: number, username ?: string) {
+      const existing = await this.prisma.akManga.findUnique({
+        where: { idManga: id },
+      });
+      if (!existing) throw new NotFoundException('Manga introuvable');
 
-  async updateStatus(id: number, statut: number, username?: string) {
-    const existing = await this.prisma.akManga.findUnique({ where: { idManga: id } });
-    if (!existing) throw new NotFoundException('Manga introuvable');
+      const updated = await this.prisma.akManga.update({
+        where: { idManga: id },
+        data: { statut },
+      });
 
-    const updated = await this.prisma.akManga.update({ where: { idManga: id }, data: { statut } });
+      // Log the status change
+      if (username) {
+        await this.adminLogging.addLog(
+          id,
+          'manga',
+          username,
+          `Modification statut (${statut})`,
+        );
+      }
 
-    // Log the status change
-    if (username) {
-      await this.adminLogging.addLog(id, 'manga', username, `Modification statut (${statut})`);
+      // Trigger notifications if status changed to published (1)
+      if (statut === 1 && existing.statut !== 1) {
+        this.triggerStatusPublishedNotifications(id).catch((err) =>
+          console.error('Failed to trigger status published notifications:', err),
+        );
+      }
+
+      return updated;
     }
 
-    return updated;
+  /**
+   * Trigger notifications for all relationships when a manga is published.
+   */
+  private async triggerStatusPublishedNotifications(id: number): Promise<void> {
+    try {
+      // Get all existing relationships for this manga
+      const relations = await this.adminContentService.getContentRelationships(
+        id,
+        'manga',
+      );
+
+      // Trigger notifications for each relationship
+      for (const rel of relations) {
+        if (rel.related_id && rel.related_type) {
+          await this.adminContentService.triggerRelatedContentNotifications(
+            { id, type: 'manga' },
+            { id: rel.related_id, type: rel.related_type },
+            rel.relation_type,
+          );
+        }
+      }
+    } catch (error) {
+      console.error('Error triggering status published notifications:', error);
+    }
   }
 
   async remove(id: number) {

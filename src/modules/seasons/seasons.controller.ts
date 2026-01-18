@@ -5,10 +5,10 @@ import { SeasonsService } from './seasons.service';
 
 @Controller('seasons')
 export class SeasonsController {
-  constructor(private readonly seasonsService: SeasonsService) {}
+  constructor(private readonly seasonsService: SeasonsService) { }
 
   @Get()
-  @Header('Cache-Control', 'public, max-age=1800, stale-while-revalidate=3600')
+  @Header('Cache-Control', 'public, max-age=60, stale-while-revalidate=120')
   async getAllSeasons() {
     const seasons = await this.seasonsService.findAll() as any[];
 
@@ -29,7 +29,7 @@ export class SeasonsController {
 
   // IMPORTANT: Specific routes must come BEFORE :id route
   @Get('current')
-  @Header('Cache-Control', 'public, max-age=900, stale-while-revalidate=1800')
+  @Header('Cache-Control', 'public, max-age=60, stale-while-revalidate=120')
   async getCurrentSeason() {
     const season = await this.seasonsService.findCurrent();
     if (!season) {
@@ -51,7 +51,7 @@ export class SeasonsController {
   }
 
   @Get('last-created')
-  @Header('Cache-Control', 'public, max-age=900, stale-while-revalidate=1800')
+  @Header('Cache-Control', 'public, max-age=60, stale-while-revalidate=120')
   async getLastCreatedSeason() {
     const season = await this.seasonsService.findLastCreated();
     if (!season) {
@@ -74,7 +74,7 @@ export class SeasonsController {
 
   // More specific parameterized routes come FIRST
   @Get(':id/animes')
-  @Header('Cache-Control', 'public, max-age=1800, stale-while-revalidate=3600')
+  @Header('Cache-Control', 'public, max-age=60, stale-while-revalidate=120')
   async getSeasonAnimes(@Param('id', ParseIntPipe) id: number) {
     const season = await this.seasonsService.findById(id);
     if (!season) {
@@ -85,7 +85,7 @@ export class SeasonsController {
 
   // Generic :id route must be LAST among parameterized routes
   @Get(':id')
-  @Header('Cache-Control', 'public, max-age=1800, stale-while-revalidate=3600')
+  @Header('Cache-Control', 'public, max-age=60, stale-while-revalidate=120')
   async getSeasonById(@Param('id', ParseIntPipe) id: number) {
     const season = await this.seasonsService.findById(id);
     if (!season) {

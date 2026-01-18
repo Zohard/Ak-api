@@ -4,6 +4,7 @@ import { IgdbService } from '../../../shared/services/igdb.service';
 import { DeepLService } from '../../../shared/services/deepl.service';
 import { AdminLoggingService } from '../logging/admin-logging.service';
 import { R2Service } from '../../media/r2.service';
+import { AdminContentService } from './admin-content.service';
 import { AdminJeuxVideoListQueryDto, CreateAdminJeuxVideoDto, UpdateAdminJeuxVideoDto } from './dto/admin-jeux-video.dto';
 import { CreateJeuVideoTrailerDto } from './dto/create-jeu-video-trailer.dto';
 import { UpdateJeuVideoTrailerDto } from './dto/update-jeu-video-trailer.dto';
@@ -16,6 +17,7 @@ export class AdminJeuxVideoService {
     private igdbService: IgdbService,
     private imagekitService: R2Service,
     private deepLService: DeepLService,
+    private adminContentService: AdminContentService,
   ) { }
 
   async list(query: AdminJeuxVideoListQueryDto) {
@@ -313,26 +315,64 @@ export class AdminJeuxVideoService {
       platformIds,
       genreIds,
     };
-  }
+  async updateStatus(id: number, statut: number, username ?: string) {
+      const existing = await this.prisma.akJeuxVideo.findUnique({
+        where: { idJeu: id },
+      });
+      if (!existing) throw new NotFoundException('Jeu vidéo introuvable');
 
-  async updateStatus(id: number, statut: number, username?: string) {
-    const existing = await this.prisma.akJeuxVideo.findUnique({ where: { idJeu: id } });
-    if (!existing) throw new NotFoundException('Jeu vidéo introuvable');
+      const updated = await this.prisma.akJeuxVideo.update({
+        where: { idJeu: id },
+        data: { statut },
+      });
 
-    const updated = await this.prisma.akJeuxVideo.update({
-      where: { idJeu: id },
-      data: { statut }
-    });
+      // Log the status change
+      if (username) {
+        await this.adminLogging.addLog(
+          id,
+          'jeu_video',
+          username,
+          `Modification statut (${statut})`,
+        );
+      }
 
-    // Log the status change
-    if (username) {
-      await this.adminLogging.addLog(id, 'jeu_video', username, `Modification statut (${statut})`);
+      // Trigger notifications if status changed to published (1)
+      if (statut === 1 && existing.statut !== 1) {
+        this.triggerStatusPublishedNotifications(id).catch((err) =>
+          console.error('Failed to trigger status published notifications:', err),
+        );
+      }
+
+      return {
+        ...updated,
+        idJeu: updated.idJeu,
+      };
     }
 
-    return {
-      ...updated,
-      idJeu: updated.idJeu,
-    };
+  /**
+   * Trigger notifications for all relationships when a game is published.
+   */
+  private async triggerStatusPublishedNotifications(id: number): Promise<void> {
+    try {
+      // Get all existing relationships for this game
+      const relations = await this.adminContentService.getContentRelationships(
+        id,
+        'jeu-video',
+      );
+
+      // Trigger notifications for each relationship
+      for (const rel of relations) {
+        if (rel.related_id && rel.related_type) {
+          await this.adminContentService.triggerRelatedContentNotifications(
+            { id, type: 'jeu-video' },
+            { id: rel.related_id, type: rel.related_type },
+            rel.relation_type,
+          );
+        }
+      }
+    } catch (error) {
+      console.error('Error triggering status published notifications:', error);
+    }
   }
 
   async remove(id: number) {
