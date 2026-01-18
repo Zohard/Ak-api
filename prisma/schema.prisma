@@ -79,6 +79,7 @@ model SmfMember {
   listesTop        AkListesTop[]
   sentMessages     SmfPersonalMessage[] @relation("SentMessages")
   receivedMessages SmfPmRecipient[] @relation("ReceivedMessages")
+  favorites        AkUserFavorite[]
 
   // Forum relations
   messages         SmfMessage[] @relation("MessageAuthor")
@@ -1413,4 +1414,30 @@ model ClientErrorLog {
   @@index([userId])
   @@index([createdAt])
   @@map("client_error_logs")
+}
+
+// User Favorites
+model AkUserFavorite {
+  id          Int       @id @default(autoincrement())
+  userId      Int       @map("user_id")
+  type        String    @db.VarChar(50) // 'anime', 'manga', 'jeu-video', 'business'
+  
+  animeId     Int?      @map("anime_id")
+  mangaId     Int?      @map("manga_id")
+  jeuId       Int?      @map("jeu_id")
+  businessId  Int?      @map("business_id")
+  
+  order       Int       @default(0)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
+
+  // Relations
+  user        SmfMember   @relation(fields: [userId], references: [idMember], onDelete: Cascade)
+  anime       AkAnime?    @relation(fields: [animeId], references: [idAnime], onDelete: Cascade)
+  manga       AkManga?    @relation(fields: [mangaId], references: [idManga], onDelete: Cascade)
+  jeuVideo    AkJeuxVideo? @relation(fields: [jeuId], references: [idJeu], onDelete: Cascade)
+  business    AkBusiness? @relation(fields: [businessId], references: [idBusiness], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, type])
+  @@map("ak_user_favorites")
 }
