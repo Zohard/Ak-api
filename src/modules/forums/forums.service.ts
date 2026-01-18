@@ -1747,6 +1747,7 @@ export class ForumsService {
         await this.cacheService.invalidateForumBoard(message.idBoard);
         await this.cacheService.delByPattern('forums:categories:*'); // Invalidate all category caches
         await this.cacheService.delByPattern('forums:messages:latest:*'); // Invalidate latest messages
+        await this.cacheService.del('homepage:forum'); // Invalidate homepage cache
 
         return {
           success: true,
@@ -1832,6 +1833,7 @@ export class ForumsService {
         await this.cacheService.invalidateForumTopic(message.idTopic);
         await this.cacheService.invalidateForumBoard(message.idBoard);
         await this.cacheService.delByPattern('forums:messages:latest:*'); // Invalidate latest messages
+        await this.cacheService.del('homepage:forum'); // Invalidate homepage cache
 
         return {
           success: true,
