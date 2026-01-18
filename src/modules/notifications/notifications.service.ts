@@ -39,18 +39,18 @@ export interface NotificationPreferences {
 export interface NotificationData {
   userId: number;
   type:
-    | 'new_review'
-    | 'new_anime'
-    | 'new_manga'
-    | 'review_moderated'
-    | 'review_liked'
-    | 'security_alert'
-    | 'marketing'
-    | 'friend_request'
-    | 'friend_accepted'
-    | 'event_voting_started'
-    | 'event_voting_ended'
-    | 'related_content_added';
+  | 'new_review'
+  | 'new_anime'
+  | 'new_manga'
+  | 'review_moderated'
+  | 'review_liked'
+  | 'security_alert'
+  | 'marketing'
+  | 'friend_request'
+  | 'friend_accepted'
+  | 'event_voting_started'
+  | 'event_voting_ended'
+  | 'related_content_added';
   title: string;
   message: string;
   data?: any;
@@ -522,13 +522,6 @@ export class NotificationsService {
       default:
         return false;
     }
-  }
-
-  private shouldSendEmail(
-    type: string,
-    preferences: NotificationPreferences,
-  ): boolean {
-    return this.shouldSendNotification(type, preferences);
   }
 
   private async storeNotification(data: NotificationData): Promise<void> {
