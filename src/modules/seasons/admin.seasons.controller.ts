@@ -5,7 +5,7 @@ import { AdminGuard } from '../../common/guards/admin.guard';
 
 @Controller('admin/seasons')
 export class AdminSeasonsController {
-  constructor(private readonly seasonsService: SeasonsService) {}
+  constructor(private readonly seasonsService: SeasonsService) { }
 
   @UseGuards(JwtAuthGuard, AdminGuard)
   @Post()
@@ -63,6 +63,16 @@ export class AdminSeasonsController {
     const season = await this.seasonsService.findById(id)
     if (!season) throw new NotFoundException(`Season with ID ${id} not found`)
     return this.seasonsService.deleteSeason(id)
+  }
+
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @Post(':id/sync-episodes')
+  async syncEpisodes(
+    @Param('id', ParseIntPipe) id: number,
+  ) {
+    const season = await this.seasonsService.findById(id)
+    if (!season) throw new NotFoundException(`Season with ID ${id} not found`)
+    return this.seasonsService.syncSeasonEpisodes(id)
   }
 }
 

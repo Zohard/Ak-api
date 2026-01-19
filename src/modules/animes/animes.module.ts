@@ -34,6 +34,6 @@ import { EpisodesController } from './episodes/episodes.controller';
     AnimeImageService,
     EpisodesService,
   ],
-  exports: [AnimesService],
+  exports: [AnimesService, EpisodesService],
 })
 export class AnimesModule { }

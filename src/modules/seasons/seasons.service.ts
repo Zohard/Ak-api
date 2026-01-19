@@ -1,6 +1,8 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../shared/services/prisma.service';
 import { CacheService } from '../../shared/services/cache.service';
+
+import { EpisodesService } from '../animes/episodes/episodes.service';
 
 @Injectable()
 export class SeasonsService {
@@ -9,7 +11,45 @@ export class SeasonsService {
   constructor(
     private prisma: PrismaService,
     private readonly cacheService: CacheService,
+    private readonly episodesService: EpisodesService,
   ) { }
+
+  async syncSeasonEpisodes(seasonId: number) {
+    const season = await this.findById(seasonId);
+    if (!season) {
+      throw new NotFoundException(`Season with ID ${seasonId} not found`);
+    }
+
+    const data = this.normalizeJsonData(season.json_data);
+    const animeIds = data.animes; // These are string or number IDs? usually number.
+
+    this.logger.log(`Syncing episodes for ${animeIds.length} animes in season ${seasonId}`);
+
+    const results = [];
+    for (const animeId of animeIds) {
+      try {
+        // Ensure ID is number
+        const id = Number(animeId);
+        if (id) {
+          await this.episodesService.fetchAndSyncEpisodes(id);
+          results.push({ id, status: 'success' });
+
+          // Rate limiting: wait 500ms between requests to avoid AniList errors
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+      } catch (e) {
+        this.logger.error(`Failed to sync episodes for anime ${animeId} in season ${seasonId}:`, e.message);
+        results.push({ id: animeId, status: 'error', error: e.message });
+      }
+    }
+
+    return {
+      total: animeIds.length,
+      success: results.filter(r => r.status === 'success').length,
+      errors: results.filter(r => r.status === 'error').length,
+      details: results
+    };
+  }
 
   async findAll() {
     try {
