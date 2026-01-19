@@ -21,7 +21,7 @@ export class SeasonsService {
     }
 
     const data = this.normalizeJsonData(season.json_data);
-    const animeIds = data.animes; // These are string or number IDs? usually number.
+    const animeIds = [...new Set(data.animes)]; // Deduplicate IDs to prevent processing twice and frontend key collisions
 
     this.logger.log(`Syncing episodes for ${animeIds.length} animes in season ${seasonId}`);
 
@@ -31,11 +31,22 @@ export class SeasonsService {
         // Ensure ID is number
         const id = Number(animeId);
         if (id) {
-          await this.episodesService.fetchAndSyncEpisodes(id);
-          results.push({ id, status: 'success' });
+          // Check if episodes already exist
+          const existingCount = await this.episodesService.countEpisodes(id);
 
-          // Rate limiting: wait 2500ms between requests to avoid AniList errors (limit 30/min = 1 req/2s)
-          await new Promise(resolve => setTimeout(resolve, 2500));
+          if (existingCount > 0) {
+            // Simply sync (will skip internal API call logic inside service)
+            // But we do NOT wait 2.5s here because we didn't hit AniList API
+            await this.episodesService.fetchAndSyncEpisodes(id);
+            results.push({ id, status: 'success', skipped: true });
+          } else {
+            // No episodes exist, this will trigger AniList API
+            await this.episodesService.fetchAndSyncEpisodes(id);
+            results.push({ id, status: 'success', skipped: false });
+
+            // Rate limiting: wait 2500ms ONLY if we effectively made a request
+            await new Promise(resolve => setTimeout(resolve, 2500));
+          }
         }
       } catch (e) {
         this.logger.error(`Failed to sync episodes for anime ${animeId} in season ${seasonId}:`, e.message);

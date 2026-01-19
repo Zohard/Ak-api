@@ -23,6 +23,10 @@ export class EpisodesService {
         });
     }
 
+    async countEpisodes(animeId: number) {
+        return this.prisma.akAnimesEpisode.count({ where: { idAnime: animeId } });
+    }
+
     private sanitizeString(str: any): string | null {
         if (str === null || str === undefined) return null;
         const strValue = typeof str === 'string' ? str : String(str);
