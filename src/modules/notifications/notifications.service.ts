@@ -772,6 +772,7 @@ export class NotificationsService {
   async notifyRelatedContent(
     newContent: { id: number; type: string; title: string; niceUrl: string },
     relatedTo: { id: number; type: string },
+    notificationType: string = 'related_content_added',
   ): Promise<void> {
     try {
       // Get users who have the related content in their favorites
@@ -815,7 +816,7 @@ export class NotificationsService {
           batch.map((userId) =>
             this.sendNotification({
               userId,
-              type: 'related_content_added',
+              type: notificationType as any,
               title: newContent.title,
               message: `${typeLabel} "${newContent.title}" lié à vos favoris a été ajouté.`,
               data: {

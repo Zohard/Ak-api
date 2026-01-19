@@ -315,39 +315,41 @@ export class AdminJeuxVideoService {
       platformIds,
       genreIds,
     };
-  async updateStatus(id: number, statut: number, username ?: string) {
-      const existing = await this.prisma.akJeuxVideo.findUnique({
-        where: { idJeu: id },
-      });
-      if (!existing) throw new NotFoundException('Jeu vidéo introuvable');
+  }
 
-      const updated = await this.prisma.akJeuxVideo.update({
-        where: { idJeu: id },
-        data: { statut },
-      });
+  async updateStatus(id: number, statut: number, username?: string) {
+    const existing = await this.prisma.akJeuxVideo.findUnique({
+      where: { idJeu: id },
+    });
+    if (!existing) throw new NotFoundException('Jeu vidéo introuvable');
 
-      // Log the status change
-      if (username) {
-        await this.adminLogging.addLog(
-          id,
-          'jeu_video',
-          username,
-          `Modification statut (${statut})`,
-        );
-      }
+    const updated = await this.prisma.akJeuxVideo.update({
+      where: { idJeu: id },
+      data: { statut },
+    });
 
-      // Trigger notifications if status changed to published (1)
-      if (statut === 1 && existing.statut !== 1) {
-        this.triggerStatusPublishedNotifications(id).catch((err) =>
-          console.error('Failed to trigger status published notifications:', err),
-        );
-      }
-
-      return {
-        ...updated,
-        idJeu: updated.idJeu,
-      };
+    // Log the status change
+    if (username) {
+      await this.adminLogging.addLog(
+        id,
+        'jeu_video',
+        username,
+        `Modification statut (${statut})`,
+      );
     }
+
+    // Trigger notifications if status changed to published (1)
+    if (statut === 1 && existing.statut !== 1) {
+      this.triggerStatusPublishedNotifications(id).catch((err) =>
+        console.error('Failed to trigger status published notifications:', err),
+      );
+    }
+
+    return {
+      ...updated,
+      idJeu: updated.idJeu,
+    };
+  }
 
   /**
    * Trigger notifications for all relationships when a game is published.

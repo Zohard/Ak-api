@@ -289,37 +289,38 @@ export class AdminMangasService {
       const username = user.pseudo || user.member_name || user.username || 'admin';
       await this.adminLogging.addLog(id, 'manga', username, 'Modification infos principales');
     }
+  }
 
-  async updateStatus(id: number, statut: number, username ?: string) {
-      const existing = await this.prisma.akManga.findUnique({
-        where: { idManga: id },
-      });
-      if (!existing) throw new NotFoundException('Manga introuvable');
+  async updateStatus(id: number, statut: number, username?: string) {
+    const existing = await this.prisma.akManga.findUnique({
+      where: { idManga: id },
+    });
+    if (!existing) throw new NotFoundException('Manga introuvable');
 
-      const updated = await this.prisma.akManga.update({
-        where: { idManga: id },
-        data: { statut },
-      });
+    const updated = await this.prisma.akManga.update({
+      where: { idManga: id },
+      data: { statut },
+    });
 
-      // Log the status change
-      if (username) {
-        await this.adminLogging.addLog(
-          id,
-          'manga',
-          username,
-          `Modification statut (${statut})`,
-        );
-      }
-
-      // Trigger notifications if status changed to published (1)
-      if (statut === 1 && existing.statut !== 1) {
-        this.triggerStatusPublishedNotifications(id).catch((err) =>
-          console.error('Failed to trigger status published notifications:', err),
-        );
-      }
-
-      return updated;
+    // Log the status change
+    if (username) {
+      await this.adminLogging.addLog(
+        id,
+        'manga',
+        username,
+        `Modification statut (${statut})`,
+      );
     }
+
+    // Trigger notifications if status changed to published (1)
+    if (statut === 1 && existing.statut !== 1) {
+      this.triggerStatusPublishedNotifications(id).catch((err) =>
+        console.error('Failed to trigger status published notifications:', err),
+      );
+    }
+
+    return updated;
+  }
 
   /**
    * Trigger notifications for all relationships when a manga is published.
