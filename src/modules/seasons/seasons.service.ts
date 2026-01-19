@@ -34,8 +34,8 @@ export class SeasonsService {
           await this.episodesService.fetchAndSyncEpisodes(id);
           results.push({ id, status: 'success' });
 
-          // Rate limiting: wait 500ms between requests to avoid AniList errors
-          await new Promise(resolve => setTimeout(resolve, 500));
+          // Rate limiting: wait 2500ms between requests to avoid AniList errors (limit 30/min = 1 req/2s)
+          await new Promise(resolve => setTimeout(resolve, 2500));
         }
       } catch (e) {
         this.logger.error(`Failed to sync episodes for anime ${animeId} in season ${seasonId}:`, e.message);
