@@ -173,7 +173,9 @@ export class AnimesService extends BaseContentService<
           select: {
             idEpisode: true,
             numero: true,
-            titre: true,
+            titreFr: true,
+            titreEn: true,
+            titreJp: true,
           },
           orderBy: { numero: 'asc' },
           take: 5,

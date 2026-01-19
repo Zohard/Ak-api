@@ -232,12 +232,17 @@ model AkAnime {
 
 // Anime Episodes
 model AkAnimesEpisode {
-  idEpisode    Int       @id @map("id_episode")
+  idEpisode    Int       @id @default(autoincrement()) @map("id_episode")
   idAnime      Int       @map("id_anime")
   numero       Int
-  titre        String?   @db.VarChar(255)
-  resume       String?   @db.Text
-  dateAjout    DateTime? @map("date_ajout") @db.Timestamptz
+  titreOriginal String?   @map("titre_original") @db.Text
+  titreJp      String    @map("titre_jp") @db.Text // NOT NULL as per request
+  titreFr      String?   @map("titre_fr") @db.Text
+  titreEn      String?   @map("titre_en") @db.Text
+  image        String?   @db.VarChar(500)
+  dateDiffusion DateTime? @map("date_diffusion") @db.Timestamptz
+  duration     Int?
+  dateAjout    DateTime? @default(now()) @map("date_ajout") @db.Timestamptz
 
   // Relations
   anime        AkAnime   @relation(fields: [idAnime], references: [idAnime], onDelete: Cascade)

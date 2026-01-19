@@ -15,9 +15,12 @@ import { AnimeExternalService } from './services/anime-external.service';
 import { AnimeCacheService } from './services/anime-cache.service';
 import { AnimeImageService } from './services/anime-image.service';
 
+import { EpisodesService } from './episodes/episodes.service';
+import { EpisodesController } from './episodes/episodes.controller';
+
 @Module({
   imports: [MediaModule, AniListModule, JikanModule, AdminLoggingModule],
-  controllers: [AnimesController],
+  controllers: [AnimesController, EpisodesController],
   providers: [
     AnimesService,
     PrismaService,
@@ -29,7 +32,8 @@ import { AnimeImageService } from './services/anime-image.service';
     AnimeExternalService,
     AnimeCacheService,
     AnimeImageService,
+    EpisodesService,
   ],
   exports: [AnimesService],
 })
-export class AnimesModule {}
+export class AnimesModule { }

@@ -793,6 +793,112 @@ export class AniListService {
     }
   }
 
+  /**
+   * Sanitize a string using Buffer to properly handle binary null bytes
+   */
+  private sanitizeStringBuffer(str: string): string {
+    const buffer = Buffer.from(str, 'utf8');
+    const cleanedBytes: number[] = [];
+    for (let i = 0; i < buffer.length; i++) {
+      const byte = buffer[i];
+      // Skip null bytes (0x00) and other problematic control characters
+      if (byte === 0x00) continue;
+      if (byte >= 0x01 && byte <= 0x08) continue;
+      if (byte === 0x0B || byte === 0x0C) continue;
+      if (byte >= 0x0E && byte <= 0x1F) continue;
+      cleanedBytes.push(byte);
+    }
+    return Buffer.from(cleanedBytes).toString('utf8');
+  }
+
+  /**
+   * Recursively sanitize all strings in an object to remove null bytes
+   * that cause PostgreSQL UTF-8 encoding errors
+   */
+  private sanitizeDeep(obj: any): any {
+    if (obj === null || obj === undefined) return obj;
+    if (typeof obj === 'string') {
+      return this.sanitizeStringBuffer(obj);
+    }
+    if (Array.isArray(obj)) {
+      return obj.map(item => this.sanitizeDeep(item));
+    }
+    if (typeof obj === 'object') {
+      const sanitized: any = {};
+      for (const [key, value] of Object.entries(obj)) {
+        sanitized[key] = this.sanitizeDeep(value);
+      }
+      return sanitized;
+    }
+    return obj;
+  }
+
+  async getAiringSchedule(anilistId: number, start?: number, end?: number): Promise<any[]> {
+    const graphqlQuery = `
+      query ($mediaId: Int, $start: Int, $end: Int) {
+        Page(page: 1, perPage: 50) {
+          airingSchedules(mediaId: $mediaId, airingAt_greater: $start, airingAt_lesser: $end, sort: TIME) {
+            id
+            episode
+            airingAt
+            media {
+              id
+              title {
+                romaji
+                english
+                native
+              }
+              coverImage {
+                large
+              }
+            }
+          }
+        }
+      }
+    `;
+
+    try {
+      const response = await this.httpClient.post('', {
+        query: graphqlQuery,
+        variables: {
+          mediaId: anilistId,
+          start: start || undefined,
+          end: end || undefined,
+        },
+      });
+
+      if (response.data.errors) {
+        this.logger.error('AniList API returned errors:', response.data.errors);
+        throw new Error('Failed to get airing schedule from AniList');
+      }
+
+      // Sanitize the response to remove any null bytes that would cause PostgreSQL errors
+      const schedules = response.data.data.Page.airingSchedules;
+
+      // Log raw data for debugging
+      this.logger.log(`Received ${schedules?.length || 0} airing schedules from AniList`);
+      if (schedules?.[0]?.media?.title?.native) {
+        const rawTitle = schedules[0].media.title.native;
+        const hex = Buffer.from(rawTitle, 'utf8').toString('hex');
+        this.logger.log(`First episode raw native title hex: ${hex}`);
+      }
+
+      const sanitized = this.sanitizeDeep(schedules);
+
+      // Verify sanitization
+      if (sanitized?.[0]?.media?.title?.native) {
+        const cleanTitle = sanitized[0].media.title.native;
+        const cleanHex = Buffer.from(cleanTitle, 'utf8').toString('hex');
+        this.logger.log(`First episode sanitized native title hex: ${cleanHex}`);
+      }
+
+      return sanitized;
+    } catch (error) {
+      this.logger.error('Error fetching airing schedule from AniList:', error.message);
+      throw new Error('Failed to connect to AniList API');
+    }
+  }
+
   mapStaffToCreateBusinessDto(anilistStaff: AniListStaff): CreateBusinessDto {
     return {
       denomination: anilistStaff.name.full,
