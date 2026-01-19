@@ -872,27 +872,9 @@ export class AniListService {
         throw new Error('Failed to get airing schedule from AniList');
       }
 
-      // Sanitize the response to remove any null bytes that would cause PostgreSQL errors
       const schedules = response.data.data.Page.airingSchedules;
-
-      // Log raw data for debugging
       this.logger.log(`Received ${schedules?.length || 0} airing schedules from AniList`);
-      if (schedules?.[0]?.media?.title?.native) {
-        const rawTitle = schedules[0].media.title.native;
-        const hex = Buffer.from(rawTitle, 'utf8').toString('hex');
-        this.logger.log(`First episode raw native title hex: ${hex}`);
-      }
-
-      const sanitized = this.sanitizeDeep(schedules);
-
-      // Verify sanitization
-      if (sanitized?.[0]?.media?.title?.native) {
-        const cleanTitle = sanitized[0].media.title.native;
-        const cleanHex = Buffer.from(cleanTitle, 'utf8').toString('hex');
-        this.logger.log(`First episode sanitized native title hex: ${cleanHex}`);
-      }
-
-      return sanitized;
+      return schedules || [];
     } catch (error) {
       this.logger.error('Error fetching airing schedule from AniList:', error.message);
       throw new Error('Failed to connect to AniList API');

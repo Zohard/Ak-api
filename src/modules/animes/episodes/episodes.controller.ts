@@ -1,6 +1,7 @@
-import { Controller, Get, Post, Param, ParseIntPipe, UseGuards, NotFoundException } from '@nestjs/common';
+import { Controller, Get, Post, Param, ParseIntPipe, UseGuards, NotFoundException, forwardRef, Inject } from '@nestjs/common';
 import { EpisodesService } from './episodes.service';
 import { AniListService } from '../../anilist/anilist.service';
+import { JikanService } from '../../jikan/jikan.service';
 import { PrismaService } from '../../../shared/services/prisma.service';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { AdminGuard } from '../../../common/guards/admin.guard';
@@ -11,6 +12,8 @@ export class EpisodesController {
         private readonly episodesService: EpisodesService,
         private readonly anilistService: AniListService,
         private readonly prisma: PrismaService,
+        @Inject(forwardRef(() => JikanService))
+        private readonly jikanService: JikanService,
     ) { }
 
     @Get(':id/episodes')
@@ -61,13 +64,43 @@ export class EpisodesController {
         }
 
         // 2. Fetch schedule from AniList
-        // We fetch a wide range or just future? Let's fetch next 50 episodes or similar.
-        // Actually getAiringSchedule allows optional start/end.
-        // If we want "all known schedule", we can just pass anilistId.
-        const schedule = await this.anilistService.getAiringSchedule(anilistId);
+        let episodesData = await this.anilistService.getAiringSchedule(anilistId);
 
-        // 3. Sync to DB
-        const result = await this.episodesService.syncEpisodes(id, schedule);
+        // 3. Fallback to Jikan (MyAnimeList) if AniList returns empty (common for finished anime)
+        if (!episodesData || episodesData.length === 0) {
+            console.log('AniList schedule is empty. switch to Jikan fallback...');
+            const aniListAnime = await this.anilistService.getAnimeById(anilistId);
+
+            if (aniListAnime && aniListAnime.idMal) {
+                console.log(`Found MAL ID: ${aniListAnime.idMal}. Fetching episodes from Jikan...`);
+                // Use getEpisodes instead of getAnimeEpisodes for consistency with service method name
+                const jikanEpisodes = await this.jikanService.getEpisodes(aniListAnime.idMal);
+
+                if (jikanEpisodes && jikanEpisodes.length > 0) {
+                    console.log(`Fetched ${jikanEpisodes.length} episodes from Jikan.`);
+                    // Map Jikan episodes to matches AniList structure expected by EpisodesService
+                    episodesData = jikanEpisodes.map(ep => ({
+                        episode: ep.mal_id,
+                        media: {
+                            title: {
+                                romaji: ep.title_romanji || ep.title,
+                                english: ep.title_english || ep.title,
+                                native: ep.title_japanese
+                            },
+                            coverImage: {
+                                large: null
+                            }
+                        },
+                        airingAt: ep.aired ? new Date(ep.aired).getTime() / 1000 : 0, // Convert to unix timestamp
+                    }));
+                }
+            } else {
+                console.log('No MAL ID found for this anime.');
+            }
+        }
+
+        // 4. Sync to DB
+        const result = await this.episodesService.syncEpisodes(id, episodesData || []);
 
         return { success: true, count: result.length, episodes: result };
     }

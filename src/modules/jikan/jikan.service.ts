@@ -178,6 +178,47 @@ export class JikanService {
   }
 
   /**
+   * Get episodes by MAL ID
+   * Automatically handles pagination to fetch all episodes
+   */
+  async getEpisodes(malId: number): Promise<any[]> {
+    try {
+      let page = 1;
+      let hasNextPage = true;
+      const allEpisodes: any[] = [];
+
+      while (hasNextPage) {
+        await this.rateLimit();
+
+        const response = await this.httpClient.get(`/anime/${malId}/episodes`, {
+          params: { page }
+        });
+
+        if (!response.data || !response.data.data) {
+          break;
+        }
+
+        allEpisodes.push(...response.data.data);
+
+        hasNextPage = response.data.pagination?.has_next_page || false;
+        page++;
+
+        // Safety break
+        if (page > 20) break;
+      }
+
+      return allEpisodes;
+    } catch (error: any) {
+      if (error.response?.status === 404) {
+        this.logger.warn(`Episodes not found for MAL ID ${malId}`);
+        return [];
+      }
+      this.logger.error(`Error fetching episodes from Jikan (MAL ID: ${malId}):`, error.message);
+      return [];
+    }
+  }
+
+  /**
    * Get the best quality image URL from a Jikan anime
    */
   getBestImageUrl(anime: JikanAnime): string {

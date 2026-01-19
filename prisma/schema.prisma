@@ -236,13 +236,13 @@ model AkAnimesEpisode {
   idAnime      Int       @map("id_anime")
   numero       Int
   titreOriginal String?   @map("titre_original") @db.Text
-  titreJp      String    @map("titre_jp") @db.Text // NOT NULL as per request
+  titreJp      String    @map("titre_jp") @db.Text
   titreFr      String?   @map("titre_fr") @db.Text
   titreEn      String?   @map("titre_en") @db.Text
   image        String?   @db.VarChar(500)
-  dateDiffusion DateTime? @map("date_diffusion") @db.Timestamptz
+  dateDiffusion String?   @map("date_diffusion") @db.VarChar(10)
   duration     Int?
-  dateAjout    DateTime? @default(now()) @map("date_ajout") @db.Timestamptz
+  dateAjout    DateTime? @default(now()) @map("date_ajout") @db.Date
 
   // Relations
   anime        AkAnime   @relation(fields: [idAnime], references: [idAnime], onDelete: Cascade)
