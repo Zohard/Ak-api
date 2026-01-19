@@ -16,11 +16,11 @@ import { AnimeCacheService } from './services/anime-cache.service';
 import { AnimeImageService } from './services/anime-image.service';
 
 import { EpisodesService } from './episodes/episodes.service';
-import { EpisodesController } from './episodes/episodes.controller';
+import { EpisodesController, EpisodesScheduleController } from './episodes/episodes.controller';
 
 @Module({
   imports: [MediaModule, AniListModule, JikanModule, AdminLoggingModule],
-  controllers: [AnimesController, EpisodesController],
+  controllers: [AnimesController, EpisodesController, EpisodesScheduleController],
   providers: [
     AnimesService,
     PrismaService,

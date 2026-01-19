@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../../shared/services/prisma.service';
+import { CacheService } from '../../../shared/services/cache.service';
 import { AniListService } from '../../anilist/anilist.service';
 import { JikanService } from '../../jikan/jikan.service';
 import { Inject, forwardRef, NotFoundException } from '@nestjs/common';
@@ -8,8 +9,13 @@ import { Inject, forwardRef, NotFoundException } from '@nestjs/common';
 export class EpisodesService {
     private readonly logger = new Logger(EpisodesService.name);
 
+    // Cache TTLs
+    private readonly SCHEDULE_CACHE_TTL = 1800; // 30 minutes
+    private readonly SEASON_SCHEDULE_CACHE_TTL = 3600; // 1 hour
+
     constructor(
         private readonly prisma: PrismaService,
+        private readonly cacheService: CacheService,
         @Inject(forwardRef(() => AniListService))
         private readonly anilistService: AniListService,
         @Inject(forwardRef(() => JikanService))
@@ -185,5 +191,220 @@ export class EpisodesService {
 
         // 4. Sync to DB
         return this.syncEpisodes(id, episodesData || []);
+    }
+
+    private async getAnimeIdsForSeason(seasonId: number): Promise<number[]> {
+        const season = await this.prisma.akAnimesSaisons.findUnique({
+            where: { idSaison: seasonId },
+            select: { jsonData: true },
+        });
+
+        if (!season?.jsonData) return [];
+
+        try {
+            const jsonData = typeof season.jsonData === 'string'
+                ? JSON.parse(season.jsonData)
+                : season.jsonData;
+
+            if (Array.isArray(jsonData)) {
+                return jsonData;
+            } else if (jsonData.animes && Array.isArray(jsonData.animes)) {
+                return jsonData.animes;
+            } else if (jsonData.anime_ids && Array.isArray(jsonData.anime_ids)) {
+                return jsonData.anime_ids;
+            }
+        } catch (e) {
+            this.logger.error(`Error parsing season json_data: ${e.message}`);
+        }
+
+        return [];
+    }
+
+    async getWeeklySchedule(seasonId?: number, weekStart?: Date) {
+        // Default to current week (Monday)
+        const now = weekStart || new Date();
+        const monday = new Date(now);
+        monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7));
+        monday.setHours(0, 0, 0, 0);
+
+        const sunday = new Date(monday);
+        sunday.setDate(sunday.getDate() + 6);
+        sunday.setHours(23, 59, 59, 999);
+
+        const mondayStr = monday.toISOString().split('T')[0];
+        const sundayStr = sunday.toISOString().split('T')[0];
+
+        // Check cache first
+        const cacheKey = `episodes_schedule:${seasonId || 'all'}:${mondayStr}`;
+        const cached = await this.cacheService.get(cacheKey);
+        if (cached) {
+            return cached;
+        }
+
+        // Build base query
+        let whereClause: any = {
+            dateDiffusion: {
+                gte: mondayStr,
+                lte: sundayStr,
+            },
+        };
+
+        // If seasonId provided, filter by animes in that season
+        if (seasonId) {
+            const animeIds = await this.getAnimeIdsForSeason(seasonId);
+            if (animeIds.length === 0) {
+                const emptyResult = {
+                    weekStart: mondayStr,
+                    weekEnd: sundayStr,
+                    schedule: { monday: [], tuesday: [], wednesday: [], thursday: [], friday: [], saturday: [], sunday: [] },
+                    totalEpisodes: 0,
+                };
+                await this.cacheService.set(cacheKey, emptyResult, this.SCHEDULE_CACHE_TTL);
+                return emptyResult;
+            }
+            whereClause.idAnime = { in: animeIds };
+        }
+
+        const episodes = await this.prisma.akAnimesEpisode.findMany({
+            where: whereClause,
+            include: {
+                anime: {
+                    select: {
+                        idAnime: true,
+                        titre: true,
+                        image: true,
+                        niceUrl: true,
+                    },
+                },
+            },
+            orderBy: [
+                { dateDiffusion: 'asc' },
+                { numero: 'asc' },
+            ],
+        });
+
+        // Group by day of week
+        const schedule: Record<string, any[]> = {
+            monday: [],
+            tuesday: [],
+            wednesday: [],
+            thursday: [],
+            friday: [],
+            saturday: [],
+            sunday: [],
+        };
+
+        const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+
+        for (const ep of episodes) {
+            if (ep.dateDiffusion) {
+                const date = new Date(ep.dateDiffusion);
+                const dayName = dayNames[date.getDay()];
+                schedule[dayName].push({
+                    id: ep.idEpisode,
+                    numero: ep.numero,
+                    titreJp: ep.titreJp,
+                    titreEn: ep.titreEn,
+                    image: ep.image,
+                    dateDiffusion: ep.dateDiffusion,
+                    anime: ep.anime,
+                });
+            }
+        }
+
+        const result = {
+            weekStart: mondayStr,
+            weekEnd: sundayStr,
+            schedule,
+            totalEpisodes: episodes.length,
+        };
+
+        // Cache the result
+        await this.cacheService.set(cacheKey, result, this.SCHEDULE_CACHE_TTL);
+        return result;
+    }
+
+    async getSeasonEpisodesSchedule(seasonId: number) {
+        // Check cache first
+        const cacheKey = `season_episodes_schedule:${seasonId}`;
+        const cached = await this.cacheService.get(cacheKey);
+        if (cached) {
+            return cached;
+        }
+
+        // Get all animes in this season from JSON data
+        const animeIds = await this.getAnimeIdsForSeason(seasonId);
+
+        if (animeIds.length === 0) {
+            const emptyResult = { episodes: [], animes: [], dateRange: { start: '', end: '' }, totalAnimes: 0, totalEpisodes: 0 };
+            await this.cacheService.set(cacheKey, emptyResult, this.SEASON_SCHEDULE_CACHE_TTL);
+            return emptyResult;
+        }
+
+        // Get all episodes for these animes with future dates
+        const episodes = await this.prisma.akAnimesEpisode.findMany({
+            where: {
+                idAnime: { in: animeIds },
+                dateDiffusion: { not: null },
+            },
+            include: {
+                anime: {
+                    select: {
+                        idAnime: true,
+                        titre: true,
+                        image: true,
+                        niceUrl: true,
+                    },
+                },
+            },
+            orderBy: [
+                { dateDiffusion: 'asc' },
+                { numero: 'asc' },
+            ],
+        });
+
+        // Get min and max dates for the calendar range
+        const dates = episodes
+            .map(ep => ep.dateDiffusion)
+            .filter(Boolean)
+            .map(d => new Date(d as string).getTime());
+
+        const minDate = dates.length ? new Date(Math.min(...dates)) : new Date();
+        const maxDate = dates.length ? new Date(Math.max(...dates)) : new Date();
+
+        const result = {
+            episodes: episodes.map(ep => ({
+                id: ep.idEpisode,
+                numero: ep.numero,
+                titreJp: ep.titreJp,
+                titreEn: ep.titreEn,
+                image: ep.image,
+                dateDiffusion: ep.dateDiffusion,
+                anime: ep.anime,
+            })),
+            dateRange: {
+                start: minDate.toISOString().split('T')[0],
+                end: maxDate.toISOString().split('T')[0],
+            },
+            totalAnimes: animeIds.length,
+            totalEpisodes: episodes.length,
+        };
+
+        // Cache the result
+        await this.cacheService.set(cacheKey, result, this.SEASON_SCHEDULE_CACHE_TTL);
+        return result;
+    }
+
+    // Method to clear schedule caches (for admin)
+    async clearScheduleCaches(seasonId?: number) {
+        if (seasonId) {
+            // Clear specific season caches
+            await this.cacheService.delByPattern(`episodes_schedule:${seasonId}:*`);
+            await this.cacheService.del(`season_episodes_schedule:${seasonId}`);
+        } else {
+            // Clear all schedule caches
+            await this.cacheService.delByPattern('episodes_schedule:*');
+            await this.cacheService.delByPattern('season_episodes_schedule:*');
+        }
     }
 }
