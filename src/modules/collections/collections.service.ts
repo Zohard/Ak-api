@@ -887,6 +887,45 @@ export class CollectionsService {
     });
   }
 
+  async checkBulkInCollection(userId: number, mediaType: 'anime' | 'manga', mediaIds: number[]) {
+    if (!mediaIds.length) {
+      return { foundIds: [] };
+    }
+
+    this.logger.debug(`🔍 [checkBulkInCollection] userId: ${userId}, mediaType: ${mediaType}, ids: ${mediaIds.length}`);
+
+    // Direct DB query for efficiency
+    let foundIds: number[] = [];
+
+    await this.prisma.executeWithRetry(async () => {
+      if (mediaType === 'anime') {
+        const results = await this.prisma.collectionAnime.findMany({
+          where: {
+            idMembre: userId,
+            idAnime: { in: mediaIds }
+          },
+          select: { idAnime: true }
+        });
+        foundIds = results.map(r => r.idAnime);
+      } else if (mediaType === 'manga') {
+        const results = await this.prisma.collectionManga.findMany({
+          where: {
+            idMembre: userId,
+            idManga: { in: mediaIds }
+          },
+          select: { idManga: true }
+        });
+        foundIds = results.map(r => r.idManga);
+      }
+    });
+
+    return {
+      userId,
+      mediaType,
+      foundIds
+    };
+  }
+
   // Get user info with collection summary (optimized for single user)
   async getUserInfo(userId: number, currentUserId?: number) {
     const isOwnCollection = currentUserId === userId;

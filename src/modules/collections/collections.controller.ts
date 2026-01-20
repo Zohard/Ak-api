@@ -172,6 +172,22 @@ export class CollectionsController {
     );
   }
 
+  @Post('check/bulk')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Vérifier la présence de multiples médias dans les collections' })
+  @ApiResponse({ status: 200, description: 'Statut de présence pour chaque média' })
+  async checkBulkInCollection(
+    @Body() body: { mediaType: 'anime' | 'manga', mediaIds: number[] },
+    @Request() req,
+  ) {
+    return this.collectionsService.checkBulkInCollection(
+      req.user.id,
+      body.mediaType,
+      body.mediaIds,
+    );
+  }
+
   @Get('check-nocache/:mediaType/:mediaId')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
