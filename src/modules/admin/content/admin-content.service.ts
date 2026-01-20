@@ -456,27 +456,53 @@ export class AdminContentService {
         id,
       );
 
-      // Fetch tags for each related item (only for anime/manga)
-      const relationshipsWithTags = await Promise.all(
-        relationships.map(async (rel) => {
-          if (rel.related_type === 'anime' || rel.related_type === 'manga') {
-            try {
-              const tags = await this.prisma.$queryRawUnsafe<any[]>(
-                `SELECT t.id_tag as id, t.tag_name as nom, t.description
-                 FROM ak_tag2fiche tf
-                 JOIN ak_tags t ON tf.id_tag = t.id_tag
-                 WHERE tf.id_fiche = $1 AND tf.type = $2`,
-                rel.related_id,
-                rel.related_type,
-              );
-              return { ...rel, tags: tags || [] };
-            } catch {
-              return { ...rel, tags: [] };
-            }
-          }
-          return { ...rel, tags: [] };
-        }),
-      );
+      // Fetch tags for all related items in bulk (optimization)
+      const animeIds = relationships
+        .filter((r) => r.related_type === 'anime')
+        .map((r) => r.related_id);
+      const mangaIds = relationships
+        .filter((r) => r.related_type === 'manga')
+        .map((r) => r.related_id);
+
+      let animeTags: any[] = [];
+      let mangaTags: any[] = [];
+
+      if (animeIds.length > 0) {
+        animeTags = await this.prisma.$queryRawUnsafe<any[]>(
+          `SELECT tf.id_fiche, tf.type, t.id_tag as id, t.tag_name as nom, t.description
+           FROM ak_tag2fiche tf
+           JOIN ak_tags t ON tf.id_tag = t.id_tag
+           WHERE tf.type = 'anime' AND tf.id_fiche IN (${animeIds.join(',')})`
+        );
+      }
+
+      if (mangaIds.length > 0) {
+        mangaTags = await this.prisma.$queryRawUnsafe<any[]>(
+          `SELECT tf.id_fiche, tf.type, t.id_tag as id, t.tag_name as nom, t.description
+           FROM ak_tag2fiche tf
+           JOIN ak_tags t ON tf.id_tag = t.id_tag
+           WHERE tf.type = 'manga' AND tf.id_fiche IN (${mangaIds.join(',')})`
+        );
+      }
+
+      // Map tags to relationships
+      const tagsMap = new Map<string, any[]>();
+
+      [...animeTags, ...mangaTags].forEach(tag => {
+        const key = `${tag.type}-${tag.id_fiche}`;
+        if (!tagsMap.has(key)) {
+          tagsMap.set(key, []);
+        }
+        tagsMap.get(key).push({ id: tag.id, nom: tag.nom, description: tag.description });
+      });
+
+      const relationshipsWithTags = relationships.map((rel) => {
+        const key = `${rel.related_type}-${rel.related_id}`;
+        return {
+          ...rel,
+          tags: tagsMap.get(key) || []
+        };
+      });
 
       return relationshipsWithTags;
     } catch (error) {
