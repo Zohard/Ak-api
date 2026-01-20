@@ -561,6 +561,7 @@ export class AnimesService extends BaseContentService<
 
     const formattedAnime = {
       ...this.formatAnime(anime, season, tags),
+      businessRelations: anime.businessRelations,
       articlesCount,
       collectionScore,
       collectionEvaluationsCount,
