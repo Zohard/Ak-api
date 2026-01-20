@@ -309,8 +309,9 @@ export class EpisodesService {
 
         for (const ep of episodes) {
             if (ep.dateDiffusion) {
-                const date = new Date(ep.dateDiffusion);
-                const dayName = dayNames[date.getDay()];
+                // Parse date as noon UTC to avoid timezone day-shift issues
+                const date = new Date(ep.dateDiffusion + 'T12:00:00Z');
+                const dayName = dayNames[date.getUTCDay()];
                 schedule[dayName].push({
                     id: ep.idEpisode,
                     numero: ep.numero,
