@@ -10,8 +10,8 @@ export class EpisodesService {
     private readonly logger = new Logger(EpisodesService.name);
 
     // Cache TTLs
-    private readonly SCHEDULE_CACHE_TTL = 1800; // 30 minutes
-    private readonly SEASON_SCHEDULE_CACHE_TTL = 3600; // 1 hour
+    private readonly SCHEDULE_CACHE_TTL = 21600; // 6 hours
+    private readonly SEASON_SCHEDULE_CACHE_TTL = 21600; // 6 hours
 
     constructor(
         private readonly prisma: PrismaService,
@@ -45,8 +45,8 @@ export class EpisodesService {
     async syncEpisodes(animeId: number, episodesData: any[]) {
         this.logger.log(`Syncing ${episodesData.length} episodes for anime ${animeId}`);
 
-        return this.prisma.$transaction(async (tx) => {
-            const results = [];
+        const results = await this.prisma.$transaction(async (tx) => {
+            const txResults = [];
 
             for (const ep of episodesData) {
                 // Simple null byte removal - no complex buffer operations
@@ -81,7 +81,7 @@ export class EpisodesService {
                             image: image || undefined,
                         },
                     });
-                    results.push(updated);
+                    txResults.push(updated);
                 } else {
                     const created = await tx.akAnimesEpisode.create({
                         data: {
@@ -97,13 +97,24 @@ export class EpisodesService {
                             dateAjout: new Date(),
                         },
                     });
-                    results.push(created);
+                    txResults.push(created);
                 }
             }
 
-            return results;
+            return txResults;
         });
+
+        // Clear schedule caches after sync
+        if (results.length > 0) {
+            this.logger.log(`Clearing schedule caches after syncing ${results.length} episodes for anime ${animeId}`);
+            // Clear all schedule caches since episodes changed (we don't know which weeks/seasons are affected)
+            await this.cacheService.delByPattern('episodes_schedule:*');
+            await this.cacheService.delByPattern('season_episodes_schedule:*');
+        }
+
+        return results;
     }
+
     async fetchAndSyncEpisodes(id: number, force: boolean = false) {
         // 0. Check if episodes already exist to avoid unnecessary API calls
         if (!force) {
