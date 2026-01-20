@@ -332,23 +332,33 @@ export class AnimeRelationsService {
     try {
       // Query to find the season where this anime ID is in the json_data
       const seasons = await this.prisma.$queryRaw<Array<{
-        id: number;
-        season: string;
-        year: number;
+        id_saison: number;
+        saison: number;
+        annee: number;
         json_data: string;
       }>>`
-        SELECT id, season, year, json_data
-        FROM ak_seasons
+        SELECT id_saison, saison, annee, json_data
+        FROM ak_animes_saisons
         WHERE json_data::text LIKE ${`%"animes":%${id}%`}
         LIMIT 1
       `;
 
       if (seasons && seasons.length > 0) {
         const season = seasons[0];
+        // Map numeric season to string
+        const seasonNames = {
+          1: 'Hiver',
+          2: 'Printemps',
+          3: 'Ete',
+          4: 'Automne'
+        };
+
+        const seasonName = seasonNames[season.saison] || 'Hiver';
+
         return {
-          id: season.id,
-          season: season.season,
-          year: season.year,
+          id: season.id_saison,
+          season: seasonName,
+          year: season.annee,
         };
       }
 

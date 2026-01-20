@@ -32,10 +32,12 @@ export class EpisodesScheduleController {
     async getWeeklySchedule(
         @Query('seasonId') seasonId?: string,
         @Query('week') week?: string, // ISO date string for the week start (Monday)
+        @Query('skipCache') skipCache?: string, // Add this to force fresh data
     ) {
         return this.episodesService.getWeeklySchedule(
             seasonId ? parseInt(seasonId) : undefined,
             week ? new Date(week) : undefined,
+            skipCache === 'true',
         );
     }
 

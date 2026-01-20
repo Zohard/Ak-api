@@ -231,7 +231,7 @@ export class EpisodesService {
         return [];
     }
 
-    async getWeeklySchedule(seasonId?: number, weekStart?: Date) {
+    async getWeeklySchedule(seasonId?: number, weekStart?: Date, skipCache: boolean = false) {
         // Default to current week (Monday)
         const now = weekStart || new Date();
         const monday = new Date(now);
@@ -245,11 +245,13 @@ export class EpisodesService {
         const mondayStr = monday.toISOString().split('T')[0];
         const sundayStr = sunday.toISOString().split('T')[0];
 
-        // Check cache first
+        // Check cache first (unless skipCache is true)
         const cacheKey = `episodes_schedule:${seasonId || 'all'}:${mondayStr}`;
-        const cached = await this.cacheService.get(cacheKey);
-        if (cached) {
-            return cached;
+        if (!skipCache) {
+            const cached = await this.cacheService.get(cacheKey);
+            if (cached) {
+                return cached;
+            }
         }
 
         // Build base query
