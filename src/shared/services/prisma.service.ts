@@ -29,10 +29,10 @@ export class PrismaService
           if (!params.has('pgbouncer')) params.set('pgbouncer', 'true');
           // Optimize connections for serverless - VERY conservative for Neon
           if (!params.has('connection_limit')) params.set('connection_limit', '5');
-          // Reduce pool wait time for faster failures
-          if (!params.has('pool_timeout')) params.set('pool_timeout', '5');
-          // Add connect timeout for faster failures
-          if (!params.has('connect_timeout')) params.set('connect_timeout', '10');
+          // Pool timeout - longer for Neon cold starts
+          if (!params.has('pool_timeout')) params.set('pool_timeout', '30');
+          // Add connect timeout - longer for Neon cold starts (can take 5-10s)
+          if (!params.has('connect_timeout')) params.set('connect_timeout', '30');
 
           u.search = params.toString();
           effectiveUrl = u.toString();
@@ -74,21 +74,30 @@ export class PrismaService
           level: 'warn',
         },
       ],
-      // Optimize for Supabase connection pooling
+      // Optimize for Neon/Supabase - longer timeout for cold starts
       transactionOptions: {
-        timeout: 10000, // 10 seconds
+        timeout: 30000, // 30 seconds for cold start scenarios
       },
     });
   }
 
   async onModuleInit() {
-    // Add retry logic for initial connection
-    let retries = 3;
+    // Add retry logic for initial connection - more retries for Neon cold starts
+    const maxRetries = 5;
+    let retries = maxRetries;
+
     while (retries > 0) {
       try {
+        const startTime = Date.now();
         await this.$connect();
-        this.logger.log('Database connected successfully');
-        
+        const duration = Date.now() - startTime;
+
+        this.logger.log(`Database connected successfully in ${duration}ms`);
+
+        if (duration > 3000) {
+          this.logger.warn(`Database was cold - connection took ${duration}ms`);
+        }
+
         // Set up query logging
         this.$on('query', (e: Prisma.QueryEvent) => {
           this.logger.debug(`Query: ${e.query} - Duration: ${e.duration}ms`);
@@ -105,14 +114,18 @@ export class PrismaService
         break;
       } catch (error) {
         retries--;
-        this.logger.error(`Database connection failed. Retries left: ${retries}`, error.message);
-        
+        const attempt = maxRetries - retries;
+        this.logger.error(`Database connection failed (attempt ${attempt}/${maxRetries}): ${error.message}`);
+
         if (retries === 0) {
+          this.logger.error('All database connection attempts failed');
           throw error;
         }
-        
-        // Wait before retry
-        await new Promise(resolve => setTimeout(resolve, 2000));
+
+        // Exponential backoff: 2s, 4s, 8s, 16s
+        const delay = Math.pow(2, attempt) * 1000;
+        this.logger.log(`Retrying in ${delay}ms...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
       }
     }
   }

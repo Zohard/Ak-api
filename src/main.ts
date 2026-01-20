@@ -8,6 +8,7 @@ import { join } from 'path';
 import { setupSwagger } from './config/swagger.config';
 import * as Sentry from '@sentry/nestjs';
 import { Logger } from 'nestjs-pino';
+import { DatabaseRetryInterceptor } from './common/interceptors/database-retry.interceptor';
 
 async function bootstrap() {
   // Initialize Sentry for error tracking and performance monitoring
@@ -51,6 +52,9 @@ async function bootstrap() {
 
   // Use Pino logger for structured logging (Railway-friendly)
   app.useLogger(app.get(Logger));
+
+  // Global database retry interceptor for Neon cold start handling
+  app.useGlobalInterceptors(new DatabaseRetryInterceptor());
 
   // Global validation pipe
   app.useGlobalPipes(

@@ -14,12 +14,13 @@ export class HealthService {
   /**
    * Check database connectivity with timeout
    * Returns false instead of throwing to avoid 500 errors
+   * Increased timeout to handle Neon cold starts
    */
   async checkDatabase(): Promise<boolean> {
     try {
-      // Use a simple query with a timeout
+      // Use a simple query with a longer timeout for cold starts
       const timeout = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('Database health check timeout')), 3000)
+        setTimeout(() => reject(new Error('Database health check timeout')), 15000)
       );
 
       const check = this.prisma.$queryRaw`SELECT 1 as health`;
@@ -50,18 +51,49 @@ export class HealthService {
 
   /**
    * Warmup function to prevent cold starts
-   * Performs minimal operations to keep the function warm
-   * Does NOT perform heavy database queries
+   * Warms up both cache and database connection
    */
-  async warmup(): Promise<void> {
-    try {
-      // Just touch the cache service without DB queries
-      await this.cacheService.get('warmup:ping');
+  async warmup(): Promise<{ database: boolean; cache: boolean; duration: number }> {
+    const startTime = Date.now();
+    let dbSuccess = false;
+    let cacheSuccess = false;
 
-      this.logger.log('Service warmed up successfully');
+    // Warm up database (important for Neon cold starts)
+    try {
+      await this.prisma.$queryRaw`SELECT 1 as warmup`;
+      dbSuccess = true;
+      this.logger.log('Database warmed up');
     } catch (error) {
-      this.logger.error('Warmup failed:', error.message);
-      // Don't throw - warmup failures shouldn't break the endpoint
+      this.logger.error('Database warmup failed:', error.message);
+
+      // Try to reconnect
+      try {
+        await this.prisma.$disconnect();
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        await this.prisma.$connect();
+        await this.prisma.$queryRaw`SELECT 1 as warmup_retry`;
+        dbSuccess = true;
+        this.logger.log('Database warmed up after reconnect');
+      } catch (retryError) {
+        this.logger.error('Database warmup retry failed:', retryError.message);
+      }
     }
+
+    // Warm up cache
+    try {
+      await this.cacheService.set('warmup:ping', 'ok', 60);
+      await this.cacheService.get('warmup:ping');
+      cacheSuccess = true;
+      this.logger.log('Cache warmed up');
+    } catch (error) {
+      this.logger.warn('Cache warmup failed:', error.message);
+      // Cache failures are not critical
+      cacheSuccess = true;
+    }
+
+    const duration = Date.now() - startTime;
+    this.logger.log(`Warmup completed in ${duration}ms (db: ${dbSuccess}, cache: ${cacheSuccess})`);
+
+    return { database: dbSuccess, cache: cacheSuccess, duration };
   }
 }

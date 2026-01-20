@@ -55,18 +55,25 @@ export class HealthController {
 
   /**
    * Warmup endpoint for cold start prevention
-   * Preloads minimal cache without heavy DB queries
+   * Warms up both database and cache connections
    */
   @Get('warmup')
   @ApiOperation({ summary: 'Warmup endpoint for cold start prevention' })
   @ApiResponse({ status: 200, description: 'Service warmed up' })
   async warmup() {
-    await this.healthService.warmup();
+    const result = await this.healthService.warmup();
 
     return {
-      status: 'warmed',
+      status: result.database ? 'warmed' : 'partial',
       timestamp: new Date().toISOString(),
-      message: 'Service warmed up successfully',
+      duration: result.duration,
+      checks: {
+        database: result.database ? 'warmed' : 'failed',
+        cache: result.cache ? 'warmed' : 'failed',
+      },
+      message: result.database
+        ? 'Service warmed up successfully'
+        : 'Partial warmup - database connection failed',
     };
   }
 }

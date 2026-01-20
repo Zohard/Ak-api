@@ -42,6 +42,7 @@ import { CronModule } from './modules/cron/cron.module';
 import { PrismaService } from './shared/services/prisma.service';
 import { CacheService } from './shared/services/cache.service';
 import { ActivityTrackerService } from './shared/services/activity-tracker.service';
+import { DatabaseWarmupService } from './shared/services/database-warmup.service';
 import { ActivityTrackerMiddleware } from './common/middleware/activity-tracker.middleware';
 import databaseConfig from './config/database.config';
 import jwtConfig from './config/jwt.config';
@@ -123,7 +124,7 @@ import jwtConfig from './config/jwt.config';
     CronModule,
   ],
   controllers: [AppController],
-  providers: [AppService, PrismaService, CacheService, ActivityTrackerService],
+  providers: [AppService, PrismaService, CacheService, ActivityTrackerService, DatabaseWarmupService],
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
