@@ -128,7 +128,7 @@ export class EpisodesService {
         // 1. Get anime to find AniList ID (usually stored in commentaire for now, based on previous files)
         const anime = await this.prisma.akAnime.findUnique({
             where: { idAnime: id },
-            select: { commentaire: true, sources: true },
+            select: { commentaire: true, sources: true, nbEp: true },
         });
 
         if (!anime) throw new NotFoundException('Anime not found');
@@ -197,6 +197,19 @@ export class EpisodesService {
                 }
             } else {
                 this.logger.log('No MAL ID found for this anime.');
+            }
+        }
+
+        // 3.5. Update nb_ep if empty
+        if (episodesData && episodesData.length > 0 && (!anime.nbEp || anime.nbEp === 0)) {
+            try {
+                this.logger.log(`Updating anime ${id} nbEp to ${episodesData.length} (was empty)`);
+                await this.prisma.akAnime.update({
+                    where: { idAnime: id },
+                    data: { nbEp: episodesData.length },
+                });
+            } catch (e) {
+                this.logger.warn(`Failed to update nbEp for anime ${id}: ${e.message}`);
             }
         }
 
