@@ -33,11 +33,6 @@ async function bootstrap() {
         return event;
       },
     });
-    const logger = new NestLogger('Sentry');
-    logger.log(`Sentry initialized for environment: ${process.env.NODE_ENV || 'development'}`);
-  } else {
-    console.warn('⚠️  SENTRY_DSN not configured - error tracking disabled');
-    console.warn('   Add SENTRY_DSN to your .env file or Railway environment variables');
   }
 
   // Fix BigInt serialization globally
@@ -80,9 +75,7 @@ async function bootstrap() {
     configService.get('AI_ORCHESTRATOR_URL'), // Production AI orchestrator
   ].filter(Boolean);
 
-  // Log CORS origins for debugging
   const logger = new NestLogger('Bootstrap');
-  logger.log(`CORS Origins: ${JSON.stringify(corsOrigins)}`);
 
   app.enableCors({
     origin: corsOrigins.length > 3 ? corsOrigins : true, // Fallback to allow all if env vars missing
@@ -112,9 +105,6 @@ async function bootstrap() {
   setupSwagger(app);
 
   const port = process.env.PORT || configService.get('PORT') || 3003;
-  logger.log(`🔌 PORT from env: ${process.env.PORT}`);
-  logger.log(`🔌 PORT from config: ${configService.get('PORT')}`);
-  logger.log(`🔌 Using PORT: ${port}`);
   await app.listen(port, '0.0.0.0');
 
   // Graceful shutdown handling
@@ -130,15 +120,7 @@ async function bootstrap() {
     process.exit(0);
   });
 
-  logger.log(
-    `🚀 Anime-Kun NestJS API v3.0 running on http://localhost:${port}`,
-  );
-  logger.log(`📊 Health check at http://localhost:${port}/api`);
-  logger.log(`📚 API documentation at http://localhost:${port}/docs`);
-  logger.log(`💾 Database: PostgreSQL with Prisma`);
-  logger.log(
-    `🌍 Environment: ${configService.get('NODE_ENV') || 'development'}`,
-  );
+  logger.log(`API running on port ${port} (${configService.get('NODE_ENV') || 'development'})`);
 }
 
 bootstrap();

@@ -72,9 +72,6 @@ export class DeepLService {
       const data: DeepLTranslationResponse = await response.json();
 
       if (data.translations && data.translations.length > 0) {
-        this.logger.log(
-          `Translated text from ${data.translations[0].detected_source_language} to ${targetLang}`,
-        );
         return data.translations[0].text;
       }
 

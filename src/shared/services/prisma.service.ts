@@ -50,33 +50,27 @@ export class PrismaService
       );
     }
 
+    // Only log errors and warnings in production, add query logging in dev
+    const isProduction = process.env.NODE_ENV === 'production';
+
     super({
       datasources: {
         db: {
           url: effectiveUrl,
         },
       },
-      log: [
-        {
-          emit: 'event',
-          level: 'query',
-        },
-        {
-          emit: 'event', 
-          level: 'error',
-        },
-        {
-          emit: 'event',
-          level: 'info',
-        },
-        {
-          emit: 'event',
-          level: 'warn',
-        },
-      ],
-      // Transaction timeout
+      log: isProduction
+        ? [
+            { emit: 'event', level: 'error' },
+            { emit: 'event', level: 'warn' },
+          ]
+        : [
+            { emit: 'event', level: 'query' },
+            { emit: 'event', level: 'error' },
+            { emit: 'event', level: 'warn' },
+          ],
       transactionOptions: {
-        timeout: 15000, // 15 seconds
+        timeout: 15000,
       },
     });
   }
@@ -89,12 +83,13 @@ export class PrismaService
     while (retries > 0) {
       try {
         await this.$connect();
-        this.logger.log('Database connected successfully');
 
-        // Set up query logging
-        this.$on('query', (e: Prisma.QueryEvent) => {
-          this.logger.debug(`Query: ${e.query} - Duration: ${e.duration}ms`);
-        });
+        // Only set up query logging in development
+        if (process.env.NODE_ENV !== 'production') {
+          this.$on('query', (e: Prisma.QueryEvent) => {
+            this.logger.debug(`Query: ${e.query} - Duration: ${e.duration}ms`);
+          });
+        }
 
         this.$on('error', (e: Prisma.LogEvent) => {
           this.logger.error(`Database error: ${e.message}`);
@@ -123,14 +118,12 @@ export class PrismaService
 
   async onModuleDestroy() {
     await this.$disconnect();
-    this.logger.log('Database disconnected');
   }
 
   // Override disconnect to handle graceful shutdown
   async disconnect() {
     try {
       await this.$disconnect();
-      this.logger.log('Prisma client disconnected gracefully');
     } catch (error) {
       this.logger.error('Error during Prisma disconnect:', error.message);
     }

@@ -23,8 +23,6 @@ export class SimpleModerationProcessor {
   ) {}
 
   async processJob(jobData: ModerationJobData): Promise<any> {
-    this.logger.log(`Processing job of type: ${jobData.type}`);
-
     try {
       switch (jobData.type) {
         case 'review_submitted':
@@ -39,7 +37,7 @@ export class SimpleModerationProcessor {
           throw new Error(`Unknown job type: ${jobData.type}`);
       }
     } catch (error) {
-      this.logger.error(`Job failed:`, error);
+      this.logger.error(`Moderation job failed:`, error);
       throw error;
     }
   }
@@ -55,63 +53,41 @@ export class SimpleModerationProcessor {
     if (autoModerationResult.action === 'approve') {
       // Auto-approve the review
       await this.prisma.$queryRaw`
-        UPDATE ak_critique 
-        SET statut = 0, 
-            moderated_by = -1, 
+        UPDATE ak_critique
+        SET statut = 0,
+            moderated_by = -1,
             moderated_at = ${Math.floor(Date.now() / 1000)},
             moderation_reason = 'Auto-approved'
         WHERE id = ${reviewId}
       `;
-
-      this.logger.log(`Review ${reviewId} auto-approved`);
     } else if (autoModerationResult.action === 'reject') {
       // Auto-reject the review
       await this.prisma.$queryRaw`
-        UPDATE ak_critique 
-        SET statut = 2, 
-            moderated_by = -1, 
+        UPDATE ak_critique
+        SET statut = 2,
+            moderated_by = -1,
             moderated_at = ${Math.floor(Date.now() / 1000)},
             moderation_reason = ${autoModerationResult.reason}
         WHERE id = ${reviewId}
       `;
-
-      this.logger.log(
-        `Review ${reviewId} auto-rejected: ${autoModerationResult.reason}`,
-      );
-    } else {
-      // Keep in moderation queue
-      this.logger.log(`Review ${reviewId} requires manual moderation`);
     }
   }
 
   private async processContentReported(
     jobData: ModerationJobData,
   ): Promise<void> {
-    const { reportId, contentType, contentId, reason } = jobData.payload;
-    this.logger.log(
-      `Processing content report for ${contentType} ${contentId}`,
-    );
     // Implementation would go here
   }
 
   private async processBulkModeration(
     jobData: ModerationJobData,
   ): Promise<void> {
-    const { action, targetIds, targetType, moderatorId, reason } =
-      jobData.payload;
-    this.logger.log(
-      `Processing bulk ${action} on ${targetIds.length} ${targetType}s`,
-    );
     // Implementation would go here
   }
 
   private async processAutoModeration(
     jobData: ModerationJobData,
   ): Promise<void> {
-    const { contentType, contentId, rules } = jobData.payload;
-    this.logger.log(
-      `Processing auto-moderation for ${contentType} ${contentId}`,
-    );
     // Implementation would go here
   }
 
