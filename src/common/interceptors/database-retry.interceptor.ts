@@ -7,47 +7,24 @@ import {
   HttpException,
   HttpStatus,
 } from '@nestjs/common';
-import { Observable, throwError, timer } from 'rxjs';
-import { catchError, retry, mergeMap } from 'rxjs/operators';
+import { Observable, throwError } from 'rxjs';
+import { catchError } from 'rxjs/operators';
 
 @Injectable()
 export class DatabaseRetryInterceptor implements NestInterceptor {
   private readonly logger = new Logger(DatabaseRetryInterceptor.name);
 
-  // Max retries for database connection errors
-  private readonly MAX_RETRIES = 3;
-
-  // Initial delay between retries (ms)
-  private readonly INITIAL_DELAY = 500;
-
   intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
-    const request = context.switchToHttp().getRequest();
-    const method = request?.method || 'UNKNOWN';
-    const url = request?.url || 'unknown';
-
     return next.handle().pipe(
-      // Retry with exponential backoff on database errors
-      retry({
-        count: this.MAX_RETRIES,
-        delay: (error, retryCount) => {
-          // Only retry on database connection errors
-          if (!this.isDatabaseConnectionError(error)) {
-            return throwError(() => error);
-          }
-
-          const delay = this.INITIAL_DELAY * Math.pow(2, retryCount - 1);
-          this.logger.warn(
-            `Database error on ${method} ${url} (retry ${retryCount}/${this.MAX_RETRIES}, waiting ${delay}ms): ${error.message}`
-          );
-
-          return timer(delay);
-        },
-      }),
-      // Transform unrecoverable database errors into proper HTTP errors
+      // Only catch and transform database connection errors into proper HTTP errors
       catchError(error => {
         if (this.isDatabaseConnectionError(error)) {
+          const request = context.switchToHttp().getRequest();
+          const method = request?.method || 'UNKNOWN';
+          const url = request?.url || 'unknown';
+
           this.logger.error(
-            `Database connection failed after ${this.MAX_RETRIES} retries on ${method} ${url}: ${error.message}`
+            `Database connection error on ${method} ${url}: ${error.message}`
           );
 
           return throwError(
@@ -69,7 +46,7 @@ export class DatabaseRetryInterceptor implements NestInterceptor {
   }
 
   /**
-   * Check if the error is a database connection error that should be retried
+   * Check if the error is a database connection error
    */
   private isDatabaseConnectionError(error: any): boolean {
     if (!error) return false;
@@ -91,24 +68,12 @@ export class DatabaseRetryInterceptor implements NestInterceptor {
       return true;
     }
 
-    // String-based error detection
+    // Only match very specific connection error patterns to avoid false positives
     const connectionErrorPatterns = [
-      'connection',
-      'timeout',
-      'timed out',
-      'econnrefused',
-      'econnreset',
-      'enotfound',
-      'socket hang up',
+      'can\'t reach database',
+      'connection pool timeout',
       'max client connections reached',
-      'too many connections',
-      'connection pool',
-      'fatal',
-      'terminating connection',
-      'server closed the connection',
-      'could not connect',
-      'connection refused',
-      'network',
+      'server closed the connection unexpectedly',
     ];
 
     return connectionErrorPatterns.some(pattern => message.includes(pattern));

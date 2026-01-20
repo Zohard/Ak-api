@@ -18,11 +18,15 @@ export class DatabaseWarmupService implements OnModuleInit, OnModuleDestroy {
   constructor(private readonly prisma: PrismaService) {}
 
   async onModuleInit() {
-    // Warmup database on startup
-    await this.warmupDatabase();
-
     // Start keepalive interval to prevent Neon from sleeping
+    // Note: PrismaService already handles connection retries on startup,
+    // so we don't block here with a warmup - just start the keepalive
     this.startKeepalive();
+
+    // Do a non-blocking warmup in the background
+    this.warmupDatabase().catch(err => {
+      this.logger.warn(`Background warmup failed: ${err.message}`);
+    });
   }
 
   onModuleDestroy() {

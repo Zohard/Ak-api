@@ -29,10 +29,10 @@ export class PrismaService
           if (!params.has('pgbouncer')) params.set('pgbouncer', 'true');
           // Optimize connections for serverless - VERY conservative for Neon
           if (!params.has('connection_limit')) params.set('connection_limit', '5');
-          // Pool timeout - longer for Neon cold starts
-          if (!params.has('pool_timeout')) params.set('pool_timeout', '30');
-          // Add connect timeout - longer for Neon cold starts (can take 5-10s)
-          if (!params.has('connect_timeout')) params.set('connect_timeout', '30');
+          // Pool timeout for Neon
+          if (!params.has('pool_timeout')) params.set('pool_timeout', '15');
+          // Connect timeout for Neon cold starts
+          if (!params.has('connect_timeout')) params.set('connect_timeout', '15');
 
           u.search = params.toString();
           effectiveUrl = u.toString();
@@ -74,29 +74,22 @@ export class PrismaService
           level: 'warn',
         },
       ],
-      // Optimize for Neon/Supabase - longer timeout for cold starts
+      // Transaction timeout
       transactionOptions: {
-        timeout: 30000, // 30 seconds for cold start scenarios
+        timeout: 15000, // 15 seconds
       },
     });
   }
 
   async onModuleInit() {
-    // Add retry logic for initial connection - more retries for Neon cold starts
-    const maxRetries = 5;
+    // Add retry logic for initial connection
+    const maxRetries = 3;
     let retries = maxRetries;
 
     while (retries > 0) {
       try {
-        const startTime = Date.now();
         await this.$connect();
-        const duration = Date.now() - startTime;
-
-        this.logger.log(`Database connected successfully in ${duration}ms`);
-
-        if (duration > 3000) {
-          this.logger.warn(`Database was cold - connection took ${duration}ms`);
-        }
+        this.logger.log('Database connected successfully');
 
         // Set up query logging
         this.$on('query', (e: Prisma.QueryEvent) => {
@@ -122,10 +115,8 @@ export class PrismaService
           throw error;
         }
 
-        // Exponential backoff: 2s, 4s, 8s, 16s
-        const delay = Math.pow(2, attempt) * 1000;
-        this.logger.log(`Retrying in ${delay}ms...`);
-        await new Promise(resolve => setTimeout(resolve, delay));
+        // Wait 2 seconds before retry
+        await new Promise(resolve => setTimeout(resolve, 2000));
       }
     }
   }
