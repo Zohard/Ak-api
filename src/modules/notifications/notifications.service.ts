@@ -47,7 +47,8 @@ export interface NotificationData {
   | 'friend_accepted'
   | 'event_voting_started'
   | 'event_voting_ended'
-  | 'related_content_added';
+  | 'related_content_added'
+  | 'episode_release';
   title: string;
   message: string;
   data?: any;
@@ -468,6 +469,9 @@ export class NotificationsService {
       case 'event_voting_started':
       case 'event_voting_ended':
         return preferences.webEventVoting;
+      case 'episode_release':
+        // Reuse new season anime preference for episode releases
+        return preferences.webNewSeasonAnime;
       default:
         return true;
     }
@@ -500,6 +504,8 @@ export class NotificationsService {
       case 'event_voting_started':
       case 'event_voting_ended':
         return preferences.emailEventVoting;
+      case 'episode_release':
+        return preferences.emailNewSeasonAnime;
       default:
         return false;
     }
@@ -605,6 +611,29 @@ export class NotificationsService {
             </div>
           `,
           text: `Nouvelle saison disponible pour ${data.title}. ${data.message}`,
+        };
+
+      case 'episode_release':
+        return {
+          subject: `${data.title}`,
+          html: `
+            <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden;">
+              <div style="background-color: #3b82f6; padding: 20px; text-align: center;">
+                <h1 style="color: white; margin: 0; font-size: 24px;">▶️ Nouvel Épisode !</h1>
+              </div>
+              <div style="padding: 30px; line-height: 1.6; color: #374151;">
+                <h2 style="margin-top: 0;">Un nouvel épisode est disponible</h2>
+                <p>${data.message}</p>
+                <div style="text-align: center; margin-top: 30px;">
+                  <a href="${baseUrl}/anime/${data.data?.animeSlug || data.data?.animeId}" style="background-color: #3b82f6; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">Voir la fiche</a>
+                </div>
+              </div>
+              <div style="background-color: #f9fafb; padding: 20px; text-align: center; border-top: 1px solid #e5e7eb; font-size: 12px; color: #6b7280;">
+                Vous recevez cet email car vous avez cet anime dans votre collection.
+              </div>
+            </div>
+          `,
+          text: `${data.title}. ${data.message}`,
         };
 
       case 'review_moderated':

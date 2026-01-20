@@ -231,6 +231,26 @@ export class EpisodesService {
         return [];
     }
 
+    async getEpisodesByDate(date: Date) {
+        const dateStr = date.toISOString().split('T')[0];
+
+        return this.prisma.akAnimesEpisode.findMany({
+            where: {
+                dateDiffusion: dateStr,
+            },
+            include: {
+                anime: {
+                    select: {
+                        idAnime: true,
+                        titre: true,
+                        image: true,
+                        niceUrl: true,
+                    }
+                }
+            }
+        });
+    }
+
     async getWeeklySchedule(seasonId?: number, weekStart?: Date, skipCache: boolean = false) {
         // Default to current week (Monday)
         const now = weekStart || new Date();
