@@ -6,14 +6,14 @@ export class DatabaseWarmupService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(DatabaseWarmupService.name);
   private keepaliveInterval: NodeJS.Timeout | null = null;
 
-  // Keepalive interval in ms (4 minutes - Neon sleeps after 5 min of inactivity)
-  private readonly KEEPALIVE_INTERVAL = 4 * 60 * 1000;
+  // Keepalive interval in ms (3 minutes - balance between preventing cold starts and compute usage)
+  private readonly KEEPALIVE_INTERVAL = 3 * 60 * 1000;
 
   // Max retries for warmup
   private readonly MAX_WARMUP_RETRIES = 5;
 
-  // Delay between retries (starts at 1s, increases exponentially)
-  private readonly INITIAL_RETRY_DELAY = 1000;
+  // Delay between retries (starts at 2s for cold start, increases exponentially)
+  private readonly INITIAL_RETRY_DELAY = 2000;
 
   constructor(private readonly prisma: PrismaService) {}
 

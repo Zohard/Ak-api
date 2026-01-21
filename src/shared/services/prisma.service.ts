@@ -23,16 +23,27 @@ export class PrismaService
         // Apply optimizations for any pooler endpoint (Supabase or Neon)
         if (isSupabase && isPooler || u.hostname.includes('neon.tech') && isPooler) {
           const params = u.searchParams;
+
+          // CRITICAL: Remove channel_binding - pgBouncer doesn't support it
+          params.delete('channel_binding');
+
           // Ensure TLS is enabled
-          if (!params.has('sslmode')) params.set('sslmode', 'require');
+          params.set('sslmode', 'require');
           // Tell Prisma we are behind pgBouncer (disables prepared statements)
-          if (!params.has('pgbouncer')) params.set('pgbouncer', 'true');
-          // Optimize connections for serverless - VERY conservative for Neon
-          if (!params.has('connection_limit')) params.set('connection_limit', '5');
-          // Pool timeout for Neon
-          if (!params.has('pool_timeout')) params.set('pool_timeout', '15');
-          // Connect timeout for Neon cold starts
-          if (!params.has('connect_timeout')) params.set('connect_timeout', '15');
+          params.set('pgbouncer', 'true');
+
+          // Force conservative connection limit for serverless (max 5)
+          const currentLimit = parseInt(params.get('connection_limit') || '5', 10);
+          if (currentLimit > 5) {
+            params.set('connection_limit', '5');
+          } else if (!params.has('connection_limit')) {
+            params.set('connection_limit', '5');
+          }
+
+          // Pool timeout - give enough time for cold starts
+          params.set('pool_timeout', '20');
+          // Connect timeout for Neon cold starts (longer for initial wake)
+          params.set('connect_timeout', '30');
 
           u.search = params.toString();
           effectiveUrl = u.toString();
@@ -70,7 +81,7 @@ export class PrismaService
             { emit: 'event', level: 'warn' },
           ],
       transactionOptions: {
-        timeout: 15000,
+        timeout: 30000, // 30 seconds for cold starts
       },
     });
   }
