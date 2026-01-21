@@ -46,12 +46,23 @@ export class CollectionQueryDto {
   @IsOptional()
   @IsString()
   @IsIn(['watching', 'completed', 'on-hold', 'dropped', 'plan-to-watch'])
+  @IsIn(['watching', 'completed', 'on-hold', 'dropped', 'plan-to-watch'])
   type?: string;
 
-  @ApiPropertyOptional({ example: 'createdAt', description: 'Field to sort by', enum: ['name', 'createdAt', 'updatedAt', 'itemCount'] })
+  @ApiPropertyOptional({ example: 2025, description: 'Filter by release year' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  year?: number;
+
+  @ApiPropertyOptional({
+    example: 'createdAt',
+    description: 'Field to sort by',
+    enum: ['name', 'createdAt', 'updatedAt', 'itemCount', 'rating', 'title']
+  })
   @IsOptional()
   @IsString()
-  @IsIn(['name', 'createdAt', 'updatedAt', 'itemCount'])
+  @IsIn(['name', 'createdAt', 'updatedAt', 'itemCount', 'rating', 'title'])
   sortBy?: string = 'createdAt';
 
   @ApiPropertyOptional({ example: 'desc', description: 'Sort order', enum: ['asc', 'desc'] })

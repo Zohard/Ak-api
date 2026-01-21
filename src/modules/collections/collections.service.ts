@@ -439,7 +439,8 @@ export class CollectionsService {
 
     // Create cache key including all relevant parameters
     const collectionType = type ? this.getCollectionTypeFromName(type) : 'all';
-    const cacheKey = `collection_items:${userId}:${mediaType || 'all'}:${collectionType}:${page}:${limit}`;
+    const { year, sortBy, sortOrder } = query;
+    const cacheKey = `collection_items:${userId}:${mediaType || 'all'}:${collectionType}:${page}:${limit}:${year || 'all'}:${sortBy || 'def'}:${sortOrder || 'def'}`;
 
     // Try to get from cache
     const cached = await this.cacheService.get(cacheKey);
@@ -457,10 +458,20 @@ export class CollectionsService {
   }
 
   private async getCollectionItemsFromDB(userId: number, query: CollectionQueryDto) {
-    const { page = 1, limit = 20, mediaType, type, search } = query;
+    const { page = 1, limit = 20, mediaType, type, search, year, sortBy = 'createdAt', sortOrder = 'desc' } = query;
     const skip = (page - 1) * limit;
 
     const collectionType = type ? this.getCollectionTypeFromName(type) : undefined;
+
+    // Helper to determine orderBy for Prisma
+    const getOrderBy = (mType: 'anime' | 'manga') => {
+      const order = sortOrder || 'desc';
+      if (sortBy === 'rating') return { evaluation: order };
+      if (sortBy === 'title' || sortBy === 'name') return mType === 'anime' ? { anime: { titre: order } } : { manga: { titre: order } };
+      if (sortBy === 'updatedAt') return { updatedAt: order };
+      // Default to createdAt
+      return { createdAt: order };
+    };
 
     if (!mediaType || mediaType === 'anime') {
       const animeWhere: any = {
@@ -471,13 +482,18 @@ export class CollectionsService {
         animeWhere.type = collectionType;
       }
 
-      if (search) {
-        animeWhere.anime = {
-          titre: {
+      const hasAnimeFilter = search || year;
+      if (hasAnimeFilter) {
+        animeWhere.anime = {};
+        if (search) {
+          animeWhere.anime.titre = {
             contains: search,
             mode: 'insensitive',
-          },
-        };
+          };
+        }
+        if (year) {
+          animeWhere.anime.annee = year;
+        }
       }
 
       const [animes, animeTotal] = await this.prisma.executeWithRetry(async () => {
@@ -486,7 +502,7 @@ export class CollectionsService {
             where: animeWhere,
             skip: mediaType === 'anime' ? skip : 0,
             take: mediaType === 'anime' ? limit : undefined,
-            orderBy: { createdAt: 'desc' },
+            orderBy: getOrderBy('anime'),
             include: {
               anime: {
                 select: {
@@ -542,13 +558,18 @@ export class CollectionsService {
         mangaWhere.type = collectionType;
       }
 
-      if (search) {
-        mangaWhere.manga = {
-          titre: {
+      const hasMangaFilter = search || year;
+      if (hasMangaFilter) {
+        mangaWhere.manga = {};
+        if (search) {
+          mangaWhere.manga.titre = {
             contains: search,
             mode: 'insensitive',
-          },
-        };
+          };
+        }
+        if (year) {
+          mangaWhere.manga.annee = year;
+        }
       }
 
       const [mangas, mangaTotal] = await this.prisma.executeWithRetry(async () => {
@@ -557,7 +578,7 @@ export class CollectionsService {
             where: mangaWhere,
             skip: mediaType === 'manga' ? skip : 0,
             take: mediaType === 'manga' ? limit : undefined,
-            orderBy: { createdAt: 'desc' },
+            orderBy: getOrderBy('manga'),
             include: {
               manga: {
                 select: {
@@ -610,11 +631,24 @@ export class CollectionsService {
       mangaWhere.type = collectionType;
     }
 
+    if (search || year) {
+      animeWhere.anime = {};
+      mangaWhere.manga = {};
+      if (search) {
+        animeWhere.anime.titre = { contains: search, mode: 'insensitive' };
+        mangaWhere.manga.titre = { contains: search, mode: 'insensitive' };
+      }
+      if (year) {
+        animeWhere.anime.annee = year;
+        mangaWhere.manga.annee = year;
+      }
+    }
+
     const [animes, mangas] = await this.prisma.executeWithRetry(async () => {
       return Promise.all([
         this.prisma.collectionAnime.findMany({
           where: animeWhere,
-          orderBy: { createdAt: 'desc' },
+          orderBy: getOrderBy('anime'),
           include: {
             anime: {
               select: {
@@ -631,7 +665,7 @@ export class CollectionsService {
         }),
         this.prisma.collectionManga.findMany({
           where: mangaWhere,
-          orderBy: { createdAt: 'desc' },
+          orderBy: getOrderBy('manga'),
           include: {
             manga: {
               select: {
@@ -652,7 +686,24 @@ export class CollectionsService {
     const combined = [
       ...animes.map(a => ({ ...a, mediaType: 'anime' })),
       ...mangas.map(m => ({ ...m, mediaType: 'manga' })),
-    ].sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+    ].sort((a: any, b: any) => {
+      // In-memory sort needed for mixed results
+      const order = sortOrder === 'asc' ? 1 : -1;
+
+      if (sortBy === 'rating') {
+        return ((a.evaluation || 0) - (b.evaluation || 0)) * order;
+      }
+      if (sortBy === 'title' || sortBy === 'name') {
+        const titleA = a.mediaType === 'anime' ? a.anime?.titre : a.manga?.titre;
+        const titleB = b.mediaType === 'anime' ? b.anime?.titre : b.manga?.titre;
+        return (titleA || '').localeCompare(titleB || '') * order;
+      }
+      if (sortBy === 'updatedAt') {
+        return (new Date(a.updatedAt || 0).getTime() - new Date(b.updatedAt || 0).getTime()) * order;
+      }
+      // Default createdAt
+      return (new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime()) * order;
+    });
 
     const paginatedData = combined.slice(skip, skip + limit);
 
@@ -2754,10 +2805,39 @@ export class CollectionsService {
     return { message: 'Game removed from collection' };
   }
 
-  async getJeuxVideoCollection(userId: number, type?: number, currentUserId?: number, page: number = 1, limit: number = 20) {
+  async getJeuxVideoCollection(
+    userId: number,
+    type?: number,
+    currentUserId?: number,
+    page: number = 1,
+    limit: number = 20,
+    year?: number,
+    sortBy?: string,
+    sortOrder: 'asc' | 'desc' = 'desc'
+  ) {
     const where: any = { idMembre: userId };
     if (type !== undefined) {
       where.type = type;
+    }
+
+    if (year) {
+      where.jeuxVideo = {
+        annee: year
+      };
+    }
+
+    // Determine orderBy
+    let orderBy: any = { dateCreated: 'desc' };
+    const order = sortOrder || 'desc';
+
+    if (sortBy === 'rating') {
+      orderBy = { evaluation: order };
+    } else if (sortBy === 'title') {
+      orderBy = { jeuxVideo: { titre: order } };
+    } else if (sortBy === 'updatedAt') {
+      orderBy = { dateModified: order };
+    } else if (sortBy === 'createdAt') {
+      orderBy = { dateCreated: order };
     }
 
     const skip = (page - 1) * limit;
@@ -2784,7 +2864,7 @@ export class CollectionsService {
             }
           }
         },
-        orderBy: { dateCreated: 'desc' }
+        orderBy
       }),
       this.prisma.collectionJeuxVideo.count({ where })
     ]);

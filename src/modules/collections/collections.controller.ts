@@ -573,10 +573,13 @@ export class CollectionsController {
     @Query('type', new ParseIntPipe({ optional: true })) type: number | undefined,
     @Query('page', new ParseIntPipe({ optional: true })) page: number | undefined,
     @Query('limit', new ParseIntPipe({ optional: true })) limit: number | undefined,
+    @Query('year', new ParseIntPipe({ optional: true })) year: number | undefined,
+    @Query('sortBy') sortBy: string | undefined,
+    @Query('sortOrder') sortOrder: 'asc' | 'desc' | undefined,
     @Request() req,
   ) {
     const currentUserId = req.user?.id;
-    return this.collectionsService.getJeuxVideoCollection(userId, type, currentUserId, page, limit);
+    return this.collectionsService.getJeuxVideoCollection(userId, type, currentUserId, page, limit, year, sortBy, sortOrder);
   }
 
   @Get('media/:mediaType/:mediaId/users')
