@@ -57,17 +57,19 @@ import jwtConfig from './config/jwt.config';
     LoggerModule.forRoot({
       pinoHttp: {
         level: process.env.NODE_ENV === 'production' ? 'info' : 'debug',
+        // Disable auto-logging of requests in production to avoid rate limits
+        autoLogging: process.env.NODE_ENV !== 'production',
         transport:
           process.env.NODE_ENV !== 'production'
             ? {
-                target: 'pino-pretty',
-                options: {
-                  colorize: true,
-                  singleLine: true,
-                  translateTime: 'HH:MM:ss Z',
-                  ignore: 'pid,hostname',
-                },
-              }
+              target: 'pino-pretty',
+              options: {
+                colorize: true,
+                singleLine: true,
+                translateTime: 'HH:MM:ss Z',
+                ignore: 'pid,hostname',
+              },
+            }
             : undefined, // Use JSON logs in production (Railway-friendly)
         redact: ['req.headers.authorization'], // Don't log sensitive data
         customProps: () => ({
