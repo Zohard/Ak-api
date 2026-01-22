@@ -249,6 +249,8 @@ model AkAnimesEpisode {
 
   @@index([idAnime])
   @@index([idAnime, numero])
+  @@index([dateDiffusion])
+  @@index([idAnime, dateDiffusion])
   @@map("ak_animes_episodes")
 }
 
