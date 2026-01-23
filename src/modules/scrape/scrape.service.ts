@@ -279,6 +279,7 @@ export class ScrapeService {
     const aired = textAfterLabel('Aired:');
     const status = textAfterLabel('Status:');
     const type = textAfterLabel('Type:');
+    const duration = textAfterLabel('Duration:');
 
     // Extract image URL from MAL leftside div
     let imageUrl = '';
@@ -407,6 +408,7 @@ export class ScrapeService {
       staff,
       characters,
       image_url: imageUrl,
+      duration,
     };
   }
 
@@ -464,6 +466,16 @@ export class ScrapeService {
         airing_dates = t.replace('Diffusion :', '').trim();
         const link = $(li).find("a[href*='/animes/']").first().text().trim();
         if (link) season = link;
+        return false;
+      }
+    });
+
+    // Duration
+    let duration = '';
+    $('li').each((_, li) => {
+      const t = $(li).text();
+      if (t && t.includes('Durée :')) {
+        duration = t.replace('Durée :', '').trim();
         return false;
       }
     });
@@ -725,6 +737,7 @@ export class ScrapeService {
       staff,
       characters,
       image_url: imageUrl,
+      duration,
     };
   }
 
@@ -744,6 +757,7 @@ export class ScrapeService {
       official_sites: [] as string[],
       source_urls: {} as Record<string, string>,
       image_url: '', // Prioritize MAL image, fallback to Nautiljon
+      duration: '',
     };
 
     if (mal?.url) merged.source_urls.myanimelist = mal.url;
@@ -854,6 +868,8 @@ export class ScrapeService {
     };
     const annee = yearFrom(mal?.aired) || yearFrom(nj?.airing_dates);
 
+    merged.duration = mal?.duration || nj?.duration || '';
+
     const mapFormat = (f?: string) => {
       if (!f) return '';
       const lower = f.toLowerCase();
@@ -879,7 +895,7 @@ export class ScrapeService {
         synopsis: merged.synopsis,
         annee,
         format,
-        nb_epduree: merged.episode_count,
+        nb_epduree: merged.duration || merged.episode_count,
         official_site: merged.official_sites[0] || '',
       },
     };
@@ -934,7 +950,7 @@ export class ScrapeService {
               anime.format === 'OVA' ? 'OAV' :
                 anime.format === 'ONA' ? 'ONA' :
                   anime.format === 'SPECIAL' ? 'Spécial' : 'Série TV',
-          nb_epduree: anime.episodes || 'NC',
+          nb_epduree: (anime.duration ? `${anime.duration} min` : null) || (anime.episodes ? `${anime.episodes} eps` : 'NC'),
           official_site: anime.externalLinks?.find((link: any) => link.site === 'Official Site')?.url || null,
         },
         merged: {
