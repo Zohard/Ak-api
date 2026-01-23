@@ -1,4 +1,5 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import Redis from 'ioredis';
 
 @Injectable()
@@ -6,30 +7,74 @@ export class CacheService implements OnModuleInit {
   private readonly logger = new Logger(CacheService.name);
   private redis: Redis;
 
-  async onModuleInit() {
-    const redisUrl = process.env.REDIS_URL;
+  constructor(private configService: ConfigService) { }
 
-    if (redisUrl) {
-      this.logger.log('🔧 Initializing Redis connection');
-      this.redis = new Redis(redisUrl, {
-        tls: { rejectUnauthorized: false },
+  async onModuleInit() {
+    const host = this.configService.get<string>('redis.host');
+    const port = this.configService.get<number>('redis.port');
+    const password = this.configService.get<string>('redis.password');
+    const tls = this.configService.get<any>('redis.tls');
+    const url = this.configService.get<string>('redis.url');
+    const isUpstash = this.configService.get<boolean>('redis.isUpstash');
+
+    if (url || (host && port)) {
+      this.logger.log(`🔧 Initializing Redis connection (upstash=${isUpstash}, tls=${!!tls})`);
+      this.redis = new Redis({
+        host,
+        port,
+        password,
+        tls,
+        keyPrefix: 'cache:',
         maxRetriesPerRequest: 3,
-        connectTimeout: 10000,
-        lazyConnect: true
+        connectTimeout: 30000,
+        keepAlive: isUpstash ? 10000 : 30000, // Shorter keepalive for Upstash
+        lazyConnect: true,
+        retryStrategy: (times) => {
+          const delay = Math.min(times * 1000, 30000);
+          this.logger.log(`🔄 Retrying Redis connection in ${delay}ms (attempt ${times})`);
+          return delay;
+        },
+        reconnectOnError: (err) => {
+          const recoverableErrors = ['READONLY', 'ECONNRESET', 'ETIMEDOUT', 'ECONNREFUSED', 'Connection is closed'];
+          const shouldReconnect = recoverableErrors.some(e => err.message.includes(e));
+          if (shouldReconnect) {
+            this.logger.log(`🔄 Reconnecting due to: ${err.message}`);
+          }
+          return shouldReconnect;
+        }
       });
 
       this.redis.on('connect', () => this.logger.log('✅ Redis connected'));
-      this.redis.on('error', (err) => this.logger.error('❌ Redis error:', err));
+      this.redis.on('ready', () => this.logger.log('✅ Redis ready'));
+      this.redis.on('error', (err) => this.logger.error(`❌ Redis error: ${err.message}`, err.stack));
+      this.redis.on('close', () => this.logger.warn('⚠️ Redis connection closed'));
+      this.redis.on('reconnecting', () => this.logger.log('🔄 Redis reconnecting...'));
 
-      this.logger.log('🚀 CacheService initialized with Redis');
+      // Explicitly connect
+      try {
+        await this.redis.connect();
+        this.logger.log(`🚀 CacheService initialized with Redis (${host}:${port})`);
+      } catch (error) {
+        this.logger.error('❌ Failed to connect to Redis:', error.message);
+        this.logger.warn('⚠️ CacheService will operate in degraded mode (no caching)');
+      }
     } else {
-      this.logger.warn('⚠️  No REDIS_URL found - caching disabled');
+      this.logger.warn('⚠️  No Redis configuration found - caching disabled');
     }
+  }
+
+  // Helper method to check if Redis is connected
+  private isConnected(): boolean {
+    if (!this.redis) return false;
+    return this.redis.status === 'ready' || this.redis.status === 'connect';
   }
 
   // Generic get method
   async get<T>(key: string): Promise<T | undefined> {
-    if (!this.redis) return undefined;
+    if (!this.isConnected()) {
+      this.logger.debug(`Redis not connected, skipping cache get for key: ${key}`);
+      return undefined;
+    }
 
     try {
       this.logger.log(`🔍 Checking cache for key: ${key}`);
@@ -42,14 +87,17 @@ export class CacheService implements OnModuleInit {
         return undefined;
       }
     } catch (error) {
-      this.logger.error(`Cache get error for key ${key}:`, error);
+      this.logger.error(`Cache get error for key ${key}:`, error.message);
       return undefined;
     }
   }
 
   // Generic set method
   async set<T>(key: string, value: T, ttl: number = 300): Promise<void> {
-    if (!this.redis) return;
+    if (!this.isConnected()) {
+      this.logger.debug(`Redis not connected, skipping cache set for key: ${key}`);
+      return;
+    }
 
     try {
       this.logger.log(`💾 Attempting to cache key: ${key}, TTL: ${ttl}s`);
@@ -57,32 +105,31 @@ export class CacheService implements OnModuleInit {
       await this.redis.setex(key, ttl, serialized);
       this.logger.log(`✅ Successfully cached key: ${key}`);
     } catch (error) {
-      this.logger.error(`❌ Cache set error for key ${key}:`, error);
+      this.logger.error(`❌ Cache set error for key ${key}:`, error.message);
     }
   }
 
   // Delete specific key
   async del(key: string): Promise<void> {
-    if (!this.redis) {
-      // Log removed
+    if (!this.isConnected()) {
+      this.logger.debug(`Redis not connected, skipping cache delete for key: ${key}`);
       return;
     }
 
     try {
-      // Log removed
       const result = await this.redis.del(key);
-      // Log removed
       this.logger.debug(`Cache deleted for key: ${key}, result: ${result}`);
     } catch (error) {
-      // Error log replaced with logger
-      this.logger.error(`❌ [CacheService] Cache delete error for key ${key}:`, error);
-      this.logger.error(`Cache delete error for key ${key}:`, error);
+      this.logger.error(`❌ Cache delete error for key ${key}:`, error.message);
     }
   }
 
   // Clear cache by pattern (useful for invalidating related keys)
   async delByPattern(pattern: string): Promise<void> {
-    if (!this.redis) return;
+    if (!this.isConnected()) {
+      this.logger.debug(`Redis not connected, skipping pattern delete for: ${pattern}`);
+      return;
+    }
 
     try {
       this.logger.debug(`Cache pattern delete requested for: ${pattern}`);
@@ -92,7 +139,7 @@ export class CacheService implements OnModuleInit {
         this.logger.debug(`Deleted ${keys.length} keys matching pattern: ${pattern}`);
       }
     } catch (error) {
-      this.logger.error(`Cache pattern delete error for pattern ${pattern}:`, error);
+      this.logger.error(`Cache pattern delete error for pattern ${pattern}:`, error.message);
     }
   }
 
@@ -539,7 +586,7 @@ export class CacheService implements OnModuleInit {
 
   // Health check method
   async isHealthy(): Promise<boolean> {
-    if (!this.redis) return false;
+    if (!this.isConnected()) return false;
 
     try {
       const testKey = 'health_check';
@@ -549,20 +596,20 @@ export class CacheService implements OnModuleInit {
       await this.del(testKey);
       return retrieved === testValue;
     } catch (error) {
-      this.logger.error('Cache health check failed:', error);
+      this.logger.error('Cache health check failed:', error.message);
       return false;
     }
   }
 
   // Admin cache management methods
   async getAllKeys(pattern: string = '*'): Promise<string[]> {
-    if (!this.redis) return [];
+    if (!this.isConnected()) return [];
 
     try {
       const keys = await this.redis.keys(pattern);
       return keys;
     } catch (error) {
-      this.logger.error(`Error getting keys with pattern ${pattern}:`, error);
+      this.logger.error(`Error getting keys with pattern ${pattern}:`, error.message);
       return [];
     }
   }
@@ -621,7 +668,7 @@ export class CacheService implements OnModuleInit {
     categoryCounts: Record<string, number>;
     memoryUsage?: string;
   }> {
-    if (!this.redis) {
+    if (!this.isConnected()) {
       return { totalKeys: 0, categoryCounts: {} };
     }
 
@@ -654,7 +701,7 @@ export class CacheService implements OnModuleInit {
         memoryUsage
       };
     } catch (error) {
-      this.logger.error('Error getting cache stats:', error);
+      this.logger.error('Error getting cache stats:', error.message);
       return { totalKeys: 0, categoryCounts: {} };
     }
   }
@@ -696,7 +743,7 @@ export class CacheService implements OnModuleInit {
       throw new Error(`Unknown cache category: ${category}`);
     }
 
-    if (!this.redis) return 0;
+    if (!this.isConnected()) return 0;
 
     try {
       const keys = await this.redis.keys(pattern);
@@ -707,7 +754,7 @@ export class CacheService implements OnModuleInit {
       }
       return 0;
     } catch (error) {
-      this.logger.error(`Error clearing cache for category ${category}:`, error);
+      this.logger.error(`Error clearing cache for category ${category}:`, error.message);
       throw error;
     }
   }

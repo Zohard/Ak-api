@@ -17,12 +17,18 @@ export class CollectionImportService {
     ) { }
 
     // Import from MAL (client-parsed XML -> JSON items)
-    async importFromMAL(userId: number, items: ImportMalItemDto[]) {
+    async importFromMAL(
+        userId: number,
+        items: ImportMalItemDto[],
+        onProgress?: (processed: number, total: number) => Promise<void>
+    ) {
         if (!items?.length) {
             return { success: false, imported: 0, failed: 0, details: [], message: 'No items to import' };
         }
 
         const results: Array<{ title: string; type: string; status: string; matchedId?: number; outcome: 'imported' | 'updated' | 'skipped' | 'not_found'; reason?: string }> = [];
+        const total = items.length;
+        let processed = 0;
 
         // Process sequentially to avoid hammering DB and Jikan rate limits
         for (const raw of items) {
@@ -40,6 +46,8 @@ export class CollectionImportService {
 
                 if (!matchId) {
                     results.push({ title: raw.title, type, status: statusName, outcome: 'not_found', reason: 'No matching title' });
+                    processed++;
+                    if (onProgress) await onProgress(processed, total);
                     continue;
                 }
 
@@ -56,6 +64,9 @@ export class CollectionImportService {
                 this.logger.error('MAL import item failed', { title: raw.title, type, err: { message: err?.message, code: err?.code } });
                 results.push({ title: raw.title, type, status: statusName, outcome: 'skipped', reason: 'Unexpected error' });
             }
+
+            processed++;
+            if (onProgress) await onProgress(processed, total);
         }
 
         const imported = results.filter(r => r.outcome === 'imported' || r.outcome === 'updated').length;
@@ -281,9 +292,11 @@ export class CollectionImportService {
         if (!title) return null;
         const t = title.trim();
         // Try exact matches first, then fallback to contains
+        // Only match published animes (statut = 1)
         const exact = await this.prisma.executeWithRetry(() =>
             this.prisma.akAnime.findFirst({
                 where: {
+                    statut: 1, // Only published
                     OR: [
                         { titre: { equals: t, mode: 'insensitive' } as any },
                         { titreFr: { equals: t, mode: 'insensitive' } as any },
@@ -298,6 +311,7 @@ export class CollectionImportService {
         const contains = await this.prisma.executeWithRetry(() =>
             this.prisma.akAnime.findFirst({
                 where: {
+                    statut: 1, // Only published
                     OR: [
                         { titre: { contains: t, mode: 'insensitive' } as any },
                         { titreFr: { contains: t, mode: 'insensitive' } as any },
@@ -314,9 +328,11 @@ export class CollectionImportService {
     private async findMangaIdByTitle(title: string): Promise<number | null> {
         if (!title) return null;
         const t = title.trim();
+        // Only match published mangas (statut = 1)
         const exact = await this.prisma.executeWithRetry(() =>
             this.prisma.akManga.findFirst({
                 where: {
+                    statut: 1, // Only published
                     OR: [
                         { titre: { equals: t, mode: 'insensitive' } as any },
                         { titreFr: { equals: t, mode: 'insensitive' } as any },
@@ -331,6 +347,7 @@ export class CollectionImportService {
         const contains = await this.prisma.executeWithRetry(() =>
             this.prisma.akManga.findFirst({
                 where: {
+                    statut: 1, // Only published
                     OR: [
                         { titre: { contains: t, mode: 'insensitive' } as any },
                         { titreFr: { contains: t, mode: 'insensitive' } as any },

@@ -47,12 +47,13 @@ import { DatabaseWarmupService } from './shared/services/database-warmup.service
 import { ActivityTrackerMiddleware } from './common/middleware/activity-tracker.middleware';
 import databaseConfig from './config/database.config';
 import jwtConfig from './config/jwt.config';
+import redisConfig from './config/redis.config';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      load: [databaseConfig, jwtConfig],
+      load: [databaseConfig, jwtConfig, redisConfig],
       envFilePath: '.env',
     }),
     LoggerModule.forRoot({
@@ -93,13 +94,40 @@ import jwtConfig from './config/jwt.config';
     // BullMQ for background job processing
     BullModule.forRootAsync({
       inject: [ConfigService],
-      useFactory: (configService: ConfigService) => ({
-        connection: {
-          host: configService.get<string>('REDIS_HOST') || 'localhost',
-          port: configService.get<number>('REDIS_PORT') || 6379,
-          password: configService.get<string>('REDIS_PASSWORD') || undefined,
-        },
-      }),
+      useFactory: (configService: ConfigService) => {
+        const isUpstash = configService.get<boolean>('redis.isUpstash');
+        console.log(`🔧 BullMQ config: isUpstash=${isUpstash}`);
+
+        return {
+          connection: {
+            host: configService.get<string>('redis.host'),
+            port: configService.get<number>('redis.port'),
+            password: configService.get<string>('redis.password'),
+            tls: configService.get<any>('redis.tls'),
+            maxRetriesPerRequest: null, // Required for BullMQ
+            enableReadyCheck: false,
+            enableOfflineQueue: false,
+            connectTimeout: 30000,
+            // Upstash needs shorter keepalive to avoid connection drops
+            keepAlive: isUpstash ? 10000 : 30000,
+            retryStrategy: (times) => {
+              const delay = Math.min(times * 1000, 30000);
+              console.log(`BullMQ Redis retry attempt ${times}, waiting ${delay}ms`);
+              return delay;
+            }
+          },
+          prefix: 'bull',
+          defaultJobOptions: {
+            attempts: 3,
+            backoff: {
+              type: 'exponential',
+              delay: 1000,
+            },
+            removeOnComplete: 100,
+            removeOnFail: 200,
+          },
+        };
+      },
     }),
     AuthModule,
     UsersModule,

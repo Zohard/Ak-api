@@ -433,7 +433,13 @@ export class EmailService {
   async sendImportSummaryEmail(
     recipientEmail: string,
     username: string,
-    summary: { imported: number; failed: number; notFound: number; total: number }
+    summary: {
+      imported: number;
+      failed: number;
+      notFound: number;
+      total: number;
+      failedItems?: Array<{ title: string; reason?: string }>;
+    }
   ): Promise<void> {
     const profileUrl = `${this.configService.get('FRONTEND_URL')}/profile`;
 
@@ -482,10 +488,17 @@ export class EmailService {
 
   private getImportSummaryTemplate(
     username: string,
-    summary: { imported: number; failed: number; notFound: number; total: number },
+    summary: {
+      imported: number;
+      failed: number;
+      notFound: number;
+      total: number;
+      failedItems?: Array<{ title: string; reason?: string }>;
+    },
     profileUrl: string
   ): string {
     const successRate = summary.total > 0 ? Math.round((summary.imported / summary.total) * 100) : 0;
+    const failedItems = summary.failedItems || [];
 
     return `
       <!DOCTYPE html>
@@ -606,8 +619,22 @@ export class EmailService {
             <div class="progress-fill" style="width: ${successRate}%"></div>
           </div>
 
+          ${failedItems.length > 0 ? `
+          <div style="margin-top: 20px; padding: 15px; background-color: #fef2f2; border-radius: 8px; border-left: 4px solid #ef4444;">
+            <p style="margin: 0 0 10px 0; font-weight: bold; color: #991b1b;">
+              Titres non importés (${failedItems.length}) :
+            </p>
+            <ul style="margin: 0; padding-left: 20px; color: #7f1d1d; font-size: 14px;">
+              ${failedItems.slice(0, 20).map(item => `
+                <li style="margin-bottom: 4px;">${item.title}${item.reason ? ` <span style="color: #9ca3af;">(${item.reason})</span>` : ''}</li>
+              `).join('')}
+              ${failedItems.length > 20 ? `<li style="color: #6b7280; font-style: italic;">... et ${failedItems.length - 20} autres</li>` : ''}
+            </ul>
+          </div>
+          ` : ''}
+
           ${summary.notFound > 0 ? `
-          <p style="color: #6b7280; font-size: 14px;">
+          <p style="color: #6b7280; font-size: 14px; margin-top: 15px;">
             <strong>Note :</strong> Les entrées "non trouvées" correspondent à des animes/mangas
             qui ne sont pas encore dans notre base de données. Ces titres seront peut-être
             ajoutés ultérieurement.

@@ -297,7 +297,7 @@ export class CollectionsController {
 
     // Get user email and username for the notification
     const userEmail = req.user.email || '';
-    const username = req.user.member_name || req.user.pseudo || 'Utilisateur';
+    const username = req.user.username || 'Utilisateur';
 
     // Add job to queue
     const job = await this.importQueue.add(
@@ -332,6 +332,62 @@ export class CollectionsController {
       jobId: job.id,
       itemCount: items.length,
       message: `Import de ${items.length} éléments en cours de traitement. Vous recevrez un email lorsque l'import sera terminé.`,
+    };
+  }
+
+  @Get('import/status/:jobId')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get import job status' })
+  @ApiParam({ name: 'jobId', description: 'Job ID returned from import/mal endpoint' })
+  @ApiResponse({ status: 200, description: 'Job status' })
+  async getImportStatus(@Param('jobId') jobId: string, @Request() req) {
+    const job = await this.importQueue.getJob(jobId);
+
+    if (!job) {
+      return {
+        found: false,
+        status: 'not_found',
+        message: 'Job not found or already completed and removed',
+      };
+    }
+
+    // Security: verify the job belongs to this user
+    if (job.data.userId !== req.user.id) {
+      return {
+        found: false,
+        status: 'not_found',
+        message: 'Job not found',
+      };
+    }
+
+    const state = await job.getState();
+    const progress = job.progress || 0;
+
+    // Get result if completed
+    let result = null;
+    if (state === 'completed') {
+      result = job.returnvalue;
+    }
+
+    // Get failure reason if failed
+    let failedReason = null;
+    if (state === 'failed') {
+      failedReason = job.failedReason;
+    }
+
+    return {
+      found: true,
+      jobId: job.id,
+      status: state,
+      progress: typeof progress === 'number' ? progress : (progress as any)?.percentage || 0,
+      processedCount: typeof progress === 'object' ? (progress as any)?.processed || 0 : 0,
+      totalCount: job.data.items?.length || 0,
+      result,
+      failedReason,
+      createdAt: job.timestamp,
+      processedAt: job.processedOn,
+      finishedAt: job.finishedOn,
     };
   }
 
