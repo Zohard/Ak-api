@@ -19,8 +19,37 @@ export interface JikanAnime {
   title: string;
   title_english?: string;
   title_japanese?: string;
+  title_synonyms?: string[];
+  titles?: Array<{ type: string; title: string }>;
   type: string;
   episodes?: number;
+  status: string;
+  year?: number;
+}
+
+export interface JikanManga {
+  mal_id: number;
+  url: string;
+  images: {
+    jpg: {
+      image_url: string;
+      small_image_url: string;
+      large_image_url: string;
+    };
+    webp: {
+      image_url: string;
+      small_image_url: string;
+      large_image_url: string;
+    };
+  };
+  title: string;
+  title_english?: string;
+  title_japanese?: string;
+  title_synonyms?: string[];
+  titles?: Array<{ type: string; title: string }>;
+  type: string;
+  chapters?: number;
+  volumes?: number;
   status: string;
   year?: number;
 }
@@ -230,5 +259,111 @@ export class JikanService {
       anime.images?.jpg?.image_url ||
       ''
     );
+  }
+
+  /**
+   * Get manga by MAL ID
+   */
+  async getMangaById(malId: number): Promise<JikanManga | null> {
+    try {
+      await this.rateLimit();
+
+      const response = await this.httpClient.get<{ data: JikanManga }>(`/manga/${malId}`);
+
+      if (!response.data || !response.data.data) {
+        this.logger.warn(`Jikan API returned no data for manga MAL ID ${malId}`);
+        return null;
+      }
+
+      return response.data.data;
+    } catch (error: any) {
+      this.logger.error(`Error fetching manga from Jikan (MAL ID: ${malId}):`, error.message);
+      return null;
+    }
+  }
+
+  /**
+   * Search for manga by title
+   */
+  async searchManga(query: string, limit = 5): Promise<JikanManga[]> {
+    try {
+      await this.rateLimit();
+
+      const response = await this.httpClient.get<{ data: JikanManga[]; pagination: any }>('/manga', {
+        params: {
+          q: query,
+          limit: limit,
+          order_by: 'popularity',
+          sort: 'asc',
+        },
+      });
+
+      if (!response.data || !response.data.data) {
+        this.logger.warn('Jikan API returned no manga data');
+        return [];
+      }
+
+      return response.data.data;
+    } catch (error: any) {
+      this.logger.error('Error searching manga on Jikan:', error.message);
+      return [];
+    }
+  }
+
+  /**
+   * Get all possible titles for an anime (for better matching)
+   * Returns: main title, english, japanese, and all synonyms
+   */
+  getAllAnimeTitles(anime: JikanAnime): string[] {
+    const titles: string[] = [];
+
+    if (anime.title) titles.push(anime.title);
+    if (anime.title_english) titles.push(anime.title_english);
+    if (anime.title_japanese) titles.push(anime.title_japanese);
+
+    // Add synonyms
+    if (anime.title_synonyms && Array.isArray(anime.title_synonyms)) {
+      titles.push(...anime.title_synonyms);
+    }
+
+    // Add titles from the titles array (newer Jikan format)
+    if (anime.titles && Array.isArray(anime.titles)) {
+      for (const t of anime.titles) {
+        if (t.title && !titles.includes(t.title)) {
+          titles.push(t.title);
+        }
+      }
+    }
+
+    // Return unique, non-empty titles
+    return [...new Set(titles.filter(t => t && t.trim()))];
+  }
+
+  /**
+   * Get all possible titles for a manga (for better matching)
+   */
+  getAllMangaTitles(manga: JikanManga): string[] {
+    const titles: string[] = [];
+
+    if (manga.title) titles.push(manga.title);
+    if (manga.title_english) titles.push(manga.title_english);
+    if (manga.title_japanese) titles.push(manga.title_japanese);
+
+    // Add synonyms
+    if (manga.title_synonyms && Array.isArray(manga.title_synonyms)) {
+      titles.push(...manga.title_synonyms);
+    }
+
+    // Add titles from the titles array (newer Jikan format)
+    if (manga.titles && Array.isArray(manga.titles)) {
+      for (const t of manga.titles) {
+        if (t.title && !titles.includes(t.title)) {
+          titles.push(t.title);
+        }
+      }
+    }
+
+    // Return unique, non-empty titles
+    return [...new Set(titles.filter(t => t && t.trim()))];
   }
 }

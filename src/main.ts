@@ -9,6 +9,7 @@ import { setupSwagger } from './config/swagger.config';
 import * as Sentry from '@sentry/nestjs';
 import { Logger } from 'nestjs-pino';
 import { DatabaseRetryInterceptor } from './common/interceptors/database-retry.interceptor';
+import { json } from 'express';
 
 async function bootstrap() {
   // Initialize Sentry for error tracking and performance monitoring
@@ -63,6 +64,9 @@ async function bootstrap() {
 
   // Cookie parser for activity tracking
   app.use(cookieParser());
+
+  // Increase body size limit for large imports (e.g., MAL XML imports)
+  app.use(json({ limit: '50mb' }));
 
   // CORS configuration
   const corsOriginEnv = configService.get('CORS_ORIGIN') || '';

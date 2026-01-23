@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, ForbiddenException, ConflictException, BadRequestException, Logger } from '@nestjs/common';
 import { PrismaService } from '../../shared/services/prisma.service';
 import { CacheService } from '../../shared/services/cache.service';
+import { JikanService } from '../jikan/jikan.service';
 import { AddAnimeToCollectionDto } from './dto/add-anime-to-collection.dto';
 import { AddMangaToCollectionDto } from './dto/add-manga-to-collection.dto';
 import { AddJeuxVideoToCollectionDto } from './dto/add-jeuxvideo-to-collection.dto';
@@ -17,6 +18,7 @@ export class CollectionsService {
   constructor(
     private prisma: PrismaService,
     private cacheService: CacheService,
+    private jikanService: JikanService,
   ) { }
 
   async createCollection(userId: number, createCollectionDto: CreateCollectionDto) {
@@ -2133,7 +2135,7 @@ export class CollectionsService {
 
     const results: Array<{ title: string; type: string; status: string; matchedId?: number; outcome: 'imported' | 'updated' | 'skipped' | 'not_found'; reason?: string }> = [];
 
-    // Process sequentially to avoid hammering DB; could be optimized with limited concurrency
+    // Process sequentially to avoid hammering DB and Jikan rate limits
     for (const raw of items) {
       const type = (raw.type === 'manga' ? 'manga' : 'anime') as 'anime' | 'manga';
       const normalized = this.normalizeMalStatus(raw.status, type);
@@ -2141,9 +2143,10 @@ export class CollectionsService {
       const rating = this.normalizeMalScore(raw.score);
 
       try {
+        // Use enhanced matching with MAL ID when available
         const matchId = await (type === 'anime'
-          ? this.findAnimeIdByTitle(raw.title)
-          : this.findMangaIdByTitle(raw.title)
+          ? this.findAnimeIdWithJikan(raw.title, raw.malId)
+          : this.findMangaIdWithJikan(raw.title, raw.malId)
         );
 
         if (!matchId) {
@@ -2197,6 +2200,81 @@ export class CollectionsService {
     const s = Math.max(0, Math.min(10, Math.round(Number(score))));
     // Convert to our 0-5 integer scale
     return Math.round(s / 2);
+  }
+
+  /**
+   * Enhanced anime matching using Jikan API for additional titles
+   * When MAL ID is available, fetches all titles (English, Japanese, synonyms) from Jikan
+   */
+  private async findAnimeIdWithJikan(title: string, malId?: number): Promise<number | null> {
+    if (!title) return null;
+
+    // First, try simple title match
+    const simpleMatch = await this.findAnimeIdByTitle(title);
+    if (simpleMatch) return simpleMatch;
+
+    // If we have a MAL ID, use Jikan to get all possible titles
+    if (malId) {
+      try {
+        this.logger.debug(`Fetching Jikan data for anime MAL ID ${malId} to improve matching`);
+        const jikanAnime = await this.jikanService.getAnimeById(malId);
+
+        if (jikanAnime) {
+          const allTitles = this.jikanService.getAllAnimeTitles(jikanAnime);
+          this.logger.debug(`Jikan returned ${allTitles.length} titles for MAL ID ${malId}: ${allTitles.join(', ')}`);
+
+          // Try each title from Jikan
+          for (const jikanTitle of allTitles) {
+            const match = await this.findAnimeIdByTitle(jikanTitle);
+            if (match) {
+              this.logger.debug(`Found match for "${title}" via Jikan title "${jikanTitle}" -> anime ID ${match}`);
+              return match;
+            }
+          }
+        }
+      } catch (err) {
+        this.logger.warn(`Failed to fetch Jikan data for MAL ID ${malId}: ${err.message}`);
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * Enhanced manga matching using Jikan API for additional titles
+   */
+  private async findMangaIdWithJikan(title: string, malId?: number): Promise<number | null> {
+    if (!title) return null;
+
+    // First, try simple title match
+    const simpleMatch = await this.findMangaIdByTitle(title);
+    if (simpleMatch) return simpleMatch;
+
+    // If we have a MAL ID, use Jikan to get all possible titles
+    if (malId) {
+      try {
+        this.logger.debug(`Fetching Jikan data for manga MAL ID ${malId} to improve matching`);
+        const jikanManga = await this.jikanService.getMangaById(malId);
+
+        if (jikanManga) {
+          const allTitles = this.jikanService.getAllMangaTitles(jikanManga);
+          this.logger.debug(`Jikan returned ${allTitles.length} titles for MAL ID ${malId}: ${allTitles.join(', ')}`);
+
+          // Try each title from Jikan
+          for (const jikanTitle of allTitles) {
+            const match = await this.findMangaIdByTitle(jikanTitle);
+            if (match) {
+              this.logger.debug(`Found match for "${title}" via Jikan title "${jikanTitle}" -> manga ID ${match}`);
+              return match;
+            }
+          }
+        }
+      } catch (err) {
+        this.logger.warn(`Failed to fetch Jikan data for manga MAL ID ${malId}: ${err.message}`);
+      }
+    }
+
+    return null;
   }
 
   private async findAnimeIdByTitle(title: string): Promise<number | null> {

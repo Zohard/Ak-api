@@ -16,6 +16,8 @@ import {
   Logger,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam, ApiQuery } from '@nestjs/swagger';
+import { InjectQueue } from '@nestjs/bullmq';
+import { Queue } from 'bullmq';
 import { CollectionsService } from './collections.service';
 import { AddAnimeToCollectionDto } from './dto/add-anime-to-collection.dto';
 import { AddMangaToCollectionDto } from './dto/add-manga-to-collection.dto';
@@ -26,13 +28,17 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { ImportMalDto } from './dto/import-mal.dto';
 import { AddJeuxVideoToCollectionDto } from './dto/add-jeuxvideo-to-collection.dto';
 import { UpdateJeuxVideoCollectionDto } from './dto/update-jeuxvideo-collection.dto';
+import { MalImportJobData } from './import.processor';
 import type { Response } from 'express';
 
 @ApiTags('collections')
 @Controller('collections')
 export class CollectionsController {
   private readonly logger = new Logger(CollectionsController.name);
-  constructor(private readonly collectionsService: CollectionsService) { }
+  constructor(
+    private readonly collectionsService: CollectionsService,
+    @InjectQueue('import-queue') private readonly importQueue: Queue<MalImportJobData>,
+  ) { }
 
   @Post()
   @UseGuards(JwtAuthGuard)
@@ -242,10 +248,58 @@ export class CollectionsController {
   @Post('import/mal')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Import MAL list (client-parsed XML as JSON)' })
-  @ApiResponse({ status: 200, description: 'Import processed with summary' })
+  @ApiOperation({ summary: 'Import MAL list (client-parsed XML as JSON) - queued for background processing' })
+  @ApiResponse({ status: 202, description: 'Import queued for background processing' })
+  @HttpCode(HttpStatus.ACCEPTED)
   async importFromMal(@Body() body: ImportMalDto, @Request() req) {
-    return this.collectionsService.importFromMAL(req.user.id, body.items || []);
+    const items = body.items || [];
+
+    if (!items.length) {
+      return {
+        success: false,
+        queued: false,
+        message: 'No items to import',
+      };
+    }
+
+    // Get user email and username for the notification
+    const userEmail = req.user.email || '';
+    const username = req.user.member_name || req.user.pseudo || 'Utilisateur';
+
+    // Add job to queue
+    const job = await this.importQueue.add(
+      'import-mal',
+      {
+        userId: req.user.id,
+        userEmail,
+        username,
+        items,
+      } as MalImportJobData,
+      {
+        attempts: 3,
+        backoff: {
+          type: 'exponential',
+          delay: 5000,
+        },
+        removeOnComplete: {
+          age: 3600, // Keep completed jobs for 1 hour
+          count: 100,
+        },
+        removeOnFail: {
+          age: 86400, // Keep failed jobs for 24 hours
+        },
+      }
+    );
+
+    this.logger.log(`MAL import job ${job.id} queued for user ${req.user.id} with ${items.length} items`);
+
+    return {
+      success: true,
+      queued: true,
+      jobId: job.id,
+      itemCount: items.length,
+      message: `Import de ${items.length} éléments en cours de traitement. Vous recevrez un email lorsque l'import sera terminé.`,
+    };
   }
 
   @Get('export/mal')

@@ -430,6 +430,295 @@ export class EmailService {
     `;
   }
 
+  async sendImportSummaryEmail(
+    recipientEmail: string,
+    username: string,
+    summary: { imported: number; failed: number; notFound: number; total: number }
+  ): Promise<void> {
+    const profileUrl = `${this.configService.get('FRONTEND_URL')}/profile`;
+
+    try {
+      const { data, error } = await this.resend.emails.send({
+        from: this.fromEmail,
+        to: recipientEmail,
+        subject: 'Import MAL terminé - Anime-Kun',
+        html: this.getImportSummaryTemplate(username, summary, profileUrl),
+      });
+
+      if (error) {
+        console.error('Error sending import summary email to', recipientEmail, ':', error);
+        throw error;
+      }
+    } catch (error) {
+      console.error('Error sending import summary email to', recipientEmail, ':', error);
+      throw error;
+    }
+  }
+
+  async sendImportFailureEmail(
+    recipientEmail: string,
+    username: string,
+    errorMessage: string
+  ): Promise<void> {
+    const profileUrl = `${this.configService.get('FRONTEND_URL')}/profile/import`;
+
+    try {
+      const { data, error } = await this.resend.emails.send({
+        from: this.fromEmail,
+        to: recipientEmail,
+        subject: 'Erreur lors de l\'import MAL - Anime-Kun',
+        html: this.getImportFailureTemplate(username, errorMessage, profileUrl),
+      });
+
+      if (error) {
+        console.error('Error sending import failure email to', recipientEmail, ':', error);
+        throw error;
+      }
+    } catch (error) {
+      console.error('Error sending import failure email to', recipientEmail, ':', error);
+      throw error;
+    }
+  }
+
+  private getImportSummaryTemplate(
+    username: string,
+    summary: { imported: number; failed: number; notFound: number; total: number },
+    profileUrl: string
+  ): string {
+    const successRate = summary.total > 0 ? Math.round((summary.imported / summary.total) * 100) : 0;
+
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <title>Import MAL terminé</title>
+        <style>
+          body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+          }
+          .header {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+            border-radius: 8px 8px 0 0;
+          }
+          .content {
+            background-color: #f8fafc;
+            padding: 30px;
+            border-radius: 0 0 8px 8px;
+          }
+          .button {
+            display: inline-block;
+            background-color: #2563eb;
+            color: white !important;
+            padding: 12px 24px;
+            text-decoration: none;
+            border-radius: 6px;
+            margin: 20px 0;
+            font-weight: 600;
+          }
+          .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+            margin: 20px 0;
+          }
+          .stat-box {
+            background-color: white;
+            border-radius: 8px;
+            padding: 15px;
+            text-align: center;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+          }
+          .stat-number {
+            font-size: 28px;
+            font-weight: bold;
+            margin-bottom: 5px;
+          }
+          .stat-label {
+            font-size: 14px;
+            color: #6b7280;
+          }
+          .success { color: #10b981; }
+          .warning { color: #f59e0b; }
+          .error { color: #ef4444; }
+          .neutral { color: #6b7280; }
+          .progress-bar {
+            background-color: #e5e7eb;
+            border-radius: 10px;
+            height: 20px;
+            overflow: hidden;
+            margin: 15px 0;
+          }
+          .progress-fill {
+            background: linear-gradient(90deg, #10b981, #34d399);
+            height: 100%;
+            border-radius: 10px;
+            transition: width 0.3s ease;
+          }
+          .footer {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #e5e7eb;
+            font-size: 14px;
+            color: #6b7280;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1>Import terminé</h1>
+          <h2>Anime-Kun</h2>
+        </div>
+        <div class="content">
+          <p>Bonjour <strong>${username}</strong>,</p>
+
+          <p>Votre import MyAnimeList est terminé ! Voici le résumé :</p>
+
+          <div class="stats-grid">
+            <div class="stat-box">
+              <div class="stat-number success">${summary.imported}</div>
+              <div class="stat-label">Importés avec succès</div>
+            </div>
+            <div class="stat-box">
+              <div class="stat-number neutral">${summary.total}</div>
+              <div class="stat-label">Total traités</div>
+            </div>
+            <div class="stat-box">
+              <div class="stat-number warning">${summary.notFound}</div>
+              <div class="stat-label">Non trouvés</div>
+            </div>
+            <div class="stat-box">
+              <div class="stat-number error">${summary.failed}</div>
+              <div class="stat-label">Échecs</div>
+            </div>
+          </div>
+
+          <p><strong>Taux de réussite :</strong> ${successRate}%</p>
+          <div class="progress-bar">
+            <div class="progress-fill" style="width: ${successRate}%"></div>
+          </div>
+
+          ${summary.notFound > 0 ? `
+          <p style="color: #6b7280; font-size: 14px;">
+            <strong>Note :</strong> Les entrées "non trouvées" correspondent à des animes/mangas
+            qui ne sont pas encore dans notre base de données. Ces titres seront peut-être
+            ajoutés ultérieurement.
+          </p>
+          ` : ''}
+
+          <div style="text-align: center;">
+            <a href="${profileUrl}" class="button">Voir ma collection</a>
+          </div>
+
+          <div class="footer">
+            <p>Merci d'utiliser Anime-Kun pour gérer votre collection !</p>
+            <p>Cet email a été envoyé automatiquement, merci de ne pas y répondre.</p>
+            <p><strong>L'équipe Anime-Kun</strong></p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+  }
+
+  private getImportFailureTemplate(
+    username: string,
+    errorMessage: string,
+    profileUrl: string
+  ): string {
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <title>Erreur lors de l'import MAL</title>
+        <style>
+          body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+          }
+          .header {
+            background-color: #dc2626;
+            color: white;
+            padding: 20px;
+            text-align: center;
+            border-radius: 8px 8px 0 0;
+          }
+          .content {
+            background-color: #f8fafc;
+            padding: 30px;
+            border-radius: 0 0 8px 8px;
+          }
+          .button {
+            display: inline-block;
+            background-color: #2563eb;
+            color: white !important;
+            padding: 12px 24px;
+            text-decoration: none;
+            border-radius: 6px;
+            margin: 20px 0;
+            font-weight: 600;
+          }
+          .error-box {
+            background-color: #fef2f2;
+            border: 2px solid #dc2626;
+            padding: 15px;
+            border-radius: 6px;
+            margin: 20px 0;
+          }
+          .footer {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #e5e7eb;
+            font-size: 14px;
+            color: #6b7280;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1>Erreur lors de l'import</h1>
+          <h2>Anime-Kun</h2>
+        </div>
+        <div class="content">
+          <p>Bonjour <strong>${username}</strong>,</p>
+
+          <p>Une erreur s'est produite lors de votre import MyAnimeList.</p>
+
+          <div class="error-box">
+            <strong>Détail de l'erreur :</strong>
+            <p style="margin: 10px 0 0 0; color: #1f2937;">${errorMessage}</p>
+          </div>
+
+          <p>Vous pouvez réessayer l'import depuis votre profil. Si le problème persiste,
+          n'hésitez pas à nous contacter.</p>
+
+          <div style="text-align: center;">
+            <a href="${profileUrl}" class="button">Réessayer l'import</a>
+          </div>
+
+          <div class="footer">
+            <p>Cet email a été envoyé automatiquement, merci de ne pas y répondre.</p>
+            <p><strong>L'équipe Anime-Kun</strong></p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+  }
+
   private getReviewRejectionTemplate(
     recipientUsername: string,
     reviewTitle: string,
