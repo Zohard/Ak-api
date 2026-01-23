@@ -400,8 +400,13 @@ export class CollectionImportService {
             await Promise.all([
                 // User collection lists cache
                 this.cacheService.delByPattern(`user_collections:${userId}:*`),
-                // Collection items cache
+                // Collection items cache (generic)
                 this.cacheService.delByPattern(`collection_items:${userId}:*`),
+                // Collection list pages (anime, manga, games)
+                this.cacheService.delByPattern(`collection_animes:${userId}:*`),
+                this.cacheService.delByPattern(`collection_mangas:${userId}:*`),
+                this.cacheService.delByPattern(`collection_games:${userId}:*`),
+                this.cacheService.delByPattern(`collection_jeuxvideo:${userId}:*`),
                 // Ratings distribution cache
                 this.cacheService.delByPattern(`collection_ratings:*:${userId}:*`),
                 // Find user collections cache (both own and public views)
