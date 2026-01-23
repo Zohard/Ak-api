@@ -24,7 +24,6 @@ export class CacheService implements OnModuleInit {
         port,
         password,
         tls,
-        keyPrefix: 'cache:',
         maxRetriesPerRequest: 3,
         connectTimeout: 30000,
         keepAlive: isUpstash ? 10000 : 30000, // Shorter keepalive for Upstash
