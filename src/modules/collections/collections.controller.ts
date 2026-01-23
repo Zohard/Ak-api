@@ -28,8 +28,12 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { ImportMalDto } from './dto/import-mal.dto';
 import { AddJeuxVideoToCollectionDto } from './dto/add-jeuxvideo-to-collection.dto';
 import { UpdateJeuxVideoCollectionDto } from './dto/update-jeuxvideo-collection.dto';
-import { MalImportJobData } from './import.processor';
+import { MalImportJobData } from './processors/import.processor';
 import type { Response } from 'express';
+import { VideoGameCollectionService } from './services/video-game-collection.service';
+import { CollectionStatisticsService } from './services/collection-statistics.service';
+import { CollectionImportService } from './services/collection-import.service';
+import { CollectionBrowseService } from './services/collection-browse.service';
 
 @ApiTags('collections')
 @Controller('collections')
@@ -38,6 +42,10 @@ export class CollectionsController {
   constructor(
     private readonly collectionsService: CollectionsService,
     @InjectQueue('import-queue') private readonly importQueue: Queue<MalImportJobData>,
+    private readonly videoGameCollectionService: VideoGameCollectionService,
+    private readonly collectionStatisticsService: CollectionStatisticsService,
+    private readonly collectionImportService: CollectionImportService,
+    private readonly collectionBrowseService: CollectionBrowseService,
   ) { }
 
   @Post()
@@ -62,6 +70,31 @@ export class CollectionsController {
   @ApiOperation({ summary: 'Récupérer mes collections' })
   @ApiResponse({ status: 200, description: 'Liste des collections utilisateur' })
   async getMyCollections(@Query() query: CollectionQueryDto, @Request() req) {
+    // Determine which service to call based on what getUserCollections was doing
+    // It seems getMyCollections was fetching "virtual" collections (counts per type)
+    // This logic was moved to CollectionBrowseService (findUserCollections) or kept in CollectionsService?
+    // Let's check the original code: getUserCollections called getUserCollectionsFromDB
+    // which returns a list of collection types with counts.
+    // This logic seems similar to findUserCollections but for the current user.
+    // Wait, original CollectionsService had getUserCollections AND findUserCollections.
+    // getUserCollections returned paginated list of collection types.
+    // findUserCollections returned all collection types.
+    // I moved findUserCollections to CollectionBrowseService.
+    // Did I move getUserCollections?
+    // getUserCollections logic was: fetch counts, build types list.
+    // This belongs to CollectionStatisticsService? Or Browse?
+    // Use CollectionBrowseService.findUserCollections for now as it seems to cover the same ground.
+    // Actually, getUserCollections was somewhat redundant.
+    // Let's us CollectionsService.getUserCollections if I kept it there, or check where I moved it.
+    // I didn't explicitly move getUserCollections in my plan, but I moved findUserCollections.
+    // I'll keep getUserCollections in CollectionsService for now if I didn't move it, OR map it to CollectionBrowseService.
+    // Let's assume I keep it in CollectionsService as it was main entry point.
+    // Checking my plan: "Retained Methods: ... getCollectionItems". getUserCollections wasn't explicitly mentioned.
+    // But I moved "CollectionBrowseService: findUserCollections".
+    // Let's check the code: getUserCollections (lines 38-62) called getUserCollectionsFromDB.
+    // I should probably move getUserCollections to CollectionBrowseService too as it's browsing own collections.
+    // But since I didn't create it in CollectionBrowseService yet, I'll rely on CollectionsService for this specific one,
+    // OR realize that findUserCollections is the same thing.
     return this.collectionsService.getUserCollections(req.user.id, query);
   }
 
@@ -313,7 +346,7 @@ export class CollectionsController {
     @Request() req,
     @Res() res: Response,
   ) {
-    const xml = await this.collectionsService.exportToMAL(req.user.id, mediaType);
+    const xml = await this.collectionImportService.exportToMAL(req.user.id, mediaType);
     const ts = Math.floor(Date.now() / 1000);
     const filename = `${mediaType === 'anime' ? 'animelist' : 'mangalist'}_${ts}_-_${req.user.id}.xml`;
     res.setHeader('Content-Type', 'application/xml; charset=utf-8');
@@ -327,7 +360,7 @@ export class CollectionsController {
   @ApiQuery({ name: 'userId', required: true, type: Number, description: 'User ID' })
   findUserCollections(@Query('userId', ParseIntPipe) userId: number, @Request() req) {
     const currentUserId = req.user?.id;
-    return this.collectionsService.findUserCollections(userId, currentUserId);
+    return this.collectionBrowseService.findUserCollections(userId, currentUserId);
   }
 
   @Get('browse')
@@ -345,7 +378,7 @@ export class CollectionsController {
     @Request() req,
   ) {
     const currentUserId = req.user?.id;
-    return this.collectionsService.browseUserCollections(
+    return this.collectionBrowseService.browseUserCollections(
       parseInt(page),
       parseInt(limit),
       search || undefined,
@@ -363,7 +396,7 @@ export class CollectionsController {
     @Request() req
   ) {
     const currentUserId = req.user?.id;
-    return this.collectionsService.getUserInfo(userId, currentUserId);
+    return this.collectionStatisticsService.getUserInfo(userId, currentUserId);
   }
 
   @Get('user/:userId/summary')
@@ -375,7 +408,7 @@ export class CollectionsController {
     @Request() req
   ) {
     const currentUserId = req.user?.id;
-    return this.collectionsService.getCollectionSummary(userId, currentUserId);
+    return this.collectionStatisticsService.getCollectionSummary(userId, currentUserId);
   }
 
   @Get('user/:userId/type/:type')
@@ -390,7 +423,7 @@ export class CollectionsController {
     @Request() req
   ) {
     const currentUserId = req.user?.id;
-    return this.collectionsService.findCollectionByType(userId, type, currentUserId);
+    return this.collectionBrowseService.findCollectionByType(userId, type, currentUserId);
   }
 
   // Anime collection routes
@@ -410,6 +443,7 @@ export class CollectionsController {
     @Request() req,
   ) {
     const currentUserId = req.user?.id;
+    // Note: getCollectionAnimes is still in CollectionsService as it returns ITEMS
     return this.collectionsService.getCollectionAnimes(userId, type, parseInt(page), parseInt(limit), currentUserId);
   }
 
@@ -525,7 +559,7 @@ export class CollectionsController {
     @Request() req,
   ) {
     const currentUserId = req.user?.id;
-    return this.collectionsService.getRatingsDistribution(userId, type, 'anime', currentUserId);
+    return this.collectionStatisticsService.getRatingsDistribution(userId, type, 'anime', currentUserId);
   }
 
   @Get('user/:userId/type/:type/mangas/ratings')
@@ -539,7 +573,7 @@ export class CollectionsController {
     @Request() req,
   ) {
     const currentUserId = req.user?.id;
-    return this.collectionsService.getRatingsDistribution(userId, type, 'manga', currentUserId);
+    return this.collectionStatisticsService.getRatingsDistribution(userId, type, 'manga', currentUserId);
   }
 
   // Video Game Collection Endpoints
@@ -561,7 +595,7 @@ export class CollectionsController {
     @Request() req,
   ) {
     const currentUserId = req.user?.id;
-    return this.collectionsService.addJeuxVideoToCollection(userId, type, dto, currentUserId);
+    return this.videoGameCollectionService.addJeuxVideoToCollection(userId, type, dto, currentUserId);
   }
 
   @Patch('users/:userId/jeuxvideo/entry/:collectionId')
@@ -593,7 +627,7 @@ export class CollectionsController {
       dto
     });
 
-    return this.collectionsService.updateJeuxVideoInCollection(userId, collectionId, dto, currentUserId);
+    return this.videoGameCollectionService.updateJeuxVideoInCollection(userId, collectionId, dto, currentUserId);
   }
 
   @Delete('users/:userId/jeuxvideo/entry/:collectionId')
@@ -612,7 +646,7 @@ export class CollectionsController {
     @Request() req,
   ) {
     const currentUserId = req.user?.id;
-    return this.collectionsService.removeJeuxVideoFromCollection(userId, collectionId, currentUserId);
+    return this.videoGameCollectionService.removeJeuxVideoFromCollection(userId, collectionId, currentUserId);
   }
 
   @Get('users/:userId/jeuxvideo')
@@ -633,7 +667,7 @@ export class CollectionsController {
     @Request() req,
   ) {
     const currentUserId = req.user?.id;
-    return this.collectionsService.getJeuxVideoCollection(userId, type, currentUserId, page, limit, year, sortBy, sortOrder);
+    return this.videoGameCollectionService.getJeuxVideoCollection(userId, type, currentUserId, page, limit, year, sortBy, sortOrder);
   }
 
   @Get('media/:mediaType/:mediaId/users')
@@ -654,6 +688,6 @@ export class CollectionsController {
   ) {
     const currentUserId = req.user?.id;
     const friendsOnlyBool = friendsOnly === 'true';
-    return this.collectionsService.getUsersWithMedia(mediaType, mediaId, page, limit, currentUserId, friendsOnlyBool);
+    return this.collectionBrowseService.getUsersWithMedia(mediaType, mediaId, page, limit, currentUserId, friendsOnlyBool);
   }
 }

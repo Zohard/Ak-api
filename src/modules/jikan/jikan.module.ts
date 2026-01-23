@@ -1,8 +1,9 @@
 import { Module } from '@nestjs/common';
 import { JikanService } from './jikan.service';
+import { CacheService } from '../../shared/services/cache.service';
 
 @Module({
-  providers: [JikanService],
+  providers: [JikanService, CacheService],
   exports: [JikanService],
 })
-export class JikanModule {}
+export class JikanModule { }

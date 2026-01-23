@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import axios, { AxiosInstance } from 'axios';
+import { CacheService } from '../../shared/services/cache.service';
 
 export interface JikanAnime {
   mal_id: number;
@@ -75,8 +76,9 @@ export class JikanService {
   private readonly baseUrl = 'https://api.jikan.moe/v4';
   private lastRequestTime = 0;
   private readonly MIN_REQUEST_DELAY = 1000; // 1 second between requests (Jikan rate limit)
+  private readonly CACHE_TTL = 86400; // 24 hours
 
-  constructor() {
+  constructor(private readonly cacheService: CacheService) {
     this.httpClient = axios.create({
       baseURL: this.baseUrl,
       timeout: 10000,
@@ -127,10 +129,19 @@ export class JikanService {
   }
 
   /**
-   * Get anime by MAL ID
+   * Get anime by MAL ID with caching
    */
   async getAnimeById(malId: number): Promise<JikanAnime | null> {
+    const cacheKey = `jikan:anime:${malId}`;
+
     try {
+      // Check cache first
+      const cached = await this.cacheService.get(cacheKey);
+      if (cached) {
+        this.logger.debug(`Jikan cache hit for anime ${malId}`);
+        return cached as JikanAnime;
+      }
+
       await this.rateLimit();
 
       const response = await this.httpClient.get<{ data: JikanAnime }>(`/anime/${malId}`);
@@ -140,8 +151,19 @@ export class JikanService {
         return null;
       }
 
-      return response.data.data;
+      const anime = response.data.data;
+
+      // Cache the result
+      await this.cacheService.set(cacheKey, anime, this.CACHE_TTL);
+
+      return anime;
     } catch (error: any) {
+      if (error.response?.status === 404) {
+        // Cache null for 404s to avoid repeated failures (shorter TTL)
+        await this.cacheService.set(cacheKey, null, 3600); // 1 hour for 404s
+        this.logger.warn(`Anime not found on Jikan (MAL ID: ${malId})`);
+        return null;
+      }
       this.logger.error(`Error fetching anime from Jikan (MAL ID: ${malId}):`, error.message);
       return null;
     }
@@ -262,10 +284,19 @@ export class JikanService {
   }
 
   /**
-   * Get manga by MAL ID
+   * Get manga by MAL ID with caching
    */
   async getMangaById(malId: number): Promise<JikanManga | null> {
+    const cacheKey = `jikan:manga:${malId}`;
+
     try {
+      // Check cache first
+      const cached = await this.cacheService.get(cacheKey);
+      if (cached) {
+        this.logger.debug(`Jikan cache hit for manga ${malId}`);
+        return cached as JikanManga;
+      }
+
       await this.rateLimit();
 
       const response = await this.httpClient.get<{ data: JikanManga }>(`/manga/${malId}`);
@@ -275,8 +306,19 @@ export class JikanService {
         return null;
       }
 
-      return response.data.data;
+      const manga = response.data.data;
+
+      // Cache the result
+      await this.cacheService.set(cacheKey, manga, this.CACHE_TTL);
+
+      return manga;
     } catch (error: any) {
+      if (error.response?.status === 404) {
+        // Cache null for 404s
+        await this.cacheService.set(cacheKey, null, 3600);
+        this.logger.warn(`Manga not found on Jikan (MAL ID: ${malId})`);
+        return null;
+      }
       this.logger.error(`Error fetching manga from Jikan (MAL ID: ${malId}):`, error.message);
       return null;
     }
