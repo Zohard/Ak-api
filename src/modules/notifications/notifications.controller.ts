@@ -218,4 +218,20 @@ export class NotificationsController {
       failureCount: results.length - successCount,
     };
   }
+
+  // Cron trigger (protected by AdminGuard or just simple check)
+  // For now using AdminGuard since it's a manual trigger from settings
+  @Post('cron/check-releases')
+  @UseGuards(AdminGuard)
+  @ApiOperation({ summary: 'Trigger check for new episodes (Cron/Manual)' })
+  @ApiResponse({ status: 200, description: 'Check completed' })
+  async checkReleases(@Query('date') dateStr?: string) {
+    const date = dateStr ? new Date(dateStr) : new Date();
+    const result = await this.notificationsService.checkAndNotifyReleasedEpisodes(date);
+    return {
+      success: true,
+      data: result,
+      message: `Checked releases for ${date.toISOString().split('T')[0]}. Found ${result.episodesFound} episodes, sent ${result.notificationsSent} notifications.`
+    };
+  }
 }

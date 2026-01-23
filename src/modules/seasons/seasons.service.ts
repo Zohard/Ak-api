@@ -105,8 +105,8 @@ export class SeasonsService {
 
       const result = Array.isArray(currentSeason) && currentSeason.length > 0 ? currentSeason[0] : null;
 
-      // Cache for 30 minutes (1800 seconds) - current season is frequently accessed
-      await this.cacheService.set('seasons:current', result, 1800);
+      // Cache for 4 hours (14400 seconds) - current season rarely changes, invalidated on admin updates
+      await this.cacheService.set('seasons:current', result, 14400);
 
       return result;
     } catch (error) {
@@ -133,8 +133,8 @@ export class SeasonsService {
 
       const result = Array.isArray(lastSeason) && lastSeason.length > 0 ? lastSeason[0] : null;
 
-      // Cache for 30 minutes (1800 seconds)
-      await this.cacheService.set('seasons:last-created', result, 1800);
+      // Cache for 4 hours (14400 seconds) - rarely changes
+      await this.cacheService.set('seasons:last-created', result, 14400);
 
       return result;
     } catch (error) {
@@ -207,7 +207,7 @@ export class SeasonsService {
 
       if (animeIds.length === 0) {
         const emptyResult = [];
-        await this.cacheService.set(`season_animes:${seasonId}`, emptyResult, 1800);
+        await this.cacheService.set(`season_animes:${seasonId}`, emptyResult, 14400);
         return emptyResult;
       }
 
@@ -245,8 +245,8 @@ export class SeasonsService {
         studio: this.deduplicateStudios(anime.studio)
       }));
 
-      // Cache for 30 minutes (1800 seconds) - season animes are frequently accessed for homepage
-      await this.cacheService.set(`season_animes:${seasonId}`, result, 1800);
+      // Cache for 4 hours (14400 seconds) - season animes rarely change, invalidated on admin updates
+      await this.cacheService.set(`season_animes:${seasonId}`, result, 14400);
 
       return result;
 

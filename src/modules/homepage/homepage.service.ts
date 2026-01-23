@@ -128,8 +128,10 @@ export class HomePageService {
             // Cache the result
             const cacheKey = keys[key as keyof typeof keys];
             if (dataToCache) {
-              await this.cache.set(cacheKey, dataToCache, 7200); // 2 hours
-              this.logger.log(`✅ Cached ${key}`);
+              // Season data cached for 4 hours (14400s), other homepage data for 2 hours (7200s)
+              const ttl = key === 'season' ? 14400 : 7200;
+              await this.cache.set(cacheKey, dataToCache, ttl);
+              this.logger.log(`✅ Cached ${key} (TTL: ${ttl}s)`);
             }
 
             // Update the local variable so we use the fresh data

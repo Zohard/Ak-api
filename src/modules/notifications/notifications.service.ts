@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../shared/services/prisma.service';
 import * as nodemailer from 'nodemailer';
 import { ConfigService } from '@nestjs/config';
+import { EpisodesService } from '../animes/episodes/episodes.service';
 
 export interface EmailTemplate {
   subject: string;
@@ -63,6 +64,7 @@ export class NotificationsService {
   constructor(
     private prisma: PrismaService,
     private configService: ConfigService,
+    private episodesService: EpisodesService,
   ) {
     this.initializeEmailTransporter();
   }
@@ -790,6 +792,70 @@ export class NotificationsService {
           `,
           text: `${data.title}\n\n${data.message}`,
         };
+    }
+  }
+
+  /**
+   * Check for episodes released on a specific date and notify users who have them in their collection.
+   * @param date Date to check for releases (defaults to today)
+   */
+  async checkAndNotifyReleasedEpisodes(date: Date = new Date()): Promise<{ episodesFound: number; notificationsSent: number }> {
+    this.logger.log(`Checking episode releases for ${date.toISOString()}...`);
+    let notificationsSent = 0;
+
+    try {
+      // 1. Get episodes released on the date
+      const episodes: any[] = await this.episodesService.getEpisodesByDate(date);
+
+      if (episodes.length === 0) {
+        this.logger.log('No episodes released on this date.');
+        return { episodesFound: 0, notificationsSent: 0 };
+      }
+
+      this.logger.log(`Found ${episodes.length} episodes released.`);
+
+      for (const episode of episodes) {
+        if (!episode.anime) continue;
+
+        // 2. Find users who have this anime in their collection
+        // Status 1 = Watching, 2 = Plan to Watch, 3 = On Hold
+        const users = await this.prisma.collectionAnime.findMany({
+          where: {
+            idAnime: episode.idAnime,
+            type: { in: [1, 2, 3] }
+          },
+          select: { idMembre: true }
+        });
+
+        if (users.length === 0) continue;
+
+        this.logger.log(`Notifying ${users.length} users for ${episode.anime.titre} episode ${episode.numero}`);
+
+        // 3. Send notifications
+        for (const user of users) {
+          const sent = await this.sendNotification({
+            userId: user.idMembre,
+            type: 'episode_release',
+            title: `Nouvel épisode : ${episode.anime.titre}`,
+            message: `L'épisode ${episode.numero} de ${episode.anime.titre} est disponible !`,
+            data: {
+              animeId: episode.idAnime,
+              animeSlug: episode.anime.niceUrl,
+              episodeId: episode.idEpisode,
+              episodeNum: episode.numero,
+              image: episode.image || episode.anime.image
+            },
+            priority: 'medium'
+          });
+          if (sent) notificationsSent++;
+        }
+      }
+
+      this.logger.log(`Episode notifications check completed. Sent ${notificationsSent} notifications.`);
+      return { episodesFound: episodes.length, notificationsSent };
+    } catch (error) {
+      this.logger.error(`Error checking episode releases: ${error.message}`);
+      throw error;
     }
   }
 

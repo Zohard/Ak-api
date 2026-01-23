@@ -364,7 +364,9 @@ export class UsersService {
       animeCollectionResult,
       mangaCollectionResult,
       ratingStats,
-      forumPopularityByMessages
+      forumPopularityByMessages,
+      animeCollectionRatings,
+      mangaCollectionRatings
     ] = await Promise.all([
       // Get reviews count and average rating
       this.prisma.akCritique.aggregate({
@@ -403,7 +405,23 @@ export class UsersService {
         GROUP BY b.id_board, b.name
         ORDER BY "messageCount" DESC
         LIMIT 10
-      `
+      `,
+      // Get anime collection ratings distribution
+      this.prisma.$queryRaw`
+        SELECT evaluation as rating, COUNT(*) as count
+        FROM collection_animes
+        WHERE id_membre = ${id} AND evaluation IS NOT NULL AND evaluation > 0
+        GROUP BY evaluation
+        ORDER BY evaluation ASC
+      `.catch(() => []),
+      // Get manga collection ratings distribution
+      this.prisma.$queryRaw`
+        SELECT evaluation as rating, COUNT(*) as count
+        FROM collection_mangas
+        WHERE id_membre = ${id} AND evaluation IS NOT NULL AND evaluation > 0
+        GROUP BY evaluation
+        ORDER BY evaluation ASC
+      `.catch(() => [])
     ]);
 
     const animeCount = Number((animeCollectionResult as any)[0]?.total || 0);
@@ -488,6 +506,22 @@ export class UsersService {
 
     const forumPopularityByActivity = [];
 
+    // Build collection ratings distribution with full 1-10 range
+    const buildRatingsDistribution = (rawRatings: any[]) => {
+      const buckets: Record<number, number> = {};
+      for (let i = 1; i <= 10; i++) buckets[i] = 0;
+      for (const r of rawRatings) {
+        const val = Number(r.rating ?? 0);
+        if (val >= 1 && val <= 10) buckets[val] = Number(r.count || 0);
+      }
+      return Object.entries(buckets)
+        .sort((a, b) => Number(a[0]) - Number(b[0]))
+        .map(([rating, count]) => ({ rating: Number(rating), count }));
+    };
+
+    const animeRatingsData = buildRatingsDistribution(animeCollectionRatings as any[]);
+    const mangaRatingsData = buildRatingsDistribution(mangaCollectionRatings as any[]);
+
     return {
       totalReviews: reviewStats._count,
       animeCount,
@@ -501,6 +535,17 @@ export class UsersService {
         count: Number(stat.count)
       })),
       collectionTagStats,
+      // Collection ratings distribution (eliminates need for separate API calls)
+      collectionRatings: {
+        anime: {
+          data: animeRatingsData,
+          totalRated: animeRatingsData.reduce((s, d) => s + d.count, 0)
+        },
+        manga: {
+          data: mangaRatingsData,
+          totalRated: mangaRatingsData.reduce((s, d) => s + d.count, 0)
+        }
+      },
       forumStats: {
         totalPosts: user.posts,
         popularityByMessages: (forumPopularityByMessages as any[]).map(stat => ({
