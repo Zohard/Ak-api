@@ -815,17 +815,39 @@ export class NotificationsService {
       this.logger.log(`Found ${episodes.length} episodes released.`);
 
       for (const episode of episodes) {
-        if (!episode.anime) continue;
+        this.logger.log(`Processing episode: ${JSON.stringify({ idAnime: episode.idAnime, numero: episode.numero, anime: episode.anime ? episode.anime.titre : 'NO ANIME RELATION' })}`);
+
+        if (!episode.anime) {
+          this.logger.warn(`Episode ${episode.idEpisode} has no anime relation, skipping`);
+          continue;
+        }
 
         // 2. Find users who have this anime in their collection
         // Status 1 = Watching, 2 = Plan to Watch, 3 = On Hold
-        const users = await this.prisma.collectionAnime.findMany({
-          where: {
-            idAnime: episode.idAnime,
-            type: { in: [1, 2, 3] }
-          },
-          select: { idMembre: true }
-        });
+        let users: { idMembre: number }[] = [];
+        try {
+          users = await this.prisma.collectionAnime.findMany({
+            where: {
+              idAnime: episode.idAnime,
+              type: { in: [1, 2, 3] }
+            },
+            select: { idMembre: true }
+          });
+          this.logger.log(`Found ${users.length} users with anime ${episode.idAnime} (${episode.anime.titre}) in collection`);
+        } catch (queryError) {
+          this.logger.error(`Error querying users for anime ${episode.idAnime}: ${queryError.message}`);
+          // Fallback to raw query
+          try {
+            const rawUsers = await this.prisma.$queryRaw<{ id_membre: number }[]>`
+              SELECT id_membre FROM collection_animes
+              WHERE id_anime = ${episode.idAnime} AND type IN (1, 2, 3)
+            `;
+            users = rawUsers.map(u => ({ idMembre: u.id_membre }));
+            this.logger.log(`Fallback raw query found ${users.length} users`);
+          } catch (rawError) {
+            this.logger.error(`Fallback raw query also failed: ${rawError.message}`);
+          }
+        }
 
         if (users.length === 0) continue;
 
