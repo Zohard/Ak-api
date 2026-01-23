@@ -514,6 +514,7 @@ export class NotificationsService {
   }
 
   private async storeNotification(data: NotificationData): Promise<void> {
+    const jsonData = data.data ? JSON.stringify(data.data) : null;
     await this.prisma.$executeRaw`
       INSERT INTO user_notifications (
         user_id,
@@ -528,7 +529,7 @@ export class NotificationsService {
         ${data.type},
         ${data.title},
         ${data.message},
-        ${data.data ? JSON.stringify(data.data) : null},
+        ${jsonData}::jsonb,
         ${data.priority},
         NOW()
       )
