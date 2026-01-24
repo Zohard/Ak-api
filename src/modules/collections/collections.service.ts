@@ -1009,7 +1009,7 @@ export class CollectionsService {
     // Use Promise.all for parallel queries
     const whereClause = {
       idMembre: userId,
-      ...(type !== undefined && type !== null ? { type: type } : {}),
+      ...(type !== undefined && type !== null && type !== 0 ? { type: type } : {}),
       ...(isOwnCollection ? {} : { isPublic: true })
     };
 
@@ -1213,7 +1213,7 @@ export class CollectionsService {
     // Use Promise.all for parallel queries
     const whereClause = {
       idMembre: userId,
-      ...(type !== undefined && type !== null ? { type: type } : {}),
+      ...(type !== undefined && type !== null && type !== 0 ? { type: type } : {}),
       ...(isOwnCollection ? {} : { isPublic: true })
     };
 
