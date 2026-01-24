@@ -11,7 +11,7 @@ import { AdminMangaListQueryDto, CreateAdminMangaDto, UpdateAdminMangaDto } from
 @UseGuards(JwtAuthGuard, AdminGuard)
 @Controller('admin/mangas')
 export class AdminMangasController {
-  constructor(private readonly service: AdminMangasService) {}
+  constructor(private readonly service: AdminMangasService) { }
 
   @Get()
   @ApiOperation({ summary: 'Liste des mangas (admin)' })
@@ -52,6 +52,13 @@ export class AdminMangasController {
   @Delete(':id')
   @ApiOperation({ summary: 'Supprimer un manga (admin)' })
   remove(@Param('id', ParseIntPipe) id: number) { return this.service.remove(id); }
+
+  @Post(':id/volumes/sync')
+  @ApiOperation({ summary: 'Générer/Sync les volumes depuis le nombre de volumes' })
+  @ApiResponse({ status: 200, description: 'Volumes générés' })
+  syncVolumes(@Param('id', ParseIntPipe) id: number) {
+    return this.service.generateVolumesFromCount(id);
+  }
 
   @Post('import-image')
   @ApiOperation({

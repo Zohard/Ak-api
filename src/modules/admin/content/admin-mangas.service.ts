@@ -390,6 +390,71 @@ export class AdminMangasService {
     }
   }
 
+  async generateVolumesFromCount(id: number) {
+    const manga = await this.prisma.akManga.findUnique({
+      where: { idManga: id },
+      select: { nbVolumes: true, titre: true },
+    });
+
+    if (!manga) {
+      throw new NotFoundException('Manga introuvable');
+    }
+
+    if (!manga.nbVolumes) {
+      throw new BadRequestException('Nombre de volumes non défini pour ce manga (laissez le champ vide ou mettez 0 si inconnu)');
+    }
+
+    // Parse volume count - handle "15+" or "20 (en cours)"
+    // Matches first number found at start of string
+    const match = manga.nbVolumes.match(/^(\d+)/);
+    const count = match ? parseInt(match[1], 10) : 0;
+
+    if (count <= 0) {
+      throw new BadRequestException(`Impossible de déterminer un nombre de volumes valide à partir de "${manga.nbVolumes}"`);
+    }
+
+    // Get existing volumes
+    const existingVolumes = await this.prisma.mangaVolume.findMany({
+      where: { idManga: id },
+      select: { volumeNumber: true },
+    });
+    const existingNumbers = new Set(existingVolumes.map(v => v.volumeNumber));
+
+    const volumesToCreate: any[] = [];
+    for (let i = 1; i <= count; i++) {
+      if (!existingNumbers.has(i)) {
+        volumesToCreate.push({
+          idManga: id,
+          volumeNumber: i,
+          title: `Tome ${i}`,
+        });
+      }
+    }
+
+    if (volumesToCreate.length > 0) {
+      await this.prisma.mangaVolume.createMany({
+        data: volumesToCreate,
+      });
+    }
+
+    // Invalidate cache
+    await this.invalidateMangaCache(id);
+
+    return {
+      success: true,
+      message: volumesToCreate.length > 0 ? `${volumesToCreate.length} volumes générés avec succès` : 'Tous les volumes existent déjà',
+      total: count,
+      created: volumesToCreate.length
+    };
+  }
+
+  async invalidateMangaCache(id: number): Promise<void> {
+    await this.prisma.akManga.update({
+      where: { idManga: id },
+      data: { latestCache: Math.floor(Date.now() / 1000) }
+    });
+  }
+
   private slugify(text: string) {
     return text
       .toLowerCase()
