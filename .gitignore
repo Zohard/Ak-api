@@ -146,3 +146,14 @@ update_to_r2.sh
 upload_to_r2.py
 verify-redis-config.js
 docs/CRON_JOBS_DOCUMENTATION.md
+
+# Migration scripts with potential secrets
+migrate-forum-images.sh
+migrate-forum-images-dryrun.sh
+migrate-forum-images.sql
+full_forum_reimport.js
+reimport_topic_165_messages.js
+create_collections_tables.sql
+extend_existing_collections.sql
+import_missing_messages.sql
+restore_missing_polls.sql
