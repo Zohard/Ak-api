@@ -10,7 +10,7 @@ export class AdminBusinessService {
     private prisma: PrismaService,
     private adminLogging: AdminLoggingService,
     private r2Service: R2Service,
-  ) {}
+  ) { }
 
   async list(query: AdminBusinessListQueryDto) {
     const {
@@ -35,7 +35,11 @@ export class AdminBusinessService {
 
     // Build dynamic orderBy
     const orderBy: any = {};
-    orderBy[safeSortBy] = sortOrder;
+    if (safeSortBy === 'dateAjout') {
+      orderBy[safeSortBy] = { sort: sortOrder, nulls: 'last' };
+    } else {
+      orderBy[safeSortBy] = sortOrder;
+    }
 
     const [items, total] = await Promise.all([
       this.prisma.akBusiness.findMany({ where, skip, take: limit, orderBy }),

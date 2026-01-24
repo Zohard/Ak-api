@@ -45,7 +45,7 @@ export class CollectionImportService {
                 );
 
                 if (!matchId) {
-                    results.push({ title: raw.title, type, status: statusName, outcome: 'not_found', reason: 'No matching title' });
+                    results.push({ title: raw.title, type, status: statusName, outcome: 'not_found', reason: 'Aucun titre correspondant' });
                     processed++;
                     if (onProgress) await onProgress(processed, total);
                     continue;
