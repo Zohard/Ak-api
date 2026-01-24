@@ -222,12 +222,31 @@ model AkAnime {
   userCollections CollectionAnime[] @relation("UserAnimeList")
   articleRelations AkWebzineToFiches[] @relation("AnimeArticles")
   favorites    AkUserFavorite[]
+  weeklyRankings AnimeWeeklyRanking[]
 
   @@index([statut])
   @@index([dateAjout])
   @@index([licence])
   @@index([niceUrl])
   @@map("ak_animes")
+}
+
+// Anime Weekly Rankings
+model AnimeWeeklyRanking {
+  id        Int      @id @default(autoincrement())
+  animeId   Int      @map("id_anime")
+  anime     AkAnime  @relation(fields: [animeId], references: [idAnime], onDelete: Cascade)
+  year      Int
+  season    String   @db.VarChar(20) // WINTER, SPRING, SUMMER, FALL
+  week      Int      // Week number (1-53)
+  rank      Int
+  score     Float?
+  trend     Int?     // Rank change vs last week
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([year, week, animeId])
+  @@index([year, week])
+  @@map("anime_weekly_rankings")
 }
 
 // Anime Episodes

@@ -7,7 +7,7 @@ export class AnimeRankingsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly cacheService: CacheService,
-  ) {}
+  ) { }
 
   async getTopAnimes(limit = 10, type = 'reviews-bayes') {
     // Try to get from cache first (1 hour TTL)
@@ -152,7 +152,7 @@ export class AnimeRankingsService {
             include: {
               membre: {
                 select: { idMember: true, memberName: true },
-                },
+              },
             },
           },
         },
@@ -265,5 +265,155 @@ export class AnimeRankingsService {
       dateDiffusion: formattedDateDiffusion,
       ...otherFields,
     };
+  }
+
+  // --- Weekly Ranking (Internal Data) ---
+
+  async getWeeklyRanking(year: number, season: string, week: number) {
+    const rankings = await this.prisma.animeWeeklyRanking.findMany({
+      where: {
+        year,
+        season,
+        week,
+      },
+      orderBy: {
+        rank: 'asc',
+      },
+      include: {
+        anime: {
+          select: {
+            idAnime: true,
+            titre: true,
+            titreFr: true,
+            image: true,
+            classementPopularite: true,
+            statut: true,
+          }
+        }
+      }
+    });
+
+    return rankings.map(r => ({
+      ...r,
+      // Calculate trend icon/color purely on frontend based on 'trend' value
+      anime: {
+        ...r.anime,
+        image: r.anime.image ? (typeof r.anime.image === 'string' && /^https?:\/\//.test(r.anime.image) ? r.anime.image : `/api/media/serve/anime/${r.anime.image}`) : null
+      }
+    }));
+  }
+
+  async generateWeeklyRanking(year: number, season: string, week: number) {
+    // 1. Determine date range for the season (to filter current anime)
+    const { start, end } = this._getSeasonDateRange(year, season);
+
+    // 2. Fetch top 20 animes from DB based on popularity + airing date range
+    // We want anime that started airing RECENTLY (within the season or shortly before)
+    // and are currently published (statut = 1)
+    const topAnimes = await this.prisma.akAnime.findMany({
+      where: {
+        statut: 1,
+        dateDiffusion: {
+          gte: start,
+          lte: end,
+        },
+      },
+      orderBy: {
+        classementPopularite: 'asc', // Lower is better (1st, 2nd...)
+      },
+      take: 20,
+      select: {
+        idAnime: true,
+        classementPopularite: true,
+      }
+    });
+
+    if (topAnimes.length === 0) {
+      return { message: 'No animes found for this season/period' };
+    }
+
+    // 3. Prepare data for bulk insert
+    // We also need previous week's data to calculate trends
+    const previousWeek = week === 1 ? 52 : week - 1;
+    const previousYear = week === 1 ? year - 1 : year; // Simplified logic, ideally use ISO weeks
+
+    const previousRankings = await this.prisma.animeWeeklyRanking.findMany({
+      where: {
+        year: previousYear,
+        season: season, // Comparing within same season context usually
+        week: previousWeek,
+      },
+      select: {
+        animeId: true,
+        rank: true,
+      }
+    });
+
+    const prevRankMap = new Map(previousRankings.map(p => [p.animeId, p.rank]));
+
+    const rankingEntries = topAnimes.map((anime, index) => {
+      const currentRank = index + 1;
+      const prevRank = prevRankMap.get(anime.idAnime);
+      let trend = 0; // 0 = same
+
+      if (prevRank) {
+        trend = prevRank - currentRank; // Positive means moved UP (e.g. 5 -> 3 = +2)
+      } else {
+        trend = 0; // New entry (or first week) -> treat as same or handled by UI as "NEW"
+      }
+
+      return {
+        animeId: anime.idAnime,
+        year,
+        season,
+        week,
+        rank: currentRank,
+        score: null, // We don't have a specific weekly score, relying on global popularity
+        trend,
+      };
+    });
+
+    // 4. Save to DB (Transaction to ensure consistency)
+    await this.prisma.$transaction(
+      rankingEntries.map(entry =>
+        this.prisma.animeWeeklyRanking.upsert({
+          where: {
+            year_week_animeId: {
+              year: entry.year,
+              week: entry.week,
+              animeId: entry.animeId,
+            }
+          },
+          update: {
+            rank: entry.rank,
+            trend: entry.trend,
+          },
+          create: entry,
+        })
+      )
+    );
+
+    return { success: true, count: rankingEntries.length };
+  }
+
+  private _getSeasonDateRange(year: number, season: string): { start: Date, end: Date } {
+    // WINTER: Jan - Mar
+    // SPRING: Apr - Jun
+    // SUMMER: Jul - Sep
+    // FALL: Oct - Dec
+    let startMonth = 0; // 0-indexed
+
+    switch (season.toUpperCase()) {
+      case 'WINTER': startMonth = 0; break; // Jan
+      case 'SPRING': startMonth = 3; break; // Apr
+      case 'SUMMER': startMonth = 6; break; // Jul
+      case 'FALL': startMonth = 9; break; // Oct
+      default: startMonth = 0;
+    }
+
+    const start = new Date(year, startMonth, 1);
+    const end = new Date(year, startMonth + 3, 0); // Last day of the 3rd month
+
+    return { start, end };
   }
 }

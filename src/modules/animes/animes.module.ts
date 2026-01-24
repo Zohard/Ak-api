@@ -18,9 +18,11 @@ import { AnimeImageService } from './services/anime-image.service';
 import { EpisodesService } from './episodes/episodes.service';
 import { EpisodesController, EpisodesScheduleController } from './episodes/episodes.controller';
 
+import { AnimeRankingsController } from './anime-rankings.controller';
+
 @Module({
   imports: [MediaModule, AniListModule, JikanModule, AdminLoggingModule],
-  controllers: [AnimesController, EpisodesController, EpisodesScheduleController],
+  controllers: [AnimesController, EpisodesController, EpisodesScheduleController, AnimeRankingsController],
   providers: [
     AnimesService,
     PrismaService,
