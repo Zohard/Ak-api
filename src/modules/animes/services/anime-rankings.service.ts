@@ -304,19 +304,40 @@ export class AnimeRankingsService {
   }
 
   async generateWeeklyRanking(year: number, season: string, week: number) {
-    // 1. Determine date range for the season (to filter current anime)
-    const { start, end } = this._getSeasonDateRange(year, season);
+    // 1. Convert season string to number (WINTER=1, SPRING=2, SUMMER=3, FALL=4)
+    const saisonNumber = this._seasonStringToNumber(season);
 
-    // 2. Fetch top 20 animes from DB based on popularity + airing date range
-    // We want anime that started airing RECENTLY (within the season or shortly before)
-    // and are currently published (statut = 1)
+    // 2. Get the season record from ak_animes_saisons
+    const saisonRecord = await this.prisma.akAnimesSaisons.findFirst({
+      where: {
+        annee: year,
+        saison: saisonNumber,
+      },
+    });
+
+    if (!saisonRecord) {
+      return { message: `No season found for ${season} ${year}` };
+    }
+
+    // 3. Parse json_data to get anime IDs
+    let animeIds: number[] = [];
+    try {
+      const jsonData = JSON.parse(saisonRecord.jsonData);
+      animeIds = jsonData.animes || [];
+    } catch (e) {
+      return { message: 'Failed to parse season anime data' };
+    }
+
+    if (animeIds.length === 0) {
+      return { message: 'No animes found in this season' };
+    }
+
+    // 4. Fetch top 20 animes from the season's anime list, ordered by popularity
     const topAnimes = await this.prisma.akAnime.findMany({
       where: {
+        idAnime: { in: animeIds },
         statut: 1,
-        dateDiffusion: {
-          gte: start,
-          lte: end,
-        },
+        classementPopularite: { gt: 0 }, // Only animes with valid popularity ranking
       },
       orderBy: {
         classementPopularite: 'asc', // Lower is better (1st, 2nd...)
@@ -396,24 +417,13 @@ export class AnimeRankingsService {
     return { success: true, count: rankingEntries.length };
   }
 
-  private _getSeasonDateRange(year: number, season: string): { start: Date, end: Date } {
-    // WINTER: Jan - Mar
-    // SPRING: Apr - Jun
-    // SUMMER: Jul - Sep
-    // FALL: Oct - Dec
-    let startMonth = 0; // 0-indexed
-
+  private _seasonStringToNumber(season: string): number {
     switch (season.toUpperCase()) {
-      case 'WINTER': startMonth = 0; break; // Jan
-      case 'SPRING': startMonth = 3; break; // Apr
-      case 'SUMMER': startMonth = 6; break; // Jul
-      case 'FALL': startMonth = 9; break; // Oct
-      default: startMonth = 0;
+      case 'WINTER': return 1;
+      case 'SPRING': return 2;
+      case 'SUMMER': return 3;
+      case 'FALL': return 4;
+      default: return 1;
     }
-
-    const start = new Date(year, startMonth, 1);
-    const end = new Date(year, startMonth + 3, 0); // Last day of the 3rd month
-
-    return { start, end };
   }
 }

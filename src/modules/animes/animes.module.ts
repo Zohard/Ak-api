@@ -36,6 +36,6 @@ import { AnimeRankingsController } from './anime-rankings.controller';
     AnimeImageService,
     EpisodesService,
   ],
-  exports: [AnimesService, EpisodesService],
+  exports: [AnimesService, EpisodesService, AnimeRankingsService],
 })
 export class AnimesModule { }
