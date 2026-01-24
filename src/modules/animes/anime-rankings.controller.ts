@@ -4,7 +4,7 @@ import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 // import { AdminGuard } from '../../auth/guards/admin.guard'; // Assuming there is an admin guard
 
 @ApiTags('Anime Rankings')
-@Controller('rankings')
+@Controller('animes/rankings')
 export class AnimeRankingsController {
     constructor(private readonly rankingsService: AnimeRankingsService) { }
 
