@@ -1,5 +1,4 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { Cron, CronExpression } from '@nestjs/schedule';
 import { ReviewsService } from '../reviews/reviews.service';
 import { PrismaService } from '../../shared/services/prisma.service';
 
@@ -13,10 +12,9 @@ export class PopularityJobService {
   ) {}
 
   /**
-   * Daily job: Recalculate popularity for recent reviews (last 7 days)
-   * Runs at 2:00 AM every day
+   * Recalculate popularity for recent reviews (last 7 days)
+   * Triggered by external cron via HTTP endpoint
    */
-  @Cron(CronExpression.EVERY_DAY_AT_2AM)
   async recalculateRecentReviewsPopularity() {
     this.logger.log('Starting daily popularity recalculation for recent reviews');
     
@@ -54,10 +52,9 @@ export class PopularityJobService {
   }
 
   /**
-   * Weekly job: Recalculate popularity for all reviews
-   * Runs every Sunday at 3:00 AM
+   * Recalculate popularity for all reviews
+   * Triggered by external cron via HTTP endpoint
    */
-  @Cron('0 3 * * 0') // Every Sunday at 3:00 AM
   async recalculateAllReviewsPopularity() {
     this.logger.log('Starting weekly popularity recalculation for all reviews');
     
@@ -108,15 +105,10 @@ export class PopularityJobService {
   }
 
   /**
-   * Hourly job: Reset daily view counters
-   * Runs at the beginning of each hour
+   * Reset daily view counters
+   * Triggered by external cron via HTTP endpoint
    */
-  @Cron(CronExpression.EVERY_HOUR)
   async resetDailyCounters() {
-    // Only reset at midnight
-    const now = new Date();
-    if (now.getHours() !== 0) return;
-
     this.logger.log('Resetting daily view counters');
     
     try {
@@ -131,10 +123,9 @@ export class PopularityJobService {
   }
 
   /**
-   * Weekly job: Reset weekly view counters
-   * Runs every Monday at midnight
+   * Reset weekly view counters
+   * Triggered by external cron via HTTP endpoint
    */
-  @Cron('0 0 * * 1') // Every Monday at midnight
   async resetWeeklyCounters() {
     this.logger.log('Resetting weekly view counters');
     
@@ -150,10 +141,9 @@ export class PopularityJobService {
   }
 
   /**
-   * Monthly job: Reset monthly view counters
-   * Runs on the first day of each month at midnight
+   * Reset monthly view counters
+   * Triggered by external cron via HTTP endpoint
    */
-  @Cron('0 0 1 * *') // First day of every month at midnight
   async resetMonthlyCounters() {
     this.logger.log('Resetting monthly view counters');
     
