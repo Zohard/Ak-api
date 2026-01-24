@@ -127,3 +127,22 @@ scripts/*
 !prisma/*.sql
 IMAGE_MIGRATION_README.md
 verify_tab_cleanup.sql
+
+# Migration scripts and docs
+.env.migration.example
+BACKEND_UPDATE_SUMMARY.md
+MIGRATION_README.md
+R2_MIGRATION_GUIDE.md
+R2_MIGRATION_SUMMARY.md
+cleanup_r2.py
+install_r2_deps.sh
+migrate.sh
+migration_progress.json
+rebuild-docker.sh
+requirements.txt
+run-check.sh
+test_imagekit_response.py
+update_to_r2.sh
+upload_to_r2.py
+verify-redis-config.js
+docs/CRON_JOBS_DOCUMENTATION.md
