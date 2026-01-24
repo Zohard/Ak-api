@@ -352,6 +352,8 @@ export class AdminMangasService {
     const existing = await this.prisma.akManga.findUnique({ where: { idManga: id } });
     if (!existing) throw new NotFoundException('Manga introuvable');
     await this.prisma.akManga.delete({ where: { idManga: id } });
+    // Delete admin activity logs for this manga
+    await this.adminLogging.deleteLog(id, 'manga');
     return { message: 'Manga supprimé' };
   }
 

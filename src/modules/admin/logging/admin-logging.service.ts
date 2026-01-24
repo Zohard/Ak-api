@@ -74,6 +74,26 @@ export class AdminLoggingService {
   }
 
   /**
+   * Delete log entry for a specific content item
+   */
+  async deleteLog(
+    contentId: number,
+    contentType: 'anime' | 'manga' | 'business' | 'jeu_video',
+  ): Promise<void> {
+    try {
+      await this.prisma.$executeRawUnsafe(
+        `DELETE FROM ak_logs_admin WHERE ${contentType} = $1`,
+        contentId,
+      );
+    } catch (error) {
+      console.error(
+        `Failed to delete log for ${contentType} ${contentId}:`,
+        error,
+      );
+    }
+  }
+
+  /**
    * Get logs for a specific content item
    */
   async getLogs(

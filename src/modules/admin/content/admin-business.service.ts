@@ -119,6 +119,8 @@ export class AdminBusinessService {
     const existing = await this.prisma.akBusiness.findUnique({ where: { idBusiness: id } });
     if (!existing) throw new NotFoundException('Fiche business introuvable');
     await this.prisma.akBusiness.delete({ where: { idBusiness: id } });
+    // Delete admin activity logs for this business
+    await this.adminLogging.deleteLog(id, 'business');
     return { message: 'Business supprimé' };
   }
 

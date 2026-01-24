@@ -64,11 +64,16 @@ export class AdminAnimesService {
     if (ficheComplete !== undefined) where.ficheComplete = ficheComplete;
     if (statut !== undefined) where.statut = statut;
 
-    // Sort "En attente" (status 2) first, then by the requested sort
-    const orderBy = [
-      { statut: 'desc' as const }, // This puts 2 (En attente) before 1 (Publié) and 0 (Refusé)
-      { [sortBy]: sortOrder }
-    ] as any;
+    // Build order by - only add status sort if not filtering by specific status
+    const orderBy: any[] = [];
+
+    // Only sort by status first if viewing all statuses (no status filter)
+    if (statut === undefined) {
+      orderBy.push({ statut: 'desc' as const }); // 2 (En attente) before 1 (Publié) before 0 (Refusé)
+    }
+
+    // Add the requested sort with nulls last handling
+    orderBy.push({ [sortBy]: { sort: sortOrder, nulls: 'last' } });
 
     const [items, total] = await Promise.all([
       this.prisma.akAnime.findMany({ where, skip, take: limit, orderBy }),
@@ -361,6 +366,9 @@ export class AdminAnimesService {
     if (!existing) throw new NotFoundException('Anime introuvable');
 
     await this.prisma.akAnime.delete({ where: { idAnime: id } });
+
+    // Delete admin activity logs for this anime
+    await this.adminLogging.deleteLog(id, 'anime');
 
     // Invalidate cache
     await this.cacheService.invalidateAnime(id);

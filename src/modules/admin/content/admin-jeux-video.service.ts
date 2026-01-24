@@ -382,6 +382,8 @@ export class AdminJeuxVideoService {
     if (!existing) throw new NotFoundException('Jeu vidéo introuvable');
 
     await this.prisma.akJeuxVideo.delete({ where: { idJeu: id } });
+    // Delete admin activity logs for this game
+    await this.adminLogging.deleteLog(id, 'jeu_video');
     return { message: 'Jeu vidéo supprimé' };
   }
 
