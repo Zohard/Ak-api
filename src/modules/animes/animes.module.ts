@@ -20,8 +20,10 @@ import { EpisodesController, EpisodesScheduleController } from './episodes/episo
 
 import { AnimeRankingsController } from './anime-rankings.controller';
 
+import { HttpModule } from '@nestjs/axios';
+
 @Module({
-  imports: [MediaModule, AniListModule, JikanModule, AdminLoggingModule],
+  imports: [HttpModule, MediaModule, AniListModule, JikanModule, AdminLoggingModule],
   controllers: [AnimesController, EpisodesController, EpisodesScheduleController, AnimeRankingsController],
   providers: [
     AnimesService,
