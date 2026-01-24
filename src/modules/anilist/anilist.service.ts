@@ -97,6 +97,8 @@ export interface AniListManga {
   id: number;
   title: { romaji: string; english?: string; native: string };
   description?: string;
+  format?: string;
+  countryOfOrigin?: string;
   startDate?: { year?: number; month?: number; day?: number };
   endDate?: { year?: number; month?: number; day?: number };
   coverImage: { extraLarge?: string; large: string; medium: string };
@@ -908,6 +910,8 @@ export class AniListService {
             id
             title { romaji english native }
             description
+            format
+            countryOfOrigin
             startDate { year month day }
             endDate { year month day }
             coverImage { large medium }
@@ -956,6 +960,8 @@ export class AniListService {
           id
           title { romaji english native }
           description
+          format
+          countryOfOrigin
           startDate { year month day }
           endDate { year month day }
           coverImage { large medium }
@@ -1046,6 +1052,13 @@ export class AniListService {
       ...(publishers.length > 0 && { publisher: publishers })
     };
 
+    // Map manga format
+    const mangaFormatMap: Record<string, string> = {
+      'MANGA': 'Manga',
+      'ONE_SHOT': 'One Shot',
+      'NOVEL': 'Light Novel',
+    };
+
     return {
       titre: anilistManga.title.romaji || anilistManga.title.english || anilistManga.title.native,
       titreOriginal: anilistManga.title.native,
@@ -1059,6 +1072,7 @@ export class AniListService {
         .filter((title, index, arr) => arr.indexOf(title) === index)
         .join('\n'),
       annee: anilistManga.startDate?.year ? String(anilistManga.startDate.year) : undefined,
+      format: anilistManga.format ? (mangaFormatMap[anilistManga.format] || anilistManga.format) : undefined,
       image: anilistManga.coverImage?.extraLarge || anilistManga.coverImage?.large || anilistManga.coverImage?.medium,
       nbVolumes: anilistManga.volumes ? String(anilistManga.volumes) : undefined,
       siteOfficiel: officialWebsite,
@@ -1069,7 +1083,9 @@ export class AniListService {
         genres: anilistManga.genres,
         score: anilistManga.averageScore,
         staff: staffData,
+        countryOfOrigin: anilistManga.countryOfOrigin,
         originalData: {
+          format: anilistManga.format,
           chapters: anilistManga.chapters,
           volumes: anilistManga.volumes,
           bannerImage: anilistManga.bannerImage,
@@ -1139,6 +1155,8 @@ export class AniListService {
             id
             title { romaji english native }
             description
+            format
+            countryOfOrigin
             startDate { year month day }
             endDate { year month day }
             coverImage { large medium }
