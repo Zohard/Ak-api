@@ -4,7 +4,7 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 
-@Controller('api/system-settings')
+@Controller('system-settings')
 export class SystemSettingsController {
     constructor(private readonly settingsService: SystemSettingsService) { }
 
