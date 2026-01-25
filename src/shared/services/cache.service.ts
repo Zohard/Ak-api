@@ -641,7 +641,11 @@ export class CacheService implements OnModuleInit {
       favorites: 'user:*:favorites',
       top: 'top:*',
       events: 'events:*',
-      forums: 'forums:*'
+      forums: 'forums:*',
+      user_profiles: 'user_profile:*',
+      user_stats: 'user_stats:*',
+      user_reviews: 'user_reviews:*',
+      user_activity: 'user_activity:*'
     };
 
     const result: Record<string, string[]> = {};
@@ -734,6 +738,10 @@ export class CacheService implements OnModuleInit {
       top: 'top:*',
       events: 'events:*',
       forums: 'forums:*',
+      user_profiles: 'user_profile:*',
+      user_stats: 'user_stats:*',
+      user_reviews: 'user_reviews:*',
+      user_activity: 'user_activity:*',
       all: '*'
     };
 

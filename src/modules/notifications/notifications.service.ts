@@ -514,6 +514,13 @@ export class NotificationsService {
   }
 
   private async storeNotification(data: NotificationData): Promise<void> {
+    // Check for duplicate notification (same user, type, and key data within 24 hours)
+    const isDuplicate = await this.checkDuplicateNotification(data);
+    if (isDuplicate) {
+      this.logger.debug(`Duplicate notification skipped: ${data.type} for user ${data.userId}`);
+      return;
+    }
+
     const jsonData = data.data ? JSON.stringify(data.data) : null;
     await this.prisma.$executeRaw`
       INSERT INTO user_notifications (
@@ -534,6 +541,55 @@ export class NotificationsService {
         NOW()
       )
     `;
+  }
+
+  /**
+   * Check if a similar notification was already sent within 24 hours
+   */
+  private async checkDuplicateNotification(data: NotificationData): Promise<boolean> {
+    try {
+      let duplicateCheck: any[] = [];
+
+      if (data.type === 'episode_release' && data.data?.episodeId) {
+        // For episode releases, check by episodeId
+        duplicateCheck = await this.prisma.$queryRaw`
+          SELECT 1 FROM user_notifications
+          WHERE user_id = ${data.userId}
+            AND type = ${data.type}
+            AND data->>'episodeId' = ${String(data.data.episodeId)}
+            AND created_at > NOW() - INTERVAL '24 hours'
+          LIMIT 1
+        `;
+      } else if (data.type === 'review_liked' && data.data?.reviewId) {
+        // For review likes, check by reviewId and reactorId
+        duplicateCheck = await this.prisma.$queryRaw`
+          SELECT 1 FROM user_notifications
+          WHERE user_id = ${data.userId}
+            AND type = ${data.type}
+            AND data->>'reviewId' = ${String(data.data.reviewId)}
+            AND data->>'reactorId' = ${String(data.data.reactorId || '')}
+            AND created_at > NOW() - INTERVAL '24 hours'
+          LIMIT 1
+        `;
+      } else if (data.data?.animeId || data.data?.mangaId) {
+        // For other content-related notifications
+        const contentId = data.data.animeId || data.data.mangaId;
+        const contentKey = data.data.animeId ? 'animeId' : 'mangaId';
+        duplicateCheck = await this.prisma.$queryRaw`
+          SELECT 1 FROM user_notifications
+          WHERE user_id = ${data.userId}
+            AND type = ${data.type}
+            AND data->>${contentKey} = ${String(contentId)}
+            AND created_at > NOW() - INTERVAL '24 hours'
+          LIMIT 1
+        `;
+      }
+
+      return duplicateCheck.length > 0;
+    } catch (error) {
+      this.logger.warn(`Error checking duplicate notification: ${error.message}`);
+      return false; // Allow notification if check fails
+    }
   }
 
   private async sendEmail(data: NotificationData): Promise<void> {

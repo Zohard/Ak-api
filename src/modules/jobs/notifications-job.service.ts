@@ -1,5 +1,4 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../../shared/services/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 
@@ -12,7 +11,7 @@ export class NotificationsJobService {
         private readonly notificationsService: NotificationsService,
     ) { }
 
-    @Cron(CronExpression.EVERY_DAY_AT_10AM)
+    // Removed @Cron decorator - now triggered via external cron calling /api/notifications/cron/check-releases
     async checkDailyEpisodes() {
         this.logger.log('Starting daily episode check...');
         try {
