@@ -10,7 +10,7 @@ import axios from 'axios';
 
 @Injectable()
 export class BusinessService {
-  constructor(private readonly prisma: PrismaService, private readonly r2Service: R2Service) {}
+  constructor(private readonly prisma: PrismaService, private readonly r2Service: R2Service) { }
 
   async create(createBusinessDto: CreateBusinessDto) {
     // Check if denomination already exists
@@ -227,29 +227,19 @@ export class BusinessService {
   }
 
   async search(searchDto: BusinessSearchDto) {
-    const { q, limit = 10 } = searchDto;
-
-    if (!q || q.trim().length === 0) {
+    const term = q.trim();
+    if (term.length === 0) {
       return { data: [] };
     }
 
-    const businesses = await this.prisma.akBusiness.findMany({
+    // 1. Search for items starting with the query (Primary matches)
+    const startsWithMatches = await this.prisma.akBusiness.findMany({
       where: {
         statut: 1,
-        OR: [
-          {
-            denomination: {
-              contains: q.trim(),
-              mode: 'insensitive',
-            },
-          },
-          {
-            autresDenominations: {
-              contains: q.trim(),
-              mode: 'insensitive',
-            },
-          },
-        ],
+        denomination: {
+          startsWith: term,
+          mode: 'insensitive',
+        },
       },
       select: {
         idBusiness: true,
@@ -262,8 +252,48 @@ export class BusinessService {
       take: limit,
     });
 
+    let finalBusinesses = [...startsWithMatches];
+
+    // 2. If we haven't reached the limit, search for other matches
+    if (finalBusinesses.length < limit) {
+      const remainingLimit = limit - finalBusinesses.length;
+      const existingIds = finalBusinesses.map(b => b.idBusiness);
+
+      const otherMatches = await this.prisma.akBusiness.findMany({
+        where: {
+          statut: 1,
+          idBusiness: { notIn: existingIds },
+          OR: [
+            {
+              denomination: {
+                contains: term,
+                mode: 'insensitive',
+              },
+            },
+            {
+              autresDenominations: {
+                contains: term,
+                mode: 'insensitive',
+              },
+            },
+          ],
+        },
+        select: {
+          idBusiness: true,
+          denomination: true,
+          type: true,
+          origine: true,
+          siteOfficiel: true,
+        },
+        orderBy: { denomination: 'asc' },
+        take: remainingLimit,
+      });
+
+      finalBusinesses = [...finalBusinesses, ...otherMatches];
+    }
+
     return {
-      data: businesses.map((business) => ({
+      data: finalBusinesses.map((business) => ({
         id: business.idBusiness,
         denomination: business.denomination,
         type: business.type,
@@ -692,10 +722,10 @@ export class BusinessService {
         const imgMeta = post.postMeta.find(meta => meta.metaKey === 'img');
 
         const coverImage = imgunebigMeta?.metaValue ||
-                          imgunebig2Meta?.metaValue ||
-                          akImgMeta?.metaValue ||
-                          imgMeta?.metaValue ||
-                          null;
+          imgunebig2Meta?.metaValue ||
+          akImgMeta?.metaValue ||
+          imgMeta?.metaValue ||
+          null;
 
         return {
           id: post.ID,
