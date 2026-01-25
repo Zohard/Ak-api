@@ -1,8 +1,8 @@
 import { Controller, Get, Patch, Body, Param, UseGuards, UnauthorizedException } from '@nestjs/common';
 import { SystemSettingsService } from './system-settings.service';
-import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { RolesGuard } from '../rbac/roles.guard';
-import { Roles } from '../rbac/roles.decorator';
+import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { RolesGuard } from '../../common/guards/roles.guard';
+import { Roles } from '../../common/decorators/roles.decorator';
 
 @Controller('api/system-settings')
 export class SystemSettingsController {
