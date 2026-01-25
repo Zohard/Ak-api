@@ -1473,3 +1473,14 @@ model AkUserFavorite {
   @@index([userId, type])
   @@map("ak_user_favorites")
 }
+
+// System Settings (Maintenance mode, etc.)
+model AkSystemSetting {
+  id          Int      @id @default(autoincrement())
+  key         String   @unique @db.VarChar(100)
+  value       String   @db.Text // JSON or simple string
+  description String?  @db.Text
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("ak_system_settings")
+}
