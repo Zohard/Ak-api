@@ -889,6 +889,8 @@ export class AdminContentService {
 
   async searchAnimeByName(query: string, limit = 10) {
     const q = `%${query}%`;
+    const qStart = `${query}%`;
+
     const rows = await this.prisma.$queryRaw`
       SELECT
         id_anime as id,
@@ -898,7 +900,13 @@ export class AdminContentService {
         statut
       FROM ak_animes
       WHERE titre ILIKE ${q} OR titre_orig ILIKE ${q}
-      ORDER BY titre
+      ORDER BY 
+        CASE 
+          WHEN titre ILIKE ${qStart} THEN 0 
+          WHEN titre_orig ILIKE ${qStart} THEN 1
+          ELSE 2 
+        END,
+        titre
       LIMIT ${limit}
     `;
     return { items: rows };
@@ -906,6 +914,8 @@ export class AdminContentService {
 
   async searchMangaByName(query: string, limit = 10) {
     const q = `%${query}%`;
+    const qStart = `${query}%`;
+
     const rows = await this.prisma.$queryRaw`
       SELECT
         id_manga as id,
@@ -915,7 +925,13 @@ export class AdminContentService {
         statut
       FROM ak_mangas
       WHERE titre ILIKE ${q} OR titre_orig ILIKE ${q}
-      ORDER BY titre
+      ORDER BY 
+        CASE 
+          WHEN titre ILIKE ${qStart} THEN 0 
+          WHEN titre_orig ILIKE ${qStart} THEN 1
+          ELSE 2 
+        END,
+        titre
       LIMIT ${limit}
     `;
     return { items: rows };

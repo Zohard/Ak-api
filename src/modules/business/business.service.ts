@@ -227,10 +227,14 @@ export class BusinessService {
   }
 
   async search(searchDto: BusinessSearchDto) {
-    const term = q.trim();
-    if (term.length === 0) {
+    // Destructure search params
+    const { q, limit = 10 } = searchDto;
+
+    if (!q || q.trim().length === 0) {
       return { data: [] };
     }
+
+    const term = q.trim();
 
     // 1. Search for items starting with the query (Primary matches)
     const startsWithMatches = await this.prisma.akBusiness.findMany({

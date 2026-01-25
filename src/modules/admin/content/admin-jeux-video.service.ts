@@ -69,6 +69,8 @@ export class AdminJeuxVideoService {
 
   async searchByName(query: string, limit = 10) {
     const q = `%${query}%`;
+    const qStart = `${query}%`;
+
     const rows = await this.prisma.$queryRaw`
       SELECT
         id_jeu as id,
@@ -77,7 +79,12 @@ export class AdminJeuxVideoService {
         statut
       FROM ak_jeux_video
       WHERE titre ILIKE ${q}
-      ORDER BY titre
+      ORDER BY 
+        CASE 
+          WHEN titre ILIKE ${qStart} THEN 0 
+          ELSE 1 
+        END,
+        titre
       LIMIT ${limit}
     `;
     return { items: rows };
