@@ -472,7 +472,7 @@ export class CollectionsService {
 
     // Helper to determine orderBy for Prisma
     const getOrderBy = (mType: 'anime' | 'manga') => {
-      const order = sortOrder || 'desc';
+      const order: 'asc' | 'desc' = sortOrder === 'asc' ? 'asc' : 'desc';
       if (sortBy === 'rating') return { evaluation: order };
       if (sortBy === 'title' || sortBy === 'name') return mType === 'anime' ? { anime: { titre: order } } : { manga: { titre: order } };
       if (sortBy === 'updatedAt') return { updatedAt: order };
@@ -577,7 +577,7 @@ export class CollectionsService {
           ];
         }
         if (year) {
-          mangaWhere.manga.annee = year;
+          mangaWhere.manga.annee = String(year); // manga.annee is varchar
         }
       }
 
@@ -657,7 +657,7 @@ export class CollectionsService {
       }
       if (year) {
         animeWhere.anime.annee = year;
-        mangaWhere.manga.annee = year;
+        mangaWhere.manga.annee = String(year); // manga.annee is varchar
       }
     }
 
