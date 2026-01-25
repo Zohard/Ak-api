@@ -493,10 +493,11 @@ export class CollectionsService {
       if (hasAnimeFilter) {
         animeWhere.anime = {};
         if (search) {
-          animeWhere.anime.titre = {
-            contains: search,
-            mode: 'insensitive',
-          };
+          animeWhere.anime.OR = [
+            { titre: { contains: search, mode: 'insensitive' } },
+            { titreOrig: { contains: search, mode: 'insensitive' } },
+            { titresAlternatifs: { contains: search, mode: 'insensitive' } },
+          ];
         }
         if (year) {
           animeWhere.anime.annee = year;
@@ -569,10 +570,11 @@ export class CollectionsService {
       if (hasMangaFilter) {
         mangaWhere.manga = {};
         if (search) {
-          mangaWhere.manga.titre = {
-            contains: search,
-            mode: 'insensitive',
-          };
+          mangaWhere.manga.OR = [
+            { titre: { contains: search, mode: 'insensitive' } },
+            { titreOrig: { contains: search, mode: 'insensitive' } },
+            { titresAlternatifs: { contains: search, mode: 'insensitive' } },
+          ];
         }
         if (year) {
           mangaWhere.manga.annee = year;
@@ -642,8 +644,16 @@ export class CollectionsService {
       animeWhere.anime = {};
       mangaWhere.manga = {};
       if (search) {
-        animeWhere.anime.titre = { contains: search, mode: 'insensitive' };
-        mangaWhere.manga.titre = { contains: search, mode: 'insensitive' };
+        animeWhere.anime.OR = [
+          { titre: { contains: search, mode: 'insensitive' } },
+          { titreOrig: { contains: search, mode: 'insensitive' } },
+          { titresAlternatifs: { contains: search, mode: 'insensitive' } },
+        ];
+        mangaWhere.manga.OR = [
+          { titre: { contains: search, mode: 'insensitive' } },
+          { titreOrig: { contains: search, mode: 'insensitive' } },
+          { titresAlternatifs: { contains: search, mode: 'insensitive' } },
+        ];
       }
       if (year) {
         animeWhere.anime.annee = year;
