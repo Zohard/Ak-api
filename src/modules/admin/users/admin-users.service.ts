@@ -10,7 +10,7 @@ import { UserActionLogDto } from './dto/user-action-log.dto';
 
 @Injectable()
 export class AdminUsersService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) { }
 
   async findAll(query: UserAdminQueryDto) {
     const {
@@ -162,6 +162,15 @@ export class AdminUsersService {
       LIMIT 10
     `;
 
+    // Get connection logs
+    const connectionLogs = await this.prisma.$queryRaw`
+      SELECT id_login, time, ip, ip2
+      FROM smf_member_logins
+      WHERE id_member = ${id}
+      ORDER BY time DESC
+      LIMIT 50
+    `;
+
     // Convert BigInt values to numbers for JSON serialization
     const userData = (user as any[])[0];
     const convertBigIntToNumber = (obj: any): any => {
@@ -181,6 +190,7 @@ export class AdminUsersService {
     return {
       user: convertBigIntToNumber(userData),
       recent_activity: convertBigIntToNumber(recentActivity),
+      connection_logs: convertBigIntToNumber(connectionLogs),
     };
   }
 
