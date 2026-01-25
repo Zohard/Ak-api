@@ -178,6 +178,34 @@ export class JobsCronController {
         };
     }
 
+    @Post('reviews/rankings')
+    @UseGuards(OptionalJwtAuthGuard, CronAuthGuard)
+    @ApiHeader({
+        name: 'x-cron-api-key',
+        description: 'API Key for external cron jobs',
+        required: false,
+    })
+    @ApiOperation({
+        summary: 'Update review popularity rankings',
+        description: 'Calculates popularity scores for all reviews based on views, interactions (c=Convaincante, a=Amusante, o=Originale, y=Agree, n=Disagree), and other factors. Updates classementPopularite and stores historical rankings in variationPopularite as JSON.',
+    })
+    @ApiResponse({ status: 200, description: 'Review rankings updated successfully' })
+    async updateReviewRankings() {
+        const startTime = Date.now();
+        const result = await this.popularityJobService.updateReviewRankings();
+        const duration = Date.now() - startTime;
+
+        return {
+            success: result.success,
+            job: 'review-rankings',
+            message: result.message,
+            stats: result.stats,
+            top10: result.top10,
+            duration: `${duration}ms`,
+            timestamp: new Date().toISOString(),
+        };
+    }
+
     private getCurrentSeasonInfo(): { year: number; season: string; week: number } {
         const now = new Date();
         const year = now.getFullYear();

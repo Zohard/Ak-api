@@ -9,6 +9,7 @@ import { EventsModule } from '../events/events.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { AnimesModule } from '../animes/animes.module';
 import { PrismaService } from '../../shared/services/prisma.service';
+import { PopularityService } from '../../shared/services/popularity.service';
 
 @Module({
   imports: [
@@ -19,7 +20,7 @@ import { PrismaService } from '../../shared/services/prisma.service';
     AnimesModule,
   ],
   controllers: [JobsCronController],
-  providers: [PopularityJobService, EventsJobService, NotificationsJobService, PrismaService],
+  providers: [PopularityJobService, EventsJobService, NotificationsJobService, PrismaService, PopularityService],
   exports: [PopularityJobService, EventsJobService, NotificationsJobService],
 })
 export class JobsModule { }
