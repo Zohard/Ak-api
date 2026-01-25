@@ -489,6 +489,9 @@ export class CollectionsController {
   @ApiParam({ name: 'type', type: 'number', description: 'Collection type (1-4)' })
   @ApiQuery({ name: 'page', required: false, type: Number, description: 'Page number' })
   @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Items per page' })
+  @ApiQuery({ name: 'year', required: false, type: Number, description: 'Filter by anime year' })
+  @ApiQuery({ name: 'sortBy', required: false, type: String, description: 'Sort by field (createdAt, rating, title, updatedAt, notes)' })
+  @ApiQuery({ name: 'sortOrder', required: false, enum: ['asc', 'desc'], description: 'Sort order' })
   @ApiResponse({ status: 200, description: 'Collection animes retrieved successfully' })
   @ApiResponse({ status: 404, description: 'Collection not found' })
   getCollectionAnimes(
@@ -496,11 +499,14 @@ export class CollectionsController {
     @Param('type', ParseIntPipe) type: number,
     @Query('page') page: string = '1',
     @Query('limit') limit: string = '20',
+    @Query('year', new ParseIntPipe({ optional: true })) year: number | undefined,
+    @Query('sortBy') sortBy: string | undefined,
+    @Query('sortOrder') sortOrder: 'asc' | 'desc' | undefined,
     @Request() req,
   ) {
     const currentUserId = req.user?.id;
     // Note: getCollectionAnimes is still in CollectionsService as it returns ITEMS
-    return this.collectionsService.getCollectionAnimes(userId, type, parseInt(page), parseInt(limit), currentUserId);
+    return this.collectionsService.getCollectionAnimes(userId, type, parseInt(page), parseInt(limit), currentUserId, year, sortBy, sortOrder);
   }
 
   @Post('user/:userId/type/:type/animes')
@@ -550,6 +556,9 @@ export class CollectionsController {
   @ApiParam({ name: 'type', type: 'number', description: 'Collection type (1-4)' })
   @ApiQuery({ name: 'page', required: false, type: Number, description: 'Page number' })
   @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Items per page' })
+  @ApiQuery({ name: 'year', required: false, type: Number, description: 'Filter by manga year' })
+  @ApiQuery({ name: 'sortBy', required: false, type: String, description: 'Sort by field (createdAt, rating, title, updatedAt, notes)' })
+  @ApiQuery({ name: 'sortOrder', required: false, enum: ['asc', 'desc'], description: 'Sort order' })
   @ApiResponse({ status: 200, description: 'Collection mangas retrieved successfully' })
   @ApiResponse({ status: 404, description: 'Collection not found' })
   getCollectionMangas(
@@ -557,10 +566,13 @@ export class CollectionsController {
     @Param('type', ParseIntPipe) type: number,
     @Query('page') page: string = '1',
     @Query('limit') limit: string = '20',
+    @Query('year', new ParseIntPipe({ optional: true })) year: number | undefined,
+    @Query('sortBy') sortBy: string | undefined,
+    @Query('sortOrder') sortOrder: 'asc' | 'desc' | undefined,
     @Request() req,
   ) {
     const currentUserId = req.user?.id;
-    return this.collectionsService.getCollectionMangas(userId, type, parseInt(page), parseInt(limit), currentUserId);
+    return this.collectionsService.getCollectionMangas(userId, type, parseInt(page), parseInt(limit), currentUserId, year, sortBy, sortOrder);
   }
 
   @Post('user/:userId/type/:type/mangas')

@@ -1007,11 +1007,20 @@ export class CollectionsService {
   // findCollectionByType moved to CollectionBrowseService
 
   // Optimized anime collections fetch with efficient queries
-  async getCollectionAnimes(userId: number, type: number, page: number = 1, limit: number = 20, currentUserId?: number) {
+  async getCollectionAnimes(
+    userId: number,
+    type: number,
+    page: number = 1,
+    limit: number = 20,
+    currentUserId?: number,
+    year?: number,
+    sortBy?: string,
+    sortOrder: 'asc' | 'desc' = 'desc'
+  ) {
     const isOwnCollection = currentUserId === userId;
 
     // Create cache key for this specific request
-    const cacheKey = `collection_animes:${userId}:${type}:${page}:${limit}:${isOwnCollection ? 'own' : 'public'}`;
+    const cacheKey = `collection_animes:${userId}:${type}:${page}:${limit}:${isOwnCollection ? 'own' : 'public'}:${year || 'all'}:${sortBy || 'def'}:${sortOrder}`;
 
     // Try to get from cache first
     const cached = await this.cacheService.get(cacheKey);
@@ -1019,12 +1028,35 @@ export class CollectionsService {
       return cached;
     }
 
-    // Use Promise.all for parallel queries
-    const whereClause = {
+    // Build where clause with year filter
+    const whereClause: any = {
       idMembre: userId,
       ...(type !== undefined && type !== null && type !== 0 ? { type: type } : {}),
       ...(isOwnCollection ? {} : { isPublic: true })
     };
+
+    // Add year filter on the anime relation
+    if (year) {
+      whereClause.anime = {
+        annee: year
+      };
+    }
+
+    // Determine orderBy based on sortBy parameter
+    const order: 'asc' | 'desc' = sortOrder || 'desc';
+    let orderBy: any = { createdAt: order };
+
+    if (sortBy === 'rating') {
+      orderBy = { evaluation: order };
+    } else if (sortBy === 'title') {
+      orderBy = { anime: { titre: order } };
+    } else if (sortBy === 'updatedAt') {
+      orderBy = { updatedAt: order };
+    } else if (sortBy === 'notes') {
+      orderBy = { notes: order };
+    } else if (sortBy === 'createdAt') {
+      orderBy = { createdAt: order };
+    }
 
     const [total, animeItems, statusCounts] = await Promise.all([
       this.prisma.collectionAnime.count({ where: whereClause }),
@@ -1032,7 +1064,7 @@ export class CollectionsService {
         where: whereClause,
         skip: (page - 1) * limit,
         take: limit,
-        orderBy: { createdAt: 'desc' },
+        orderBy,
         include: {
           anime: {
             select: {
@@ -1048,10 +1080,6 @@ export class CollectionsService {
             }
           }
         }
-      }),
-      this.prisma.collectionAnime.findMany({
-        where: { idMembre: userId, ...(isOwnCollection ? {} : { isPublic: true }) },
-        orderBy: { createdAt: 'desc' },
       }),
       // Get all status counts
       this.collectionStatisticsService.getStatusCounts(userId, 'anime', type)
@@ -1211,11 +1239,20 @@ export class CollectionsService {
   }
 
   // Optimized manga collections fetch with efficient queries
-  async getCollectionMangas(userId: number, type: number, page: number = 1, limit: number = 20, currentUserId?: number) {
+  async getCollectionMangas(
+    userId: number,
+    type: number,
+    page: number = 1,
+    limit: number = 20,
+    currentUserId?: number,
+    year?: number,
+    sortBy?: string,
+    sortOrder: 'asc' | 'desc' = 'desc'
+  ) {
     const isOwnCollection = currentUserId === userId;
 
     // Create cache key for this specific request
-    const cacheKey = `collection_mangas:${userId}:${type}:${page}:${limit}:${isOwnCollection ? 'own' : 'public'}`;
+    const cacheKey = `collection_mangas:${userId}:${type}:${page}:${limit}:${isOwnCollection ? 'own' : 'public'}:${year || 'all'}:${sortBy || 'def'}:${sortOrder}`;
 
     // Try to get from cache first
     const cached = await this.cacheService.get(cacheKey);
@@ -1223,12 +1260,35 @@ export class CollectionsService {
       return cached;
     }
 
-    // Use Promise.all for parallel queries
-    const whereClause = {
+    // Build where clause with year filter
+    const whereClause: any = {
       idMembre: userId,
       ...(type !== undefined && type !== null && type !== 0 ? { type: type } : {}),
       ...(isOwnCollection ? {} : { isPublic: true })
     };
+
+    // Add year filter on the manga relation (manga.annee is varchar)
+    if (year) {
+      whereClause.manga = {
+        annee: String(year)
+      };
+    }
+
+    // Determine orderBy based on sortBy parameter
+    const order: 'asc' | 'desc' = sortOrder || 'desc';
+    let orderBy: any = { createdAt: order };
+
+    if (sortBy === 'rating') {
+      orderBy = { evaluation: order };
+    } else if (sortBy === 'title') {
+      orderBy = { manga: { titre: order } };
+    } else if (sortBy === 'updatedAt') {
+      orderBy = { updatedAt: order };
+    } else if (sortBy === 'notes') {
+      orderBy = { notes: order };
+    } else if (sortBy === 'createdAt') {
+      orderBy = { createdAt: order };
+    }
 
     const [total, mangaItems, statusCounts] = await Promise.all([
       this.prisma.collectionManga.count({ where: whereClause }),
@@ -1236,7 +1296,7 @@ export class CollectionsService {
         where: whereClause,
         skip: (page - 1) * limit,
         take: limit,
-        orderBy: { createdAt: 'desc' },
+        orderBy,
         include: {
           manga: {
             select: {
