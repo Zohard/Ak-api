@@ -771,4 +771,48 @@ export class CacheService implements OnModuleInit {
   async invalidateFriendsActivity(userId: number): Promise<void> {
     await this.delByPattern(`friends_activity:${userId}:*`);
   }
+
+  // User public profile cache methods
+  async getUserProfile(pseudo: string): Promise<any> {
+    return this.get(`user_profile:${pseudo.toLowerCase()}`);
+  }
+
+  async setUserProfile(pseudo: string, data: any, ttl = 300): Promise<void> {
+    await this.set(`user_profile:${pseudo.toLowerCase()}`, data, ttl); // 5 minutes
+  }
+
+  async getUserStats(pseudo: string): Promise<any> {
+    return this.get(`user_stats:${pseudo.toLowerCase()}`);
+  }
+
+  async setUserStats(pseudo: string, data: any, ttl = 300): Promise<void> {
+    await this.set(`user_stats:${pseudo.toLowerCase()}`, data, ttl); // 5 minutes
+  }
+
+  async getUserReviews(pseudo: string, key: string): Promise<any> {
+    return this.get(`user_reviews:${pseudo.toLowerCase()}:${key}`);
+  }
+
+  async setUserReviews(pseudo: string, key: string, data: any, ttl = 180): Promise<void> {
+    await this.set(`user_reviews:${pseudo.toLowerCase()}:${key}`, data, ttl); // 3 minutes
+  }
+
+  async getUserActivity(pseudo: string, limit: number): Promise<any> {
+    return this.get(`user_activity:${pseudo.toLowerCase()}:${limit}`);
+  }
+
+  async setUserActivity(pseudo: string, limit: number, data: any, ttl = 120): Promise<void> {
+    await this.set(`user_activity:${pseudo.toLowerCase()}:${limit}`, data, ttl); // 2 minutes
+  }
+
+  async invalidateUserProfile(pseudo: string): Promise<void> {
+    const lowerPseudo = pseudo.toLowerCase();
+    await Promise.all([
+      this.del(`user_profile:${lowerPseudo}`),
+      this.del(`user_stats:${lowerPseudo}`),
+      this.delByPattern(`user_reviews:${lowerPseudo}:*`),
+      this.delByPattern(`user_activity:${lowerPseudo}:*`),
+    ]);
+    this.logger.debug(`Invalidated user profile cache for: ${pseudo}`);
+  }
 }

@@ -5,6 +5,7 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { PrismaService } from '../../shared/services/prisma.service';
+import { CacheService } from '../../shared/services/cache.service';
 import { hasAdminAccess, getRoleName } from '../../shared/constants/rbac.constants';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { UserQueryDto } from './dto/user-query.dto';
@@ -13,7 +14,10 @@ import * as bcrypt from 'bcryptjs';
 
 @Injectable()
 export class UsersService {
-  constructor(private readonly prisma: PrismaService) { }
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly cacheService: CacheService,
+  ) { }
 
   async findAll(query: UserQueryDto) {
     const { page, limit, search, sortBy, sortOrder } = query;
@@ -1302,6 +1306,12 @@ export class UsersService {
 
   // Public methods (no authentication required)
   async findPublicByPseudo(pseudo: string) {
+    // Check cache first
+    const cached = await this.cacheService.getUserProfile(pseudo);
+    if (cached) {
+      return cached;
+    }
+
     const user = await this.prisma.smfMember.findFirst({
       where: {
         OR: [
@@ -1333,12 +1343,23 @@ export class UsersService {
       throw new NotFoundException('Utilisateur introuvable');
     }
 
-    return {
+    const result = {
       user: this.sanitizePublicUser(user)
     };
+
+    // Cache for 5 minutes
+    await this.cacheService.setUserProfile(pseudo, result);
+
+    return result;
   }
 
   async getPublicUserStats(pseudo: string) {
+    // Check cache first
+    const cached = await this.cacheService.getUserStats(pseudo);
+    if (cached) {
+      return cached;
+    }
+
     const user = await this.prisma.smfMember.findFirst({
       where: {
         OR: [
@@ -1465,7 +1486,7 @@ export class UsersService {
       LIMIT 10
     `;
 
-    return {
+    const result = {
       totalReviews: totalReviewsResult,
       reviewStats: (reviewStats as any[]).map(stat => ({
         rating: stat.rating,
@@ -1494,6 +1515,11 @@ export class UsersService {
         }))
       },
     };
+
+    // Cache for 5 minutes
+    await this.cacheService.setUserStats(pseudo, result);
+
+    return result;
   }
 
   // Internal helper to compute collection-based tags stats for a user
@@ -1595,6 +1621,15 @@ export class UsersService {
     search?: string;
   } = {}) {
     const { limit = 12, page = 1, type = 'all', sort = 'recent', search = '' } = options;
+
+    // Check cache first (only for non-search requests)
+    const cacheKey = `${page}_${limit}_${type}_${sort}_${search}`;
+    if (!search) {
+      const cached = await this.cacheService.getUserReviews(pseudo, cacheKey);
+      if (cached) {
+        return cached;
+      }
+    }
 
     const user = await this.prisma.smfMember.findFirst({
       where: {
@@ -1701,7 +1736,7 @@ export class UsersService {
 
     const reviews = await this.prisma.$queryRawUnsafe(reviewsQuery);
 
-    return {
+    const result = {
       reviews: (reviews as any[]).map(review => ({
         ...review,
         // Add media objects for compatibility
@@ -1734,9 +1769,22 @@ export class UsersService {
       limit,
       totalPages: Math.ceil(total / limit)
     };
+
+    // Cache for 3 minutes (skip if search was used)
+    if (!search) {
+      await this.cacheService.setUserReviews(pseudo, cacheKey, result);
+    }
+
+    return result;
   }
 
   async getPublicUserActivity(pseudo: string, limit: number = 10) {
+    // Check cache first
+    const cached = await this.cacheService.getUserActivity(pseudo, limit);
+    if (cached) {
+      return cached;
+    }
+
     const user = await this.prisma.smfMember.findFirst({
       where: {
         OR: [
@@ -1819,9 +1867,14 @@ export class UsersService {
 
     const activities = allActivities;
 
-    return {
+    const result = {
       activities: activities
     };
+
+    // Cache for 2 minutes
+    await this.cacheService.setUserActivity(pseudo, limit, result);
+
+    return result;
   }
 
   async checkUserActivity(userId: number) {
