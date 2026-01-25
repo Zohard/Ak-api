@@ -51,4 +51,15 @@ export class AddToCollectionDto {
   @IsOptional()
   @IsString()
   notes?: string;
+
+  @ApiProperty({
+    description: 'Nombre de chapitres lus (pour manga)',
+    example: 12,
+    required: false,
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  nbChapitresLu?: number;
 }

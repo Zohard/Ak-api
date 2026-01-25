@@ -148,11 +148,11 @@ export class AdminUsersService {
 
     // Get user's recent activity
     const recentActivity = await this.prisma.$queryRaw`
-      SELECT 
+      SELECT
         'review' as type,
         c.date_critique as date,
         c.titre as title,
-        CASE 
+        CASE
           WHEN c.id_anime IS NOT NULL AND c.id_anime > 0 THEN 'anime'
           WHEN c.id_manga IS NOT NULL AND c.id_manga > 0 THEN 'manga'
         END as content_type
@@ -169,6 +169,29 @@ export class AdminUsersService {
       WHERE id_member = ${id}
       ORDER BY time DESC
       LIMIT 50
+    `;
+
+    // Get collection statistics
+    const collectionStats = await this.prisma.$queryRaw`
+      SELECT
+        (SELECT COUNT(*) FROM ak_user_anime_list WHERE user_id = ${id}) as anime_list_count,
+        (SELECT COUNT(*) FROM ak_user_anime_list WHERE user_id = ${id} AND status = 'completed') as anime_completed,
+        (SELECT COUNT(*) FROM ak_user_anime_list WHERE user_id = ${id} AND status = 'watching') as anime_watching,
+        (SELECT COUNT(*) FROM ak_user_manga_list WHERE user_id = ${id}) as manga_list_count,
+        (SELECT COUNT(*) FROM ak_user_manga_list WHERE user_id = ${id} AND status = 'completed') as manga_completed,
+        (SELECT COUNT(*) FROM ak_user_manga_list WHERE user_id = ${id} AND status = 'reading') as manga_reading,
+        (SELECT COUNT(*) FROM ak_user_favorites WHERE user_id = ${id}) as favorites_count,
+        (SELECT COUNT(*) FROM ak_user_favorites WHERE user_id = ${id} AND type = 'anime') as anime_favorites,
+        (SELECT COUNT(*) FROM ak_user_favorites WHERE user_id = ${id} AND type = 'manga') as manga_favorites,
+        (SELECT COUNT(*) FROM user_notifications WHERE user_id = ${id}) as notifications_count
+    `;
+
+    // Get user roles
+    const userRoles = await this.prisma.$queryRaw`
+      SELECT r.id_role as id, r.display_name as name, r.description, r.color
+      FROM ak_user_roles ur
+      JOIN ak_roles r ON ur.id_role = r.id_role
+      WHERE ur.id_member = ${id}
     `;
 
     // Convert BigInt values to numbers for JSON serialization
@@ -191,6 +214,8 @@ export class AdminUsersService {
       user: convertBigIntToNumber(userData),
       recent_activity: convertBigIntToNumber(recentActivity),
       connection_logs: convertBigIntToNumber(connectionLogs),
+      collection_stats: convertBigIntToNumber((collectionStats as any[])[0] || {}),
+      roles: convertBigIntToNumber(userRoles),
     };
   }
 

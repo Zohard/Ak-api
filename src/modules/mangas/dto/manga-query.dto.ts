@@ -120,10 +120,10 @@ export class MangaQueryDto {
   @ApiPropertyOptional({
     description: 'Champ pour le tri',
     example: 'dateAjout',
-    enum: ['titre', 'dateAjout', 'annee', 'classementPopularite'],
+    enum: ['titre', 'dateAjout', 'annee', 'classementPopularite', 'nbChapitres'],
   })
   @IsOptional()
-  @IsIn(['titre', 'dateAjout', 'annee', 'classementPopularite'])
+  @IsIn(['titre', 'dateAjout', 'annee', 'classementPopularite', 'nbChapitres'])
   sortBy?: string = 'dateAjout';
 
   @ApiPropertyOptional({

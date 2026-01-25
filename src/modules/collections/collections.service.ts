@@ -218,7 +218,7 @@ export class CollectionsService {
   }
 
   async addToCollection(userId: number, addToCollectionDto: AddToCollectionDto) {
-    const { mediaId, mediaType, type, rating, notes } = addToCollectionDto;
+    const { mediaId, mediaType, type, rating, notes, nbChapitresLu } = addToCollectionDto;
     const collectionType = this.getCollectionTypeFromName(type);
 
     // Normalize rating to 0-5 range (supports 0.5 increments for half-stars)
@@ -306,6 +306,7 @@ export class CollectionsService {
                 type: collectionType,
                 evaluation: normalizedRating,
                 notes: notes || null,
+                nbChapitresLu: nbChapitresLu || 0,
                 isPublic: true,
                 updatedAt: new Date(),
               },
@@ -330,6 +331,7 @@ export class CollectionsService {
                 type: collectionType,
                 evaluation: normalizedRating,
                 notes: notes || null,
+                nbChapitresLu: nbChapitresLu || 0,
                 isPublic: true,
               },
               include: {
@@ -376,6 +378,7 @@ export class CollectionsService {
               type: collectionType,
               evaluation: normalizedRating,
               notes: notes || null,
+              nbChapitresLu: nbChapitresLu || 0,
               isPublic: true,
               updatedAt: new Date(),
             },

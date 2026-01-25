@@ -76,6 +76,20 @@ export class CreateMangaDto {
   nbVolumes?: string;
 
   @ApiPropertyOptional({
+    description: 'Nombre de chapitres',
+    example: 1050,
+  })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  @Transform(({ value }) => {
+    // Convert string to number if needed
+    if (value === null || value === undefined) return value;
+    return typeof value === 'string' ? parseInt(value, 10) : value;
+  })
+  nbChapitres?: number;
+
+  @ApiPropertyOptional({
     description: 'Statut (0 = en attente, 1 = validé, 2 = refusé)',
     example: 1,
   })

@@ -1075,6 +1075,7 @@ export class AniListService {
       format: anilistManga.format ? (mangaFormatMap[anilistManga.format] || anilistManga.format) : undefined,
       image: anilistManga.coverImage?.extraLarge || anilistManga.coverImage?.large || anilistManga.coverImage?.medium,
       nbVolumes: anilistManga.volumes ? String(anilistManga.volumes) : undefined,
+      nbChapitres: anilistManga.chapters || undefined,
       siteOfficiel: officialWebsite,
       statut: 0,
       commentaire: JSON.stringify({

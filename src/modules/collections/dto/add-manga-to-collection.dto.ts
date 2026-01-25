@@ -17,4 +17,10 @@ export class AddMangaToCollectionDto {
   @Min(0)
   @Max(10)
   rating?: number;
+
+  @ApiPropertyOptional({ example: 45, description: 'Number of chapters read', minimum: 0 })
+  @IsNumber()
+  @IsOptional()
+  @Min(0)
+  nbChapitresLu?: number;
 }
