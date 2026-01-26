@@ -39,6 +39,22 @@ export class BusinessService {
     const { page = 1, limit = 50, statut, search, type, origine } = query;
 
     const skip = (page - 1) * limit;
+
+    // Role types are stored in relation tables (ak_business_to_animes, ak_business_to_mangas),
+    // not in ak_business.type which only contains 'Personne' or 'Studio'
+    const roleTypes = [
+      'Auteur', 'Auteur original', 'Réalisateur', 'Scénariste', 'Character designer',
+      'Compositeur', 'Directeur artistique', 'Directeur de l\'animation', 'Producteur',
+      'Mangaka', 'Illustrateur', 'Dessinateur', 'Coloriste'
+    ];
+
+    const isRoleTypeFilter = type && roleTypes.some(rt => rt.toLowerCase().includes(type.toLowerCase()) || type.toLowerCase().includes(rt.toLowerCase()));
+
+    // If filtering by a role type, use raw query to join with relation tables
+    if (isRoleTypeFilter) {
+      return this.findAllByRoleType(query, type);
+    }
+
     const where: any = {};
 
     if (statut !== undefined) {
@@ -94,6 +110,113 @@ export class BusinessService {
         total,
         totalPages: Math.ceil(total / limit),
       },
+    };
+  }
+
+  private async findAllByRoleType(query: BusinessQueryDto, roleType: string) {
+    const { page = 1, limit = 50, statut, search, origine } = query;
+    const offset = (page - 1) * limit;
+
+    // Build WHERE conditions for the business table
+    const conditions: string[] = [];
+    const params: any[] = [];
+    let paramIndex = 1;
+
+    // Filter by role type in relation tables (anime and manga)
+    const roleTypePattern = `%${roleType}%`;
+    params.push(roleTypePattern);
+    const roleTypeParamIndex = paramIndex++;
+
+    if (statut !== undefined) {
+      params.push(statut);
+      conditions.push(`b.statut = $${paramIndex++}`);
+    }
+
+    if (search) {
+      const searchPattern = `%${search}%`;
+      params.push(searchPattern, searchPattern);
+      conditions.push(`(b.denomination ILIKE $${paramIndex++} OR b.autres_denominations ILIKE $${paramIndex++})`);
+    }
+
+    if (origine) {
+      const originePattern = `%${origine}%`;
+      params.push(originePattern);
+      conditions.push(`b.origine ILIKE $${paramIndex++}`);
+    }
+
+    const whereClause = conditions.length > 0 ? `AND ${conditions.join(' AND ')}` : '';
+
+    // Count query - find distinct businesses that have this role type in any relation
+    const countQuery = `
+      SELECT COUNT(DISTINCT b.id_business)::int as count
+      FROM ak_business b
+      WHERE b.id_business IN (
+        SELECT DISTINCT bta.id_business FROM ak_business_to_animes bta WHERE bta.type ILIKE $1
+        UNION
+        SELECT DISTINCT btm.id_business FROM ak_business_to_mangas btm WHERE btm.type ILIKE $1
+      )
+      ${whereClause}
+    `;
+
+    const countResult = await this.prisma.$queryRawUnsafe<Array<{ count: number }>>(countQuery, ...params);
+    const total = countResult[0]?.count || 0;
+
+    if (total === 0) {
+      return {
+        data: [],
+        pagination: { page, limit, total: 0, totalPages: 0 },
+      };
+    }
+
+    // Add pagination params
+    params.push(limit, offset);
+
+    // Data query
+    const dataQuery = `
+      SELECT b.*
+      FROM ak_business b
+      WHERE b.id_business IN (
+        SELECT DISTINCT bta.id_business FROM ak_business_to_animes bta WHERE bta.type ILIKE $1
+        UNION
+        SELECT DISTINCT btm.id_business FROM ak_business_to_mangas btm WHERE btm.type ILIKE $1
+      )
+      ${whereClause}
+      ORDER BY b.denomination ASC
+      LIMIT $${paramIndex++} OFFSET $${paramIndex++}
+    `;
+
+    const businesses = await this.prisma.$queryRawUnsafe<any[]>(dataQuery, ...params);
+
+    return {
+      data: businesses.map(b => this.formatBusinessRaw(b)),
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  }
+
+  private formatBusinessRaw(business: any) {
+    return {
+      id: business.id_business,
+      addedDate: business.date_ajout?.toISOString?.() || business.date_ajout,
+      modificationDate: business.date_modification,
+      denomination: decodeHTMLEntities(business.denomination),
+      autresDenominations: decodeHTMLEntities(business.autres_denominations),
+      notes: decodeHTMLEntities(business.notes),
+      niceUrl: business.nice_url,
+      type: business.type,
+      origine: business.origine,
+      date: business.date,
+      siteOfficiel: business.site_officiel,
+      image: business.image,
+      nbClics: business.nb_clics,
+      nbClicsDay: business.nb_clics_day,
+      nbClicsWeek: business.nb_clics_week,
+      nbClicsMonth: business.nb_clics_month,
+      statut: business.statut,
     };
   }
 
