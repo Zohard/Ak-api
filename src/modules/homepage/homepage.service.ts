@@ -191,13 +191,23 @@ export class HomePageService {
                   Array.isArray(data) ? data : [];
             }
 
-            // Cache the result
+            // Cache the result - but DON'T cache empty arrays for reviews/articles
             const cacheKey = keys[key as keyof typeof keys];
-            if (dataToCache) {
+            const shouldCache = dataToCache && (
+              // For reviews and articles, only cache if we have data
+              (key === 'reviews' && Array.isArray(dataToCache) && dataToCache.length > 0) ||
+              (key === 'articles' && Array.isArray(dataToCache) && dataToCache.length > 0) ||
+              // For other data types, cache if truthy
+              (key !== 'reviews' && key !== 'articles' && dataToCache)
+            );
+
+            if (shouldCache) {
               // Season data cached for 4 hours (14400s), other homepage data for 2 hours (7200s)
               const ttl = key === 'season' ? 14400 : 7200;
               await this.cache.set(cacheKey, dataToCache, ttl);
-              this.logger.log(`✅ Cached ${key} (TTL: ${ttl}s)`);
+              this.logger.log(`✅ Cached ${key} (TTL: ${ttl}s, ${Array.isArray(dataToCache) ? dataToCache.length : 'N/A'} items)`);
+            } else if (key === 'reviews' || key === 'articles') {
+              this.logger.warn(`⚠️ Skipping cache for ${key} - empty array (${Array.isArray(dataToCache) ? dataToCache.length : 0} items)`);
             }
 
             // Update the local variable so we use the fresh data

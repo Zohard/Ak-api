@@ -2,6 +2,7 @@ import { Controller, Get, Logger, Post } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { HomePageService } from './homepage.service';
 import { CacheService } from '../../shared/services/cache.service';
+import { PrismaService } from '../../shared/services/prisma.service';
 
 @ApiTags('Homepage')
 @Controller('homepage')
@@ -11,7 +12,8 @@ export class HomePageController {
   constructor(
     private readonly homePageService: HomePageService,
     private readonly cache: CacheService,
-  ) {}
+    private readonly prisma: PrismaService,
+  ) { }
 
   @Get()
   @ApiOperation({ summary: 'Aggregated data for homepage' })
