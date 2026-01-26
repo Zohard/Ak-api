@@ -5,7 +5,7 @@ import { AppService } from './app.service';
 @ApiTags('General')
 @Controller()
 export class AppController {
-  constructor(private readonly appService: AppService) {}
+  constructor(private readonly appService: AppService) { }
 
   @Get()
   @ApiOperation({ summary: 'API Information' })
@@ -38,8 +38,8 @@ export class AppController {
 
   @Get('ak-tags')
   @ApiOperation({ summary: 'Get all AK tags with tag names' })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: 'List of all AK tags with their names and metadata',
     schema: {
       type: 'object',
@@ -67,8 +67,8 @@ export class AppController {
 
   @Get('imagekit/auth')
   @ApiOperation({ summary: 'Get ImageKit authentication parameters' })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: 'Authentication parameters for ImageKit uploads',
     schema: {
       type: 'object',
@@ -81,5 +81,11 @@ export class AppController {
   })
   async getImageKitAuth() {
     return this.appService.getImageKitAuth();
+  }
+
+  @Get('debug-sentry')
+  @ApiOperation({ summary: 'Test Sentry reporting' })
+  getError() {
+    throw new Error('My first Sentry error!');
   }
 }
