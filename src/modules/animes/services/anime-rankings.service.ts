@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../shared/services/prisma.service';
 import { CacheService } from '../../../shared/services/cache.service';
 
@@ -394,25 +395,19 @@ export class AnimeRankingsService {
       };
     });
 
-    // 4. Save to DB (Transaction to ensure consistency)
-    await this.prisma.$transaction(
-      rankingEntries.map(entry =>
-        this.prisma.animeWeeklyRanking.upsert({
-          where: {
-            year_week_animeId: {
-              year: entry.year,
-              week: entry.week,
-              animeId: entry.animeId,
-            }
-          },
-          update: {
-            rank: entry.rank,
-            trend: entry.trend,
-          },
-          create: entry,
-        })
-      )
-    );
+    // 4. Save to DB using bulk upsert (single query for all 20 entries)
+    if (rankingEntries.length > 0) {
+      const values = rankingEntries.map(
+        e => Prisma.sql`(${e.animeId}, ${e.year}, ${e.season}, ${e.week}, ${e.rank}, ${e.score}, ${e.trend})`
+      );
+
+      await this.prisma.$executeRaw`
+        INSERT INTO anime_weekly_rankings (id_anime, year, season, week, rank, score, trend)
+        VALUES ${Prisma.join(values)}
+        ON CONFLICT (year, week, id_anime)
+        DO UPDATE SET rank = EXCLUDED.rank, trend = EXCLUDED.trend
+      `;
+    }
 
     return { success: true, count: rankingEntries.length };
   }
