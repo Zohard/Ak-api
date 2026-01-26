@@ -20,16 +20,16 @@ export class HomePageService {
   ) { }
 
   async getHomePageData() {
-    // Define cache keys
+    // Define cache keys (without 'homepage:' prefix as cache service adds it)
     const keys = {
-      reviews: 'homepage:reviews',
-      articles: 'homepage:articles',
-      season: 'homepage:season',
-      forum: 'homepage:forum',
-      stats: 'homepage:stats',
-      recentAnimes: 'homepage:recent_animes',
-      recentMangas: 'homepage:recent_mangas',
-      recentGames: 'homepage:recent_games',
+      reviews: 'reviews',
+      articles: 'articles',
+      season: 'season',
+      forum: 'forum',
+      stats: 'stats',
+      recentAnimes: 'recent_animes',
+      recentMangas: 'recent_mangas',
+      recentGames: 'recent_games',
     };
 
     // 1. Try to get all parts from cache in parallel
@@ -43,14 +43,14 @@ export class HomePageService {
       cachedRecentMangas,
       cachedRecentGames,
     ] = await Promise.all([
-      this.cache.get<any>(keys.reviews),
-      this.cache.get<any>(keys.articles),
-      this.cache.get<any>(keys.season),
-      this.cache.get<any>(keys.forum),
-      this.cache.get<any>(keys.stats),
-      this.cache.get<any>(keys.recentAnimes),
-      this.cache.get<any>(keys.recentMangas),
-      this.cache.get<any>(keys.recentGames),
+      this.cache.get<any>(`homepage:${keys.reviews}`),
+      this.cache.get<any>(`homepage:${keys.articles}`),
+      this.cache.get<any>(`homepage:${keys.season}`),
+      this.cache.get<any>(`homepage:${keys.forum}`),
+      this.cache.get<any>(`homepage:${keys.stats}`),
+      this.cache.get<any>(`homepage:${keys.recentAnimes}`),
+      this.cache.get<any>(`homepage:${keys.recentMangas}`),
+      this.cache.get<any>(`homepage:${keys.recentGames}`),
     ]);
 
     // 2. Prepare data fetch promises for missing parts
@@ -192,7 +192,7 @@ export class HomePageService {
             }
 
             // Cache the result - but DON'T cache empty arrays for reviews/articles
-            const cacheKey = keys[key as keyof typeof keys];
+            const cacheKey = `homepage:${keys[key as keyof typeof keys]}`;
             const shouldCache = dataToCache && (
               // For reviews and articles, only cache if we have data
               (key === 'reviews' && Array.isArray(dataToCache) && dataToCache.length > 0) ||

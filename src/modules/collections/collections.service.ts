@@ -907,7 +907,7 @@ export class CollectionsService {
         this.logger.debug(`🔍 [isInCollection] Anime RAW SQL - Found ${collections.length} rows: ${JSON.stringify(collections)}`);
       } else if (mediaType === 'manga') {
         collections = await this.prisma.$queryRaw<any[]>`
-          SELECT type, evaluation, notes, NULL as id_collection
+          SELECT type, evaluation, notes, chapters_read, NULL as id_collection
           FROM collection_mangas
           WHERE id_membre = ${userId} AND id_manga = ${mediaId}
         `;
@@ -939,6 +939,7 @@ export class CollectionsService {
             name: this.getCollectionNameByTypeId(c.type),
             rating,
             notes: c.notes,
+            chaptersRead: c.chapters_read || undefined,
             collectionId: c.id_collection || undefined,
             platformPlayed: c.platform_played || undefined,
             startedDate: c.started_date || undefined,
