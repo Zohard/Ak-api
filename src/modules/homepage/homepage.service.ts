@@ -26,7 +26,10 @@ export class HomePageService {
       articles: 'homepage:articles',
       season: 'homepage:season',
       forum: 'homepage:forum',
-      stats: 'homepage:stats'
+      stats: 'homepage:stats',
+      recentAnimes: 'homepage:recent_animes',
+      recentMangas: 'homepage:recent_mangas',
+      recentGames: 'homepage:recent_games',
     };
 
     // 1. Try to get all parts from cache in parallel
@@ -35,13 +38,19 @@ export class HomePageService {
       cachedArticles,
       cachedSeason,
       cachedForum,
-      cachedStats
+      cachedStats,
+      cachedRecentAnimes,
+      cachedRecentMangas,
+      cachedRecentGames,
     ] = await Promise.all([
       this.cache.get<any>(keys.reviews),
       this.cache.get<any>(keys.articles),
       this.cache.get<any>(keys.season),
       this.cache.get<any>(keys.forum),
-      this.cache.get<any>(keys.stats)
+      this.cache.get<any>(keys.stats),
+      this.cache.get<any>(keys.recentAnimes),
+      this.cache.get<any>(keys.recentMangas),
+      this.cache.get<any>(keys.recentGames),
     ]);
 
     // 2. Prepare data fetch promises for missing parts
@@ -96,6 +105,61 @@ export class HomePageService {
       })();
     }
 
+    // Recent anime/manga/games for "Activité récente" section
+    if (!cachedRecentAnimes) {
+      this.logger.log('MISS: Recent Animes');
+      promises.recentAnimes = this.prisma.akAnime.findMany({
+        where: { statut: 1 },
+        orderBy: { dateAjout: 'desc' },
+        take: 3,
+        select: {
+          idAnime: true,
+          titre: true,
+          niceUrl: true,
+          image: true,
+          annee: true,
+          studio: true,
+          origine: true,
+        },
+      });
+    }
+
+    if (!cachedRecentMangas) {
+      this.logger.log('MISS: Recent Mangas');
+      promises.recentMangas = this.prisma.akManga.findMany({
+        where: { statut: 1 },
+        orderBy: { dateAjout: 'desc' },
+        take: 3,
+        select: {
+          idManga: true,
+          titre: true,
+          niceUrl: true,
+          image: true,
+          annee: true,
+          editeur: true,
+          origine: true,
+        },
+      });
+    }
+
+    if (!cachedRecentGames) {
+      this.logger.log('MISS: Recent Games');
+      promises.recentGames = this.prisma.akJeuxVideo.findMany({
+        where: { statut: 1 },
+        orderBy: { dateAjout: 'desc' },
+        take: 3,
+        select: {
+          idJeu: true,
+          titre: true,
+          niceUrl: true,
+          image: true,
+          annee: true,
+          editeur: true,
+          support: true,
+        },
+      });
+    }
+
     // 3. Resolve all missing data
     // We can't use Promise.allSettled on an object directly, so we map the values
     const keysToFetch = Object.keys(promises);
@@ -140,6 +204,9 @@ export class HomePageService {
             if (key === 'season') promises.seasonResult = dataToCache;
             if (key === 'forum') promises.forumResult = dataToCache;
             if (key === 'stats') promises.statsResult = dataToCache;
+            if (key === 'recentAnimes') promises.recentAnimesResult = dataToCache;
+            if (key === 'recentMangas') promises.recentMangasResult = dataToCache;
+            if (key === 'recentGames') promises.recentGamesResult = dataToCache;
 
           } catch (e) {
             this.logger.error(`Failed to fetch ${key}`, e);
@@ -154,6 +221,9 @@ export class HomePageService {
     const season = promises.seasonResult || cachedSeason || { current: null, animes: [] };
     const forum = promises.forumResult || cachedForum || { messages: [], total: 0, limit: 2, offset: 0 };
     const stats = promises.statsResult || cachedStats || { animes: 0, mangas: 0, reviews: 0 };
+    const recentAnimes = promises.recentAnimesResult || cachedRecentAnimes || [];
+    const recentMangas = promises.recentMangasResult || cachedRecentMangas || [];
+    const recentGames = promises.recentGamesResult || cachedRecentGames || [];
 
     return {
       hero: {
@@ -163,6 +233,38 @@ export class HomePageService {
       season,
       forum,
       stats,
+      recent: {
+        animes: recentAnimes.map((a: any) => ({
+          id: a.idAnime,
+          idAnime: a.idAnime,
+          titre: a.titre,
+          niceUrl: a.niceUrl,
+          image: a.image,
+          annee: a.annee,
+          studio: a.studio,
+          origine: a.origine,
+        })),
+        mangas: recentMangas.map((m: any) => ({
+          id: m.idManga,
+          idManga: m.idManga,
+          titre: m.titre,
+          niceUrl: m.niceUrl,
+          image: m.image,
+          annee: m.annee,
+          editeur: m.editeur,
+          origine: m.origine,
+        })),
+        games: recentGames.map((g: any) => ({
+          id: g.idJeu,
+          idJeu: g.idJeu,
+          titre: g.titre,
+          niceUrl: g.niceUrl,
+          image: g.image,
+          annee: g.annee,
+          editeur: g.editeur,
+          support: g.support,
+        })),
+      },
       generatedAt: new Date().toISOString(),
     };
   }
