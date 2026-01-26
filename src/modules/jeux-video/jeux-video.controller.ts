@@ -27,6 +27,25 @@ export class JeuxVideoController {
     return this.jeuxVideoService.autocomplete(query, exclude, parsedLimit);
   }
 
+  @Get('planning')
+  @ApiOperation({ summary: 'Planning des sorties jeux vidéo par mois' })
+  @ApiResponse({ status: 200, description: 'Liste des jeux sortant sur la période donnée' })
+  async getPlanning(
+    @Query('year') year: string, // NestJS Query params are strings by default unless transformed
+    @Query('month') month: string,
+  ) {
+    if (!year || !month) {
+      // Default to current month if not provided? Or throw error?
+      // Let's mirror usual behavior or default to current.
+      const now = new Date();
+      return this.jeuxVideoService.getPlanning(
+        year ? parseInt(year) : now.getFullYear(),
+        month ? parseInt(month) : now.getMonth() + 1
+      );
+    }
+    return this.jeuxVideoService.getPlanning(parseInt(year), parseInt(month));
+  }
+
   @Get('bulk')
   @ApiOperation({ summary: 'Récupérer plusieurs jeux vidéo par IDs (bulk fetch)' })
   @ApiResponse({ status: 200, description: 'Liste des jeux vidéo' })

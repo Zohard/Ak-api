@@ -179,6 +179,68 @@ export class JeuxVideoService {
     return result;
   }
 
+  async getPlanning(year: number, month: number) {
+    // Cache key
+    const cacheKey = `planning_games:${year}_${month}`;
+    const cached = await this.cacheService.get(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
+    // Calculate generic start/end dates for the month
+    // Note: JS months are 0-indexed in Date constructor, but we expect 1-12 input
+    const startDate = new Date(year, month - 1, 1);
+    const endDate = new Date(year, month, 0); // Last day of current month
+
+    const items = await this.prisma.akJeuxVideo.findMany({
+      where: {
+        statut: 1, // Published
+        OR: [
+          { dateSortieWorldwide: { gte: startDate, lte: endDate } },
+          { dateSortieJapon: { gte: startDate, lte: endDate } },
+          { dateSortieUsa: { gte: startDate, lte: endDate } },
+          { dateSortieEurope: { gte: startDate, lte: endDate } },
+        ]
+      },
+      orderBy: {
+        dateSortieWorldwide: 'asc',
+      },
+      select: {
+        idJeu: true,
+        titre: true,
+        niceUrl: true,
+        plateforme: true, // Legacy
+        image: true,
+        moyenneNotes: true,
+        dateSortieWorldwide: true,
+        dateSortieJapon: true,
+        dateSortieUsa: true,
+        dateSortieEurope: true,
+        platforms: {
+          select: {
+            platform: {
+              select: {
+                name: true,
+                shortName: true,
+              }
+            }
+          }
+        }
+      },
+    });
+
+    // Map for frontend
+    const mappedItems = items.map(item => ({
+      ...item,
+      id: item.idJeu,
+    }));
+
+    // Cache for 1 hour
+    await this.cacheService.set(cacheKey, mappedItems, 3600);
+
+    return mappedItems;
+  }
+
   async findOne(id: number) {
     const item = await this.prisma.akJeuxVideo.findUnique({
       where: { idJeu: id, statut: 1 }, // Only show published games
