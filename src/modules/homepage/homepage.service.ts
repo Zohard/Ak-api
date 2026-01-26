@@ -109,7 +109,7 @@ export class HomePageService {
     if (!cachedRecentAnimes) {
       this.logger.log('MISS: Recent Animes');
       promises.recentAnimes = this.prisma.akAnime.findMany({
-        where: { statut: 1 },
+        where: { statut: 1, dateAjout: { not: null } },
         orderBy: { dateAjout: 'desc' },
         take: 3,
         select: {
@@ -119,6 +119,7 @@ export class HomePageService {
           image: true,
           annee: true,
           studio: true,
+          dateAjout: true,
         },
       });
     }
@@ -126,7 +127,7 @@ export class HomePageService {
     if (!cachedRecentMangas) {
       this.logger.log('MISS: Recent Mangas');
       promises.recentMangas = this.prisma.akManga.findMany({
-        where: { statut: 1 },
+        where: { statut: 1, dateAjout: { not: null } },
         orderBy: { dateAjout: 'desc' },
         take: 3,
         select: {
@@ -137,6 +138,7 @@ export class HomePageService {
           annee: true,
           editeur: true,
           origine: true,
+          dateAjout: true,
         },
       });
     }
@@ -144,7 +146,7 @@ export class HomePageService {
     if (!cachedRecentGames) {
       this.logger.log('MISS: Recent Games');
       promises.recentGames = this.prisma.akJeuxVideo.findMany({
-        where: { statut: 1 },
+        where: { statut: 1, dateAjout: { not: null } },
         orderBy: { dateAjout: 'desc' },
         take: 3,
         select: {
@@ -155,6 +157,7 @@ export class HomePageService {
           annee: true,
           editeur: true,
           plateforme: true,
+          dateAjout: true,
         },
       });
     }
@@ -241,6 +244,7 @@ export class HomePageService {
           image: a.image,
           annee: a.annee,
           studio: a.studio,
+          addedDate: a.dateAjout ? a.dateAjout.toISOString() : null,
         })),
         mangas: recentMangas.map((m: any) => ({
           id: m.idManga,
@@ -250,6 +254,7 @@ export class HomePageService {
           image: m.image,
           annee: m.annee,
           editeur: m.editeur,
+          addedDate: m.dateAjout ? m.dateAjout.toISOString() : null,
         })),
         games: recentGames.map((g: any) => ({
           id: g.idJeu,
@@ -260,6 +265,7 @@ export class HomePageService {
           annee: g.annee,
           editeur: g.editeur,
           support: g.plateforme,
+          addedDate: g.dateAjout ? g.dateAjout.toISOString() : null,
         })),
       },
       generatedAt: new Date().toISOString(),
