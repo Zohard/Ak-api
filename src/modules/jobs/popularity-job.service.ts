@@ -19,7 +19,7 @@ export class PopularityJobService {
     private readonly reviewsService: ReviewsService,
     private readonly prisma: PrismaService,
     private readonly popularityService: PopularityService,
-  ) {}
+  ) { }
 
   /**
    * Recalculate popularity for recent reviews (last 7 days)
@@ -27,7 +27,7 @@ export class PopularityJobService {
    */
   async recalculateRecentReviewsPopularity() {
     this.logger.log('Starting daily popularity recalculation for recent reviews');
-    
+
     try {
       const sevenDaysAgo = new Date();
       sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
@@ -67,9 +67,9 @@ export class PopularityJobService {
    */
   async recalculateAllReviewsPopularity() {
     this.logger.log('Starting weekly popularity recalculation for all reviews');
-    
+
     try {
-      const batchSize = 100;
+      const batchSize = 500;
       let offset = 0;
       let totalProcessed = 0;
       let totalErrors = 0;
@@ -104,8 +104,8 @@ export class PopularityJobService {
 
         this.logger.log(`Batch completed: ${batchProcessed} processed, ${batchErrors} errors (Total: ${totalProcessed})`);
 
-        // Small delay between batches to prevent overloading the database
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        // Smaller delay between batches to prevent overloading the database while remaining fast
+        await new Promise(resolve => setTimeout(resolve, 200));
       }
 
       this.logger.log(`Weekly popularity recalculation completed: ${totalProcessed} processed, ${totalErrors} errors`);
@@ -120,7 +120,7 @@ export class PopularityJobService {
    */
   async resetDailyCounters() {
     this.logger.log('Resetting daily view counters');
-    
+
     try {
       await this.prisma.akCritique.updateMany({
         data: { nbClicsDay: 0 },
@@ -138,7 +138,7 @@ export class PopularityJobService {
    */
   async resetWeeklyCounters() {
     this.logger.log('Resetting weekly view counters');
-    
+
     try {
       await this.prisma.akCritique.updateMany({
         data: { nbClicsWeek: 0 },
@@ -156,7 +156,7 @@ export class PopularityJobService {
    */
   async resetMonthlyCounters() {
     this.logger.log('Resetting monthly view counters');
-    
+
     try {
       await this.prisma.akCritique.updateMany({
         data: { nbClicsMonth: 0 },
@@ -331,7 +331,7 @@ export class PopularityJobService {
       let updatedCount = 0;
       let errorCount = 0;
 
-      const batchSize = 100;
+      const batchSize = 500;
       for (let i = 0; i < rankings.length; i += batchSize) {
         const batch = rankings.slice(i, i + batchSize);
         const batchReviews = reviewsWithScores.slice(i, i + batchSize);
@@ -389,8 +389,7 @@ export class PopularityJobService {
         await Promise.all(promises);
         this.logger.log(`Batch ${Math.floor(i / batchSize) + 1} completed: ${batch.length} reviews processed`);
 
-        // Small delay between batches
-        await new Promise(resolve => setTimeout(resolve, 500));
+        // No delay needed for ranking updates as it's a critical background job
       }
 
       // Step 5: Build top 10 results

@@ -1,8 +1,10 @@
 import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
+import { APP_FILTER } from '@nestjs/core';
 import { LoggerModule } from 'nestjs-pino';
 import { BullModule } from '@nestjs/bullmq';
+import { SentryModule, SentryGlobalFilter } from '@sentry/nestjs/setup';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './modules/auth/auth.module';
@@ -130,6 +132,7 @@ import redisConfig from './config/redis.config';
         };
       },
     }),
+    SentryModule.forRoot(),
     AuthModule,
     UsersModule,
     AnimesModule,
@@ -168,7 +171,17 @@ import redisConfig from './config/redis.config';
     SystemSettingsModule,
   ],
   controllers: [AppController],
-  providers: [AppService, PrismaService, CacheService, ActivityTrackerService, DatabaseWarmupService],
+  providers: [
+    AppService,
+    PrismaService,
+    CacheService,
+    ActivityTrackerService,
+    DatabaseWarmupService,
+    {
+      provide: APP_FILTER,
+      useClass: SentryGlobalFilter,
+    },
+  ],
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {

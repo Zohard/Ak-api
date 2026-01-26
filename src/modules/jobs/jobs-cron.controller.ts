@@ -4,6 +4,7 @@ import {
     Get,
     UseGuards,
     Query,
+    Logger as NestLogger,
 } from '@nestjs/common';
 import {
     ApiTags,
@@ -20,6 +21,8 @@ import { OptionalJwtAuthGuard } from '../../common/guards/optional-jwt-auth.guar
 @ApiTags('Jobs Cron')
 @Controller('jobs/cron')
 export class JobsCronController {
+    private readonly logger = new NestLogger(JobsCronController.name);
+
     constructor(
         private readonly popularityJobService: PopularityJobService,
         private readonly animeRankingsService: AnimeRankingsService,
@@ -204,6 +207,19 @@ export class JobsCronController {
             duration: `${duration}ms`,
             timestamp: new Date().toISOString(),
         };
+    }
+
+    @Get('debug/sentry')
+    @UseGuards(OptionalJwtAuthGuard, CronAuthGuard)
+    @ApiHeader({
+        name: 'x-cron-api-key',
+        description: 'API Key for external cron jobs',
+        required: false,
+    })
+    @ApiOperation({ summary: 'Test Sentry integration by throwing an error' })
+    async testSentry() {
+        this.logger.log('Triggering intentional error for Sentry test');
+        throw new Error('Sentry Test Error from JobsCronController');
     }
 
     private getCurrentSeasonInfo(): { year: number; season: string; week: number } {

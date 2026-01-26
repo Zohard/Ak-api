@@ -1,3 +1,6 @@
+// IMPORTANT: Import instrument.ts first to initialize Sentry before anything else
+import './instrument';
+
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe, Logger as NestLogger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -6,36 +9,11 @@ import * as express from 'express';
 import cookieParser from 'cookie-parser';
 import { join } from 'path';
 import { setupSwagger } from './config/swagger.config';
-import * as Sentry from '@sentry/nestjs';
 import { Logger } from 'nestjs-pino';
 import { DatabaseRetryInterceptor } from './common/interceptors/database-retry.interceptor';
 import { json } from 'express';
 
 async function bootstrap() {
-  // Initialize Sentry for error tracking and performance monitoring
-  if (process.env.SENTRY_DSN) {
-    Sentry.init({
-      dsn: process.env.SENTRY_DSN,
-      environment: process.env.RAILWAY_ENVIRONMENT_NAME || process.env.NODE_ENV || 'development',
-      // Performance Monitoring
-      tracesSampleRate: process.env.NODE_ENV === 'production' ? 0.2 : 1.0, // Railway-friendly
-      // Send default PII (IP address, user context)
-      sendDefaultPii: true,
-      // Add Railway context
-      beforeSend(event) {
-        if (event.request) {
-          event.contexts = event.contexts || {};
-          event.contexts.railway = {
-            service: process.env.RAILWAY_SERVICE_NAME,
-            environment: process.env.RAILWAY_ENVIRONMENT_NAME,
-            deployment_id: process.env.RAILWAY_DEPLOYMENT_ID,
-          };
-        }
-        return event;
-      },
-    });
-  }
-
   // Fix BigInt serialization globally
   (BigInt.prototype as any).toJSON = function () {
     return Number(this);
