@@ -334,28 +334,29 @@ export class AnimesService extends BaseContentService<
       }
     }
 
-    // Exclude null dateAjout when sorting by it
-    if (sortBy === 'dateAjout' || !sortBy) {
-      where.NOT = where.NOT || [];
-      where.NOT.push({ dateAjout: null });
-    }
-
-    // Exclude null annee when sorting by it
-    if (sortBy === 'annee') {
-      where.NOT = where.NOT || [];
-      where.NOT.push({ annee: null });
-    }
-
     // Exclude unranked anime (classement = 0 or null) when sorting by popularity
     if (sortBy === 'classementPopularite') {
       where.classementPopularite = { gt: 0 };
     }
 
     // Build order by clause with secondary sort by idAnime for stable pagination
-    const orderBy: any = [
-      { [sortBy || 'dateAjout']: sortOrder || 'desc' },
-      { idAnime: 'asc' as const } // Secondary sort for stable pagination when primary values are equal
-    ];
+    // Use nulls: 'last' to show items with null values at the end
+    const effectiveSortBy = sortBy || 'dateAjout';
+    const effectiveSortOrder = sortOrder || 'desc';
+
+    let orderBy: any;
+    if (effectiveSortBy === 'dateAjout' || effectiveSortBy === 'annee') {
+      // For date/year fields, put nulls at the end
+      orderBy = [
+        { [effectiveSortBy]: { sort: effectiveSortOrder, nulls: 'last' } },
+        { idAnime: 'asc' as const }
+      ];
+    } else {
+      orderBy = [
+        { [effectiveSortBy]: effectiveSortOrder },
+        { idAnime: 'asc' as const }
+      ];
+    }
 
     // Build include clause
     const include: any = {};
