@@ -70,6 +70,7 @@ model SmfMember {
   refreshTokens    AkRefreshToken[]
   passwordResetTokens AkPasswordResetToken[]
   emailVerificationTokens AkEmailVerificationToken[]
+  socialIdentities AkSocialIdentity[]
   reviews          AkCritique[]
   adminAuditLogs   AdminAuditLog[]
   animeCollections CollectionAnime[] @relation("UserAnimeCollection")
@@ -171,6 +172,20 @@ model AkEmailVerificationToken {
   user        SmfMember @relation(fields: [userId], references: [idMember], onDelete: Cascade)
 
   @@map("ak_email_verification_tokens")
+}
+
+// Social Identities (Google, etc.)
+model AkSocialIdentity {
+  id          Int      @id @default(autoincrement())
+  userId      Int      @map("user_id")
+  provider    String   @db.VarChar(50) // 'google'
+  providerId  String   @map("provider_id") @db.VarChar(255)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+  
+  user        SmfMember @relation(fields: [userId], references: [idMember], onDelete: Cascade)
+
+  @@unique([provider, providerId])
+  @@map("ak_social_identities")
 }
 
 // Animes

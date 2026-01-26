@@ -6,6 +6,7 @@ import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { LocalStrategy } from './strategies/local.strategy';
+import { GoogleStrategy } from './strategies/google.strategy';
 import { PrismaService } from '../../shared/services/prisma.service';
 import { EmailService } from '../../shared/services/email.service';
 import { CaptchaService } from '../../shared/services/captcha.service';
@@ -27,7 +28,7 @@ import { MetricsModule } from '../metrics/metrics.module';
     MetricsModule,
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy, LocalStrategy, PrismaService, EmailService, CaptchaService],
+  providers: [AuthService, JwtStrategy, LocalStrategy, GoogleStrategy, PrismaService, EmailService, CaptchaService],
   exports: [AuthService, JwtModule],
 })
-export class AuthModule {}
+export class AuthModule { }

@@ -25,7 +25,7 @@ export class AuthService {
     private readonly configService: ConfigService,
     private readonly emailService: EmailService,
     private readonly metricsService: MetricsService,
-  ) {}
+  ) { }
 
   async validateUser(emailOrUsername: string, password: string): Promise<any> {
     const user = await this.prisma.smfMember.findFirst({
@@ -226,6 +226,116 @@ export class AuthService {
     return {
       message: 'Registration successful. Please check your email to verify your account.',
       emailSent: true,
+      user: this.sanitizeUser(user),
+    };
+  }
+
+  async validateGoogleUser(googleUser: any, ipAddress?: string, userAgent?: string) {
+    const { provider, providerId, email, firstName, lastName } = googleUser;
+
+    // 1. Check if we already have this social identity linked
+    let socialIdentity = await this.prisma.akSocialIdentity.findFirst({
+      where: { provider, providerId },
+      include: { user: true },
+    });
+
+    let user = socialIdentity?.user;
+
+    // 2. If no identity linked, check if we have a user with same email
+    if (!user) {
+      user = await this.prisma.smfMember.findFirst({
+        where: { emailAddress: email },
+      });
+
+      if (user) {
+        // Link existing user to this Google identity
+        await this.prisma.akSocialIdentity.create({
+          data: {
+            userId: user.idMember,
+            provider,
+            providerId,
+          },
+        });
+
+        // Mark email as verified if it wasn't already
+        if (!user.emailVerified) {
+          await this.prisma.smfMember.update({
+            where: { idMember: user.idMember },
+            data: { emailVerified: true, emailVerifiedAt: new Date() },
+          });
+        }
+      } else {
+        // 3. Create a new user
+        // Generate a unique username based on email or name
+        const baseUsername = email.split('@')[0].replace(/[^a-zA-Z0-9]/g, '');
+        let username = baseUsername;
+        let counter = 1;
+
+        while (await this.prisma.smfMember.findFirst({ where: { memberName: username } })) {
+          username = `${baseUsername}${counter}`;
+          counter++;
+        }
+
+        user = await this.prisma.smfMember.create({
+          data: {
+            memberName: username,
+            realName: `${firstName} ${lastName}`.trim() || username,
+            emailAddress: email,
+            passwd: await bcrypt.hash(crypto.randomBytes(16).toString('hex'), 12), // Random password
+            dateRegistered: Math.floor(Date.now() / 1000),
+            idGroup: 0,
+            emailVerified: true, // Google emails are already verified
+            emailVerifiedAt: new Date(),
+          } as any,
+        });
+
+        // Link new user to Google identity
+        await this.prisma.akSocialIdentity.create({
+          data: {
+            userId: user.idMember,
+            provider,
+            providerId,
+          },
+        });
+      }
+    }
+
+    // 4. Log the user in (generate tokens)
+    // Update last login
+    const fullUser = await this.prisma.smfMember.findUnique({
+      where: { idMember: user.idMember },
+      select: { lastLogin: true }
+    });
+
+    await this.prisma.smfMember.update({
+      where: { idMember: user.idMember },
+      data: {
+        previousLogin: fullUser?.lastLogin,
+        lastLogin: Math.floor(Date.now() / 1000)
+      },
+    });
+
+    if (ipAddress) {
+      await this.trackLoginIP(user.idMember, ipAddress);
+    }
+
+    const payload = {
+      sub: user.idMember,
+      username: user.memberName,
+      email: user.emailAddress,
+      groupId: user.idGroup,
+      role: getRoleName(user.idGroup),
+      isAdmin: hasAdminAccess(user.idGroup) || user.idMember === 1,
+    };
+
+    const accessToken = this.jwtService.sign(payload);
+    const refreshToken = await this.generateRefreshToken(user, ipAddress, userAgent);
+
+    this.metricsService.trackAuthAttempt('login', 'success', 'google');
+
+    return {
+      accessToken,
+      refreshToken,
       user: this.sanitizeUser(user),
     };
   }

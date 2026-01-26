@@ -9,7 +9,9 @@ import {
   HttpStatus,
   Ip,
   Headers,
+  Res,
 } from '@nestjs/common';
+import { AuthGuard } from '@nestjs/passport';
 import {
   ApiTags,
   ApiOperation,
@@ -17,6 +19,7 @@ import {
   ApiBearerAuth,
   ApiHeader,
 } from '@nestjs/swagger';
+import { ConfigService } from '@nestjs/config';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RegisterDto } from './dto/register.dto';
@@ -32,7 +35,10 @@ export class LogoutDto {
 @ApiTags('Authentication')
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly configService: ConfigService,
+  ) { }
 
   @Post('register')
   @ApiOperation({ summary: "Inscription d'un nouvel utilisateur" })
@@ -59,7 +65,7 @@ export class AuthController {
       registerDto,
       ip,
       userAgent ||
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36 Edg/134.0.0.0',
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36 Edg/134.0.0.0',
     );
   }
 
@@ -86,7 +92,7 @@ export class AuthController {
       loginDto,
       ip,
       userAgent ||
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36 Edg/134.0.0.0',
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36 Edg/134.0.0.0',
     );
   }
 
@@ -116,7 +122,7 @@ export class AuthController {
       refreshTokenDto.refreshToken,
       ip,
       userAgent ||
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36 Edg/134.0.0.0',
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36 Edg/134.0.0.0',
     );
   }
 
@@ -142,7 +148,7 @@ export class AuthController {
       forgotPasswordDto,
       ip,
       userAgent ||
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36 Edg/134.0.0.0',
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36 Edg/134.0.0.0',
     );
   }
 
@@ -199,7 +205,7 @@ export class AuthController {
       email,
       ip,
       userAgent ||
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36 Edg/134.0.0.0',
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36 Edg/134.0.0.0',
     );
   }
 
@@ -230,5 +236,30 @@ export class AuthController {
   @ApiResponse({ status: 400, description: 'Échec de la déconnexion' })
   async logout(@Body() logoutDto: LogoutDto) {
     return this.authService.logout(logoutDto.refreshToken);
+  }
+
+  // --- Google OAuth ---
+
+  @Get('google')
+  @UseGuards(AuthGuard('google'))
+  @ApiOperation({ summary: 'Redirect to Google for authentication' })
+  async googleLogin() {
+    // Redirects automatically via Passport Google strategy
+  }
+
+  @Get('google/callback')
+  @UseGuards(AuthGuard('google'))
+  @ApiOperation({ summary: 'Handle Google OAuth callback' })
+  async googleLoginCallback(@Request() req, @Ip() ip: string, @Headers('user-agent') userAgent?: string, @Res() res?: any) {
+    const result = await this.authService.validateGoogleUser(req.user, ip, userAgent);
+
+    // Redirect back to frontend with tokens
+    const frontendUrl = this.configService.get('FRONTEND_URL') || 'http://localhost:3000';
+    const redirectUrl = `${frontendUrl}/auth/callback?accessToken=${result.accessToken}&refreshToken=${result.refreshToken}`;
+
+    if (res) {
+      return res.redirect(redirectUrl);
+    }
+    return { redirect: redirectUrl };
   }
 }
