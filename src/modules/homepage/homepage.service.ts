@@ -119,7 +119,6 @@ export class HomePageService {
           image: true,
           annee: true,
           studio: true,
-          origine: true,
         },
       });
     }
@@ -155,7 +154,7 @@ export class HomePageService {
           image: true,
           annee: true,
           editeur: true,
-          support: true,
+          plateforme: true,
         },
       });
     }
@@ -242,7 +241,6 @@ export class HomePageService {
           image: a.image,
           annee: a.annee,
           studio: a.studio,
-          origine: a.origine,
         })),
         mangas: recentMangas.map((m: any) => ({
           id: m.idManga,
@@ -252,7 +250,6 @@ export class HomePageService {
           image: m.image,
           annee: m.annee,
           editeur: m.editeur,
-          origine: m.origine,
         })),
         games: recentGames.map((g: any) => ({
           id: g.idJeu,
@@ -262,7 +259,7 @@ export class HomePageService {
           image: g.image,
           annee: g.annee,
           editeur: g.editeur,
-          support: g.support,
+          support: g.plateforme,
         })),
       },
       generatedAt: new Date().toISOString(),
