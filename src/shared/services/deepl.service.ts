@@ -33,12 +33,15 @@ export class DeepLService {
     targetLang: string = 'FR',
     sourceLang?: string,
   ): Promise<string | null> {
+    this.logger.log(`DeepL translate called - API key configured: ${!!this.apiKey}, text length: ${text?.length || 0}`);
+
     if (!this.apiKey) {
       this.logger.error('DeepL API key not configured, cannot translate');
       return null;
     }
 
     if (!text || text.trim().length === 0) {
+      this.logger.warn('DeepL: Empty text provided, skipping translation');
       return null;
     }
 
@@ -70,11 +73,14 @@ export class DeepLService {
       }
 
       const data: DeepLTranslationResponse = await response.json();
+      this.logger.log(`DeepL response received: ${data.translations?.length || 0} translations`);
 
       if (data.translations && data.translations.length > 0) {
+        this.logger.log(`DeepL translation success - detected language: ${data.translations[0].detected_source_language}`);
         return data.translations[0].text;
       }
 
+      this.logger.warn('DeepL: No translations in response');
       return null;
     } catch (error) {
       this.logger.error(
