@@ -152,6 +152,77 @@ export class JobsCronController {
         };
     }
 
+    @Get('list')
+    @UseGuards(OptionalJwtAuthGuard, CronAuthGuard)
+    @ApiOperation({ summary: 'List all available jobs' })
+    @ApiResponse({ status: 200, description: 'List of available jobs' })
+    async listJobs() {
+        return {
+            success: true,
+            jobs: [
+                {
+                    id: 'popularity-daily',
+                    name: 'Popularité quotidienne',
+                    description: 'Recalcule la popularité des critiques récentes',
+                    endpoint: 'popularity/daily',
+                    method: 'POST',
+                    category: 'popularity',
+                },
+                {
+                    id: 'popularity-weekly',
+                    name: 'Popularité hebdomadaire',
+                    description: 'Recalcule la popularité de toutes les critiques',
+                    endpoint: 'popularity/weekly',
+                    method: 'POST',
+                    category: 'popularity',
+                },
+                {
+                    id: 'review-rankings',
+                    name: 'Classement des critiques',
+                    description: 'Met à jour le classement de popularité des critiques',
+                    endpoint: 'reviews/rankings',
+                    method: 'POST',
+                    category: 'rankings',
+                },
+                {
+                    id: 'weekly-rankings',
+                    name: 'Classement anime hebdomadaire',
+                    description: 'Génère le classement hebdomadaire des animes de la saison',
+                    endpoint: 'rankings/weekly',
+                    method: 'POST',
+                    category: 'rankings',
+                },
+                {
+                    id: 'reset-daily-counters',
+                    name: 'Reset compteurs quotidiens',
+                    description: 'Remet à zéro les compteurs de vues quotidiens',
+                    endpoint: 'counters/reset-daily',
+                    method: 'POST',
+                    category: 'counters',
+                    danger: true,
+                },
+                {
+                    id: 'reset-weekly-counters',
+                    name: 'Reset compteurs hebdomadaires',
+                    description: 'Remet à zéro les compteurs de vues hebdomadaires',
+                    endpoint: 'counters/reset-weekly',
+                    method: 'POST',
+                    category: 'counters',
+                    danger: true,
+                },
+                {
+                    id: 'reset-monthly-counters',
+                    name: 'Reset compteurs mensuels',
+                    description: 'Remet à zéro les compteurs de vues mensuels',
+                    endpoint: 'counters/reset-monthly',
+                    method: 'POST',
+                    category: 'counters',
+                    danger: true,
+                },
+            ],
+        };
+    }
+
     @Post('rankings/weekly')
     @UseGuards(OptionalJwtAuthGuard, CronAuthGuard)
     @ApiHeader({
