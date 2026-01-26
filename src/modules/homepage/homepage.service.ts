@@ -237,6 +237,14 @@ export class HomePageService {
     const recentMangas = promises.recentMangasResult || cachedRecentMangas || [];
     const recentGames = promises.recentGamesResult || cachedRecentGames || [];
 
+    // Helper to safely convert date to ISO string (handles both Date objects and strings from cache)
+    const toISOString = (date: any): string | null => {
+      if (!date) return null;
+      if (typeof date === 'string') return date;
+      if (date instanceof Date) return date.toISOString();
+      return null;
+    };
+
     return {
       hero: {
         reviews,
@@ -254,7 +262,7 @@ export class HomePageService {
           image: a.image,
           annee: a.annee,
           studio: a.studio,
-          addedDate: a.dateAjout ? a.dateAjout.toISOString() : null,
+          addedDate: toISOString(a.dateAjout),
         })),
         mangas: recentMangas.map((m: any) => ({
           id: m.idManga,
@@ -264,7 +272,7 @@ export class HomePageService {
           image: m.image,
           annee: m.annee,
           editeur: m.editeur,
-          addedDate: m.dateAjout ? m.dateAjout.toISOString() : null,
+          addedDate: toISOString(m.dateAjout),
         })),
         games: recentGames.map((g: any) => ({
           id: g.idJeu,
@@ -275,7 +283,7 @@ export class HomePageService {
           annee: g.annee,
           editeur: g.editeur,
           support: g.plateforme,
-          addedDate: g.dateAjout ? g.dateAjout.toISOString() : null,
+          addedDate: toISOString(g.dateAjout),
         })),
       },
       generatedAt: new Date().toISOString(),
