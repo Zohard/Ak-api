@@ -47,7 +47,6 @@ export class DeepLService {
 
     try {
       const params = new URLSearchParams({
-        auth_key: this.apiKey,
         text: text,
         target_lang: targetLang,
       });
@@ -59,6 +58,7 @@ export class DeepLService {
       const response = await fetch(this.apiUrl, {
         method: 'POST',
         headers: {
+          'Authorization': `DeepL-Auth-Key ${this.apiKey}`,
           'Content-Type': 'application/x-www-form-urlencoded',
         },
         body: params.toString(),
