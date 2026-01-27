@@ -202,9 +202,6 @@ export class JeuxVideoService {
           { dateSortieEurope: { gte: startDate, lte: endDate } },
         ]
       },
-      orderBy: {
-        dateSortieWorldwide: 'asc',
-      },
       select: {
         idJeu: true,
         titre: true,
@@ -229,8 +226,27 @@ export class JeuxVideoService {
       },
     });
 
+    // Sort by earliest release date in the target month
+    const sortedItems = items.sort((a, b) => {
+      const getEarliestDateInMonth = (item: typeof items[0]) => {
+        const dates = [
+          item.dateSortieWorldwide,
+          item.dateSortieJapon,
+          item.dateSortieUsa,
+          item.dateSortieEurope,
+        ]
+          .filter(d => d !== null)
+          .map(d => new Date(d!))
+          .filter(d => d.getMonth() + 1 === month && d.getFullYear() === year);
+
+        return dates.length > 0 ? Math.min(...dates.map(d => d.getTime())) : Infinity;
+      };
+
+      return getEarliestDateInMonth(a) - getEarliestDateInMonth(b);
+    });
+
     // Map for frontend
-    const mappedItems = items.map(item => ({
+    const mappedItems = sortedItems.map(item => ({
       ...item,
       id: item.idJeu,
     }));
