@@ -1471,6 +1471,18 @@ export class AdminJeuxVideoService {
     };
   }
 
+  /**
+   * Translate text to French using DeepL
+   */
+  async translateDescription(text: string): Promise<{ translatedText: string | null }> {
+    if (!text || text.trim().length === 0) {
+      return { translatedText: null };
+    }
+
+    const translatedText = await this.deepLService.translateToFrench(text);
+    return { translatedText };
+  }
+
   private slugify(text: string) {
     return text
       .toLowerCase()

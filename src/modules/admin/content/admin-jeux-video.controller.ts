@@ -167,4 +167,13 @@ export class AdminJeuxVideoController {
     const username = req.user?.pseudo || req.user?.member_name || 'admin';
     return this.service.importStaffFromIgdb(id, igdbId, username);
   }
+
+  @Post(':id/translate-description')
+  @ApiOperation({ summary: 'Traduire la description en français via DeepL' })
+  translateDescription(
+    @Param('id', ParseIntPipe) id: number,
+    @Body('text') text: string
+  ) {
+    return this.service.translateDescription(text);
+  }
 }
