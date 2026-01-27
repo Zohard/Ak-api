@@ -258,6 +258,9 @@ export class EpisodesService {
                         titre: true,
                         image: true,
                         niceUrl: true,
+                        nbEp: true,
+                        format: true,
+                        studio: true,
                     }
                 }
             }
@@ -320,6 +323,9 @@ export class EpisodesService {
                         titre: true,
                         image: true,
                         niceUrl: true,
+                        nbEp: true,
+                        format: true,
+                        studio: true,
                     },
                 },
             },
@@ -401,6 +407,9 @@ export class EpisodesService {
                         titre: true,
                         image: true,
                         niceUrl: true,
+                        nbEp: true,
+                        format: true,
+                        studio: true,
                     },
                 },
             },
