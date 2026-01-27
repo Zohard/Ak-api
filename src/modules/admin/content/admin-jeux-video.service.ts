@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../../shared/services/prisma.service';
+import { CacheService } from '../../../shared/services/cache.service';
 import { IgdbService } from '../../../shared/services/igdb.service';
 import { DeepLService } from '../../../shared/services/deepl.service';
 import { AdminLoggingService } from '../logging/admin-logging.service';
@@ -13,6 +14,7 @@ import { UpdateJeuVideoTrailerDto } from './dto/update-jeu-video-trailer.dto';
 export class AdminJeuxVideoService {
   constructor(
     private prisma: PrismaService,
+    private cacheService: CacheService,
     private adminLogging: AdminLoggingService,
     private igdbService: IgdbService,
     private imagekitService: R2Service,
@@ -246,6 +248,11 @@ export class AdminJeuxVideoService {
     const existing = await this.prisma.akJeuxVideo.findUnique({ where: { idJeu: id } });
     if (!existing) throw new NotFoundException('Jeu vidéo introuvable');
 
+    // Invalidate planning cache if existing game was published (to handle date changes)
+    if (existing.statut === 1) {
+      await this.invalidatePlanningCache(existing);
+    }
+
     const data: any = { ...dto };
     const platformIds = data.platformIds;
     const genreIds = data.genreIds;
@@ -272,6 +279,11 @@ export class AdminJeuxVideoService {
       where: { idJeu: id },
       data
     });
+
+    // Invalidate planning cache if status is published
+    if (updated.statut === 1) {
+      await this.invalidatePlanningCache(updated);
+    }
 
     // Update platform associations if platformIds provided
     if (platformIds !== undefined) {
@@ -330,10 +342,20 @@ export class AdminJeuxVideoService {
     });
     if (!existing) throw new NotFoundException('Jeu vidéo introuvable');
 
+    // Invalidate planning cache for existing state if it was published
+    if (existing.statut === 1) {
+      await this.invalidatePlanningCache(existing);
+    }
+
     const updated = await this.prisma.akJeuxVideo.update({
       where: { idJeu: id },
       data: { statut },
     });
+
+    // Invalidate planning cache for new state if it is published
+    if (statut === 1) {
+      await this.invalidatePlanningCache(updated);
+    }
 
     // Log the status change
     if (username) {
@@ -1490,5 +1512,34 @@ export class AdminJeuxVideoService {
       .replace(/[\u0300-\u036f]/g, '')
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/(^-|-$)+/g, '');
+  }
+
+  /**
+   * Helper to invalidate planning cache for a game's release months
+   */
+  private async invalidatePlanningCache(game: any) {
+    if (!game) return;
+    const dates = [
+      game.dateSortieWorldwide,
+      game.dateSortieJapon,
+      game.dateSortieUsa,
+      game.dateSortieEurope,
+    ];
+
+    const keysToInvalidate = new Set<string>();
+
+    for (const dateVal of dates) {
+      if (!dateVal) continue;
+      const date = new Date(dateVal);
+      if (isNaN(date.getTime())) continue;
+
+      const year = date.getFullYear();
+      const month = date.getMonth() + 1;
+      keysToInvalidate.add(`planning_games:${year}_${month}`);
+    }
+
+    for (const key of keysToInvalidate) {
+      await this.cacheService.del(key);
+    }
   }
 }
