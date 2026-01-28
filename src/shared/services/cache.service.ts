@@ -123,7 +123,7 @@ export class CacheService implements OnModuleInit {
     }
   }
 
-  // Clear cache by pattern (useful for invalidating related keys)
+  // Clear cache by pattern using SCAN (non-blocking, safe for production)
   async delByPattern(pattern: string): Promise<void> {
     if (!this.isConnected()) {
       this.logger.debug(`Redis not connected, skipping pattern delete for: ${pattern}`);
@@ -132,10 +132,22 @@ export class CacheService implements OnModuleInit {
 
     try {
       this.logger.debug(`Cache pattern delete requested for: ${pattern}`);
-      const keys = await this.redis.keys(pattern);
-      if (keys.length > 0) {
-        await this.redis.del(...keys);
-        this.logger.debug(`Deleted ${keys.length} keys matching pattern: ${pattern}`);
+      let cursor = '0';
+      let deletedCount = 0;
+
+      // Use SCAN instead of KEYS to avoid blocking Redis
+      do {
+        const [nextCursor, keys] = await this.redis.scan(cursor, 'MATCH', pattern, 'COUNT', 100);
+        cursor = nextCursor;
+
+        if (keys.length > 0) {
+          await this.redis.del(...keys);
+          deletedCount += keys.length;
+        }
+      } while (cursor !== '0');
+
+      if (deletedCount > 0) {
+        this.logger.debug(`Deleted ${deletedCount} keys matching pattern: ${pattern}`);
       }
     } catch (error) {
       this.logger.error(`Cache pattern delete error for pattern ${pattern}:`, error.message);
@@ -600,13 +612,22 @@ export class CacheService implements OnModuleInit {
     }
   }
 
-  // Admin cache management methods
+  // Admin cache management methods - uses SCAN for production safety
   async getAllKeys(pattern: string = '*'): Promise<string[]> {
     if (!this.isConnected()) return [];
 
     try {
-      const keys = await this.redis.keys(pattern);
-      return keys;
+      const allKeys: string[] = [];
+      let cursor = '0';
+
+      // Use SCAN instead of KEYS to avoid blocking Redis with 100k+ keys
+      do {
+        const [nextCursor, keys] = await this.redis.scan(cursor, 'MATCH', pattern, 'COUNT', 1000);
+        cursor = nextCursor;
+        allKeys.push(...keys);
+      } while (cursor !== '0');
+
+      return allKeys;
     } catch (error) {
       this.logger.error(`Error getting keys with pattern ${pattern}:`, error.message);
       return [];
@@ -753,13 +774,24 @@ export class CacheService implements OnModuleInit {
     if (!this.isConnected()) return 0;
 
     try {
-      const keys = await this.redis.keys(pattern);
-      if (keys.length > 0) {
-        await this.redis.del(...keys);
-        this.logger.log(`✅ Cleared ${keys.length} keys for category: ${category}`);
-        return keys.length;
+      // Use SCAN instead of KEYS to avoid blocking Redis with many keys
+      let cursor = '0';
+      let deletedCount = 0;
+
+      do {
+        const [nextCursor, keys] = await this.redis.scan(cursor, 'MATCH', pattern, 'COUNT', 1000);
+        cursor = nextCursor;
+
+        if (keys.length > 0) {
+          await this.redis.del(...keys);
+          deletedCount += keys.length;
+        }
+      } while (cursor !== '0');
+
+      if (deletedCount > 0) {
+        this.logger.log(`✅ Cleared ${deletedCount} keys for category: ${category}`);
       }
-      return 0;
+      return deletedCount;
     } catch (error) {
       this.logger.error(`Error clearing cache for category ${category}:`, error.message);
       throw error;

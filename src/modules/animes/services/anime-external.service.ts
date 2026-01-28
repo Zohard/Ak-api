@@ -44,22 +44,24 @@ export class AnimeExternalService {
 
   /**
    * Check if an anime exists in the database by titles
-   * Cached individually per title for granular cache invalidation
+   * Uses a single cache key based on all titles combined to reduce key proliferation
    */
-  async checkAnimeExists(titles: { romaji?: string; english?: string; native?: string }) {
+  async checkAnimeExists(titles: { romaji?: string; english?: string; native?: string }, anilistId?: number) {
     const titleList = [
       titles.romaji?.toLowerCase(),
       titles.english?.toLowerCase(),
       titles.native?.toLowerCase(),
     ].filter(Boolean);
 
-    // Try to get from individual title caches first
-    for (const title of titleList) {
-      const cacheKey = `anime_exists:${this.hashQuery(title)}`;
-      const cached = await this.cacheService.get(cacheKey);
-      if (cached !== null && cached !== undefined) {
-        return cached; // Return cached result (can be null if doesn't exist)
-      }
+    // Use AniList ID as cache key if available (most stable), otherwise hash all titles together
+    const cacheKey = anilistId
+      ? `anime_exists:anilist:${anilistId}`
+      : `anime_exists:titles:${this.hashQuery(titleList.sort().join('|'))}`;
+
+    // Try to get from cache first
+    const cached = await this.cacheService.get(cacheKey);
+    if (cached !== null && cached !== undefined) {
+      return cached;
     }
 
     // Not in cache, query database
@@ -95,29 +97,31 @@ export class AnimeExternalService {
       dbData: null,
     };
 
-    // Cache all title variations with the same result (1 hour cache)
-    for (const title of titleList) {
-      const cacheKey = `anime_exists:${this.hashQuery(title)}`;
-      await this.cacheService.set(cacheKey, result, 3600);
-    }
+    // Cache with single key (1 hour cache)
+    await this.cacheService.set(cacheKey, result, 3600);
 
     return result;
   }
 
   /**
-   * Invalidate existence cache for specific anime titles
+   * Invalidate existence cache for specific anime
    * Call this after creating a new anime
    */
-  async invalidateAnimeExistsCache(titles: { romaji?: string; english?: string; native?: string; alternatifs?: string[] }) {
+  async invalidateAnimeExistsCache(titles: { romaji?: string; english?: string; native?: string; alternatifs?: string[] }, anilistId?: number) {
+    // Delete by AniList ID if available
+    if (anilistId) {
+      await this.cacheService.del(`anime_exists:anilist:${anilistId}`);
+    }
+
+    // Also delete by title hash for backwards compatibility
     const titleList = [
       titles.romaji?.toLowerCase(),
       titles.english?.toLowerCase(),
       titles.native?.toLowerCase(),
-      ...(titles.alternatifs || []).map(t => t.toLowerCase()),
     ].filter(Boolean);
 
-    for (const title of titleList) {
-      const cacheKey = `anime_exists:${this.hashQuery(title)}`;
+    if (titleList.length > 0) {
+      const cacheKey = `anime_exists:titles:${this.hashQuery(titleList.sort().join('|'))}`;
       await this.cacheService.del(cacheKey);
     }
   }
@@ -136,14 +140,14 @@ export class AnimeExternalService {
         await this.cacheService.set(cacheKey, seasonalAnime, 3600);
       }
 
-      // Check existence for each anime individually (uses per-title cache)
+      // Check existence for each anime individually (uses per-anime cache with AniList ID)
       const comparisons: any[] = [];
 
       for (const anilistAnime of seasonalAnime) {
         const primaryTitle = anilistAnime.title.romaji || anilistAnime.title.english || anilistAnime.title.native;
 
-        // Check existence using individual cache per title
-        const existenceCheck: any = await this.checkAnimeExists(anilistAnime.title);
+        // Check existence using AniList ID as cache key (1 key per anime instead of 3)
+        const existenceCheck: any = await this.checkAnimeExists(anilistAnime.title, anilistAnime.id);
 
         const comparison = {
           titre: primaryTitle,
