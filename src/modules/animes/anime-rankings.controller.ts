@@ -14,6 +14,13 @@ export class AnimeRankingsController {
         private readonly httpService: HttpService,
     ) { }
 
+    @Get('weekly/current')
+    @ApiOperation({ summary: 'Get weekly anime ranking for the current week' })
+    async getCurrentWeeklyRanking() {
+        const { year, season, week } = this.getCurrentSeasonInfo();
+        return this.rankingsService.getWeeklyRanking(year, season, week);
+    }
+
     @Get('weekly/:year/:season/:week')
     @ApiOperation({ summary: 'Get weekly anime ranking' })
     async getWeeklyRanking(
@@ -82,5 +89,36 @@ export class AnimeRankingsController {
             console.error('Proxy image error:', error.message, 'URL:', url);
             return res.status(HttpStatus.BAD_GATEWAY).send('Failed to fetch image');
         }
+    }
+
+    private getCurrentSeasonInfo(): { year: number; season: string; week: number } {
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = now.getMonth(); // 0-indexed
+
+        // Determine season based on month
+        let season: string;
+        if (month >= 0 && month <= 2) {
+            season = 'WINTER'; // Jan-Mar
+        } else if (month >= 3 && month <= 5) {
+            season = 'SPRING'; // Apr-Jun
+        } else if (month >= 6 && month <= 8) {
+            season = 'SUMMER'; // Jul-Sep
+        } else {
+            season = 'FALL'; // Oct-Dec
+        }
+
+        // Calculate ISO week number
+        const week = this.getISOWeek(now);
+
+        return { year, season, week };
+    }
+
+    private getISOWeek(date: Date): number {
+        const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+        const dayNum = d.getUTCDay() || 7;
+        d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+        const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+        return Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
     }
 }
