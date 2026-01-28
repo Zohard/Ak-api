@@ -113,10 +113,21 @@ export class CollectionStatisticsService {
             }
         });
 
+        const gameCounts = await this.prisma.collectionJeuxVideo.groupBy({
+            by: ['type'],
+            where: {
+                idMembre: userId
+            },
+            _count: {
+                type: true
+            }
+        });
+
         // Format the response
         const data = collectionTypes.map(ct => {
             const animeCount = animeCounts.find(ac => ac.type === ct.type)?._count?.type || 0;
             const mangaCount = mangaCounts.find(mc => mc.type === ct.type)?._count?.type || 0;
+            const gameCount = gameCounts.find(gc => gc.type === ct.type)?._count?.type || 0;
 
             return {
                 type: ct.type,
@@ -129,7 +140,11 @@ export class CollectionStatisticsService {
                     count: mangaCount,
                     mediaType: 'manga' as const
                 },
-                totalCount: animeCount + mangaCount
+                game: {
+                    count: gameCount,
+                    mediaType: 'game' as const
+                },
+                totalCount: animeCount + mangaCount + gameCount
             };
         });
 
@@ -142,6 +157,10 @@ export class CollectionStatisticsService {
             {
                 mediaType: 'manga' as const,
                 totalCount: mangaCounts.reduce((sum, mc) => sum + (mc._count?.type || 0), 0)
+            },
+            {
+                mediaType: 'game' as const,
+                totalCount: gameCounts.reduce((sum, gc) => sum + (gc._count?.type || 0), 0)
             }
         ];
 
@@ -156,7 +175,7 @@ export class CollectionStatisticsService {
         const isOwnCollection = currentUserId === userId;
 
         // Fetch user info and collection counts in parallel
-        const [user, animeCounts, mangaCounts] = await Promise.all([
+        const [user, animeCounts, mangaCounts, gameCounts] = await Promise.all([
             this.prisma.smfMember.findUnique({
                 where: { idMember: userId },
                 select: {
@@ -182,6 +201,11 @@ export class CollectionStatisticsService {
                     ...(isOwnCollection ? {} : { isPublic: true })
                 },
                 _count: { type: true }
+            }),
+            this.prisma.collectionJeuxVideo.groupBy({
+                by: ['type'],
+                where: { idMembre: userId },
+                _count: { type: true }
             })
         ]);
 
@@ -200,19 +224,22 @@ export class CollectionStatisticsService {
         const collections = collectionTypes.map(ct => {
             const animeCount = animeCounts.find(ac => ac.type === ct.type)?._count?.type || 0;
             const mangaCount = mangaCounts.find(mc => mc.type === ct.type)?._count?.type || 0;
+            const gameCount = gameCounts.find(gc => gc.type === ct.type)?._count?.type || 0;
 
             return {
                 type: ct.type,
                 name: ct.name,
                 animeCount,
                 mangaCount,
-                totalCount: animeCount + mangaCount,
-                hasItems: (animeCount + mangaCount) > 0
+                gameCount,
+                totalCount: animeCount + mangaCount + gameCount,
+                hasItems: (animeCount + mangaCount + gameCount) > 0
             };
         }).filter(c => c.hasItems);
 
         const totalPublicAnimes = animeCounts.reduce((sum, ac) => sum + (ac._count?.type || 0), 0);
         const totalPublicMangas = mangaCounts.reduce((sum, mc) => sum + (mc._count?.type || 0), 0);
+        const totalPublicGames = gameCounts.reduce((sum, gc) => sum + (gc._count?.type || 0), 0);
 
         return {
             id: user.idMember,
@@ -223,7 +250,8 @@ export class CollectionStatisticsService {
             collections,
             totalPublicAnimes,
             totalPublicMangas,
-            totalPublicItems: totalPublicAnimes + totalPublicMangas
+            totalPublicGames,
+            totalPublicItems: totalPublicAnimes + totalPublicMangas + totalPublicGames
         };
     }
 
