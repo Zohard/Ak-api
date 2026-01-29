@@ -276,6 +276,69 @@ export class AdminMangasController {
     };
   }
 
+  @Get(':id/volumes/:volumeNumber/candidates')
+  @ApiOperation({
+    summary: 'Search volume candidates for selection',
+    description: 'Returns multiple volume candidates from different sources for user to choose from.'
+  })
+  @ApiParam({ name: 'id', description: 'Manga ID' })
+  @ApiParam({ name: 'volumeNumber', description: 'Volume number to search' })
+  @ApiResponse({
+    status: 200,
+    description: 'List of volume candidates',
+    schema: {
+      type: 'object',
+      properties: {
+        mangaTitle: { type: 'string' },
+        volumeNumber: { type: 'number' },
+        candidates: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              volumeNumber: { type: 'number' },
+              title: { type: 'string' },
+              isbn: { type: 'string' },
+              releaseDate: { type: 'string' },
+              coverUrl: { type: 'string' },
+              description: { type: 'string' },
+              publisher: { type: 'string' },
+              source: { type: 'string', enum: ['google_books', 'nautiljon'] },
+            }
+          }
+        },
+        sources: { type: 'array', items: { type: 'string' } },
+      }
+    }
+  })
+  async searchVolumeCandidates(
+    @Param('id', ParseIntPipe) id: number,
+    @Param('volumeNumber', ParseIntPipe) volumeNumber: number,
+  ) {
+    // Get manga title
+    const manga = await this.service.getOne(id);
+    if (!manga) {
+      return { mangaTitle: '', volumeNumber, candidates: [], sources: [] };
+    }
+
+    // Get title variants from Jikan
+    const titleVariants = await this.mangaVolumesService.getMangaTitleVariants(manga.titre);
+
+    // Search for volume candidates
+    const result = await this.mangaVolumesService.searchVolumeCandidates(
+      manga.titre,
+      volumeNumber,
+      titleVariants,
+    );
+
+    return {
+      mangaTitle: manga.titre,
+      volumeNumber,
+      titleVariants,
+      ...result,
+    };
+  }
+
   @Get('volumes/missing-covers')
   @ApiOperation({
     summary: 'Get volumes without covers',

@@ -446,7 +446,8 @@ export class AdminMangasService {
       success: true,
       message: volumesToCreate.length > 0 ? `${volumesToCreate.length} volumes générés avec succès` : 'Tous les volumes existent déjà',
       total: count,
-      created: volumesToCreate.length
+      created: volumesToCreate.length,
+      existing: existingVolumes.length
     };
   }
 

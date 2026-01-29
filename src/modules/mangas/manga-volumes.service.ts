@@ -180,6 +180,105 @@ export class MangaVolumesService {
   }
 
   /**
+   * Search for volume candidates (returns multiple options for user to choose)
+   * Used when user wants to manually select the correct volume from search results
+   */
+  async searchVolumeCandidates(
+    mangaTitle: string,
+    volumeNumber: number,
+    titleVariants?: MangaTitleVariants,
+  ): Promise<{
+    candidates: Array<VolumeInfo & { score?: number }>;
+    sources: string[];
+  }> {
+    const allCandidates: Array<VolumeInfo & { score?: number }> = [];
+    const sources: string[] = [];
+
+    // Build search queries with different title formats
+    const titles = titleVariants
+      ? [titleVariants.original, titleVariants.french, titleVariants.english, ...titleVariants.synonyms]
+      : [mangaTitle];
+
+    const uniqueTitles = [...new Set(titles.filter(Boolean))] as string[];
+    const searchQueries: string[] = [];
+
+    for (const title of uniqueTitles.slice(0, 2)) {
+      searchQueries.push(`${title} Tome ${volumeNumber}`);
+    }
+
+    // ===== Google Books candidates =====
+    for (const query of searchQueries) {
+      try {
+        const candidates = await this.googleBooksService.searchVolumeCandidates(query, volumeNumber, 'fr');
+        if (candidates.length > 0) {
+          sources.push('google_books');
+          for (const c of candidates) {
+            // Check if this candidate is already in the list (by ISBN or title)
+            const isDuplicate = allCandidates.some(
+              existing => (existing.isbn && existing.isbn === c.isbn) ||
+                         (existing.title?.toLowerCase() === c.title?.toLowerCase())
+            );
+            if (!isDuplicate) {
+              allCandidates.push({
+                ...c,
+                volumeNumber: c.volumeNumber || volumeNumber,
+                source: 'google_books',
+              });
+            }
+          }
+        }
+      } catch (error) {
+        this.logger.warn(`[Google Books] Candidates search failed for "${query}": ${error.message}`);
+      }
+    }
+
+    // ===== Nautiljon candidate =====
+    for (const title of uniqueTitles.slice(0, 1)) {
+      try {
+        const nautiljonResult = await this.nautiljonService.searchVolume(title, volumeNumber);
+        if (nautiljonResult && (nautiljonResult.isbn || nautiljonResult.releaseDate || nautiljonResult.coverUrl)) {
+          sources.push('nautiljon');
+          const isDuplicate = allCandidates.some(
+            existing => existing.isbn && existing.isbn === nautiljonResult.isbn
+          );
+          if (!isDuplicate) {
+            allCandidates.push({
+              volumeNumber: nautiljonResult.volumeNumber,
+              title: nautiljonResult.title,
+              isbn: nautiljonResult.isbn,
+              releaseDate: nautiljonResult.releaseDate,
+              coverUrl: nautiljonResult.coverUrl,
+              description: nautiljonResult.description,
+              publisher: nautiljonResult.publisher,
+              source: 'nautiljon',
+            });
+          }
+        }
+      } catch (error) {
+        this.logger.warn(`[Nautiljon] Candidates search failed for "${title}": ${error.message}`);
+      }
+    }
+
+    // Sort candidates: prioritize those with matching volume number, then by completeness
+    allCandidates.sort((a, b) => {
+      // Volume number match
+      const aVolMatch = a.volumeNumber === volumeNumber ? 100 : 0;
+      const bVolMatch = b.volumeNumber === volumeNumber ? 100 : 0;
+
+      // Completeness score
+      const aComplete = (a.isbn ? 30 : 0) + (a.releaseDate ? 20 : 0) + (a.coverUrl ? 20 : 0) + (a.publisher ? 10 : 0);
+      const bComplete = (b.isbn ? 30 : 0) + (b.releaseDate ? 20 : 0) + (b.coverUrl ? 20 : 0) + (b.publisher ? 10 : 0);
+
+      return (bVolMatch + bComplete) - (aVolMatch + aComplete);
+    });
+
+    return {
+      candidates: allCandidates.slice(0, 10), // Limit to 10 candidates
+      sources: [...new Set(sources)],
+    };
+  }
+
+  /**
    * Upload volume cover to R2 and save to ak_screenshots
    * Naming convention: {safe-title}-tome-{number}-{timestamp}.{ext}
    */

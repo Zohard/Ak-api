@@ -472,6 +472,81 @@ export class GoogleBooksService {
   }
 
   /**
+   * Search for manga volumes and return ALL candidates (for user selection)
+   * @param query Search query (e.g., "Death Note Tome 1")
+   * @param volumeNumber Expected volume number
+   * @param language Language filter
+   * @returns Array of volume candidates
+   */
+  async searchVolumeCandidates(
+    query: string,
+    volumeNumber: number,
+    language: 'fr' | 'en' = 'fr',
+  ): Promise<Array<{
+    title: string;
+    isbn?: string;
+    releaseDate?: string;
+    coverUrl?: string;
+    description?: string;
+    publisher?: string;
+    volumeNumber?: number;
+  }>> {
+    try {
+      // Add "manga" to the query to filter results better
+      const mangaQuery = `${query} manga`;
+
+      const params = {
+        q: mangaQuery,
+        langRestrict: language,
+        printType: 'books',
+        maxResults: 20,
+      };
+
+      this.logger.debug(`Searching Google Books candidates: "${mangaQuery}"`);
+
+      const response = await firstValueFrom(
+        this.httpService.get<GoogleBooksResponse>(this.GOOGLE_BOOKS_API_URL, { params }),
+      );
+
+      const items = response.data.items || [];
+      if (items.length === 0) {
+        return [];
+      }
+
+      // Filter for likely manga
+      const mangaItems = items.filter(item => this.isLikelyManga(item, language));
+
+      // Transform all matching items to candidates
+      return mangaItems.map(item => {
+        const volumeInfo = item.volumeInfo;
+        const isbn13 = volumeInfo.industryIdentifiers?.find(id => id.type === 'ISBN_13')?.identifier;
+        const isbn10 = volumeInfo.industryIdentifiers?.find(id => id.type === 'ISBN_10')?.identifier;
+
+        let coverUrl = volumeInfo.imageLinks?.thumbnail;
+        if (coverUrl) {
+          coverUrl = coverUrl
+            .replace('http://', 'https://')
+            .replace('zoom=1', 'zoom=2')
+            .replace('&edge=curl', '');
+        }
+
+        return {
+          title: volumeInfo.title,
+          isbn: isbn13 || isbn10,
+          releaseDate: volumeInfo.publishedDate,
+          coverUrl,
+          description: volumeInfo.description,
+          publisher: volumeInfo.publisher,
+          volumeNumber: this.extractVolumeNumberFromTitle(volumeInfo.title),
+        };
+      });
+    } catch (error) {
+      this.logger.error(`Error searching volume candidates "${query}": ${error.message}`);
+      return [];
+    }
+  }
+
+  /**
    * Extract volume number from a title string
    */
   private extractVolumeNumberFromTitle(title: string): number | null {
