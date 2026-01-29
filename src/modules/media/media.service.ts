@@ -7,6 +7,10 @@ import {
 import { PrismaService } from '../../shared/services/prisma.service';
 import { R2Service } from './r2.service';
 import { slugify } from '../../shared/utils/text.util';
+import {
+  validateImageUrl,
+  validateMetadataUrl,
+} from '../../shared/utils/url-validator.util';
 import sharp from 'sharp';
 import * as path from 'path';
 import * as fs from 'fs/promises';
@@ -20,6 +24,10 @@ export class MediaService {
     private r2Service: R2Service,
   ) { }
   private readonly logger = new Logger(MediaService.name);
+
+  // Maximum file size: 10MB for regular uploads, 5MB for avatars
+  private readonly MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+  private readonly MAX_AVATAR_SIZE = 5 * 1024 * 1024; // 5MB
 
   private readonly allowedMimeTypes = [
     'image/jpeg',
@@ -43,6 +51,15 @@ export class MediaService {
     if (!this.allowedMimeTypes.includes(file.mimetype)) {
       throw new BadRequestException(
         'Invalid file type. Only images are allowed.',
+      );
+    }
+
+    // Validate file size
+    const maxSize = type === 'avatar' ? this.MAX_AVATAR_SIZE : this.MAX_FILE_SIZE;
+    if (file.size > maxSize) {
+      const maxSizeMB = maxSize / (1024 * 1024);
+      throw new BadRequestException(
+        `File too large. Maximum size is ${maxSizeMB}MB for ${type} uploads.`,
       );
     }
 
@@ -226,6 +243,9 @@ export class MediaService {
     saveAsScreenshot: boolean = false,
     title?: string,
   ) {
+    // SSRF Protection: Validate URL before fetching
+    await validateImageUrl(imageUrl);
+
     try {
       // Build headers based on the image URL domain
       const headers: any = {
@@ -256,6 +276,16 @@ export class MediaService {
 
       if (!response.data) {
         throw new BadRequestException('Failed to download image from URL');
+      }
+
+      // Validate downloaded file size
+      const downloadedSize = response.data.byteLength || response.data.length;
+      const maxSize = type === 'avatar' ? this.MAX_AVATAR_SIZE : this.MAX_FILE_SIZE;
+      if (downloadedSize > maxSize) {
+        const maxSizeMB = maxSize / (1024 * 1024);
+        throw new BadRequestException(
+          `Downloaded image too large (${(downloadedSize / (1024 * 1024)).toFixed(2)}MB). Maximum size is ${maxSizeMB}MB.`,
+        );
       }
 
       // Detect image type from Content-Type header
@@ -769,12 +799,11 @@ export class MediaService {
   }
 
   async fetchUrlMetadata(url: string) {
+    // SSRF Protection: Validate URL before fetching
+    await validateMetadataUrl(url);
+
     try {
-      // Validate URL
       const urlObj = new URL(url);
-      if (!['http:', 'https:'].includes(urlObj.protocol)) {
-        throw new BadRequestException('Invalid URL protocol. Only HTTP(S) allowed');
-      }
 
       // Check if URL is Twitter/X and use oEmbed API
       if (this.isTwitterUrl(url)) {

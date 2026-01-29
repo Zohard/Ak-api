@@ -43,24 +43,62 @@ async function bootstrap() {
   // Cookie parser for activity tracking
   app.use(cookieParser());
 
+  // Security headers middleware
+  app.use((req, res, next) => {
+    // Prevent clickjacking
+    res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+    // Prevent MIME type sniffing
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    // XSS Protection (legacy, but still useful)
+    res.setHeader('X-XSS-Protection', '1; mode=block');
+    // Referrer policy
+    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+    // Permissions policy (restrict sensitive APIs)
+    res.setHeader(
+      'Permissions-Policy',
+      'geolocation=(), microphone=(), camera=(), payment=()',
+    );
+    // HSTS (only in production with HTTPS)
+    if (process.env.NODE_ENV === 'production') {
+      res.setHeader(
+        'Strict-Transport-Security',
+        'max-age=31536000; includeSubDomains',
+      );
+    }
+    next();
+  });
+
   // Increase body size limit for large imports (e.g., MAL XML imports)
   app.use(json({ limit: '50mb' }));
 
   // CORS configuration
   const corsOriginEnv = configService.get('CORS_ORIGIN') || '';
+  const nodeEnv = configService.get('NODE_ENV') || 'development';
   const corsOrigins = [
     'http://localhost:3000', // Nuxt frontend dev
     'http://localhost:3001', // AI orchestrator dev
     'http://localhost:3003', // Frontend dev alternate port
     configService.get('FRONTEND_URL'), // Production frontend
-    ...corsOriginEnv.split(',').map((o: string) => o.trim()), // Additional CORS origins (comma-separated)
+    ...corsOriginEnv.split(',').map((o: string) => o.trim()).filter(Boolean), // Additional CORS origins (comma-separated)
     configService.get('AI_ORCHESTRATOR_URL'), // Production AI orchestrator
   ].filter(Boolean);
 
   const logger = new NestLogger('Bootstrap');
 
+  // In production, require explicit CORS origins. In development, allow localhost origins.
+  const isProduction = nodeEnv === 'production';
+  const hasProductionOrigins = corsOrigins.some(
+    (origin) => origin && !origin.includes('localhost'),
+  );
+
+  if (isProduction && !hasProductionOrigins) {
+    logger.warn(
+      'SECURITY WARNING: No production CORS origins configured. Set FRONTEND_URL or CORS_ORIGIN environment variables.',
+    );
+  }
+
   app.enableCors({
-    origin: corsOrigins.length > 3 ? corsOrigins : true, // Fallback to allow all if env vars missing
+    origin: corsOrigins,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'HEAD', 'PATCH'],
     allowedHeaders: [
@@ -71,7 +109,6 @@ async function bootstrap() {
       'Origin',
       'X-Current-Page',
       'X-Page-Path',
-      'X-User-Id', // Add this for AI orchestrator
     ],
     preflightContinue: false,
     optionsSuccessStatus: 204,

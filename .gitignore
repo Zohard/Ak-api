@@ -157,3 +157,8 @@ create_collections_tables.sql
 extend_existing_collections.sql
 import_missing_messages.sql
 restore_missing_polls.sql
+
+# Screenshots and migration data
+anime_screenshots_to_upload.txt
+manga_screenshots_to_upload.txt
+migration_old_to_new_website/
