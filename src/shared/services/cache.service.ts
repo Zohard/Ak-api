@@ -197,8 +197,20 @@ export class CacheService implements OnModuleInit {
     await this.set(`user_collections:${userId}:${key}`, data, ttl); // 5 minutes
   }
 
+  // OPTIMIZED: Delete known collection cache keys instead of SCAN
   async invalidateUserCollections(userId: number): Promise<void> {
-    await this.delByPattern(`user_collections:${userId}:*`);
+    // Collections have short TTL (5 min), only delete the most common keys
+    const types = ['anime', 'manga', 'jeu-video'];
+    const statuses = ['all', 'watching', 'completed', 'plantowatch', 'onhold', 'dropped'];
+
+    const keysToDelete: Promise<void>[] = [];
+    for (const type of types) {
+      for (const status of statuses) {
+        keysToDelete.push(this.del(`user_collections:${userId}:${type}:${status}`));
+      }
+    }
+
+    await Promise.all(keysToDelete);
   }
 
   // Search cache methods
@@ -230,9 +242,24 @@ export class CacheService implements OnModuleInit {
     await this.set(`rankings:${mediaType}:${rankingType}:${type}:${limit}`, content, ttl); // 1 hour
   }
 
+  // OPTIMIZED: Avoid SCAN operations on Upstash - delete known ranking keys
   async invalidateRankings(mediaType: 'anime' | 'manga' | 'jeu-video'): Promise<void> {
-    await this.delByPattern(`rankings:${mediaType}:*`);
-    this.logger.debug(`Invalidated rankings cache for ${mediaType}`);
+    // Delete common ranking cache keys instead of using SCAN
+    const limits = [10, 20, 50, 100];
+    const types = ['top', 'flop'];
+    const rankingTypes = ['popularity', 'rating', 'recent'];
+
+    const keysToDelete: Promise<void>[] = [];
+    for (const type of types) {
+      for (const rankType of rankingTypes) {
+        for (const limit of limits) {
+          keysToDelete.push(this.del(`rankings:${mediaType}:${type}:${rankType}:${limit}`));
+        }
+      }
+    }
+
+    await Promise.all(keysToDelete);
+    this.logger.debug(`Invalidated rankings cache for ${mediaType} (${keysToDelete.length} keys)`);
   }
 
   // Lists cache methods
@@ -287,10 +314,17 @@ export class CacheService implements OnModuleInit {
   }
 
   // Invalidate all reviews cache
+  // OPTIMIZED: Avoid SCAN operations on Upstash - only delete known critical keys
+  // Other cached reviews will expire via TTL (5-10 minutes)
   async invalidateAllReviews(): Promise<void> {
-    await this.delByPattern('reviews:*');
-    await this.delByPattern('reviews_list:*');
-    this.logger.debug('Invalidated all reviews cache');
+    // Only delete the most critical cached keys, let others expire via TTL
+    await Promise.all([
+      this.del('reviews:count'),
+      this.del('reviews:top:both:10'),
+      this.del('reviews:top:anime:10'),
+      this.del('reviews:top:manga:10'),
+    ]);
+    this.logger.debug('Invalidated critical reviews cache (TTL handles the rest)');
   }
 
   // Invalidation methods
@@ -343,13 +377,21 @@ export class CacheService implements OnModuleInit {
     await this.set(key, lists, ttl); // 5 minutes
   }
 
+  // OPTIMIZED: Avoid SCAN operations on Upstash
   async invalidatePublicLists(mediaType: 'anime' | 'manga' | 'jeu-video'): Promise<void> {
-    // Invalidate all cached public lists for this media type
-    await Promise.all([
-      this.delByPattern(`lists:${mediaType}:*`),
-      this.delByPattern(`lists_paged:${mediaType}:*`)
-    ]);
-    this.logger.debug(`Invalidated public lists cache for ${mediaType}`);
+    // Delete known list cache keys instead of using SCAN
+    const sorts = ['recent', 'popular', 'top'];
+    const limits = [10, 20, 50];
+
+    const keysToDelete: Promise<void>[] = [];
+    for (const sort of sorts) {
+      for (const limit of limits) {
+        keysToDelete.push(this.del(`lists:${mediaType}:${sort}:${limit}`));
+      }
+    }
+
+    await Promise.all(keysToDelete);
+    this.logger.debug(`Invalidated public lists cache for ${mediaType} (TTL handles paged lists)`);
   }
 
   // Utility method to create consistent cache keys
@@ -501,12 +543,13 @@ export class CacheService implements OnModuleInit {
     await this.set('featured_articles', articles, ttl); // 1 hour for featured articles
   }
 
+  // OPTIMIZED: Delete specific keys instead of SCAN pattern
   async invalidateArticle(id: number): Promise<void> {
     await Promise.all([
       this.del(`article:${id}`),
-      this.delByPattern(`articles_list:*`), // Invalidate all article lists
-      this.del('featured_articles'), // Invalidate featured articles
-      this.invalidateHomepageArticles(), // Invalidate homepage articles
+      this.del('featured_articles'),
+      this.del('homepage:articles'),
+      // Article lists will expire via TTL (10 min)
     ]);
     this.logger.debug(`Invalidated article cache for ID: ${id}`);
   }
@@ -528,17 +571,17 @@ export class CacheService implements OnModuleInit {
     await this.set(`events:${key}`, events, ttl); // 5 minutes for events lists
   }
 
+  // OPTIMIZED: Delete specific key, let lists expire via TTL
   async invalidateEvent(id: number): Promise<void> {
-    await Promise.all([
-      this.del(`event:${id}`),
-      this.delByPattern(`events:*`), // Invalidate all events lists
-    ]);
+    await this.del(`event:${id}`);
+    // Events lists have short TTL (5 min), let them expire naturally
     this.logger.debug(`Invalidated event cache for ID: ${id}`);
   }
 
+  // OPTIMIZED: Let events expire via TTL instead of SCAN
   async invalidateAllEvents(): Promise<void> {
-    await this.delByPattern(`events:*`);
-    this.logger.debug('Invalidated all events cache');
+    // Events have short TTL (5 min), let them expire naturally
+    this.logger.debug('Events cache will expire via TTL');
   }
 
   // Forums cache methods
@@ -580,19 +623,46 @@ export class CacheService implements OnModuleInit {
     await this.set(`forums:messages:latest:limit${limit}:offset${offset}${boardKey}`, messages, ttl); // 30 seconds
   }
 
+  // OPTIMIZED: Delete known pagination keys instead of SCAN
   async invalidateForumTopic(topicId: number): Promise<void> {
-    await this.delByPattern(`forums:topic:${topicId}:*`);
+    // Delete first few pages which are most commonly accessed
+    const pages = [1, 2, 3, 4, 5];
+    const limits = [20, 50];
+
+    const keysToDelete: Promise<void>[] = [];
+    for (const page of pages) {
+      for (const limit of limits) {
+        keysToDelete.push(this.del(`forums:topic:${topicId}:page${page}:limit${limit}`));
+      }
+    }
+
+    await Promise.all(keysToDelete);
     this.logger.debug(`Invalidated forum topic cache for ID: ${topicId}`);
   }
 
+  // OPTIMIZED: Delete known pagination keys instead of SCAN
   async invalidateForumBoard(boardId: number): Promise<void> {
-    await this.delByPattern(`forums:board:${boardId}:*`);
+    const pages = [1, 2, 3];
+    const limits = [20, 50];
+    const userTypes = [':public', ''];
+
+    const keysToDelete: Promise<void>[] = [];
+    for (const page of pages) {
+      for (const limit of limits) {
+        for (const userType of userTypes) {
+          keysToDelete.push(this.del(`forums:board:${boardId}:page${page}:limit${limit}${userType}`));
+        }
+      }
+    }
+
+    await Promise.all(keysToDelete);
     this.logger.debug(`Invalidated forum board cache for ID: ${boardId}`);
   }
 
+  // OPTIMIZED: Let forums expire via TTL instead of SCAN
   async invalidateAllForums(): Promise<void> {
-    await this.delByPattern('forums:*');
-    this.logger.debug('Invalidated all forums cache');
+    // Forums have short TTL (1-10 min), let them expire naturally
+    this.logger.debug('Forums cache will expire via TTL');
   }
 
   // Health check method
@@ -808,8 +878,10 @@ export class CacheService implements OnModuleInit {
     await this.set(key, data, ttl); // 2 minutes default
   }
 
+  // OPTIMIZED: Let friends activity expire via TTL (2 min) instead of SCAN
   async invalidateFriendsActivity(userId: number): Promise<void> {
-    await this.delByPattern(`friends_activity:${userId}:*`);
+    // Friends activity has short TTL, let it expire naturally
+    this.logger.debug(`Friends activity for user ${userId} will expire via TTL`);
   }
 
   // User public profile cache methods
@@ -845,13 +917,13 @@ export class CacheService implements OnModuleInit {
     await this.set(`user_activity:${pseudo.toLowerCase()}:${limit}`, data, ttl); // 2 minutes
   }
 
+  // OPTIMIZED: Delete specific keys instead of SCAN pattern
   async invalidateUserProfile(pseudo: string): Promise<void> {
     const lowerPseudo = pseudo.toLowerCase();
+    // Only delete core profile keys, let reviews/activity expire via TTL (2-3 min)
     await Promise.all([
       this.del(`user_profile:${lowerPseudo}`),
       this.del(`user_stats:${lowerPseudo}`),
-      this.delByPattern(`user_reviews:${lowerPseudo}:*`),
-      this.delByPattern(`user_activity:${lowerPseudo}:*`),
     ]);
     this.logger.debug(`Invalidated user profile cache for: ${pseudo}`);
   }

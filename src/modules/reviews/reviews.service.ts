@@ -1491,34 +1491,37 @@ export class ReviewsService {
   }
 
   // Cache invalidation methods
+  // OPTIMIZED: Reduced Redis operations to minimize Upstash costs
   async invalidateReviewCache(reviewId: number, animeId?: number, mangaId?: number, userId?: number): Promise<void> {
-    await this.cacheService.del(`review:${reviewId}`);
+    // Batch all deletions in parallel to minimize round trips
+    const deletions: Promise<void>[] = [
+      this.cacheService.del(`review:${reviewId}`),
+    ];
 
     // Invalidate user review check cache
     if (userId) {
       if (animeId) {
-        await this.cacheService.del(`user_review:${userId}:anime:${animeId}`);
+        deletions.push(this.cacheService.del(`user_review:${userId}:anime:${animeId}`));
       }
       if (mangaId) {
-        await this.cacheService.del(`user_review:${userId}:manga:${mangaId}`);
+        deletions.push(this.cacheService.del(`user_review:${userId}:manga:${mangaId}`));
       }
     }
 
-    // Invalidate related content caches
+    // Invalidate specific content cache (not full invalidation)
     if (animeId) {
-      await this.cacheService.invalidateAnime(animeId);
+      deletions.push(this.cacheService.del(`reviews:anime:${animeId}`));
     }
     if (mangaId) {
-      await this.cacheService.invalidateManga(mangaId);
+      deletions.push(this.cacheService.del(`reviews:manga:${mangaId}`));
     }
 
-    // Invalidate all reviews-related caches (lists, counts, top reviews)
-    await this.cacheService.invalidateAllReviews();
+    // Invalidate critical homepage/reviews caches
+    deletions.push(this.cacheService.del('homepage:reviews'));
+    deletions.push(this.cacheService.del('reviews:count'));
 
-    // Invalidate homepage reviews cache
-    await this.cacheService.invalidateHomepageReviews();
-    // Invalidate homepage stats cache (review count)
-    await this.cacheService.invalidateHomepageStats();
+    await Promise.all(deletions);
+    // Note: Other cached data (anime details, top reviews, etc.) will expire via TTL
   }
 
   /**
@@ -1700,9 +1703,8 @@ export class ReviewsService {
     const successful = results.filter(r => r.status === 'fulfilled').length;
     const failed = results.filter(r => r.status === 'rejected').length;
 
-    // Invalidate all top reviews cache
-    await this.cacheService.delByPattern('top_reviews:*');
-    await this.cacheService.delByPattern('reviews:*');
+    // Invalidate critical reviews cache (let others expire via TTL)
+    await this.cacheService.invalidateAllReviews();
 
     return {
       message: `Bulk moderation completed. ${successful} successful, ${failed} failed.`,

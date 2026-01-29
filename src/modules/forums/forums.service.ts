@@ -1203,8 +1203,17 @@ export class ForumsService {
 
       // Invalidate caches after creating topic
       await this.cacheService.invalidateForumBoard(boardId);
-      await this.cacheService.delByPattern('forums:categories:*'); // Invalidate all category caches
-      await this.cacheService.delByPattern('forums:messages:latest:*'); // Invalidate latest messages
+      // OPTIMIZED: Delete known category keys instead of SCAN
+      await Promise.all([
+        this.cacheService.del('forums:categories:public'),
+        this.cacheService.del('forums:categories'),
+      ]);
+      // OPTIMIZED: Delete known latest messages keys instead of SCAN
+      await Promise.all([
+        this.cacheService.del('forums:messages:latest:limit10:offset0:all'),
+        this.cacheService.del('forums:messages:latest:limit20:offset0:all'),
+        this.cacheService.del('forums:messages:latest:limit50:offset0:all'),
+      ]);
       await this.cacheService.invalidateHomepageForum(); // Invalidate homepage forum
 
       return {
@@ -1318,7 +1327,12 @@ export class ForumsService {
       // Invalidate caches after creating post
       await this.cacheService.invalidateForumTopic(topicId);
       await this.cacheService.invalidateForumBoard(topic.idBoard);
-      await this.cacheService.delByPattern('forums:messages:latest:*'); // Invalidate latest messages
+      // OPTIMIZED: Delete known latest messages keys instead of SCAN
+      await Promise.all([
+        this.cacheService.del('forums:messages:latest:limit10:offset0:all'),
+        this.cacheService.del('forums:messages:latest:limit20:offset0:all'),
+        this.cacheService.del('forums:messages:latest:limit50:offset0:all'),
+      ]);
       await this.cacheService.invalidateHomepageForum(); // Invalidate homepage forum
 
       return {
@@ -1668,7 +1682,12 @@ export class ForumsService {
 
       // Invalidate caches after updating post
       await this.cacheService.invalidateForumTopic(message.idTopic);
-      await this.cacheService.delByPattern('forums:messages:latest:*'); // Invalidate latest messages
+      // OPTIMIZED: Delete known latest messages keys instead of SCAN
+      await Promise.all([
+        this.cacheService.del('forums:messages:latest:limit10:offset0:all'),
+        this.cacheService.del('forums:messages:latest:limit20:offset0:all'),
+        this.cacheService.del('forums:messages:latest:limit50:offset0:all'),
+      ]);
 
       return {
         messageId: updatedMessage.idMsg,
@@ -1745,8 +1764,17 @@ export class ForumsService {
         // Invalidate caches after deleting topic
         await this.cacheService.invalidateForumTopic(message.idTopic);
         await this.cacheService.invalidateForumBoard(message.idBoard);
-        await this.cacheService.delByPattern('forums:categories:*'); // Invalidate all category caches
-        await this.cacheService.delByPattern('forums:messages:latest:*'); // Invalidate latest messages
+        // OPTIMIZED: Delete known category keys instead of SCAN
+      await Promise.all([
+        this.cacheService.del('forums:categories:public'),
+        this.cacheService.del('forums:categories'),
+      ]);
+        // OPTIMIZED: Delete known latest messages keys instead of SCAN
+      await Promise.all([
+        this.cacheService.del('forums:messages:latest:limit10:offset0:all'),
+        this.cacheService.del('forums:messages:latest:limit20:offset0:all'),
+        this.cacheService.del('forums:messages:latest:limit50:offset0:all'),
+      ]);
         await this.cacheService.del('homepage:forum'); // Invalidate homepage cache
 
         return {
@@ -1832,7 +1860,12 @@ export class ForumsService {
         // Invalidate caches after deleting post
         await this.cacheService.invalidateForumTopic(message.idTopic);
         await this.cacheService.invalidateForumBoard(message.idBoard);
-        await this.cacheService.delByPattern('forums:messages:latest:*'); // Invalidate latest messages
+        // OPTIMIZED: Delete known latest messages keys instead of SCAN
+      await Promise.all([
+        this.cacheService.del('forums:messages:latest:limit10:offset0:all'),
+        this.cacheService.del('forums:messages:latest:limit20:offset0:all'),
+        this.cacheService.del('forums:messages:latest:limit50:offset0:all'),
+      ]);
         await this.cacheService.del('homepage:forum'); // Invalidate homepage cache
 
         return {

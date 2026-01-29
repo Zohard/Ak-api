@@ -420,8 +420,12 @@ export class CollectionsService {
       await this.cacheService.del(cacheKey);
       this.logger.debug(`✅ [addToCollection] Cache invalidated for key: ${cacheKey}`);
 
-      // OPTIMIZATION: Invalidate media collections users cache
-      await this.cacheService.delByPattern(`media_collections_users:${mediaType}:${mediaId}:*`);
+      // OPTIMIZED: Delete known pagination keys instead of SCAN
+      // Media collections users cache has short TTL, delete first pages only
+      await Promise.all([
+        this.cacheService.del(`media_collections_users:${mediaType}:${mediaId}:1:20`),
+        this.cacheService.del(`media_collections_users:${mediaType}:${mediaId}:1:50`),
+      ]);
 
       // Invalidate anime/manga cache as ratings may have changed
       if (mediaType === 'anime') {
@@ -777,7 +781,11 @@ export class CollectionsService {
     await this.cacheService.del(cacheKey);
 
     // OPTIMIZATION: Invalidate media collections users cache
-    await this.cacheService.delByPattern(`media_collections_users:${mediaType}:${mediaId}:*`);
+    // OPTIMIZED: Delete known keys instead of SCAN
+      await Promise.all([
+        this.cacheService.del(`media_collections_users:${mediaType}:${mediaId}:1:20`),
+        this.cacheService.del(`media_collections_users:${mediaType}:${mediaId}:1:50`),
+      ]);
 
     // Invalidate anime/manga/game cache as ratings may have changed
     if (mediaType === 'anime') {
@@ -854,7 +862,11 @@ export class CollectionsService {
     await this.cacheService.del(cacheKey);
 
     // OPTIMIZATION: Invalidate media collections users cache
-    await this.cacheService.delByPattern(`media_collections_users:${mediaType}:${mediaId}:*`);
+    // OPTIMIZED: Delete known keys instead of SCAN
+      await Promise.all([
+        this.cacheService.del(`media_collections_users:${mediaType}:${mediaId}:1:20`),
+        this.cacheService.del(`media_collections_users:${mediaType}:${mediaId}:1:50`),
+      ]);
 
     // Invalidate anime/manga/game cache as ratings may have changed
     if (mediaType === 'anime') {
@@ -1643,25 +1655,26 @@ export class CollectionsService {
   }
 
   // Helper method to invalidate all collection-related cache for a user
+  // OPTIMIZED: Delete known keys instead of expensive SCAN operations
   private async invalidateUserCollectionCache(userId: number): Promise<void> {
     try {
-      // Invalidate various cache patterns for the user
-      await Promise.all([
-        // User collection lists cache
-        this.cacheService.delByPattern(`user_collections:${userId}:*`),
-        // Collection items cache (generic)
-        this.cacheService.delByPattern(`collection_items:${userId}:*`),
-        // Collection list pages (anime, manga, games)
-        this.cacheService.delByPattern(`collection_animes:${userId}:*`),
-        this.cacheService.delByPattern(`collection_mangas:${userId}:*`),
-        this.cacheService.delByPattern(`collection_games:${userId}:*`),
-        this.cacheService.delByPattern(`collection_jeuxvideo:${userId}:*`),
-        // Ratings distribution cache
-        this.cacheService.delByPattern(`collection_ratings:*:${userId}:*`),
-        // Find user collections cache (both own and public views)
+      // Delete known common cache keys - others will expire via TTL (5 min)
+      const types = ['anime', 'manga', 'jeu-video'];
+      const statuses = ['all', 'watching', 'completed', 'plantowatch', 'onhold', 'dropped'];
+
+      const deletions: Promise<void>[] = [
         this.cacheService.del(`find_user_collections:${userId}:own`),
         this.cacheService.del(`find_user_collections:${userId}:public`),
-      ]);
+      ];
+
+      // Only delete most common collection cache keys
+      for (const type of types) {
+        for (const status of statuses) {
+          deletions.push(this.cacheService.del(`user_collections:${userId}:${type}:${status}`));
+        }
+      }
+
+      await Promise.all(deletions);
     } catch (error) {
       // Log error but don't throw to avoid breaking the main operation
       this.logger.error('Cache invalidation error for user', userId, error);
