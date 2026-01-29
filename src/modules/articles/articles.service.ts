@@ -901,6 +901,12 @@ export class ArticlesService {
       },
     });
 
+    // Invalidate cache
+    await this.cacheService.invalidateArticle(id);
+    if (articleWithCategories?.postName) {
+      await this.cacheService.invalidateArticleBySlug(articleWithCategories.postName);
+    }
+
     return this.transformPost(articleWithCategories, true);
   }
 
@@ -933,6 +939,12 @@ export class ArticlesService {
         postModifiedGmt: new Date(),
       },
     });
+
+    // Invalidate cache
+    await this.cacheService.invalidateArticle(id);
+    if (article.postName) {
+      await this.cacheService.invalidateArticleBySlug(article.postName);
+    }
 
     return {
       message: `Article ${publishData.publish ? 'published' : 'unpublished'} successfully`,

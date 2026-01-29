@@ -554,6 +554,13 @@ export class CacheService implements OnModuleInit {
     this.logger.debug(`Invalidated article cache for ID: ${id}`);
   }
 
+  async invalidateArticleBySlug(slug: string): Promise<void> {
+    await Promise.all([
+      this.del(`article_slug:${slug}`),
+    ]);
+    this.logger.debug(`Invalidated article cache for slug: ${slug}`);
+  }
+
   // Events cache methods
   async getEvent(id: number): Promise<any> {
     return this.get(`event:${id}`);
