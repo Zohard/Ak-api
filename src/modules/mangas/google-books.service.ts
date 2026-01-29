@@ -366,4 +366,113 @@ export class GoogleBooksService {
       return null;
     }
   }
+
+  /**
+   * Search for a specific manga volume by title and volume number
+   * Optimized for French editions (Tome X format)
+   * @param query Search query (e.g., "Death Note Tome 1")
+   * @param volumeNumber Expected volume number for validation
+   * @param language Language filter: 'fr' for French (default)
+   */
+  async searchVolumeByTitle(
+    query: string,
+    volumeNumber: number,
+    language: 'fr' | 'en' = 'fr',
+  ): Promise<{
+    volumeNumber: number;
+    title?: string;
+    isbn?: string;
+    releaseDate?: string;
+    coverUrl?: string;
+    description?: string;
+    publisher?: string;
+  } | null> {
+    try {
+      const params = {
+        q: query,
+        langRestrict: language,
+        printType: 'books',
+        maxResults: 10,
+      };
+
+      const response = await firstValueFrom(
+        this.httpService.get<GoogleBooksResponse>(this.GOOGLE_BOOKS_API_URL, { params }),
+      );
+
+      const items = response.data.items || [];
+      if (items.length === 0) {
+        return null;
+      }
+
+      // Filter for likely manga and matching volume number
+      const mangaItems = items.filter(item => this.isLikelyManga(item, language));
+
+      if (mangaItems.length === 0) {
+        return null;
+      }
+
+      // Find the best match based on volume number in title
+      let bestMatch = mangaItems[0];
+      for (const item of mangaItems) {
+        const extractedVol = this.extractVolumeNumberFromTitle(item.volumeInfo.title);
+        if (extractedVol === volumeNumber) {
+          bestMatch = item;
+          break;
+        }
+      }
+
+      const volumeInfo = bestMatch.volumeInfo;
+      const isbn13 = volumeInfo.industryIdentifiers?.find(id => id.type === 'ISBN_13')?.identifier;
+      const isbn10 = volumeInfo.industryIdentifiers?.find(id => id.type === 'ISBN_10')?.identifier;
+
+      // Get higher quality cover image
+      let coverUrl = volumeInfo.imageLinks?.thumbnail;
+      if (coverUrl) {
+        // Google Books returns small thumbnails by default
+        // Replace zoom parameter to get larger image
+        coverUrl = coverUrl
+          .replace('http://', 'https://')
+          .replace('zoom=1', 'zoom=2')
+          .replace('&edge=curl', '');
+      }
+
+      return {
+        volumeNumber,
+        title: volumeInfo.title,
+        isbn: isbn13 || isbn10,
+        releaseDate: volumeInfo.publishedDate,
+        coverUrl,
+        description: volumeInfo.description,
+        publisher: volumeInfo.publisher,
+      };
+    } catch (error) {
+      this.logger.error(`Error searching volume "${query}": ${error.message}`);
+      return null;
+    }
+  }
+
+  /**
+   * Extract volume number from a title string
+   */
+  private extractVolumeNumberFromTitle(title: string): number | null {
+    if (!title) return null;
+
+    const patterns = [
+      /tome\s*(\d+)/i,
+      /vol\.?\s*(\d+)/i,
+      /volume\s*(\d+)/i,
+      /t\.?\s*(\d+)(?:\s|$)/i,
+      /(\d+)巻/,
+      /#(\d+)/,
+    ];
+
+    for (const pattern of patterns) {
+      const match = title.match(pattern);
+      if (match) {
+        return parseInt(match[1], 10);
+      }
+    }
+
+    return null;
+  }
 }

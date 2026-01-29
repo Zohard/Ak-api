@@ -22,14 +22,17 @@ import { CacheService } from '../../../shared/services/cache.service';
 import { IgdbService } from '../../../shared/services/igdb.service';
 import { DeepLService } from '../../../shared/services/deepl.service';
 import { GoogleBooksService } from '../../mangas/google-books.service';
+import { MangaVolumesService } from '../../mangas/manga-volumes.service';
+import { NautiljonService } from '../../mangas/nautiljon.service';
 import { MediaModule } from '../../media/media.module';
 import { AdminLoggingModule } from '../logging/admin-logging.module';
 import { NotificationsModule } from '../../notifications/notifications.module';
+import { JikanModule } from '../../jikan/jikan.module';
 
 @Module({
-  imports: [HttpModule, MediaModule, AdminLoggingModule, NotificationsModule],
+  imports: [HttpModule, MediaModule, AdminLoggingModule, NotificationsModule, JikanModule],
   controllers: [AdminContentController, AdminAnimesController, AdminMangasController, AdminBusinessController, AdminJeuxVideoController, AdminPlatformsController, AdminGenresController, AdminTagsController, SourcesExternesController, AniListImportController],
-  providers: [AdminContentService, AdminAnimesService, AdminMangasService, AdminBusinessService, AdminJeuxVideoService, SourcesExternesService, AniListImportService, PrismaService, CacheService, IgdbService, DeepLService, GoogleBooksService],
+  providers: [AdminContentService, AdminAnimesService, AdminMangasService, AdminBusinessService, AdminJeuxVideoService, SourcesExternesService, AniListImportService, PrismaService, CacheService, IgdbService, DeepLService, GoogleBooksService, MangaVolumesService, NautiljonService],
   exports: [AdminContentService, AniListImportService],
 })
 export class AdminContentModule {}
