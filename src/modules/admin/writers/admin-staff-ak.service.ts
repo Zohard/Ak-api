@@ -7,11 +7,11 @@ import {
 import { PrismaService } from '../../../shared/services/prisma.service';
 import { AddStaffAkDto } from './dto/add-staff-ak.dto';
 import { StaffAkQueryDto } from './dto/staff-ak-query.dto';
-import * as bcrypt from 'bcrypt';
+import * as bcrypt from 'bcryptjs';
 
 @Injectable()
 export class AdminStaffAkService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) { }
 
   async findAllStaffAk(query: StaffAkQueryDto) {
     const {
