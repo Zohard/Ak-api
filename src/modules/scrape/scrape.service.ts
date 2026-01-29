@@ -1142,6 +1142,104 @@ export class ScrapeService {
   }
 
   /**
+   * Scrape detailed manga information from a booknode.com book page
+   * @param url The booknode book URL
+   * @returns Detailed manga information
+   */
+  async scrapeBooknodeDetails(url: string) {
+    const $ = await this.fetchHtml(url);
+
+    // Title
+    const title = $('h1[itemprop="name"]').text().trim() ||
+                  $('.book-title h1').text().trim() ||
+                  $('h1').first().text().trim();
+
+    // Original title (titre original)
+    const originalTitle = $('span:contains("Titre original")').parent().text()
+      .replace('Titre original', '').replace(':', '').trim() ||
+      $('[itemprop="alternativeHeadline"]').text().trim();
+
+    // Author
+    const author = $('a[itemprop="author"]').text().trim() ||
+                   $('.author-name').text().trim() ||
+                   $('span:contains("Auteur")').next('a').text().trim();
+
+    // Publisher (éditeur)
+    const publisher = $('a[itemprop="publisher"]').text().trim() ||
+                      $('span:contains("Editeur")').next('a').text().trim() ||
+                      $('span:contains("Éditeur")').next('a').text().trim();
+
+    // ISBN
+    const isbn = $('[itemprop="isbn"]').text().trim() ||
+                 $('span:contains("ISBN")').parent().text().replace(/ISBN\s*:?\s*/i, '').trim();
+
+    // Release date
+    let releaseDate = $('[itemprop="datePublished"]').attr('content') ||
+                      $('span:contains("Date de parution")').parent().text()
+                        .replace(/Date de parution\s*:?\s*/i, '').trim();
+
+    // Parse French date format (e.g., "15 janvier 2024") to ISO format
+    if (releaseDate && !/^\d{4}-\d{2}-\d{2}$/.test(releaseDate)) {
+      const frenchMonths: Record<string, string> = {
+        'janvier': '01', 'février': '02', 'mars': '03', 'avril': '04',
+        'mai': '05', 'juin': '06', 'juillet': '07', 'août': '08',
+        'septembre': '09', 'octobre': '10', 'novembre': '11', 'décembre': '12'
+      };
+      const match = releaseDate.match(/(\d{1,2})\s+(\w+)\s+(\d{4})/);
+      if (match) {
+        const [, day, monthFr, year] = match;
+        const month = frenchMonths[monthFr.toLowerCase()];
+        if (month) {
+          releaseDate = `${year}-${month}-${day.padStart(2, '0')}`;
+        }
+      }
+    }
+
+    // Cover image
+    let imageUrl = $('.main-cover img, .cover-image img, [itemprop="image"]').attr('src') ||
+                   $('img.cover').attr('src');
+    if (imageUrl && !imageUrl.startsWith('http')) {
+      imageUrl = `https://booknode.com${imageUrl}`;
+    }
+
+    // Synopsis/Description
+    const synopsis = $('[itemprop="description"]').text().trim() ||
+                     $('.book-resume, .resume, .description').text().trim();
+
+    // Number of pages
+    const pageCount = $('[itemprop="numberOfPages"]').text().trim() ||
+                      $('span:contains("Nombre de pages")').parent().text()
+                        .replace(/Nombre de pages\s*:?\s*/i, '').trim();
+
+    // Series/Collection
+    const series = $('span:contains("Série")').next('a').text().trim() ||
+                   $('span:contains("Collection")').next('a').text().trim();
+
+    // Volume number (extract from title if present)
+    let volumeNumber: number | null = null;
+    const volMatch = title.match(/tome\s*(\d+)|vol\.?\s*(\d+)|t\.?\s*(\d+)/i);
+    if (volMatch) {
+      volumeNumber = parseInt(volMatch[1] || volMatch[2] || volMatch[3], 10);
+    }
+
+    return {
+      source: 'booknode',
+      url,
+      title,
+      originalTitle: originalTitle || undefined,
+      author: author || undefined,
+      publisher: publisher || undefined,
+      isbn: isbn || undefined,
+      releaseDate: releaseDate || undefined,
+      imageUrl: imageUrl || undefined,
+      synopsis: synopsis || undefined,
+      pageCount: pageCount ? parseInt(pageCount, 10) : undefined,
+      series: series || undefined,
+      volumeNumber,
+    };
+  }
+
+  /**
    * Search Booknode for a book/manga
    * @param query Search query (e.g. ISBN or Title)
    * @returns Found book URL or null

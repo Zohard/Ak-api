@@ -278,6 +278,19 @@ export class MangasController {
     return this.mangasService.compareBooknodeMangasWithDatabase(booknodeMangas);
   }
 
+  @Get('booknode/details')
+  @ApiOperation({ summary: 'Récupérer les détails d\'un manga depuis booknode.com' })
+  @ApiQuery({ name: 'url', required: true, description: 'URL booknode du manga' })
+  @ApiResponse({ status: 200, description: 'Détails du manga depuis booknode.com' })
+  async getBooknodeDetails(
+    @Query('url') url: string,
+  ) {
+    if (!url) {
+      throw new BadRequestException('URL parameter is required');
+    }
+    return this.scrapeService.scrapeBooknodeDetails(url);
+  }
+
   @Get('manga-news/details')
   @ApiOperation({ summary: 'Récupérer les détails d\'un manga depuis manga-news.com' })
   @ApiQuery({ name: 'url', required: true, description: 'URL manga-news du manga' })
