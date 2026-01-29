@@ -518,15 +518,7 @@ export class MangasController {
     return this.mangasService.getMangaVolumes(mangaId);
   }
 
-  @Get('volumes/:volumeId')
-  @ApiOperation({ summary: 'Get a specific volume by ID' })
-  @ApiParam({ name: 'volumeId', description: 'Volume ID' })
-  @ApiResponse({ status: 200, description: 'Returns the volume' })
-  @ApiResponse({ status: 404, description: 'Volume not found' })
-  async getVolume(@Param('volumeId', ParseIntPipe) volumeId: number) {
-    return this.mangasService.getVolume(volumeId);
-  }
-
+  // Static route must come before dynamic :volumeId route
   @Get('volumes/isbn/:isbn')
   @ApiOperation({ summary: 'Get volume by ISBN' })
   @ApiParam({ name: 'isbn', description: 'ISBN-13' })
@@ -534,6 +526,15 @@ export class MangasController {
   @ApiResponse({ status: 404, description: 'Volume not found' })
   async getVolumeByIsbn(@Param('isbn') isbn: string) {
     return this.mangasService.getVolumeByIsbn(isbn);
+  }
+
+  @Get('volumes/:volumeId')
+  @ApiOperation({ summary: 'Get a specific volume by ID' })
+  @ApiParam({ name: 'volumeId', description: 'Volume ID' })
+  @ApiResponse({ status: 200, description: 'Returns the volume' })
+  @ApiResponse({ status: 404, description: 'Volume not found' })
+  async getVolume(@Param('volumeId', ParseIntPipe) volumeId: number) {
+    return this.mangasService.getVolume(volumeId);
   }
 
   @Post(':id/volumes')

@@ -40,34 +40,49 @@ export class GoogleBooksService {
 
   /**
    * Check if a book is likely a real manga based on various criteria
+   * STRICT mode: only returns true if we're confident it's manga
    */
   private isLikelyManga(item: any, language: 'fr' | 'en' = 'fr'): boolean {
     const volumeInfo = item.volumeInfo;
-    const publisher = volumeInfo.publisher || '';
-    const title = volumeInfo.title || '';
+    const publisher = (volumeInfo.publisher || '').toLowerCase();
+    const title = (volumeInfo.title || '').toLowerCase();
     const categories = (volumeInfo.categories || []).join(' ').toLowerCase();
+    const description = (volumeInfo.description || '').toLowerCase();
 
+    // ===== EXCLUSION LIST (check first) =====
+    // Non-manga publishers (romance, general fiction, etc.)
+    const nonMangaPublishers = [
+      'harper', 'harpercollins', 'scholastic', 'random house', 'penguin',
+      'harlequin', 'j\'ai lu', 'milady', 'pocket', 'fleuve', 'bragelonne',
+      'hugo roman', 'city editions', 'archipoche', 'le livre de poche',
+      'folio', 'gallimard', 'albin michel', 'robert laffont', 'flammarion',
+      'editions addictives', 'collection infinity', 'new romance',
+    ];
+    if (nonMangaPublishers.some(pub => publisher.includes(pub))) {
+      return false;
+    }
+
+    // Non-manga title/description patterns (romance, fiction, etc.)
+    const nonMangaPatterns = [
+      'séductrice', 'seductrice', 'romance', 'love story', 'milliardaire',
+      'billionaire', 'dark romance', 'new romance', 'warriors', 'warrior cats',
+      'survivors', 'diary of a wimpy', 'cinquante nuances', 'fifty shades',
+      'after', 'twilight', 'bad boy', 'alpha', 'new adult',
+    ];
+    const textToCheck = `${title} ${description}`;
+    if (nonMangaPatterns.some(pattern => textToCheck.includes(pattern))) {
+      return false;
+    }
+
+    // ===== INCLUSION LIST (manga publishers) =====
     if (language === 'fr') {
       // Common French manga publishers
       const frenchMangaPublishers = [
-        'Glénat',
-        'Pika',
-        'Kana',
-        'Kurokawa',
-        'Ki-oon',
-        'Delcourt',
-        'Akata',
-        'Casterman',
-        'Doki-Doki',
-        'Komikku',
-        'Panini',
-        'Soleil',
-        'Mangetsu',
-        'Isan Manga',
-        'Taifu Comics',
-        'Vega',
-        'Black Box',
-        'Ankama',
+        'glénat', 'glenat', 'pika', 'kana', 'kurokawa', 'ki-oon', 'kioon',
+        'delcourt', 'tonkam', 'akata', 'casterman', 'doki-doki', 'dokidoki',
+        'komikku', 'panini manga', 'soleil manga', 'mangetsu', 'isan manga',
+        'taifu', 'vega', 'black box', 'ankama', 'ototo', 'meian', 'crunchyroll',
+        'kazé', 'kaze', 'nobi nobi', 'le lézard noir', 'imho', 'omaké',
       ];
 
       // Check if publisher is a known French manga publisher
@@ -75,67 +90,34 @@ export class GoogleBooksService {
         return true;
       }
 
-      // If categories explicitly mention comics/manga in French context
-      if (categories.includes('bandes dessinées') || categories.includes('comics')) {
-        return true;
-      }
-
-      // If it has "Tome" or "Vol" in title (French manga pattern)
-      if (/tome\s*\d+|vol\.?\s*\d+|t\d+/i.test(title)) {
+      // Check categories for manga
+      if (categories.includes('manga') || categories.includes('comics & graphic novels')) {
         return true;
       }
     } else {
       // English/International manga publishers
       const englishMangaPublishers = [
-        'VIZ Media',
-        'Viz',
-        'Kodansha',
-        'Seven Seas',
-        'Yen Press',
-        'Dark Horse',
-        'Vertical',
-        'Tokyopop',
-        'Del Rey',
-        'Square Enix',
-        'Digital Manga',
-        'One Peace Books',
-        'J-Novel Club',
-        'Denpa',
-        'Ablaze',
-        'Ghost Ship',
-        'Airship',
+        'viz media', 'viz', 'kodansha', 'seven seas', 'yen press',
+        'dark horse manga', 'vertical', 'tokyopop', 'del rey manga',
+        'square enix', 'digital manga', 'one peace books', 'j-novel club',
+        'denpa', 'ablaze', 'ghost ship', 'airship', 'udon entertainment',
       ];
 
       // Check if publisher is a known English manga publisher
-      if (englishMangaPublishers.some(pub => publisher.toLowerCase().includes(pub.toLowerCase()))) {
-        return true;
-      }
-
-      // If it has "Vol" or "Volume" in title (English manga pattern)
-      if (/vol\.?\s*\d+|volume\s*\d+/i.test(title)) {
+      if (englishMangaPublishers.some(pub => publisher.includes(pub))) {
         return true;
       }
 
       // Check for manga-related categories
-      if (categories.includes('manga') || categories.includes('graphic novels')) {
+      if (categories.includes('manga') || categories.includes('comics & graphic novels')) {
         return true;
       }
     }
 
-    // Exclude obvious non-manga (common to both languages)
-    const nonMangaPublishers = ['Harper', 'HarperCollins', 'Scholastic', 'Random House', 'Penguin'];
-    if (nonMangaPublishers.some(pub => publisher.includes(pub))) {
-      return false;
-    }
-
-    // Exclude if title contains common non-manga patterns
-    const nonMangaPatterns = ['Warriors', 'Warrior Cats', 'Survivors', 'Diary of a Wimpy Kid'];
-    if (nonMangaPatterns.some(pattern => title.includes(pattern))) {
-      return false;
-    }
-
-    // Default to true if we can't determine (user can filter later)
-    return true;
+    // ===== DEFAULT: REJECT if not from known manga publisher =====
+    // This is strict mode - we only accept books from known manga publishers
+    // Having "Tome" in title is NOT enough (many romance novels use this)
+    return false;
   }
 
   /**
@@ -388,12 +370,17 @@ export class GoogleBooksService {
     publisher?: string;
   } | null> {
     try {
+      // Add "manga" to the query to filter results better
+      const mangaQuery = `${query} manga`;
+
       const params = {
-        q: query,
+        q: mangaQuery,
         langRestrict: language,
         printType: 'books',
-        maxResults: 10,
+        maxResults: 15,
       };
+
+      this.logger.debug(`Searching Google Books: "${mangaQuery}"`);
 
       const response = await firstValueFrom(
         this.httpService.get<GoogleBooksResponse>(this.GOOGLE_BOOKS_API_URL, { params }),
@@ -401,29 +388,62 @@ export class GoogleBooksService {
 
       const items = response.data.items || [];
       if (items.length === 0) {
+        this.logger.debug(`No results for "${mangaQuery}"`);
         return null;
       }
+
+      this.logger.debug(`Found ${items.length} results, filtering for manga...`);
 
       // Filter for likely manga and matching volume number
-      const mangaItems = items.filter(item => this.isLikelyManga(item, language));
+      const mangaItems = items.filter(item => {
+        const isManga = this.isLikelyManga(item, language);
+        if (!isManga) {
+          this.logger.debug(`Filtered out: "${item.volumeInfo.title}" (publisher: ${item.volumeInfo.publisher || 'N/A'})`);
+        }
+        return isManga;
+      });
 
       if (mangaItems.length === 0) {
+        this.logger.debug(`No manga items found after filtering`);
         return null;
       }
+
+      this.logger.debug(`${mangaItems.length} manga items after filtering`);
 
       // Find the best match based on volume number in title
       let bestMatch = mangaItems[0];
+      let bestScore = 0;
+
       for (const item of mangaItems) {
+        let score = 0;
         const extractedVol = this.extractVolumeNumberFromTitle(item.volumeInfo.title);
+
+        // Volume number match is most important
         if (extractedVol === volumeNumber) {
+          score += 100;
+        }
+
+        // Prefer items with ISBN
+        if (item.volumeInfo.industryIdentifiers?.length) {
+          score += 20;
+        }
+
+        // Prefer items with cover images
+        if (item.volumeInfo.imageLinks?.thumbnail) {
+          score += 10;
+        }
+
+        if (score > bestScore) {
+          bestScore = score;
           bestMatch = item;
-          break;
         }
       }
 
       const volumeInfo = bestMatch.volumeInfo;
       const isbn13 = volumeInfo.industryIdentifiers?.find(id => id.type === 'ISBN_13')?.identifier;
       const isbn10 = volumeInfo.industryIdentifiers?.find(id => id.type === 'ISBN_10')?.identifier;
+
+      this.logger.debug(`Best match: "${volumeInfo.title}" (ISBN: ${isbn13 || isbn10 || 'N/A'}, publisher: ${volumeInfo.publisher || 'N/A'})`);
 
       // Get higher quality cover image
       let coverUrl = volumeInfo.imageLinks?.thumbnail;
