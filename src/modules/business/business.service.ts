@@ -92,6 +92,12 @@ export class BusinessService {
       };
     }
 
+    if (query.year) {
+      where.date = {
+        contains: query.year,
+      };
+    }
+
     const [businesses, total] = await Promise.all([
       this.prisma.akBusiness.findMany({
         where,
@@ -114,7 +120,7 @@ export class BusinessService {
   }
 
   private async findAllByRoleType(query: BusinessQueryDto, roleType: string) {
-    const { page = 1, limit = 50, statut, search, origine } = query;
+    const { page = 1, limit = 50, statut, search, origine, year } = query;
     const offset = (page - 1) * limit;
 
     // Build WHERE conditions for the business table
@@ -142,6 +148,12 @@ export class BusinessService {
       const originePattern = `%${origine}%`;
       params.push(originePattern);
       conditions.push(`b.origine ILIKE $${paramIndex++}`);
+    }
+
+    if (year) {
+      const yearPattern = `%${year}%`;
+      params.push(yearPattern);
+      conditions.push(`b.date ILIKE $${paramIndex++}`);
     }
 
     const whereClause = conditions.length > 0 ? `AND ${conditions.join(' AND ')}` : '';

@@ -1002,6 +1002,16 @@ export class AniListService {
     }
   }
 
+  async getMangaByIsbn(isbn: string): Promise<AniListManga | null> {
+    try {
+      const results = await this.searchManga(isbn, 1);
+      return results.length > 0 ? results[0] : null;
+    } catch (error) {
+      this.logger.warn(`Failed to lookup manga by ISBN ${isbn} on AniList: ${error.message}`);
+      return null;
+    }
+  }
+
   mapToCreateMangaDto(anilistManga: AniListManga): Partial<any> {
     // Map staff roles to traditional functions
     const staffMapping = (anilistManga.staff?.edges || []).reduce((acc: any, edge: any) => {

@@ -17,6 +17,7 @@ import { R2Service } from '../media/r2.service';
 import { MediaService } from '../media/media.service';
 import { AniListService, AniListManga } from '../anilist/anilist.service';
 import { OpenLibraryService } from '../books/openlibrary.service';
+import { ScrapeService } from '../scrape/scrape.service';
 import { Prisma } from '@prisma/client';
 import axios from 'axios';
 import { hasAdminAccess } from '../../shared/constants/rbac.constants';
@@ -35,6 +36,7 @@ export class MangasService extends BaseContentService<
     private readonly mediaService: MediaService,
     private readonly aniListService: AniListService,
     private readonly openLibraryService: OpenLibraryService,
+    private readonly scrapeService: ScrapeService,
   ) {
     super(prisma);
   }
@@ -1364,11 +1366,74 @@ export class MangasService extends BaseContentService<
         }
       }
 
+      // Strategy 3: Try Manga-News (French)
+      if (!bookInfo) {
+        try {
+          this.logger.debug(`Trying Manga-News for ISBN ${isbn}`);
+          const mangaNewsUrl = await this.scrapeService.searchMangaNews(isbn);
+
+          if (mangaNewsUrl) {
+            const mangaData = await this.scrapeService.scrapeMangaNewsMangaDetails(mangaNewsUrl);
+            rawTitle = mangaData.titre || '';
+            authors = mangaData.auteurs.map(a => a.name).join(', ') || '';
+            description = mangaData.description || '';
+            thumbnail = mangaData.coverUrl || null;
+
+            bookInfo = {
+              title: rawTitle,
+              authors,
+              description,
+              thumbnail,
+              publisher: mangaData.editeurs.map(e => e.name).join(', '),
+              language: 'fr', // Manga-News is French
+              mangaNewsUrl: mangaData.url,
+            };
+            bookSource = 'manga-news';
+            this.logger.debug(`✓ Found in Manga-News: ${rawTitle}`);
+          }
+        } catch (mangaNewsError) {
+          this.logger.debug(`Manga-News lookup failed: ${mangaNewsError.message}`);
+        }
+      }
+
+      // Strategy 4: Try AniList API
+      if (!bookInfo) {
+        try {
+          this.logger.debug(`Trying AniList API for ISBN ${isbn}`);
+          const anilistManga = await this.aniListService.getMangaByIsbn(isbn);
+
+          if (anilistManga) {
+            rawTitle = anilistManga.title.romaji || anilistManga.title.english || anilistManga.title.native || '';
+            authors = anilistManga.staff?.edges
+              ?.filter(e => e.role.toLowerCase().includes('story') || e.role.toLowerCase().includes('art'))
+              ?.map(e => e.node.name.full)
+              ?.join(', ') || '';
+            description = anilistManga.description || '';
+            thumbnail = anilistManga.coverImage?.extraLarge || anilistManga.coverImage?.large || null;
+
+            bookInfo = {
+              title: rawTitle,
+              authors,
+              description,
+              thumbnail,
+              publishedDate: anilistManga.startDate?.year ? String(anilistManga.startDate.year) : undefined,
+              publisher: '',
+              language: 'ja',
+              anilistId: anilistManga.id,
+            };
+            bookSource = 'anilist';
+            this.logger.debug(`✓ Found in AniList: ${rawTitle}`);
+          }
+        } catch (anilistError) {
+          this.logger.debug(`AniList lookup failed: ${anilistError.message}`);
+        }
+      }
+
       // If we found book info, log the source
       if (bookInfo) {
         this.logger.debug(`Book metadata source: ${bookSource}`);
       } else {
-        this.logger.debug(`No book metadata found in Google Books or OpenLibrary, will search local database only`);
+        this.logger.debug(`No book metadata found in Google Books, OpenLibrary, Booknode or AniList, will search local database only`);
       }
 
       // Clean the title for better matching

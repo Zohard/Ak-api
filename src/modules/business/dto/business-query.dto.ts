@@ -60,4 +60,12 @@ export class BusinessQueryDto {
   @IsOptional()
   @IsString()
   origine?: string;
+
+  @ApiPropertyOptional({
+    description: "Filtrer par année de création",
+    example: '2000',
+  })
+  @IsOptional()
+  @IsString()
+  year?: string;
 }

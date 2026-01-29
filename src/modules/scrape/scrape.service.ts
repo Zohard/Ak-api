@@ -1095,78 +1095,155 @@ export class ScrapeService {
    * @param url The booknode book URL
    * @returns Detailed manga information
    */
-  async scrapeBooknodeMangaDetails(url: string) {
+  async scrapeMangaNewsMangaDetails(url: string) {
     const $ = await this.fetchHtml(url);
 
     // Extract title
     const titre = $('h1').first().text().trim();
 
-    // Extract authors and illustrators
+    // Extract authors
     const auteurs: Array<{ name: string; role: string }> = [];
-    $('.main-bloc-right h4').filter((_, el) => $(el).text().includes('Auteur')).first().parent().find('ul li').each((_, li) => {
-      const $li = $(li);
-      const nameLink = $li.find('a').first();
-      const name = nameLink.find('span').text().trim();
-      const roleSmall = $li.find('small').text().trim();
-
-      if (name && roleSmall) {
-        auteurs.push({
-          name,
-          role: roleSmall.replace(/[()]/g, '') // Remove parentheses
-        });
+    $('.entry-author a').each((_, el) => {
+      const name = $(el).text().trim();
+      if (name) {
+        auteurs.push({ name, role: 'Auteur' });
       }
     });
 
     // Extract cover image
-    const coverImg = $('.main-cover.physical-cover img').first();
-    const coverUrl = coverImg.attr('src') || coverImg.attr('data-src') || '';
+    const coverImg = $('#cover img').first();
+    const coverUrl = coverImg.attr('src') || '';
 
-    // Extract themes
-    const themes: string[] = [];
-    $('h4').filter((_, el) => $(el).text().includes('Thèmes')).first().parent().find('a').each((_, a) => {
-      const theme = $(a).text().trim();
-      if (theme) themes.push(theme);
-    });
-
-    // Extract editors
+    // Extract publisher (Editeur)
     const editeurs: Array<{ name: string; collection?: string }> = [];
-    $('.panel-info.panel-index h3').filter((_, el) => $(el).text().includes('Editeurs')).first().parent().find('.list-group-item').each((_, li) => {
-      const $li = $(li);
-      const editorName = $li.find('> a').first().text().trim();
-      const collectionName = $li.find('ul li a').first().text().trim();
-
-      if (editorName) {
-        editeurs.push({
-          name: editorName,
-          collection: collectionName || undefined
-        });
+    $('.entry-editor a').each((_, el) => {
+      const name = $(el).text().trim();
+      if (name) {
+        editeurs.push({ name });
       }
-    });
-
-    // Extract serie information
-    let serie = '';
-    $('.main-bloc-right h4').filter((_, el) => $(el).text().includes('Série')).first().parent().find('a').each((_, a) => {
-      serie = $(a).text().trim().replace(/\s*\(\d+\s+livres?\)\s*/i, '');
     });
 
     // Extract description
     let description = '';
-    $('.frontbook-description .actual-text').each((_, el) => {
-      const text = $(el).text().trim();
-      // Remove "Résumé" title if present
-      description = text.replace(/^Résumé\s*/i, '').trim();
-    });
+    const summary = $('#summary');
+    if (summary.length) {
+      description = summary.text().trim();
+    }
 
     return {
-      source: 'booknode',
+      source: 'manga-news',
       url,
       titre,
       auteurs,
       coverUrl,
-      themes,
       editeurs,
-      serie,
       description
     };
+  }
+
+  /**
+   * Search Booknode for a book/manga
+   * @param query Search query (e.g. ISBN or Title)
+   * @returns Found book URL or null
+   */
+  async searchBooknode(query: string): Promise<string | null> {
+    const searchUrl = `https://booknode.com/recherche?q=${encodeURIComponent(query)}`;
+
+    // Check if we already have a cached result for this exact query
+    if (this.requestCache.has(searchUrl)) {
+      const cached = this.requestCache.get(searchUrl);
+      if (Date.now() - cached.timestamp < this.CACHE_TTL) {
+        // If the query was cached, we need to parse it again to extract the URL
+        // OR we could cache the result, but fetchHtml returns loaded cheerio object
+        // For simplicity, we just let fetchHtml handle the caching logic
+      }
+    }
+
+    try {
+      const $ = await this.fetchHtml(searchUrl);
+
+      // Check if we were redirected to a book page directly
+      // This is tricky with fetchHtml unless we check the loaded HTML for book-specific elements
+      if ($('.main-cover.physical-cover').length > 0) {
+        // We are on a book page!
+        // Try to extract canonical URL
+        const canonical = $('link[rel="canonical"]').attr('href');
+        if (canonical) return canonical;
+      }
+
+      // Check for search results
+      // Look for book links in results
+      let bookUrl: string | null = null;
+
+      // Select books from result list
+      $('.book_search_result, .row.search-row').each((_, el) => {
+        if (bookUrl) return; // Found one already
+
+        const $el = $(el);
+        const link = $el.find('a').first();
+        const href = link.attr('href');
+
+        if (href && href.includes('/livre/')) {
+          bookUrl = href;
+        }
+      });
+
+      if (!bookUrl) {
+        // Try alternate selector (Booknode generic search results)
+        $('.search-result-item, .row.result-row').each((_, el) => {
+          if (bookUrl) return;
+          const href = $(el).find('a').attr('href');
+          if (href && href.includes('/livre/')) {
+            bookUrl = href;
+          }
+        });
+      }
+
+      return bookUrl;
+
+    } catch (error) {
+      this.logger.error(`Error searching Booknode for "${query}": ${error.message}`);
+      return null;
+    }
+  }
+
+  /**
+   * Search Manga-News for a manga by ISBN
+   */
+  async searchMangaNews(query: string): Promise<string | null> {
+    const searchUrl = `https://www.manga-news.com/index.php/recherche?q=${encodeURIComponent(query)}`;
+
+    try {
+      const $ = await this.fetchHtml(searchUrl);
+
+      // Check for canonical on potential direct page hit
+      if ($('#cover').length > 0 && $('h1').length > 0) {
+        const canonical = $('link[rel="canonical"]').attr('href');
+        if (canonical) return canonical;
+      }
+
+      // Check for search results
+      let bookUrl: string | null = null;
+
+      // Look for results in #results_search
+      $('#results_search .entry').each((_, el) => {
+        if (bookUrl) return;
+
+        const $el = $(el);
+        const link = $el.find('a.title').first();
+        const href = link.attr('href');
+
+        // Filter: ensure it's a volume/manga page
+        if (href && (href.includes('/manga/') || href.includes('/vol/'))) {
+          bookUrl = href;
+        }
+      });
+
+      return bookUrl;
+
+    } catch (error) {
+      this.logger.error(`Error searching Manga-News for "${query}": ${error.message}`);
+      return null;
+    }
   }
 }
