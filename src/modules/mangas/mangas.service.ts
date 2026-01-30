@@ -2411,7 +2411,7 @@ export class MangasService extends BaseContentService<
 
     // Check if ISBN already exists
     if (createVolumeDto.isbn) {
-      const existingIsbn = await this.prisma.mangaVolume.findUnique({
+      const existingIsbn = await this.prisma.mangaVolume.findFirst({
         where: { isbn: createVolumeDto.isbn },
       });
 
