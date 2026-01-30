@@ -309,7 +309,23 @@ export class RecommendationsService {
       const reviewCount = anime.nbReviews || 0;
       const popularityScore = Math.log(reviewCount + 1) * 0.5;
 
-      const score = tagScore * 10 + avgRating * 2 + popularityScore;
+      // Recency boost - favor newer content
+      const currentYear = new Date().getFullYear();
+      const itemYear = anime.annee || 0;
+      let recencyScore = 0;
+      if (itemYear >= currentYear) {
+        recencyScore = 5; // Current year
+      } else if (itemYear >= currentYear - 1) {
+        recencyScore = 4; // Last year
+      } else if (itemYear >= currentYear - 3) {
+        recencyScore = 3; // 2-3 years ago
+      } else if (itemYear >= currentYear - 5) {
+        recencyScore = 2; // 4-5 years ago
+      } else if (itemYear >= currentYear - 10) {
+        recencyScore = 1; // 6-10 years ago
+      }
+
+      const score = tagScore * 10 + avgRating * 2 + popularityScore + recencyScore * 1.5;
 
       return {
         id: anime.idAnime,
@@ -413,7 +429,23 @@ export class RecommendationsService {
       const reviewCount = manga.nbReviews || 0;
       const popularityScore = Math.log(reviewCount + 1) * 0.5;
 
-      const score = tagScore * 10 + avgRating * 2 + popularityScore;
+      // Recency boost - favor newer content
+      const currentYear = new Date().getFullYear();
+      const itemYear = manga.annee ? parseInt(manga.annee) : 0;
+      let recencyScore = 0;
+      if (itemYear >= currentYear) {
+        recencyScore = 5; // Current year
+      } else if (itemYear >= currentYear - 1) {
+        recencyScore = 4; // Last year
+      } else if (itemYear >= currentYear - 3) {
+        recencyScore = 3; // 2-3 years ago
+      } else if (itemYear >= currentYear - 5) {
+        recencyScore = 2; // 4-5 years ago
+      } else if (itemYear >= currentYear - 10) {
+        recencyScore = 1; // 6-10 years ago
+      }
+
+      const score = tagScore * 10 + avgRating * 2 + popularityScore + recencyScore * 1.5;
 
       return {
         id: manga.idManga,
