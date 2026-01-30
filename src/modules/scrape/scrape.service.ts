@@ -1151,8 +1151,8 @@ export class ScrapeService {
 
     // Title
     const title = $('h1[itemprop="name"]').text().trim() ||
-                  $('.book-title h1').text().trim() ||
-                  $('h1').first().text().trim();
+      $('.book-title h1').text().trim() ||
+      $('h1').first().text().trim();
 
     // Original title (titre original)
     const originalTitle = $('span:contains("Titre original")').parent().text()
@@ -1161,22 +1161,22 @@ export class ScrapeService {
 
     // Author
     const author = $('a[itemprop="author"]').text().trim() ||
-                   $('.author-name').text().trim() ||
-                   $('span:contains("Auteur")').next('a').text().trim();
+      $('.author-name').text().trim() ||
+      $('span:contains("Auteur")').next('a').text().trim();
 
     // Publisher (éditeur)
     const publisher = $('a[itemprop="publisher"]').text().trim() ||
-                      $('span:contains("Editeur")').next('a').text().trim() ||
-                      $('span:contains("Éditeur")').next('a').text().trim();
+      $('span:contains("Editeur")').next('a').text().trim() ||
+      $('span:contains("Éditeur")').next('a').text().trim();
 
     // ISBN
     const isbn = $('[itemprop="isbn"]').text().trim() ||
-                 $('span:contains("ISBN")').parent().text().replace(/ISBN\s*:?\s*/i, '').trim();
+      $('span:contains("ISBN")').parent().text().replace(/ISBN\s*:?\s*/i, '').trim();
 
     // Release date
     let releaseDate = $('[itemprop="datePublished"]').attr('content') ||
-                      $('span:contains("Date de parution")').parent().text()
-                        .replace(/Date de parution\s*:?\s*/i, '').trim();
+      $('span:contains("Date de parution")').parent().text()
+        .replace(/Date de parution\s*:?\s*/i, '').trim();
 
     // Parse French date format (e.g., "15 janvier 2024") to ISO format
     if (releaseDate && !/^\d{4}-\d{2}-\d{2}$/.test(releaseDate)) {
@@ -1197,23 +1197,23 @@ export class ScrapeService {
 
     // Cover image
     let imageUrl = $('.main-cover img, .cover-image img, [itemprop="image"]').attr('src') ||
-                   $('img.cover').attr('src');
+      $('img.cover').attr('src');
     if (imageUrl && !imageUrl.startsWith('http')) {
       imageUrl = `https://booknode.com${imageUrl}`;
     }
 
     // Synopsis/Description
     const synopsis = $('[itemprop="description"]').text().trim() ||
-                     $('.book-resume, .resume, .description').text().trim();
+      $('.book-resume, .resume, .description').text().trim();
 
     // Number of pages
     const pageCount = $('[itemprop="numberOfPages"]').text().trim() ||
-                      $('span:contains("Nombre de pages")').parent().text()
-                        .replace(/Nombre de pages\s*:?\s*/i, '').trim();
+      $('span:contains("Nombre de pages")').parent().text()
+        .replace(/Nombre de pages\s*:?\s*/i, '').trim();
 
     // Series/Collection
     const series = $('span:contains("Série")').next('a').text().trim() ||
-                   $('span:contains("Collection")').next('a').text().trim();
+      $('span:contains("Collection")').next('a').text().trim();
 
     // Volume number (extract from title if present)
     let volumeNumber: number | null = null;
@@ -1343,5 +1343,135 @@ export class ScrapeService {
       this.logger.error(`Error searching Manga-News for "${query}": ${error.message}`);
       return null;
     }
+  }
+
+  async scrapeManga(q: string) {
+    return this.scrapeNautiljonManga(q);
+  }
+
+  private async scrapeNautiljonManga(q: string) {
+    const isUrl = /^https?:\/\//i.test(q);
+    const formatName = (name: string) => name.toLowerCase().replace(/ \: /g, ' - ').replace(/\s+/g, '+');
+    const url = isUrl ? q : `https://www.nautiljon.com/mangas/${formatName(q)}.html`;
+    const $ = await this.fetchHtml(url);
+
+    const h1 = $('h1.h1titre').first().clone();
+    h1.find('a.buttonlike').remove();
+    const title = h1.text().trim() || $('div.image_fiche img').attr('alt') || '';
+
+    let original_title = '';
+    $('li').each((_, li) => {
+      const t = $(li).text();
+      if (t && t.includes('Titre original')) {
+        original_title = t.replace('Titre original :', '').trim();
+        return false;
+      }
+    });
+
+    let start_date = '';
+    $('li').each((_, li) => {
+      const t = $(li).text();
+      if (t && t.includes('Origine :')) {
+        const span = $(li).find("span[itemprop='datePublished']").first();
+        if (span.length) start_date = span.attr('content') || span.text().trim();
+        return false;
+      }
+    });
+
+    let type = '';
+    $('li').each((_, li) => {
+      const t = $(li).text();
+      if (t && t.includes('Type :')) {
+        type = t.replace('Type :', '').trim();
+        return false;
+      }
+    });
+
+    const genres = (() => {
+      let liNode: any;
+      $('li').each((_, li) => { const t = $(li).text(); if (t && t.includes('Genres :')) { liNode = li; return false; } });
+      if (!liNode) return [] as string[];
+      return $(liNode).find("a span[itemprop='genre']").map((_, s) => $(s).text().trim()).get();
+    })();
+
+    const themes = (() => {
+      let liNode: any;
+      $('li').each((_, li) => { const t = $(li).text(); if (t && t.includes('Thèmes :')) { liNode = li; return false; } });
+      if (!liNode) return [] as string[];
+      return $(liNode).find('a').map((_, s) => $(s).text().trim()).get();
+    })();
+
+    const authors = (() => {
+      let liNode: any;
+      $('li').each((_, li) => { const t = $(li).text(); if (t && t.includes('Auteur :') || t.includes('Auteurs :')) { liNode = li; return false; } });
+      if (!liNode) return [] as string[];
+      return $(liNode).find("span[itemprop='author'] span[itemprop='name']").map((_, s) => $(s).text().trim()).get();
+    })();
+
+    let publisher_vo = '';
+    let publisher_vf = '';
+    $('li').each((_, li) => {
+      const t = $(li).text();
+      if (t && t.includes('Éditeur VO :')) {
+        publisher_vo = $(li).find("span[itemprop='legalName']").first().text().trim();
+      }
+      if (t && t.includes('Éditeur VF :')) {
+        publisher_vf = $(li).find("span[itemprop='legalName']").first().text().trim();
+      }
+    });
+
+    let volumes_vo = '';
+    let volumes_vf = '';
+    let status = '';
+    $('li').each((_, li) => {
+      const t = $(li).text();
+      if (t && t.includes('Nb volumes VO :')) {
+        volumes_vo = t.replace('Nb volumes VO :', '').trim();
+        if (volumes_vo.includes('Terminé')) status = 'Terminé';
+        else if (volumes_vo.includes('En cours')) status = 'En cours';
+      }
+      if (t && t.includes('Nb volumes VF :')) {
+        volumes_vf = t.replace('Nb volumes VF :', '').trim();
+      }
+    });
+
+    const synopsisNode = $('div.description').first().clone();
+    synopsisNode.find('div.fader').remove();
+    const synopsis = synopsisNode.text().trim();
+
+    let imageUrl = '';
+    const imageElement = $('.image_fiche img').first();
+    if (imageElement.length) {
+      const imgSrc = imageElement.attr('src');
+      if (imgSrc) {
+        let fullUrl = imgSrc;
+        if (imgSrc.startsWith('/')) {
+          fullUrl = `https://www.nautiljon.com${imgSrc}`;
+        }
+        imageUrl = fullUrl.split('?')[0];
+        if (imageUrl.includes('/mini/')) {
+          imageUrl = imageUrl.replace('/mini/', '/');
+        }
+      }
+    }
+
+    return {
+      source: 'nautiljon',
+      url,
+      title,
+      original_title,
+      start_date,
+      type,
+      genres,
+      themes,
+      authors,
+      publisher_vo,
+      publisher_vf,
+      volumes_vo,
+      volumes_vf,
+      status,
+      synopsis,
+      image_url: imageUrl,
+    };
   }
 }
