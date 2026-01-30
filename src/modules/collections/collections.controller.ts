@@ -299,40 +299,54 @@ export class CollectionsController {
     const userEmail = req.user.email || '';
     const username = req.user.username || 'Utilisateur';
 
-    // Add job to queue
-    const job = await this.importQueue.add(
-      'import-mal',
-      {
-        userId: req.user.id,
-        userEmail,
-        username,
-        items,
-      } as MalImportJobData,
-      {
-        attempts: 3,
-        backoff: {
-          type: 'exponential',
-          delay: 5000,
-        },
-        removeOnComplete: {
-          age: 3600, // Keep completed jobs for 1 hour
-          count: 100,
-        },
-        removeOnFail: {
-          age: 86400, // Keep failed jobs for 24 hours
-        },
+    try {
+      // Add job to queue
+      const job = await this.importQueue.add(
+        'import-mal',
+        {
+          userId: req.user.id,
+          userEmail,
+          username,
+          items,
+        } as MalImportJobData,
+        {
+          attempts: 3,
+          backoff: {
+            type: 'exponential',
+            delay: 5000,
+          },
+          removeOnComplete: {
+            age: 3600, // Keep completed jobs for 1 hour
+            count: 100,
+          },
+          removeOnFail: {
+            age: 86400, // Keep failed jobs for 24 hours
+          },
+        }
+      );
+
+      this.logger.log(`MAL import job ${job.id} queued for user ${req.user.id} with ${items.length} items`);
+
+      return {
+        success: true,
+        queued: true,
+        jobId: job.id,
+        itemCount: items.length,
+        message: `Import de ${items.length} éléments en cours de traitement. Vous recevrez un email lorsque l'import sera terminé.`,
+      };
+    } catch (error) {
+      // Handle Redis/Upstash limit errors gracefully
+      if (error.message?.includes('max requests limit exceeded') || error.message?.includes('ERR max')) {
+        this.logger.error(`Redis limit reached, cannot queue import: ${error.message}`);
+        return {
+          success: false,
+          queued: false,
+          error: 'queue_limit_exceeded',
+          message: 'Le service de file d\'attente est temporairement indisponible. Veuillez réessayer plus tard.',
+        };
       }
-    );
-
-    this.logger.log(`MAL import job ${job.id} queued for user ${req.user.id} with ${items.length} items`);
-
-    return {
-      success: true,
-      queued: true,
-      jobId: job.id,
-      itemCount: items.length,
-      message: `Import de ${items.length} éléments en cours de traitement. Vous recevrez un email lorsque l'import sera terminé.`,
-    };
+      throw error;
+    }
   }
 
   @Get('import/status/:jobId')
@@ -342,7 +356,22 @@ export class CollectionsController {
   @ApiParam({ name: 'jobId', description: 'Job ID returned from import/mal endpoint' })
   @ApiResponse({ status: 200, description: 'Job status' })
   async getImportStatus(@Param('jobId') jobId: string, @Request() req) {
-    const job = await this.importQueue.getJob(jobId);
+    let job;
+    try {
+      job = await this.importQueue.getJob(jobId);
+    } catch (error) {
+      // Handle Redis/Upstash limit errors gracefully
+      if (error.message?.includes('max requests limit exceeded') || error.message?.includes('ERR max')) {
+        this.logger.error(`Redis limit reached, cannot check job status: ${error.message}`);
+        return {
+          found: false,
+          status: 'unavailable',
+          error: 'queue_limit_exceeded',
+          message: 'Le service de file d\'attente est temporairement indisponible.',
+        };
+      }
+      throw error;
+    }
 
     if (!job) {
       return {

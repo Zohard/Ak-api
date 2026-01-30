@@ -30,7 +30,12 @@ export interface MalImportResult {
     }>;
 }
 
-@Processor('import-queue')
+@Processor('import-queue', {
+    // Reduce Redis polling to save Upstash requests
+    drainDelay: 30000,        // Wait 30s between job checks when queue is empty (default: 5s)
+    stalledInterval: 60000,   // Check for stalled jobs every 60s (default: 30s)
+    lockDuration: 60000,      // Lock jobs for 60s (default: 30s)
+})
 export class ImportProcessor extends WorkerHost {
     private readonly logger = new Logger(ImportProcessor.name);
 

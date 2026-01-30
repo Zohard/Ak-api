@@ -1655,26 +1655,20 @@ export class CollectionsService {
   }
 
   // Helper method to invalidate all collection-related cache for a user
-  // OPTIMIZED: Delete known keys instead of expensive SCAN operations
+  // Uses SCAN to delete all collection cache keys for the user
   private async invalidateUserCollectionCache(userId: number): Promise<void> {
     try {
-      // Delete known common cache keys - others will expire via TTL (5 min)
-      const types = ['anime', 'manga', 'jeu-video'];
-      const statuses = ['all', 'watching', 'completed', 'plantowatch', 'onhold', 'dropped'];
+      // Delete by pattern using SCAN - safe for Railway Redis (no request limits)
+      await Promise.all([
+        this.cacheService.delByPattern(`collection_animes:${userId}:*`),
+        this.cacheService.delByPattern(`collection_mangas:${userId}:*`),
+        this.cacheService.delByPattern(`collection_items:${userId}:*`),
+        this.cacheService.delByPattern(`user_collections:v2:${userId}:*`),
+        this.cacheService.delByPattern(`user_collections:${userId}:*`),
+        this.cacheService.delByPattern(`find_user_collections:${userId}:*`),
+      ]);
 
-      const deletions: Promise<void>[] = [
-        this.cacheService.del(`find_user_collections:${userId}:own`),
-        this.cacheService.del(`find_user_collections:${userId}:public`),
-      ];
-
-      // Only delete most common collection cache keys
-      for (const type of types) {
-        for (const status of statuses) {
-          deletions.push(this.cacheService.del(`user_collections:${userId}:${type}:${status}`));
-        }
-      }
-
-      await Promise.all(deletions);
+      this.logger.debug(`Cache invalidated for user ${userId} collections`);
     } catch (error) {
       // Log error but don't throw to avoid breaking the main operation
       this.logger.error('Cache invalidation error for user', userId, error);
