@@ -145,6 +145,7 @@ export class AuthService {
       user,
       ipAddress,
       userAgent,
+      loginDto.rememberMe,
     );
 
     return {
@@ -633,10 +634,17 @@ export class AuthService {
     user: SmfMember,
     ipAddress?: string,
     userAgent?: string,
+    rememberMe?: boolean,
   ): Promise<string> {
     const token = crypto.randomBytes(64).toString('hex');
     const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + 30); // 30 days
+
+    // If "remember me" is checked, extend session to 90 days, otherwise 7 days
+    if (rememberMe) {
+      expiresAt.setDate(expiresAt.getDate() + 90); // 90 days for "remember me"
+    } else {
+      expiresAt.setDate(expiresAt.getDate() + 7); // 7 days for regular session
+    }
 
     await this.prisma.akRefreshToken.create({
       data: {
