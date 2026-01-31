@@ -1212,6 +1212,16 @@ export class CollectionsService {
     // Invalidate user's collection cache after adding
     await this.invalidateUserCollectionCache(userId);
 
+    // Invalidate collection check cache
+    const cacheKey = `user_collection_check:${userId}:anime:${addAnimeDto.animeId}`;
+    await this.cacheService.del(cacheKey);
+
+    // Invalidate media collections users cache
+    await Promise.all([
+      this.cacheService.del(`media_collections_users:anime:${addAnimeDto.animeId}:1:20`),
+      this.cacheService.del(`media_collections_users:anime:${addAnimeDto.animeId}:1:50`),
+    ]);
+
     // Invalidate anime cache as ratings may have changed
     await this.cacheService.invalidateAnime(addAnimeDto.animeId);
 
@@ -1244,6 +1254,16 @@ export class CollectionsService {
 
     // Invalidate user's collection cache after removal
     await this.invalidateUserCollectionCache(userId);
+
+    // Invalidate collection check cache
+    const cacheKey = `user_collection_check:${userId}:anime:${animeId}`;
+    await this.cacheService.del(cacheKey);
+
+    // Invalidate media collections users cache
+    await Promise.all([
+      this.cacheService.del(`media_collections_users:anime:${animeId}:1:20`),
+      this.cacheService.del(`media_collections_users:anime:${animeId}:1:50`),
+    ]);
 
     // Invalidate anime cache as ratings may have changed
     await this.cacheService.invalidateAnime(animeId);
@@ -1466,6 +1486,16 @@ export class CollectionsService {
     // Invalidate user's collection cache after adding
     await this.invalidateUserCollectionCache(userId);
 
+    // Invalidate collection check cache
+    const cacheKey = `user_collection_check:${userId}:manga:${addMangaDto.mangaId}`;
+    await this.cacheService.del(cacheKey);
+
+    // Invalidate media collections users cache
+    await Promise.all([
+      this.cacheService.del(`media_collections_users:manga:${addMangaDto.mangaId}:1:20`),
+      this.cacheService.del(`media_collections_users:manga:${addMangaDto.mangaId}:1:50`),
+    ]);
+
     // Invalidate manga cache as ratings may have changed
     await this.cacheService.invalidateManga(addMangaDto.mangaId);
 
@@ -1498,6 +1528,16 @@ export class CollectionsService {
 
     // Invalidate user's collection cache after removal
     await this.invalidateUserCollectionCache(userId);
+
+    // Invalidate collection check cache
+    const cacheKey = `user_collection_check:${userId}:manga:${mangaId}`;
+    await this.cacheService.del(cacheKey);
+
+    // Invalidate media collections users cache
+    await Promise.all([
+      this.cacheService.del(`media_collections_users:manga:${mangaId}:1:20`),
+      this.cacheService.del(`media_collections_users:manga:${mangaId}:1:50`),
+    ]);
 
     // Invalidate manga cache as ratings may have changed
     await this.cacheService.invalidateManga(mangaId);

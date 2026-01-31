@@ -99,6 +99,14 @@ export class VideoGameCollectionService {
         const cacheKey = `user_collection_check:${userId}:jeu-video:${dto.gameId}`;
         await this.cacheService.del(cacheKey);
 
+        // Invalidate media collections users cache
+        await Promise.all([
+            this.cacheService.del(`media_collections_users:jeu-video:${dto.gameId}:1:20`),
+            this.cacheService.del(`media_collections_users:jeu-video:${dto.gameId}:1:50`),
+        ]);
+
+        // Invalidate game cache as ratings may have changed
+        await this.cacheService.invalidateGame(dto.gameId);
 
         return collection;
     }
@@ -181,8 +189,16 @@ export class VideoGameCollectionService {
         if (existing?.idJeu) {
             const cacheKey = `user_collection_check:${userId}:jeu-video:${existing.idJeu}`;
             await this.cacheService.del(cacheKey);
-        }
 
+            // Invalidate media collections users cache
+            await Promise.all([
+                this.cacheService.del(`media_collections_users:jeu-video:${existing.idJeu}:1:20`),
+                this.cacheService.del(`media_collections_users:jeu-video:${existing.idJeu}:1:50`),
+            ]);
+
+            // Invalidate game cache as ratings may have changed
+            await this.cacheService.invalidateGame(existing.idJeu);
+        }
 
         return updated;
     }
@@ -219,8 +235,16 @@ export class VideoGameCollectionService {
         if (existing?.idJeu) {
             const cacheKey = `user_collection_check:${userId}:jeu-video:${existing.idJeu}`;
             await this.cacheService.del(cacheKey);
-        }
 
+            // Invalidate media collections users cache
+            await Promise.all([
+                this.cacheService.del(`media_collections_users:jeu-video:${existing.idJeu}:1:20`),
+                this.cacheService.del(`media_collections_users:jeu-video:${existing.idJeu}:1:50`),
+            ]);
+
+            // Invalidate game cache as ratings may have changed
+            await this.cacheService.invalidateGame(existing.idJeu);
+        }
 
         return { message: 'Game removed from collection' };
     }
@@ -307,8 +331,12 @@ export class VideoGameCollectionService {
             await Promise.all([
                 // User collection lists cache
                 this.cacheService.delByPattern(`user_collections:${userId}:*`),
+                this.cacheService.delByPattern(`user_collections:v2:${userId}:*`),
                 // Collection items cache
                 this.cacheService.delByPattern(`collection_items:${userId}:*`),
+                // Video game collection cache
+                this.cacheService.delByPattern(`collection_jeuxvideo:${userId}:*`),
+                this.cacheService.delByPattern(`collection_games:${userId}:*`),
                 // Ratings distribution cache
                 this.cacheService.delByPattern(`collection_ratings:*:${userId}:*`),
                 // Find user collections cache (both own and public views)
