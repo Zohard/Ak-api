@@ -76,4 +76,30 @@ export class HealthController {
         : 'Partial warmup - database connection failed',
     };
   }
+
+  /**
+   * Database latency diagnostic endpoint
+   * Use this to diagnose Railway PostgreSQL performance issues
+   */
+  @Get('latency')
+  @ApiOperation({ summary: 'Database latency diagnostic' })
+  @ApiResponse({ status: 200, description: 'Latency measurement' })
+  async latency() {
+    const result = await this.healthService.measureLatency();
+
+    return {
+      timestamp: new Date().toISOString(),
+      database: {
+        latency_ms: result.latency,
+        active_connections: result.connectionCount,
+        version: result.dbVersion,
+        status: result.latency < 50 ? 'excellent' : result.latency < 100 ? 'good' : result.latency < 300 ? 'acceptable' : 'slow',
+      },
+      recommendations: result.latency > 100 ? [
+        'Consider using connection pooling (PgBouncer or Prisma Accelerate)',
+        'Check if app and database are in the same region',
+        'Review slow query logs for optimization opportunities',
+      ] : [],
+    };
+  }
 }

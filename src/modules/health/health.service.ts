@@ -96,4 +96,11 @@ export class HealthService {
 
     return { database: dbSuccess, cache: cacheSuccess, duration };
   }
+
+  /**
+   * Measure database latency for diagnostics
+   */
+  async measureLatency(): Promise<{ latency: number; connectionCount: number; dbVersion: string }> {
+    return this.prisma.measureLatency();
+  }
 }

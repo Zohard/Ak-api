@@ -18,12 +18,31 @@ export class PrismaService
       if (originalUrl) {
         const u = new URL(originalUrl);
         const isSupabase = u.hostname.includes('supabase.com');
+        const isNeon = u.hostname.includes('neon.tech');
+        const isRailway = u.hostname.includes('railway.app') || u.hostname.includes('railway.internal');
         const isPooler = u.hostname.includes('pooler');
 
-        // Apply optimizations for any pooler endpoint (Supabase or Neon)
-        if (isSupabase && isPooler || u.hostname.includes('neon.tech') && isPooler) {
-          const params = u.searchParams;
+        const params = u.searchParams;
 
+        // Railway PostgreSQL - direct connection (not a pooler)
+        if (isRailway) {
+          // Railway needs higher connection limit since it's not pooled
+          if (!params.has('connection_limit')) {
+            params.set('connection_limit', '10');
+          }
+          // Shorter timeouts for Railway's fast network
+          params.set('pool_timeout', '10');
+          params.set('connect_timeout', '10');
+          // Statement cache for better performance on direct connections
+          params.set('statement_cache_size', '100');
+
+          u.search = params.toString();
+          effectiveUrl = u.toString();
+
+          this.logger.log('🚂 Railway PostgreSQL detected - using direct connection optimizations');
+        }
+        // Apply optimizations for any pooler endpoint (Supabase or Neon)
+        else if ((isSupabase && isPooler) || (isNeon && isPooler)) {
           // CRITICAL: Remove channel_binding - pgBouncer doesn't support it
           params.delete('channel_binding');
 
@@ -95,12 +114,14 @@ export class PrismaService
       try {
         await this.$connect();
 
-        // Only set up query logging in development
-        if (process.env.NODE_ENV !== 'production') {
-          this.$on('query', (e: Prisma.QueryEvent) => {
+        // Log slow queries in all environments (> 500ms)
+        this.$on('query', (e: Prisma.QueryEvent) => {
+          if (e.duration > 500) {
+            this.logger.warn(`🐌 SLOW QUERY (${e.duration}ms): ${e.query.substring(0, 200)}...`);
+          } else if (process.env.NODE_ENV !== 'production') {
             this.logger.debug(`Query: ${e.query} - Duration: ${e.duration}ms`);
-          });
-        }
+          }
+        });
 
         this.$on('error', (e: Prisma.LogEvent) => {
           this.logger.error(`Database error: ${e.message}`);
@@ -165,6 +186,32 @@ export class PrismaService
     } catch (error) {
       this.logger.error('Health check failed:', error.message);
       return false;
+    }
+  }
+
+  // Diagnostic method to measure database latency
+  async measureLatency(): Promise<{ latency: number; connectionCount: number; dbVersion: string }> {
+    const start = Date.now();
+
+    try {
+      const [pingResult, connectionResult, versionResult] = await Promise.all([
+        this.$queryRaw`SELECT 1 as ping`,
+        this.$queryRaw`SELECT count(*) as connections FROM pg_stat_activity WHERE state = 'active'`,
+        this.$queryRaw`SELECT version() as version`
+      ]);
+
+      const latency = Date.now() - start;
+      const connectionCount = Number((connectionResult as any[])[0]?.connections || 0);
+      const dbVersion = ((versionResult as any[])[0]?.version || '').split(' ').slice(0, 2).join(' ');
+
+      if (latency > 100) {
+        this.logger.warn(`⚠️ High database latency: ${latency}ms`);
+      }
+
+      return { latency, connectionCount, dbVersion };
+    } catch (error) {
+      this.logger.error('Latency measurement failed:', error.message);
+      throw error;
     }
   }
 
