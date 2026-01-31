@@ -782,10 +782,10 @@ export class CollectionsService {
 
     // OPTIMIZATION: Invalidate media collections users cache
     // OPTIMIZED: Delete known keys instead of SCAN
-      await Promise.all([
-        this.cacheService.del(`media_collections_users:${mediaType}:${mediaId}:1:20`),
-        this.cacheService.del(`media_collections_users:${mediaType}:${mediaId}:1:50`),
-      ]);
+    await Promise.all([
+      this.cacheService.del(`media_collections_users:${mediaType}:${mediaId}:1:20`),
+      this.cacheService.del(`media_collections_users:${mediaType}:${mediaId}:1:50`),
+    ]);
 
     // Invalidate anime/manga/game cache as ratings may have changed
     if (mediaType === 'anime') {
@@ -863,10 +863,10 @@ export class CollectionsService {
 
     // OPTIMIZATION: Invalidate media collections users cache
     // OPTIMIZED: Delete known keys instead of SCAN
-      await Promise.all([
-        this.cacheService.del(`media_collections_users:${mediaType}:${mediaId}:1:20`),
-        this.cacheService.del(`media_collections_users:${mediaType}:${mediaId}:1:50`),
-      ]);
+    await Promise.all([
+      this.cacheService.del(`media_collections_users:${mediaType}:${mediaId}:1:20`),
+      this.cacheService.del(`media_collections_users:${mediaType}:${mediaId}:1:50`),
+    ]);
 
     // Invalidate anime/manga/game cache as ratings may have changed
     if (mediaType === 'anime') {
@@ -1322,7 +1322,8 @@ export class CollectionsService {
               moyenneNotes: true,
               niceUrl: true,
               origine: true,
-              nbVol: true
+              nbVol: true,
+              nbChapitres: true
             }
           }
         }
@@ -1341,6 +1342,7 @@ export class CollectionsService {
       type: item.type,
       notes: item.notes,
       rating: Number(item.evaluation) > 0 ? Number(item.evaluation) : null,
+      nbChapitresLu: item.nbChapitresLu || 0,
       manga: {
         id: item.manga.idManga,
         titre: item.manga.titre,
@@ -1351,7 +1353,8 @@ export class CollectionsService {
         moyenneNotes: item.manga.moyenneNotes,
         niceUrl: item.manga.niceUrl,
         origine: item.manga.origine,
-        nbVol: item.manga.nbVol
+        nbVol: item.manga.nbVol,
+        nbChapitres: item.manga.nbChapitres
       }
     }));
 
