@@ -231,11 +231,11 @@ export class EpisodesService {
                 : season.jsonData;
 
             if (Array.isArray(jsonData)) {
-                return jsonData;
+                return jsonData.map(Number);
             } else if (jsonData.animes && Array.isArray(jsonData.animes)) {
-                return jsonData.animes;
+                return jsonData.animes.map(Number);
             } else if (jsonData.anime_ids && Array.isArray(jsonData.anime_ids)) {
-                return jsonData.anime_ids;
+                return jsonData.anime_ids.map(Number);
             }
         } catch (e) {
             this.logger.error(`Error parsing season json_data: ${e.message}`);
