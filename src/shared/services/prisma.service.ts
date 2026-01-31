@@ -4,11 +4,38 @@ import { PrismaClient, Prisma } from '@prisma/client';
 @Injectable()
 export class PrismaService
   extends PrismaClient<Prisma.PrismaClientOptions, 'query' | 'error' | 'info' | 'warn'>
-  implements OnModuleInit, OnModuleDestroy
-{
+  implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(PrismaService.name);
 
   constructor() {
+    const effectiveUrl = PrismaService.getEffectiveUrl();
+
+    // Only log errors and warnings in production, add query logging in dev
+    const isProduction = process.env.NODE_ENV === 'production';
+
+    super({
+      datasources: {
+        db: {
+          url: effectiveUrl,
+        },
+      },
+      log: isProduction
+        ? [
+          { emit: 'event', level: 'error' },
+          { emit: 'event', level: 'warn' },
+        ]
+        : [
+          { emit: 'event', level: 'query' },
+          { emit: 'event', level: 'error' },
+          { emit: 'event', level: 'warn' },
+        ],
+      transactionOptions: {
+        timeout: 30000, // 30 seconds for cold starts
+      },
+    });
+  }
+
+  private static getEffectiveUrl(): string {
     // Prepare a serverless-friendly connection string for Supabase pgBouncer
     // and disable prepared statements when using a pooled connection.
     const originalUrl = process.env.DATABASE_URL || '';
@@ -39,7 +66,7 @@ export class PrismaService
           u.search = params.toString();
           effectiveUrl = u.toString();
 
-          this.logger.log('🚂 Railway PostgreSQL detected - using direct connection optimizations');
+          // Note: Cannot log here as this is a static method called before super()
         }
         // Apply optimizations for any pooler endpoint (Supabase or Neon)
         else if ((isSupabase && isPooler) || (isNeon && isPooler)) {
@@ -73,36 +100,12 @@ export class PrismaService
       }
     } catch (e) {
       // If URL parsing fails, fall back to the original value
-      // Avoid using `this` before `super()`; use static Logger
       Logger.warn(
         'Failed to normalize DATABASE_URL for serverless pooling',
         PrismaService.name,
       );
     }
-
-    // Only log errors and warnings in production, add query logging in dev
-    const isProduction = process.env.NODE_ENV === 'production';
-
-    super({
-      datasources: {
-        db: {
-          url: effectiveUrl,
-        },
-      },
-      log: isProduction
-        ? [
-            { emit: 'event', level: 'error' },
-            { emit: 'event', level: 'warn' },
-          ]
-        : [
-            { emit: 'event', level: 'query' },
-            { emit: 'event', level: 'error' },
-            { emit: 'event', level: 'warn' },
-          ],
-      transactionOptions: {
-        timeout: 30000, // 30 seconds for cold starts
-      },
-    });
+    return effectiveUrl;
   }
 
   async onModuleInit() {
@@ -221,13 +224,13 @@ export class PrismaService
     maxRetries: number = 3,
   ): Promise<T> {
     let lastError: any;
-    
+
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
         return await operation();
       } catch (error: any) {
         lastError = error;
-        
+
         // Check if it's a connection-related error
         if (
           error.code === 'P2024' || // Connection timeout
@@ -237,7 +240,7 @@ export class PrismaService
           error.message?.includes('FATAL')
         ) {
           this.logger.warn(`Database operation failed (attempt ${attempt}/${maxRetries}):`, error.message);
-          
+
           if (attempt < maxRetries) {
             // For max connections error, force disconnect to free up connections
             if (error.message?.includes('Max client connections reached')) {
@@ -248,13 +251,13 @@ export class PrismaService
                 this.logger.warn('Failed to disconnect:', disconnectError.message);
               }
             }
-            
+
             // Exponential backoff with jitter
             const baseDelay = Math.pow(2, attempt - 1) * 1000;
             const jitter = Math.random() * 1000;
             const delay = baseDelay + jitter;
             await new Promise(resolve => setTimeout(resolve, delay));
-            
+
             // Try to reconnect
             try {
               await this.$disconnect();
@@ -263,15 +266,15 @@ export class PrismaService
             } catch (reconnectError) {
               this.logger.error('Failed to reconnect:', reconnectError);
             }
-            
+
             continue;
           }
         }
-        
+
         throw error;
       }
     }
-    
+
     throw lastError;
   }
 }
