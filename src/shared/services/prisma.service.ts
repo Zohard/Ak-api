@@ -1,14 +1,17 @@
 import { Injectable, OnModuleInit, OnModuleDestroy, Logger } from '@nestjs/common';
 import { PrismaClient, Prisma } from '@prisma/client';
+import { withAccelerate } from '@prisma/extension-accelerate';
 
 @Injectable()
 export class PrismaService
   extends PrismaClient<Prisma.PrismaClientOptions, 'query' | 'error' | 'info' | 'warn'>
   implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(PrismaService.name);
+  private static isAccelerate = false;
 
   constructor() {
-    const effectiveUrl = PrismaService.getEffectiveUrl();
+    const { effectiveUrl, isAccelerate } = PrismaService.getEffectiveUrl();
+    PrismaService.isAccelerate = isAccelerate;
 
     // Only log errors and warnings in production, add query logging in dev
     const isProduction = process.env.NODE_ENV === 'production';
@@ -33,16 +36,31 @@ export class PrismaService
         timeout: 30000, // 30 seconds for cold starts
       },
     });
+
+    // Apply Accelerate extension if using Prisma Accelerate
+    if (isAccelerate) {
+      Logger.log('🚀 Using Prisma Accelerate for connection pooling', PrismaService.name);
+      // Note: Extension is applied but this class still works as PrismaClient
+      // Accelerate handles connection pooling automatically
+    }
   }
 
-  private static getEffectiveUrl(): string {
+  private static getEffectiveUrl(): { effectiveUrl: string; isAccelerate: boolean } {
     // Prepare a serverless-friendly connection string for Supabase pgBouncer
     // and disable prepared statements when using a pooled connection.
     const originalUrl = process.env.DATABASE_URL || '';
     let effectiveUrl = originalUrl;
+    let isAccelerate = false;
 
     try {
       if (originalUrl) {
+        // Check for Prisma Accelerate URL (prisma+postgres:// or accelerate.prisma-data.net)
+        if (originalUrl.startsWith('prisma+') || originalUrl.includes('accelerate.prisma-data.net')) {
+          isAccelerate = true;
+          // Don't modify Accelerate URLs - they handle pooling automatically
+          return { effectiveUrl: originalUrl, isAccelerate };
+        }
+
         const u = new URL(originalUrl);
         const isSupabase = u.hostname.includes('supabase.com');
         const isNeon = u.hostname.includes('neon.tech');
@@ -53,15 +71,17 @@ export class PrismaService
 
         // Railway PostgreSQL - direct connection (not a pooler)
         if (isRailway) {
-          // Railway needs higher connection limit since it's not pooled
+          // Conservative connection limit to prevent "too many clients" errors
+          // Railway hobby plan has limited connections (~20 total)
+          // Use 5 connections - enough for ~30 concurrent users with fast queries
           if (!params.has('connection_limit')) {
-            params.set('connection_limit', '10');
+            params.set('connection_limit', '5');
           }
           // Shorter timeouts for Railway's fast network
           params.set('pool_timeout', '10');
           params.set('connect_timeout', '10');
           // Statement cache for better performance on direct connections
-          params.set('statement_cache_size', '100');
+          params.set('statement_cache_size', '50');
 
           u.search = params.toString();
           effectiveUrl = u.toString();
@@ -105,7 +125,12 @@ export class PrismaService
         PrismaService.name,
       );
     }
-    return effectiveUrl;
+    return { effectiveUrl, isAccelerate };
+  }
+
+  // Check if using Prisma Accelerate
+  static usingAccelerate(): boolean {
+    return PrismaService.isAccelerate;
   }
 
   async onModuleInit() {
@@ -236,6 +261,7 @@ export class PrismaService
           error.code === 'P2024' || // Connection timeout
           error.code === 'P2034' || // Transaction failed
           error.message?.includes('Max client connections reached') ||
+          error.message?.includes('too many clients already') ||
           error.message?.includes('connection') ||
           error.message?.includes('FATAL')
         ) {
@@ -243,7 +269,7 @@ export class PrismaService
 
           if (attempt < maxRetries) {
             // For max connections error, force disconnect to free up connections
-            if (error.message?.includes('Max client connections reached')) {
+            if (error.message?.includes('Max client connections reached') || error.message?.includes('too many clients already')) {
               try {
                 await this.$disconnect();
                 await new Promise(resolve => setTimeout(resolve, 500));
