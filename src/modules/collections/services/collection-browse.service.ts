@@ -467,6 +467,7 @@ export class CollectionBrowseService {
                 data: [],
                 meta: {
                     totalCount: 0,
+                    friendsCount: 0,
                     page,
                     limit,
                     hasMore: false
@@ -477,19 +478,23 @@ export class CollectionBrowseService {
         // Query based on media type (separate queries for TypeScript type safety)
         let collections: any[];
         let totalCount: number;
+        let friendsCount: number = 0;
 
         if (mediaType === 'anime') {
             const where: any = {
                 idAnime: mediaId,
                 isPublic: true,
             };
+
+            // Query for main data
+            const queryWhere = { ...where };
             if (friendsOnly && friendIds.length > 0) {
-                where.idMembre = { in: friendIds };
+                queryWhere.idMembre = { in: friendIds };
             }
 
-            [collections, totalCount] = await Promise.all([
+            const promises: any[] = [
                 this.prisma.collectionAnime.findMany({
-                    where,
+                    where: queryWhere,
                     skip,
                     take: limit,
                     select: {
@@ -509,20 +514,45 @@ export class CollectionBrowseService {
                         { user: { memberName: 'asc' } }
                     ]
                 }),
-                this.prisma.collectionAnime.count({ where })
-            ]);
+                this.prisma.collectionAnime.count({ where: queryWhere })
+            ];
+
+            // If not filtering by friends but user is logged in, calculate friends count separately
+            if (!friendsOnly && currentUserId && friendIds.length > 0) {
+                promises.push(this.prisma.collectionAnime.count({
+                    where: {
+                        ...where,
+                        idMembre: { in: friendIds }
+                    }
+                }));
+            }
+
+            const results = await Promise.all(promises);
+            collections = results[0];
+            totalCount = results[1];
+
+            if (friendsOnly) {
+                friendsCount = totalCount;
+            } else if (results.length > 2) {
+                friendsCount = results[2];
+            } else {
+                friendsCount = 0;
+            }
         } else {
             const where: any = {
                 idManga: mediaId,
                 isPublic: true,
             };
+
+            // Query for main data
+            const queryWhere = { ...where };
             if (friendsOnly && friendIds.length > 0) {
-                where.idMembre = { in: friendIds };
+                queryWhere.idMembre = { in: friendIds };
             }
 
-            [collections, totalCount] = await Promise.all([
+            const promises: any[] = [
                 this.prisma.collectionManga.findMany({
-                    where,
+                    where: queryWhere,
                     skip,
                     take: limit,
                     select: {
@@ -542,8 +572,30 @@ export class CollectionBrowseService {
                         { user: { memberName: 'asc' } }
                     ]
                 }),
-                this.prisma.collectionManga.count({ where })
-            ]);
+                this.prisma.collectionManga.count({ where: queryWhere })
+            ];
+
+            // If not filtering by friends but user is logged in, calculate friends count separately
+            if (!friendsOnly && currentUserId && friendIds.length > 0) {
+                promises.push(this.prisma.collectionManga.count({
+                    where: {
+                        ...where,
+                        idMembre: { in: friendIds }
+                    }
+                }));
+            }
+
+            const results = await Promise.all(promises);
+            collections = results[0];
+            totalCount = results[1];
+
+            if (friendsOnly) {
+                friendsCount = totalCount;
+            } else if (results.length > 2) {
+                friendsCount = results[2];
+            } else {
+                friendsCount = 0;
+            }
         }
 
         // Map collection type to status label
@@ -573,6 +625,7 @@ export class CollectionBrowseService {
             data: users,
             meta: {
                 totalCount,
+                friendsCount,
                 page,
                 limit,
                 hasMore: skip + collections.length < totalCount
