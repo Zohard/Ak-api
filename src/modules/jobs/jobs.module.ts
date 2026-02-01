@@ -19,6 +19,7 @@ import { PopularityService } from '../../shared/services/popularity.service';
     NotificationsModule,
     AnimesModule,
     CronModule,
+    ReviewsModule,
   ],
   controllers: [JobsCronController],
   providers: [PopularityJobService, EventsJobService, NotificationsJobService, PrismaService, PopularityService],
