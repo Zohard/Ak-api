@@ -917,9 +917,15 @@ export class AniListService {
             coverImage { large medium }
             bannerImage
             genres
+            tags {
+              name
+              description
+              rank
+              category
+            }
             chapters
             volumes
-            staff(perPage: 30) {
+            staff(perPage: 50) {
               edges {
                 id
                 role
@@ -967,6 +973,12 @@ export class AniListService {
           coverImage { large medium }
           bannerImage
           genres
+          tags {
+            name
+            description
+            rank
+            category
+          }
           chapters
           volumes
           staff(perPage: 50) {
@@ -1092,8 +1104,15 @@ export class AniListService {
         anilistId: anilistManga.id,
         source: 'AniList',
         genres: anilistManga.genres,
+        tags: (anilistManga as any).tags || [],
         score: anilistManga.averageScore,
         staff: staffData,
+        // Also save raw staff list for manual import of other roles
+        rawStaff: anilistManga.staff?.edges?.map(edge => ({
+          name: edge.node?.name?.full,
+          role: edge.role,
+          primaryOccupations: edge.node?.primaryOccupations
+        })) || [],
         countryOfOrigin: anilistManga.countryOfOrigin,
         originalData: {
           format: anilistManga.format,
