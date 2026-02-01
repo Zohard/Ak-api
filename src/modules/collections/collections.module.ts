@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { BullModule } from '@nestjs/bullmq';
 import { CollectionsService } from './collections.service';
 import { CollectionsController } from './collections.controller';
@@ -11,12 +11,14 @@ import { VideoGameCollectionService } from './services/video-game-collection.ser
 import { CollectionStatisticsService } from './services/collection-statistics.service';
 import { CollectionImportService } from './services/collection-import.service';
 import { CollectionBrowseService } from './services/collection-browse.service';
+import { RecommendationsModule } from '../recommendations/recommendations.module';
 
 @Module({
   imports: [
     BullModule.registerQueue({
       name: 'import-queue',
     }),
+    forwardRef(() => RecommendationsModule),
   ],
   controllers: [CollectionsController],
   providers: [

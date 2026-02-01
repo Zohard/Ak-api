@@ -32,7 +32,7 @@ export class RecommendationsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly cacheService: CacheService,
-  ) {}
+  ) { }
 
   async getRecommendationsForUser(
     userId: number,
@@ -264,7 +264,6 @@ export class RecommendationsService {
     const animes = await this.prisma.akAnime.findMany({
       where: {
         idAnime: { notIn: excludeIds },
-        ficheComplete: 1,
         businessRelations: {
           some: {
             business: {
@@ -338,7 +337,7 @@ export class RecommendationsService {
         year: anime.annee || undefined,
         nbEp: anime.nbEp || undefined,
         format: anime.format || undefined,
-        studio: anime.studio || undefined,
+        studio: anime.businessRelations?.find(r => r.type === "Studio d'animation")?.business?.denomination || anime.studio || undefined,
         type: 'anime' as const,
         score,
         matchingTags,
@@ -363,7 +362,6 @@ export class RecommendationsService {
     const mangas = await this.prisma.akManga.findMany({
       where: {
         idManga: { notIn: excludeIds },
-        ficheComplete: 1,
         OR: [
           ...tagConditions,
           {

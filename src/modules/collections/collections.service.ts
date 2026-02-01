@@ -1,8 +1,9 @@
-import { Injectable, NotFoundException, ForbiddenException, ConflictException, BadRequestException, Logger } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, ConflictException, BadRequestException, Logger, Inject, forwardRef } from '@nestjs/common';
 import { PrismaService } from '../../shared/services/prisma.service';
 import { CacheService } from '../../shared/services/cache.service';
 import { JikanService } from '../jikan/jikan.service';
 import { CollectionStatisticsService } from './services/collection-statistics.service';
+import { RecommendationsService } from '../recommendations/recommendations.service';
 import { AddAnimeToCollectionDto } from './dto/add-anime-to-collection.dto';
 import { AddMangaToCollectionDto } from './dto/add-manga-to-collection.dto';
 import { AddJeuxVideoToCollectionDto } from './dto/add-jeuxvideo-to-collection.dto';
@@ -21,6 +22,8 @@ export class CollectionsService {
     private cacheService: CacheService,
     private jikanService: JikanService,
     private collectionStatisticsService: CollectionStatisticsService,
+    @Inject(forwardRef(() => RecommendationsService))
+    private recommendationsService: RecommendationsService,
   ) { }
 
   async createCollection(userId: number, createCollectionDto: CreateCollectionDto) {
@@ -1709,9 +1712,11 @@ export class CollectionsService {
         this.cacheService.delByPattern(`user_collections:v2:${userId}:*`),
         this.cacheService.delByPattern(`user_collections:${userId}:*`),
         this.cacheService.delByPattern(`find_user_collections:${userId}:*`),
+        // Also invalidate recommendations cache when collection changes
+        this.recommendationsService.invalidateUserRecommendations(userId),
       ]);
 
-      this.logger.debug(`Cache invalidated for user ${userId} collections`);
+      this.logger.debug(`Cache invalidated for user ${userId} collections and recommendations`);
     } catch (error) {
       // Log error but don't throw to avoid breaking the main operation
       this.logger.error('Cache invalidation error for user', userId, error);
