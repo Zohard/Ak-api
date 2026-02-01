@@ -382,20 +382,20 @@ export class SeasonsService {
     if (!season) return null
 
     if (isCurrent) {
-      // First, unset all other seasons as current
+      // Unset all seasons and set the target one in a single query to avoid Accelerate timeout
+      await this.prisma.$executeRaw`
+        UPDATE ak_animes_saisons
+        SET current_season = CASE WHEN id_saison = ${seasonId} THEN true ELSE false END
+        WHERE current_season = true OR id_saison = ${seasonId}
+      `
+    } else {
+      // Just unset this specific season
       await this.prisma.$executeRaw`
         UPDATE ak_animes_saisons
         SET current_season = false
-        WHERE current_season = true
+        WHERE id_saison = ${seasonId}
       `
     }
-
-    // Set the specified season's current_season flag
-    await this.prisma.$executeRaw`
-      UPDATE ak_animes_saisons
-      SET current_season = ${isCurrent}
-      WHERE id_saison = ${seasonId}
-    `
 
     // Invalidate all season-related caches
     await this.cacheService.del(`season:${seasonId}`)

@@ -45,16 +45,18 @@ export class EpisodesService {
     async syncEpisodes(animeId: number, episodesData: any[]) {
         this.logger.log(`Syncing ${episodesData.length} episodes for anime ${animeId}`);
 
-        const results = await this.prisma.$transaction(async (tx) => {
-            const txResults = [];
+        // Process without transaction to avoid Prisma Accelerate 15s timeout
+        // Each episode upsert is independent, so no transaction needed
+        const results = [];
 
-            for (const ep of episodesData) {
-                // Simple null byte removal - no complex buffer operations
-                const cleanString = (str: any): string | null => {
-                    if (!str) return null;
-                    return String(str).replace(/\0/g, '').trim() || null;
-                };
+        // Simple null byte removal helper
+        const cleanString = (str: any): string | null => {
+            if (!str) return null;
+            return String(str).replace(/\0/g, '').trim() || null;
+        };
 
+        for (const ep of episodesData) {
+            try {
                 const titleNative = cleanString(ep.media?.title?.native);
                 const titleEnglish = cleanString(ep.media?.title?.english);
                 const titleRomaji = cleanString(ep.media?.title?.romaji);
@@ -69,21 +71,21 @@ export class EpisodesService {
                     }
                 }
 
-                const existing = await tx.akAnimesEpisode.findFirst({
+                const existing = await this.prisma.akAnimesEpisode.findFirst({
                     where: { idAnime: animeId, numero: ep.episode },
                 });
 
                 if (existing) {
-                    const updated = await tx.akAnimesEpisode.update({
+                    const updated = await this.prisma.akAnimesEpisode.update({
                         where: { idEpisode: existing.idEpisode },
                         data: {
                             dateDiffusion: dateDiffusionStr,
                             image: image || undefined,
                         },
                     });
-                    txResults.push(updated);
+                    results.push(updated);
                 } else {
-                    const created = await tx.akAnimesEpisode.create({
+                    const created = await this.prisma.akAnimesEpisode.create({
                         data: {
                             idAnime: animeId,
                             numero: ep.episode,
@@ -97,12 +99,12 @@ export class EpisodesService {
                             dateAjout: new Date(),
                         },
                     });
-                    txResults.push(created);
+                    results.push(created);
                 }
+            } catch (err) {
+                this.logger.error(`Failed to sync episode ${ep.episode} for anime ${animeId}:`, err);
             }
-
-            return txResults;
-        });
+        }
 
         // Clear schedule caches after sync
         if (results.length > 0) {
