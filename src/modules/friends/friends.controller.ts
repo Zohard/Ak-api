@@ -19,12 +19,12 @@ import { FriendsService } from './friends.service';
 @ApiTags('Friends')
 @Controller('friends')
 export class FriendsController {
-  constructor(private readonly friendsService: FriendsService) {}
+  constructor(private readonly friendsService: FriendsService) { }
 
   @Get()
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Get user\'s friends list',
     description: 'Retrieve the current user\'s friends list with statistics'
   })
@@ -67,7 +67,7 @@ export class FriendsController {
 
   // Public endpoint for viewing anyone's friends list
   @Get('public/user/:userId')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Get specific user\'s public friends list',
     description: 'Retrieve a specific user\'s friends list (public view, no authentication required)'
   })
@@ -89,7 +89,7 @@ export class FriendsController {
   @Get('user/:userId')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Get specific user\'s friends list',
     description: 'Retrieve a specific user\'s friends list (public view)'
   })
@@ -112,7 +112,7 @@ export class FriendsController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Add a friend',
     description: 'Add another user to the current user\'s friends list'
   })
@@ -146,7 +146,7 @@ export class FriendsController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Remove a friend',
     description: 'Remove a user from the current user\'s friends list'
   })
@@ -178,7 +178,7 @@ export class FriendsController {
   @Get('status/:targetUserId')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Check friendship status',
     description: 'Check the friendship status between current user and target user'
   })
@@ -210,7 +210,7 @@ export class FriendsController {
   @Get('mutual/:targetUserId')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Get mutual friends',
     description: 'Get friends in common between current user and target user'
   })
@@ -247,7 +247,7 @@ export class FriendsController {
   @Get('search')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Search for users',
     description: 'Search for potential friends by name'
   })
@@ -286,7 +286,7 @@ export class FriendsController {
   @Get('recommendations')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Get friend recommendations',
     description: 'Get friend recommendations based on mutual friends'
   })
@@ -328,7 +328,7 @@ export class FriendsController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Add multiple friends',
     description: 'Add multiple users to friends list in one request'
   })
@@ -403,7 +403,7 @@ export class FriendsController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Remove multiple friends',
     description: 'Remove multiple users from friends list in one request'
   })
@@ -458,7 +458,7 @@ export class FriendsController {
   @Get('requests')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Get pending friend requests',
     description: 'Get friend requests sent to the current user that haven\'t been accepted yet'
   })
@@ -488,7 +488,7 @@ export class FriendsController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Accept a friend request',
     description: 'Accept a pending friend request from another user'
   })
@@ -521,7 +521,7 @@ export class FriendsController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Decline a friend request',
     description: 'Decline a pending friend request from another user'
   })
@@ -693,5 +693,41 @@ export class FriendsController {
       type || 'all',
       contentType || 'all'
     );
+  }
+
+  @Get('watching')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Get friends watching list',
+    description: 'Retrieve a list of animes currently being watched by friends'
+  })
+  @ApiQuery({ name: 'limit', type: 'number', required: false, description: 'Items limit (default: 20)' })
+  @ApiResponse({
+    status: 200,
+    description: 'Friends watching list retrieved successfully',
+    schema: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          userId: { type: 'number', example: 123 },
+          userName: { type: 'string', example: 'Bob' },
+          animeTitle: { type: 'string', example: 'Naruto' },
+          currentEpisode: { type: 'number', example: 42 }
+        }
+      }
+    }
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  async getFriendsWatching(
+    @Request() req: any,
+    @Query('limit') limit?: string
+  ) {
+    const parsedLimit = limit ? parseInt(limit) : 20;
+    if (isNaN(parsedLimit) || parsedLimit < 1 || parsedLimit > 50) {
+      throw new BadRequestException('Invalid limit');
+    }
+    return await this.friendsService.getFriendsWatching(req.user.id, parsedLimit);
   }
 }

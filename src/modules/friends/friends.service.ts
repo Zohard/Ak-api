@@ -1056,4 +1056,59 @@ export class FriendsService {
 
     return date.toLocaleDateString('fr-FR');
   }
+
+  /**
+   * Get list of animes currently being watched by friends
+   */
+  async getFriendsWatching(userId: number, limit: number = 20) {
+    if (!userId || userId <= 0) {
+      throw new BadRequestException('Invalid user ID');
+    }
+
+    // Get user's friends list
+    const { friends } = await this.getFriends(userId);
+    const friendIds = friends.map(f => f.id);
+
+    if (friendIds.length === 0) {
+      return [];
+    }
+
+    // Query friends watching list
+    const watchingList = await this.prisma.$queryRaw<Array<{
+      user_id: number;
+      anime_id: number;
+      updatedat: Date;
+      current_episode: number;
+      real_name: string;
+      avatar: string;
+      titre: string;
+      image: string;
+      slug: string;
+    }>>`
+      SELECT
+        ual.user_id, ual.anime_id, ual.updatedat, ual.current_episode,
+        m.real_name, m.avatar,
+        a.titre, a.image, a.slug
+      FROM ak_user_anime_list ual
+      JOIN smf_members m ON ual.user_id = m.id_member
+      JOIN ak_animes a ON ual.anime_id = a.id_anime
+      WHERE ual.user_id IN (${Prisma.join(friendIds)})
+        AND (ual.status = 'watching' OR ual.type = 2)
+      ORDER BY ual.updatedat DESC
+      LIMIT ${limit}
+    `;
+
+    return watchingList.map(item => ({
+      userId: item.user_id,
+      userName: item.real_name,
+      userAvatar: item.avatar || '../img/noavatar.png',
+      animeId: item.anime_id,
+      animeTitle: item.titre,
+      animeImage: item.image,
+      animeSlug: item.slug,
+      currentEpisode: item.current_episode,
+      updatedAt: item.updatedat,
+      formattedDate: this.formatLastLogin(Math.floor(new Date(item.updatedat).getTime() / 1000))
+    }));
+  }
 }
