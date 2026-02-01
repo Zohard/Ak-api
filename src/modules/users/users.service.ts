@@ -1326,7 +1326,11 @@ export class UsersService {
         dateRegistered: true,
         lastLogin: true,
         posts: true,
-        nbCritiques: true,
+        _count: {
+          select: {
+            reviews: { where: { statut: 0 } }
+          }
+        },
         nbSynopsis: true,
         nbContributions: true,
         experience: true,
@@ -2022,16 +2026,18 @@ export class UsersService {
       dateRegistered,
       lastLogin,
       posts,
+      _count,
       ...otherFields
     } = user;
 
-    const publicUser = {
+    const publicUser: any = {
       id: idMember,
       pseudo: realName || memberName,
       username: memberName,
       dateInscription: dateRegistered,
       lastLogin,
       nbPost: posts,
+      nbCritiques: _count?.reviews ?? user.nbCritiques ?? 0,
       reputation: otherFields.experience || 0,
       ...otherFields,
     };

@@ -132,15 +132,19 @@ export class ReviewsService {
       },
     });
 
-    // Update user's review count
-    await this.prisma.smfMember.update({
-      where: { idMember: userId },
-      data: {
-        nbCritiques: {
-          increment: 1,
+    // Update user's review count if the review is published (statut: 0)
+    // By default, new reviews have statut 0 in the schema
+    const isPublished = (review as any).statut === 0;
+    if (isPublished) {
+      await this.prisma.smfMember.update({
+        where: { idMember: userId },
+        data: {
+          nbCritiques: {
+            increment: 1,
+          },
         },
-      },
-    });
+      });
+    }
 
     // Update content rating statistics if review is published (statut: 0)
     if (review.statut === 0) {
@@ -667,6 +671,24 @@ export class ReviewsService {
       },
     });
 
+    // Update user's review count if status changed from/to published
+    const statusChanged = updateData.statut !== undefined && updateData.statut !== review.statut;
+    if (statusChanged) {
+      if (review.statut !== 0 && updatedReview.statut === 0) {
+        // Now published: increment
+        await this.prisma.smfMember.update({
+          where: { idMember: review.idMembre },
+          data: { nbCritiques: { increment: 1 } },
+        });
+      } else if (review.statut === 0 && updatedReview.statut !== 0) {
+        // No longer published: decrement
+        await this.prisma.smfMember.update({
+          where: { idMember: review.idMembre },
+          data: { nbCritiques: { decrement: 1 } },
+        });
+      }
+    }
+
     // Update content rating statistics if notation changed and review is published
     if (notationChanged && updatedReview.statut === 0) {
       await this.updateContentRatingStats(
@@ -702,15 +724,17 @@ export class ReviewsService {
       where: { idCritique: id },
     });
 
-    // Update user's review count (decrement)
-    await this.prisma.smfMember.update({
-      where: { idMember: review.idMembre },
-      data: {
-        nbCritiques: {
-          decrement: 1,
+    // Update user's review count (decrement) if it was published
+    if (review.statut === 0) {
+      await this.prisma.smfMember.update({
+        where: { idMember: review.idMembre },
+        data: {
+          nbCritiques: {
+            decrement: 1,
+          },
         },
-      },
-    });
+      });
+    }
 
     // Update content rating statistics after deletion
     await this.updateContentRatingStats(
@@ -1577,13 +1601,30 @@ export class ReviewsService {
       causeSuppr = moderateDto.reason || 'Contenu non conforme aux règles de la communauté';
     }
 
-    await this.prisma.akCritique.update({
+    const updatedReview = await this.prisma.akCritique.update({
       where: { idCritique: id },
       data: {
         statut: newStatus,
         causeSuppr,
       },
     });
+
+    // Update user's review count if status changed from/to published
+    if (review.statut !== updatedReview.statut) {
+      if (review.statut !== 0 && updatedReview.statut === 0) {
+        // Approved/Published: increment
+        await this.prisma.smfMember.update({
+          where: { idMember: review.idMembre },
+          data: { nbCritiques: { increment: 1 } },
+        });
+      } else if (review.statut === 0 && updatedReview.statut !== 0) {
+        // Rejected/Moderated: decrement
+        await this.prisma.smfMember.update({
+          where: { idMember: review.idMembre },
+          data: { nbCritiques: { decrement: 1 } },
+        });
+      }
+    }
 
     // Update content rating statistics when approving a review
     if (moderateDto.action === 'approve') {
@@ -1663,13 +1704,30 @@ export class ReviewsService {
           ? (reason || 'Contenu non conforme aux règles de la communauté')
           : null;
 
-        await this.prisma.akCritique.update({
+        const updatedReview = await this.prisma.akCritique.update({
           where: { idCritique: id },
           data: {
             statut: newStatus,
             causeSuppr,
           },
         });
+
+        // Update user's review count if status changed from/to published
+        if (review.statut !== updatedReview.statut) {
+          if (review.statut !== 0 && updatedReview.statut === 0) {
+            // Approved/Published: increment
+            await this.prisma.smfMember.update({
+              where: { idMember: review.idMembre },
+              data: { nbCritiques: { increment: 1 } },
+            });
+          } else if (review.statut === 0 && updatedReview.statut !== 0) {
+            // Rejected/Moderated: decrement
+            await this.prisma.smfMember.update({
+              where: { idMember: review.idMembre },
+              data: { nbCritiques: { decrement: 1 } },
+            });
+          }
+        }
 
         // Update content rating statistics when approving
         if (action === 'approve') {
