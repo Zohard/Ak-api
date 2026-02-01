@@ -999,13 +999,14 @@ model AkSynopsis {
 
 // Anime Seasons
 model AkAnimesSaisons {
-  idSaison     Int    @id @default(autoincrement()) @map("id_saison")
-  saison       Int    @db.SmallInt
-  annee        Int
-  idArticle    Int    @map("id_article")
-  jsonData     String @map("json_data") @db.Text
-  jsonAuteurs  String @map("json_auteurs") @db.VarChar(255)
-  statut       Int?   @default(0) @db.SmallInt
+  idSaison       Int     @id @default(autoincrement()) @map("id_saison")
+  saison         Int     @db.SmallInt
+  annee          Int
+  idArticle      Int     @map("id_article")
+  jsonData       String  @map("json_data") @db.Text
+  jsonAuteurs    String  @map("json_auteurs") @db.VarChar(255)
+  statut         Int?    @default(0) @db.SmallInt
+  currentSeason  Boolean @default(false) @map("current_season")
 
   @@map("ak_animes_saisons")
 }

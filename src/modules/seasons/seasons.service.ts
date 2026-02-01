@@ -71,7 +71,7 @@ export class SeasonsService {
       }
 
       const seasons = await this.prisma.$queryRaw`
-        SELECT id_saison, saison, annee, statut, json_data
+        SELECT id_saison, saison, annee, statut, current_season, json_data
         FROM ak_animes_saisons
         ORDER BY annee DESC, saison DESC, id_saison DESC
       `;
@@ -94,11 +94,11 @@ export class SeasonsService {
         return cached;
       }
 
-      // Current season = last created entry with statut=1 (ordered by id_saison DESC)
+      // Current season = entry with current_season = true
       const currentSeason = await this.prisma.$queryRaw`
-        SELECT id_saison, saison, annee, statut, json_data
+        SELECT id_saison, saison, annee, statut, current_season, json_data
         FROM ak_animes_saisons
-        WHERE statut = 1
+        WHERE current_season = true
         ORDER BY id_saison DESC
         LIMIT 1
       `;
@@ -125,7 +125,7 @@ export class SeasonsService {
 
       // Last created season = most recent entry regardless of status (ordered by id_saison DESC)
       const lastSeason = await this.prisma.$queryRaw`
-        SELECT id_saison, saison, annee, statut, json_data
+        SELECT id_saison, saison, annee, statut, current_season, json_data
         FROM ak_animes_saisons
         ORDER BY id_saison DESC
         LIMIT 1
@@ -152,7 +152,7 @@ export class SeasonsService {
       }
 
       const season = await this.prisma.$queryRaw`
-        SELECT id_saison, saison, annee, statut, json_data
+        SELECT id_saison, saison, annee, statut, current_season, json_data
         FROM ak_animes_saisons
         WHERE id_saison = ${id}
       `;
@@ -257,13 +257,14 @@ export class SeasonsService {
   }
 
   // Admin: create a new season
-  async createSeason(data: { annee: number; saison: number; statut?: number; id_article?: number; json_auteurs?: string }) {
+  async createSeason(data: { annee: number; saison: number; statut?: number; id_article?: number; json_auteurs?: string; currentSeason?: boolean }) {
     const statut = typeof data.statut === 'number' ? data.statut : 0
     const id_article = typeof data.id_article === 'number' ? data.id_article : 0
     const json_auteurs = data.json_auteurs || ''
-    const created = (await this.prisma.$queryRaw`INSERT INTO ak_animes_saisons (annee, saison, statut, json_data, id_article, json_auteurs)
-      VALUES (${data.annee}, ${data.saison}, ${statut}, ${JSON.stringify({ animes: [] })}, ${id_article}, ${json_auteurs})
-      RETURNING id_saison, saison, annee, statut, json_data, id_article, json_auteurs`) as any
+    const currentSeason = data.currentSeason === true ? true : false
+    const created = (await this.prisma.$queryRaw`INSERT INTO ak_animes_saisons (annee, saison, statut, json_data, id_article, json_auteurs, current_season)
+      VALUES (${data.annee}, ${data.saison}, ${statut}, ${JSON.stringify({ animes: [] })}, ${id_article}, ${json_auteurs}, ${currentSeason})
+      RETURNING id_saison, saison, annee, statut, current_season, json_data, id_article, json_auteurs`) as any
 
     // Invalidate caches related to seasons lists/current
     await this.cacheService.del('seasons:all')
@@ -373,6 +374,38 @@ export class SeasonsService {
     await this.cacheService.invalidateHomepageSeason()
 
     return { success: true, seasonId, statut }
+  }
+
+  // Admin: set a season as the current season (only one can be current at a time)
+  async setCurrentSeason(seasonId: number, isCurrent: boolean) {
+    const season = await this.findById(seasonId)
+    if (!season) return null
+
+    if (isCurrent) {
+      // First, unset all other seasons as current
+      await this.prisma.$executeRaw`
+        UPDATE ak_animes_saisons
+        SET current_season = false
+        WHERE current_season = true
+      `
+    }
+
+    // Set the specified season's current_season flag
+    await this.prisma.$executeRaw`
+      UPDATE ak_animes_saisons
+      SET current_season = ${isCurrent}
+      WHERE id_saison = ${seasonId}
+    `
+
+    // Invalidate all season-related caches
+    await this.cacheService.del(`season:${seasonId}`)
+    await this.cacheService.del(`season_animes:${seasonId}`)
+    await this.cacheService.del('seasons:all')
+    await this.cacheService.del('seasons:current')
+    await this.cacheService.del('seasons:last-created')
+    await this.cacheService.invalidateHomepageSeason()
+
+    return { success: true, seasonId, currentSeason: isCurrent }
   }
 
   // Admin: delete a season
