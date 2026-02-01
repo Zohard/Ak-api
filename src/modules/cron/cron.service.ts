@@ -9,7 +9,7 @@ export class CronService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly cacheService: CacheService,
-  ) {}
+  ) { }
 
   /**
    * Update anime popularity rankings
@@ -253,6 +253,54 @@ export class CronService {
     } catch (error) {
       this.logger.error(
         `Fatal error in manga popularity update: ${error.message}`,
+        error.stack,
+      );
+      throw error;
+    }
+  }
+  /**
+   * Update anime episode counts
+   * Updates `nb_ep` in `ak_animes` based on count in `ak_animes_episodes`
+   */
+  async updateAnimeEpisodeCount() {
+    this.logger.log('Starting anime episode count update...');
+
+    try {
+      // Execute raw query to count episodes and update anime table
+      // Only updates where the count is different to avoid unnecessary writes
+      const updateResult = await this.prisma.$executeRaw`
+        WITH episode_counts AS (
+          SELECT
+            id_anime,
+            COUNT(*) as actual_count
+          FROM ak_animes_episodes
+          GROUP BY id_anime
+        )
+        UPDATE ak_animes a
+        SET nb_ep = ec.actual_count
+        FROM episode_counts ec
+        WHERE a.id_anime = ec.id_anime
+        AND (a.nb_ep IS NULL OR a.nb_ep != ec.actual_count)
+      `;
+
+      this.logger.log(`Updated episode counts for ${updateResult} animes`);
+
+      // Invalidate anime caches if any updates happened
+      if (updateResult > 0) {
+        await this.cacheService.delByPattern('anime:*');
+      }
+
+      return {
+        success: true,
+        message: `Updated episode counts for ${updateResult} animes`,
+        stats: {
+          updatedCount: updateResult,
+          errorCount: 0,
+        },
+      };
+    } catch (error) {
+      this.logger.error(
+        `Fatal error in anime episode count update: ${error.message}`,
         error.stack,
       );
       throw error;

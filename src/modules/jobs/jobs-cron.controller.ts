@@ -17,6 +17,7 @@ import { PopularityJobService } from './popularity-job.service';
 import { AnimeRankingsService } from '../animes/services/anime-rankings.service';
 import { CronAuthGuard } from '../../common/guards/cron-auth.guard';
 import { OptionalJwtAuthGuard } from '../../common/guards/optional-jwt-auth.guard';
+import { CronService } from '../cron/cron.service';
 
 @ApiTags('Jobs Cron')
 @Controller('jobs/cron')
@@ -26,6 +27,7 @@ export class JobsCronController {
     constructor(
         private readonly popularityJobService: PopularityJobService,
         private readonly animeRankingsService: AnimeRankingsService,
+        private readonly cronService: CronService,
     ) { }
 
     @Post('popularity/daily')
@@ -219,7 +221,92 @@ export class JobsCronController {
                     category: 'counters',
                     danger: true,
                 },
+                {
+                    id: 'anime-popularity',
+                    name: 'Popularité Animes',
+                    description: 'Recalcule les classements de popularité des animes',
+                    endpoint: 'general/anime-popularity',
+                    method: 'POST',
+                    category: 'system',
+                },
+                {
+                    id: 'manga-popularity',
+                    name: 'Popularité Mangas',
+                    description: 'Recalcule les classements de popularité des mangas',
+                    endpoint: 'general/manga-popularity',
+                    method: 'POST',
+                    category: 'system',
+                },
+                {
+                    id: 'anime-episode-count',
+                    name: 'Compteur Episodes',
+                    description: 'Met à jour le nombre d\'épisodes des animes (sync)',
+                    endpoint: 'general/anime-episode-count',
+                    method: 'POST',
+                    category: 'system',
+                },
             ],
+        };
+    }
+
+    @Post('general/anime-popularity')
+    @UseGuards(OptionalJwtAuthGuard, CronAuthGuard)
+    @ApiHeader({
+        name: 'x-cron-api-key',
+        description: 'API Key for external cron jobs',
+        required: false,
+    })
+    @ApiOperation({ summary: 'Trigger anime popularity update' })
+    @ApiResponse({ status: 200, description: 'Anime popularity updated' })
+    async triggerAnimePopularity() {
+        const result = await this.cronService.updateAnimePopularity();
+        return {
+            success: true,
+            job: 'anime-popularity',
+            message: result.message,
+            stats: result.stats,
+            timestamp: new Date().toISOString(),
+        };
+    }
+
+    @Post('general/manga-popularity')
+    @UseGuards(OptionalJwtAuthGuard, CronAuthGuard)
+    @ApiHeader({
+        name: 'x-cron-api-key',
+        description: 'API Key for external cron jobs',
+        required: false,
+    })
+    @ApiOperation({ summary: 'Trigger manga popularity update' })
+    @ApiResponse({ status: 200, description: 'Manga popularity updated' })
+    async triggerMangaPopularity() {
+        const result = await this.cronService.updateMangaPopularity();
+        return {
+            success: true,
+            job: 'manga-popularity',
+            message: result.message,
+            stats: result.stats,
+            timestamp: new Date().toISOString(),
+        };
+    }
+
+    @Post('general/anime-episode-count')
+    @UseGuards(OptionalJwtAuthGuard, CronAuthGuard)
+    @ApiHeader({
+        name: 'x-cron-api-key',
+        description: 'API Key for external cron jobs',
+        required: false,
+    })
+    @ApiOperation({ summary: 'Trigger anime episode count update' })
+    @ApiResponse({ status: 200, description: 'Anime episode count updated' })
+    async triggerAnimeEpisodeCount() {
+        // Cast as any if method is not yet recognized by TS in this context
+        const result = await (this.cronService as any).updateAnimeEpisodeCount();
+        return {
+            success: true,
+            job: 'anime-episode-count',
+            message: result.message,
+            stats: result.stats,
+            timestamp: new Date().toISOString(),
         };
     }
 
