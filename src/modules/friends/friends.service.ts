@@ -1073,11 +1073,11 @@ export class FriendsService {
       return [];
     }
 
-    // Query friends watching list
+    // Query friends watching list from collection_animes
     const watchingList = await this.prisma.$queryRaw<Array<{
       user_id: number;
       anime_id: number;
-      updatedat: Date;
+      updated_at: Date;
       current_episode: number;
       real_name: string;
       avatar: string;
@@ -1086,15 +1086,15 @@ export class FriendsService {
       slug: string;
     }>>`
       SELECT
-        ual.user_id, ual.anime_id, ual.updatedat, ual.current_episode,
+        ca.id_membre as user_id, ca.id_anime as anime_id, ca.updated_at, 0 as current_episode,
         m.real_name, m.avatar,
-        a.titre, a.image, a.slug
-      FROM ak_user_anime_list ual
-      JOIN smf_members m ON ual.user_id = m.id_member
-      JOIN ak_animes a ON ual.anime_id = a.id_anime
-      WHERE ual.user_id IN (${Prisma.join(friendIds)})
-        AND (ual.status = 'watching' OR ual.type = 2)
-      ORDER BY ual.updatedat DESC
+        a.titre, a.image, a.nice_url as slug
+      FROM collection_animes ca
+      JOIN smf_members m ON ca.id_membre = m.id_member
+      JOIN ak_animes a ON ca.id_anime = a.id_anime
+      WHERE ca.id_membre IN (${Prisma.join(friendIds)})
+        AND ca.type = 2
+      ORDER BY ca.updated_at DESC
       LIMIT ${limit}
     `;
 
@@ -1107,8 +1107,10 @@ export class FriendsService {
       animeImage: item.image,
       animeSlug: item.slug,
       currentEpisode: item.current_episode,
-      updatedAt: item.updatedat,
-      formattedDate: this.formatLastLogin(Math.floor(new Date(item.updatedat).getTime() / 1000))
+      updatedAt: item.updated_at,
+      formattedDate: this.formatTimeAgo(new Date(item.updated_at))
     }));
   }
 }
+
+

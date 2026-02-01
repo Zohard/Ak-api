@@ -1,6 +1,7 @@
 import { Controller, Get, Logger, Post } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { HomePageService } from './homepage.service';
+import { MobileHomePageService } from './mobile-homepage.service';
 import { CacheService } from '../../shared/services/cache.service';
 import { PrismaService } from '../../shared/services/prisma.service';
 
@@ -11,6 +12,7 @@ export class HomePageController {
 
   constructor(
     private readonly homePageService: HomePageService,
+    private readonly mobileHomePageService: MobileHomePageService,
     private readonly cache: CacheService,
     private readonly prisma: PrismaService,
   ) { }
@@ -20,6 +22,13 @@ export class HomePageController {
   @ApiResponse({ status: 200, description: 'Homepage aggregated payload' })
   async getHomePageData() {
     return this.homePageService.getHomePageData();
+  }
+
+  @Get('mobile')
+  @ApiOperation({ summary: 'Aggregated data for mobile homepage' })
+  @ApiResponse({ status: 200, description: 'Mobile homepage aggregated payload' })
+  async getMobileHomePageData() {
+    return this.mobileHomePageService.getMobileHomePageData();
   }
 
   @Post('clear-cache')
