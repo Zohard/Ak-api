@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, ParseIntPipe, Post, Put, Query, Request, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, ParseIntPipe, Post, Put, Query, Request, UseGuards, Patch } from '@nestjs/common';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import { ApiBearerAuth, ApiBody, ApiOperation, ApiParam, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
@@ -8,6 +8,8 @@ import { AdminMangaListQueryDto, CreateAdminMangaDto, UpdateAdminMangaDto } from
 import { GoogleBooksService } from '../../mangas/google-books.service';
 import { MangaVolumesService } from '../../mangas/manga-volumes.service';
 import { NautiljonService } from '../../mangas/nautiljon.service';
+import { MangasService } from '../../mangas/mangas.service';
+import { MediaService } from '../../media/media.service';
 
 @ApiTags('Admin - Mangas')
 @ApiBearerAuth()
@@ -16,9 +18,11 @@ import { NautiljonService } from '../../mangas/nautiljon.service';
 export class AdminMangasController {
   constructor(
     private readonly service: AdminMangasService,
+    private readonly mangasService: MangasService,
     private readonly googleBooksService: GoogleBooksService,
     private readonly mangaVolumesService: MangaVolumesService,
     private readonly nautiljonService: NautiljonService,
+    private readonly mediaService: MediaService,
   ) { }
 
   @Get()
@@ -140,6 +144,60 @@ export class AdminMangasController {
   }
 
   // ========== VOLUME SYNC ENDPOINTS ==========
+
+  @Post(':id/volumes')
+  @ApiOperation({ summary: 'Create a new volume for a manga' })
+  @ApiParam({ name: 'id', description: 'Manga ID' })
+  @ApiResponse({ status: 201, description: 'Volume created' })
+  @ApiResponse({ status: 400, description: 'Invalid data' })
+  @ApiResponse({ status: 404, description: 'Manga not found' })
+  async createVolume(
+    @Param('id', ParseIntPipe) mangaId: number,
+    @Body() createVolumeDto: any,
+  ) {
+    return this.mangasService.createVolume(mangaId, createVolumeDto);
+  }
+
+  @Patch('volumes/:volumeId')
+  @ApiOperation({ summary: 'Update a volume' })
+  @ApiParam({ name: 'volumeId', description: 'Volume ID' })
+  @ApiResponse({ status: 200, description: 'Volume updated' })
+  @ApiResponse({ status: 404, description: 'Volume not found' })
+  async updateVolume(
+    @Param('volumeId', ParseIntPipe) volumeId: number,
+    @Body() updateVolumeDto: any,
+  ) {
+    return this.mangasService.updateVolume(volumeId, updateVolumeDto);
+  }
+
+  @Delete('volumes/:volumeId')
+  @ApiOperation({ summary: 'Delete a volume' })
+  @ApiParam({ name: 'volumeId', description: 'Volume ID' })
+  @ApiResponse({ status: 200, description: 'Volume deleted' })
+  @ApiResponse({ status: 404, description: 'Volume not found' })
+  async deleteVolume(@Param('volumeId', ParseIntPipe) volumeId: number) {
+    return this.mangasService.deleteVolume(volumeId);
+  }
+
+  @Post(':id/volumes/scan')
+  @ApiOperation({ summary: 'Add volume from ISBN scan' })
+  @ApiParam({ name: 'id', description: 'Manga ID' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        isbn: { type: 'string' }
+      }
+    }
+  })
+  async scanVolume(
+    @Param('id', ParseIntPipe) mangaId: number,
+    @Body('isbn') isbn: string,
+  ) {
+    // Fetch book data first
+    const bookData = await this.mangaVolumesService.searchByIsbn(isbn);
+    return this.mangasService.upsertVolumeFromIsbn(mangaId, isbn, bookData);
+  }
 
   @Get(':id/volumes')
   @ApiOperation({ summary: 'Get all volumes for a manga' })
@@ -397,6 +455,118 @@ export class AdminMangasController {
     return {
       found: !!(result.isbn || result.releaseDate || result.coverUrl),
       ...result,
+    };
+  }
+
+  @Post('nautiljon/scrape-url')
+  @ApiOperation({
+    summary: 'Scrape volume info from a specific Nautiljon URL',
+    description: 'Directly scrape a Nautiljon volume page URL.'
+  })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        url: { type: 'string', description: 'Nautiljon volume page URL' },
+        volumeNumber: { type: 'number', description: 'Expected volume number' },
+        mangaId: { type: 'number', description: 'Manga ID for attaching screenshot/cover' }
+      },
+      required: ['url']
+    }
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Volume info from Nautiljon',
+    schema: {
+      type: 'object',
+      properties: {
+        found: { type: 'boolean' },
+        volumeNumber: { type: 'number' },
+        title: { type: 'string' },
+        isbn: { type: 'string' },
+        releaseDate: { type: 'string' },
+        coverUrl: { type: 'string' },
+        description: { type: 'string' },
+        publisher: { type: 'string' },
+        source: { type: 'string', enum: ['nautiljon'] },
+        sourceUrl: { type: 'string' },
+      }
+    }
+  })
+  async scrapeNautiljonUrl(
+    @Body() body: { url: string; volumeNumber?: number; mangaId?: number },
+  ) {
+    if (!body.url) {
+      return { found: false, message: 'URL is required' };
+    }
+
+    // Basic validation
+    if (!body.url.includes('nautiljon.com')) {
+      return { found: false, message: 'Invalid URL. Must be from Nautiljon.com' };
+    }
+
+    const volumeNumber = body.volumeNumber || 0;
+    const result = await this.nautiljonService.scrapeVolumePage(body.url, volumeNumber);
+
+    if (!result) {
+      return {
+        found: false,
+        message: 'Failed to scrape volume info from URL',
+      };
+    }
+
+    // Use a local variable so we can modify it
+    let finalCoverUrl = result.coverUrl;
+
+    // If we have a cover URL and a manga ID, upload it to our storage
+    if (finalCoverUrl && body.mangaId) {
+      try {
+        const mangaId = Number(body.mangaId);
+        console.log(`[Scrape] Processing upload for Manga ID: ${mangaId}`);
+
+        // Fetch manga title for filename generation
+        const manga = await this.service.getOne(mangaId);
+
+        if (manga && manga.titre) {
+          console.log(`[Scrape] Found manga: ${manga.titre}`);
+          // Generate filename: titre_(tome_number)_timestamp
+          // slugify using underscores instead of dashes?
+          // Manual robust slugify preserving underscores, or just replacing spaces.
+          const safeTitle = manga.titre
+            .toLowerCase()
+            .normalize('NFD') // split accents
+            .replace(/[\u0300-\u036f]/g, '') // remove accents
+            .replace(/[^a-z0-9]+/g, '_') // replace non-alphanum with underscore
+            .replace(/(^_|_$)+/g, ''); // trim underscores
+
+          const volNum = result.volumeNumber || volumeNumber || '0';
+          const timestamp = Date.now();
+          const customFilename = `${safeTitle}_tome_${volNum}_${timestamp}`;
+
+          // Upload to ak_screenshot (manga type, saveAsScreenshot=true)
+          const uploadResult = await this.mediaService.uploadImageFromUrl(
+            finalCoverUrl,
+            'manga',
+            mangaId, // Use parsed ID (Number)
+            true, // saveAsScreenshot
+            undefined, // title (ignored if customFilename provided)
+            customFilename // customFilename
+          );
+
+          if (uploadResult && uploadResult.url) {
+            finalCoverUrl = uploadResult.url;
+          }
+        }
+      } catch (e) {
+        console.error('Failed to upload/optimize cover image from Nautiljon:', e);
+        // Fallback to original URL if upload fails
+      }
+    }
+
+    return {
+      found: true,
+      ...result,
+      coverUrl: finalCoverUrl
     };
   }
 }

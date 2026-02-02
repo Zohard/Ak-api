@@ -242,6 +242,7 @@ export class MediaService {
     relatedId?: number,
     saveAsScreenshot: boolean = false,
     title?: string,
+    customFilename?: string,
   ) {
     // SSRF Protection: Validate URL before fetching
     await validateImageUrl(imageUrl);
@@ -300,8 +301,17 @@ export class MediaService {
       const extension = contentType.split('/')[1] || 'jpg';
       let filename = `${type}_${Date.now()}_${Math.random().toString(36).substring(7)}.${extension}`;
 
-      // Use title + timestamp for anime, manga, and game
-      if ((title || relatedId) && (type === 'anime' || type === 'manga' || type === 'game')) {
+      if (customFilename) {
+        // Ensure it ends with correct extension if not present, or replace with correct one
+        // Actuallly we process to webp later, so we should probably stick to webp extension in the end?
+        // processImage converts to WebP. So the input filename extension matters less, but R2 upload uses 'filename'.
+        // Wait, processImage returns a buffer. R2 upload uses the filename we pass.
+        // IF we process to WebP, we should ensure filename ends in .webp
+        // But 'processImage' implementation below converts to webp.
+        // So we should force .webp extension on the final filename.
+        const baseName = customFilename.replace(/\.[^/.]+$/, "");
+        filename = `${baseName}.webp`;
+      } else if ((title || relatedId) && (type === 'anime' || type === 'manga' || type === 'game')) {
         try {
           let entityTitle: string | null = title || null;
 
@@ -339,6 +349,13 @@ export class MediaService {
         }
       }
 
+      // Force webp extension if we are converting
+      if (filename.endsWith(`.${extension}`) && extension !== 'webp') {
+        // Verify if processImage converts to webp
+        // Yes it does: return processor.webp({ quality }).toBuffer();
+        filename = filename.replace(`.${extension}`, '.webp');
+      }
+
       // Process image with Sharp
       const processedImage = await this.processImage(Buffer.from(response.data), type);
 
@@ -351,11 +368,14 @@ export class MediaService {
       } else {
         typeFolder = `${type}s`;
       }
-      const folderPath = `images/${typeFolder}`;
+
+      const folderPath = (saveAsScreenshot && (type === 'anime' || type === 'manga'))
+        ? `images/${typeFolder}/screenshots`
+        : `images/${typeFolder}`;
 
       const uploadResult = await this.r2Service.uploadImage(
         processedImage,
-        filename,
+        filename, // Use the finalized filename with extension
         folderPath
       );
 
@@ -379,9 +399,13 @@ export class MediaService {
             screenshotId = result.id;
           } else if (type === 'anime' || type === 'manga') {
             // Save to ak_screenshots for anime/manga
+            // We need to store path relative to type folder, e.g. "screenshots/filename.webp"
+            // This matches expectation in getMediaByRelatedId
+            const dbFilename = `screenshots/${uploadResult.name}`;
+
             const queryResult = await this.prisma.$queryRaw`
               INSERT INTO ak_screenshots (url_screen, id_titre, type, upload_date)
-              VALUES (${uploadResult.name}, ${relatedId}, ${this.getTypeId(type)}, NOW())
+              VALUES (${dbFilename}, ${relatedId}, ${this.getTypeId(type)}, NOW())
               RETURNING id_screen
             `;
             screenshotId = (queryResult as any[])[0]?.id_screen;

@@ -58,12 +58,9 @@ export class NautiljonService {
 
         const res = await fetch(url, {
           headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-            'Accept-Language': 'fr-FR,fr;q=0.9,en;q=0.8',
-            'Accept-Encoding': 'gzip, deflate, br',
-            'Connection': 'keep-alive',
-            'Referer': 'https://www.nautiljon.com/',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Accept-Language': 'fr-FR,fr;q=0.9',
           },
           signal: controller.signal,
         });
@@ -278,7 +275,7 @@ export class NautiljonService {
   /**
    * Scrape volume details from a Nautiljon volume page
    */
-  private async scrapeVolumePage(url: string, expectedVolumeNumber: number): Promise<NautiljonVolumeInfo | null> {
+  public async scrapeVolumePage(url: string, expectedVolumeNumber: number): Promise<NautiljonVolumeInfo | null> {
     try {
       this.logger.debug(`Scraping volume page: ${url}`);
       const $ = await this.fetchHtml(url);
@@ -303,23 +300,36 @@ export class NautiljonService {
       // Extract info from the info box (usually in a table or div.info_fiche)
       const infoBox = $('div.info_fiche, table.info_fiche').first();
 
-      // ISBN - look for ISBN-13 or ISBN
+      // ISBN - look for ISBN-13, ISBN or Code EAN
       let isbn: string | undefined;
-      const isbnText = infoBox.text().match(/ISBN(?:-13)?[\s:]*(\d{10,13})/i) ||
-        $('body').text().match(/ISBN(?:-13)?[\s:]*(\d{10,13})/i);
-      if (isbnText) {
-        isbn = isbnText[1];
+
+      // Try reliable itemprop first
+      const isbnItemProp = $('[itemprop="isbn"]').text().trim();
+      if (isbnItemProp) {
+        isbn = isbnItemProp.replace(/[-\s]/g, '');
+      } else {
+        // Fallback to text matching
+        const infoText = infoBox.text() + $('body').text();
+        const isbnMatch = infoText.match(/(?:ISBN(?:-13)?|Code\s+EAN)[\s:]*(\d[\d\s-]{10,16})/i);
+        if (isbnMatch) {
+          isbn = isbnMatch[1].replace(/[-\s]/g, '');
+        }
       }
 
-      // Release date - look for "Date de sortie" or "Sortie"
+      // Release date - look for "Date de sortie", "Date de parution" or "Sortie"
       let releaseDate: string | undefined;
+
+      // For date, we prefer the VF date if available. VO date often has itemprop="datePublished" but we want VF.
+      // Search specifically for "Date de parution VF" or "Date de sortie"
+      const bodyText = $('body').text();
       const datePatterns = [
-        /date\s+de\s+sortie[\s:]*(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{4})/i,
-        /sortie[\s:]*(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{4})/i,
-        /(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{4})/,
+        /Date\s+de\s+parution\s+VF\s*:\s*(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{4})/i,
+        /Date\s+de\s+sortie\s*:\s*(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{4})/i,
+        /Sortie\s*:\s*(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{4})/i,
+        // Fallback to any date format if strictly found in the details list?
+        // Be careful not to pick up unrelated dates.
       ];
 
-      const bodyText = $('body').text();
       for (const pattern of datePatterns) {
         const dateMatch = bodyText.match(pattern);
         if (dateMatch) {
@@ -333,13 +343,39 @@ export class NautiljonService {
         }
       }
 
+      // If no VF date found, fallback to simple date finder in specific areas if possible, or general fallback
+      if (!releaseDate) {
+        const generalDateMatch = bodyText.match(/(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{4})/);
+        if (generalDateMatch) {
+          const parts = generalDateMatch[1].split(/[\/\-]/);
+          if (parts.length === 3) {
+            const [day, month, year] = parts;
+            releaseDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+          }
+        }
+      }
+
       // Cover image
       let coverUrl: string | undefined;
-      const imageElement = $('div.image_fiche img, .image_fiche img').first();
+      // Image fiche usually has class image_fiche
+      const imageElement = $('.image_fiche img').first();
       if (imageElement.length) {
         let imgSrc = imageElement.attr('src') || imageElement.attr('data-src');
         if (imgSrc) {
           // Convert mini to full size
+          imgSrc = imgSrc.replace('/mini/', '/').replace(/\?.*$/, '');
+          coverUrl = imgSrc.startsWith('http') ? imgSrc : `${this.BASE_URL}${imgSrc}`;
+        }
+      }
+
+      // Fallback for cover if not found in image_fiche (sometimes just in a div)
+      if (!coverUrl) {
+        // Try to look for an image that looks like a cover (often in the stats/info area)
+        // The user snippet showed an image in li.nav_vols but that's a small one. 
+        // Use the `href` of the link around it if possible, or the image itself
+        const probableCover = $('[itemprop="image"]').attr('src') || $('.cover img').attr('src');
+        if (probableCover) {
+          let imgSrc = probableCover;
           imgSrc = imgSrc.replace('/mini/', '/').replace(/\?.*$/, '');
           coverUrl = imgSrc.startsWith('http') ? imgSrc : `${this.BASE_URL}${imgSrc}`;
         }
@@ -356,14 +392,20 @@ export class NautiljonService {
 
       // Publisher
       let publisher: string | undefined;
-      const publisherMatch = bodyText.match(/[eé]diteur[\s:]*([^\n\r,]+)/i);
-      if (publisherMatch) {
-        publisher = publisherMatch[1].trim();
+      // Try itemprop="publisher"
+      const publisherItemProp = $('[itemprop="publisher"] [itemprop="legalName"]').first().text().trim();
+      if (publisherItemProp) {
+        publisher = publisherItemProp;
+      } else {
+        const publisherMatch = bodyText.match(/[eé]diteur(?:\s+VF)?[\s:]*([^\n\r,]+)/i);
+        if (publisherMatch) {
+          publisher = publisherMatch[1].trim();
+        }
       }
 
       // Page count
       let pageCount: number | undefined;
-      const pageMatch = bodyText.match(/(\d+)\s*pages?/i);
+      const pageMatch = bodyText.match(/(\d+)\s*pages?/i) || $('[itemprop="numberOfPages"]').text().match(/(\d+)/);
       if (pageMatch) {
         pageCount = parseInt(pageMatch[1], 10);
       }

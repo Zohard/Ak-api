@@ -29,6 +29,9 @@ const ALLOWED_IMAGE_DOMAINS = [
   'imgur.com',
   'upload.wikimedia.org',
   'staticflickr.com',
+  // Manga sources
+  'nautiljon.com',
+  'www.nautiljon.com',
 ];
 
 /**

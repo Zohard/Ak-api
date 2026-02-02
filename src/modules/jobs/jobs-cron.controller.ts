@@ -245,7 +245,40 @@ export class JobsCronController {
                     method: 'POST',
                     category: 'system',
                 },
+                {
+                    id: 'manga-sync-volumes',
+                    name: 'Sync Volumes Mangas',
+                    description: 'Télécharge les sorties manga depuis Nautiljon (mois courant)',
+                    endpoint: 'mangas/sync-volumes',
+                    method: 'POST',
+                    category: 'system',
+                },
             ],
+        };
+    }
+
+    @Post('mangas/sync-volumes')
+    @UseGuards(OptionalJwtAuthGuard, CronAuthGuard)
+    @ApiHeader({
+        name: 'x-cron-api-key',
+        description: 'API Key for external cron jobs',
+        required: false,
+    })
+    @ApiOperation({ summary: 'Trigger manga volume sync' })
+    @ApiResponse({ status: 200, description: 'Manga volume sync started' })
+    async triggerMangaVolumeSync() {
+        // Run sync for 10 mangas
+        const result = await this.cronService.syncMangaVolumes(10);
+        const titles = result.results.map(r => r.title).join(', ');
+        return {
+            success: true,
+            job: 'manga-sync-volumes',
+            message: `Processed ${result.processed} mangas: ${titles}`,
+            stats: {
+                processed: result.processed,
+                results: result.results
+            },
+            timestamp: new Date().toISOString(),
         };
     }
 

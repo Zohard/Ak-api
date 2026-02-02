@@ -30,10 +30,12 @@ import { NotificationsModule } from '../../notifications/notifications.module';
 import { JikanModule } from '../../jikan/jikan.module';
 import { AniListModule } from '../../anilist/anilist.module';
 
+import { MangasModule } from '../../mangas/mangas.module';
+
 @Module({
-  imports: [HttpModule, MediaModule, AdminLoggingModule, NotificationsModule, JikanModule, AniListModule],
+  imports: [HttpModule, MediaModule, AdminLoggingModule, NotificationsModule, JikanModule, AniListModule, MangasModule],
   controllers: [AdminContentController, AdminAnimesController, AdminMangasController, AdminBusinessController, AdminJeuxVideoController, AdminPlatformsController, AdminGenresController, AdminTagsController, SourcesExternesController, AniListImportController],
-  providers: [AdminContentService, AdminAnimesService, AdminMangasService, AdminBusinessService, AdminJeuxVideoService, SourcesExternesService, AniListImportService, PrismaService, CacheService, IgdbService, DeepLService, GoogleBooksService, MangaVolumesService, NautiljonService],
+  providers: [AdminContentService, AdminAnimesService, AdminMangasService, AdminBusinessService, AdminJeuxVideoService, SourcesExternesService, AniListImportService, PrismaService, CacheService, IgdbService, DeepLService, GoogleBooksService],
   exports: [AdminContentService, AniListImportService],
 })
 export class AdminContentModule { }
