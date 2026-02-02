@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../shared/services/prisma.service';
 import { CacheService } from '../../shared/services/cache.service';
+import { MangaVolumesService } from '../mangas/manga-volumes.service';
 
 @Injectable()
 export class CronService {
@@ -9,6 +10,7 @@ export class CronService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly cacheService: CacheService,
+    private readonly mangaVolumesService: MangaVolumesService,
   ) { }
 
   /**
@@ -133,6 +135,70 @@ export class CronService {
       );
       throw error;
     }
+  }
+
+  /**
+   * Sync volumes for active mangas
+   * Fetches pending/active mangas and updates their volume list
+   */
+  async syncMangaVolumes(limit: number = 5): Promise<{
+    processed: number;
+    results: any[];
+  }> {
+    this.logger.log(`Starting manga volume sync (limit: ${limit})...`);
+
+    // Find active mangas (statut = 1) that haven't been updated recently?
+    // Or just pick random ones? Or order by update date?
+    // Let's pick active mangas, prioritizing those that haven't been cached/updated recently
+    const mangas = await this.prisma.akManga.findMany({
+      where: {
+        statut: 1, // Only active/validated mangas
+        // Maybe exclude those marked as "Finished" in publication status if we check that field?
+        // statutVol != 'Terminé' ?
+      },
+      orderBy: {
+        latestCache: 'asc', // Process oldest cache first
+      },
+      take: limit,
+    });
+
+    this.logger.log(`Found ${mangas.length} mangas to sync volumes for`);
+
+    const results = [];
+    for (const manga of mangas) {
+      try {
+        this.logger.debug(`Syncing volumes for ${manga.titre} (ID: ${manga.idManga})`);
+
+        // We use the exported service from MangasModule
+        // But we need to inject it. We'll add it to constructor below.
+        // For now let's assume it's injected as private readonly mangaVolumesService
+        const result = await this.mangaVolumesService.syncAllVolumes(manga.idManga, {
+          uploadCovers: true,
+          force: false, // Don't overwrite existing complete info
+          filterDate: new Date(), // Sync only for current month/year
+        });
+
+        results.push({
+          id: manga.idManga,
+          title: manga.titre,
+          success: result.success,
+          summary: result.summary,
+        });
+      } catch (error) {
+        this.logger.error(`Failed to sync volumes for ${manga.titre}: ${error.message}`);
+        results.push({
+          id: manga.idManga,
+          title: manga.titre,
+          success: false,
+          error: error.message,
+        });
+      }
+    }
+
+    return {
+      processed: mangas.length,
+      results,
+    };
   }
 
   /**

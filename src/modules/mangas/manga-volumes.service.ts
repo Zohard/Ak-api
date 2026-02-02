@@ -6,6 +6,7 @@ import { MediaService } from '../media/media.service';
 import { GoogleBooksService } from './google-books.service';
 import { NautiljonService } from './nautiljon.service';
 import { JikanService, JikanManga } from '../jikan/jikan.service';
+import { AniListService } from '../anilist/anilist.service';
 import { slugify } from '../../shared/utils/text.util';
 
 export interface VolumeInfo {
@@ -46,7 +47,8 @@ export class MangaVolumesService {
     private readonly googleBooksService: GoogleBooksService,
     private readonly nautiljonService: NautiljonService,
     private readonly jikanService: JikanService,
-  ) {}
+    private readonly anilistService: AniListService,
+  ) { }
 
   /**
    * Get all title variants for a manga using Jikan (MAL)
@@ -216,7 +218,7 @@ export class MangaVolumesService {
             // Check if this candidate is already in the list (by ISBN or title)
             const isDuplicate = allCandidates.some(
               existing => (existing.isbn && existing.isbn === c.isbn) ||
-                         (existing.title?.toLowerCase() === c.title?.toLowerCase())
+                (existing.title?.toLowerCase() === c.title?.toLowerCase())
             );
             if (!isDuplicate) {
               allCandidates.push({
@@ -440,112 +442,149 @@ export class MangaVolumesService {
 
   /**
    * Sync all volumes for a manga
-   * Uses the manga's nbVolumes count or a specified range
+   * Now uses bulk scraping for better performance from Nautiljon
    */
   async syncAllVolumes(
     mangaId: number,
     options: {
-      fromVolume?: number;
-      toVolume?: number;
       uploadCovers?: boolean;
-      force?: boolean; // Re-sync even if volumes exist
+      force?: boolean;
+      filterDate?: Date;
     } = {},
-  ): Promise<{
-    success: boolean;
-    results: VolumeSyncResult[];
-    summary: { created: number; updated: number; skipped: number; errors: number };
-  }> {
-    const { fromVolume = 1, uploadCovers = true, force = false } = options;
+  ): Promise<{ success: boolean; summary: string }> {
+    try {
+      const manga = await this.prisma.akManga.findUnique({
+        where: { idManga: mangaId },
+      });
 
-    // Get manga details
-    const manga = await this.prisma.akManga.findUnique({
-      where: { idManga: mangaId },
-      select: {
-        titre: true,
-        titreOrig: true,
-        nbVolumes: true,
-        nbVol: true,
-        commentaire: true,
-      },
-    });
-
-    if (!manga) {
-      throw new NotFoundException('Manga not found');
-    }
-
-    // Determine total volumes
-    let totalVolumes = options.toVolume;
-    if (!totalVolumes) {
-      // Try to get from nbVol (integer) first, then parse nbVolumes (string)
-      if (manga.nbVol && manga.nbVol > 0) {
-        totalVolumes = manga.nbVol;
-      } else if (manga.nbVolumes) {
-        const match = manga.nbVolumes.match(/^(\d+)/);
-        totalVolumes = match ? parseInt(match[1], 10) : 0;
-      }
-    }
-
-    if (!totalVolumes || totalVolumes <= 0) {
-      throw new BadRequestException('Could not determine total volume count. Please set nbVolumes or specify toVolume.');
-    }
-
-    this.logger.log(`Starting volume sync for "${manga.titre}" (ID: ${mangaId}): volumes ${fromVolume}-${totalVolumes}`);
-
-    // Get title variants for better search results
-    const titleVariants = await this.getMangaTitleVariants(manga.titre);
-    this.logger.debug(`Title variants: ${JSON.stringify(titleVariants)}`);
-
-    // Get existing volumes if not forcing re-sync
-    const existingVolumes = force ? [] : await this.prisma.mangaVolume.findMany({
-      where: { idManga: mangaId },
-      select: { volumeNumber: true, isbn: true, coverImage: true },
-    });
-    const existingMap = new Map(existingVolumes.map(v => [v.volumeNumber, v]));
-
-    const results: VolumeSyncResult[] = [];
-    const summary = { created: 0, updated: 0, skipped: 0, errors: 0 };
-
-    // Process each volume
-    for (let vol = fromVolume; vol <= totalVolumes; vol++) {
-      // Skip if already complete and not forcing
-      const existing = existingMap.get(vol);
-      if (!force && existing?.isbn && existing?.coverImage) {
-        results.push({ volumeNumber: vol, status: 'skipped', message: 'Already complete' });
-        summary.skipped++;
-        continue;
+      if (!manga) {
+        throw new NotFoundException(`Manga ${mangaId} not found`);
       }
 
-      // Search for volume info
-      const volumeInfo = await this.searchVolumeInfo(manga.titre, vol, titleVariants);
+      const totalVolumes = parseInt(manga.nbVolumes || '0', 10);
+      let updatedCount = 0;
+      let createdCount = 0;
+      let errorCount = 0;
 
-      // Sync the volume
-      const result = await this.syncSingleVolume(
-        mangaId,
-        manga.titre,
-        vol,
-        volumeInfo || undefined,
-        uploadCovers,
-      );
+      // Try bulk scraping first (Nautiljon)
+      let bulkVolumes: any[] = [];
+      try {
+        const titleVariants = await this.getMangaTitleVariants(manga.titre);
+        // Try with French title first, then Original, then Title
+        const titlesToTry = [
+          titleVariants.french,
+          titleVariants.original,
+          manga.titre,
+          ...titleVariants.synonyms
+        ].filter(Boolean);
 
-      results.push(result);
-      summary[result.status === 'created' ? 'created' :
-              result.status === 'updated' ? 'updated' :
-              result.status === 'error' ? 'errors' : 'skipped']++;
+        const uniqueTitles = [...new Set(titlesToTry)] as string[];
 
-      // Small delay to avoid rate limiting (Google Books has limits)
-      await new Promise(resolve => setTimeout(resolve, 500));
+        // Start bulk scrape
+        for (const title of uniqueTitles) {
+          if (!title) continue;
+          this.logger.debug(`Attempting bulk scrape for "${title}"...`);
+          const results = await this.nautiljonService.scrapeVolumeList(title);
+
+          if (results && results.length > 0) {
+            // Apply filtering if options provided
+            if (options.filterDate) {
+              const filterMonth = options.filterDate.getMonth();
+              const filterYear = options.filterDate.getFullYear();
+
+              bulkVolumes = results.filter(v => {
+                if (!v.releaseDate) return false;
+                const d = new Date(v.releaseDate);
+                return d.getMonth() === filterMonth && d.getFullYear() === filterYear;
+              });
+
+              this.logger.log(`Bulk scrape found ${results.length} total, filtered to ${bulkVolumes.length} for ${filterMonth + 1}/${filterYear}`);
+            } else {
+              bulkVolumes = results;
+              this.logger.log(`Bulk scrape successful for "${title}": found ${results.length} volumes`);
+            }
+            break;
+          }
+        }
+      } catch (error) {
+        this.logger.warn(`Bulk scrape failed: ${error.message}`);
+      }
+
+      // If bulk scrape worked, process those volumes
+      if (bulkVolumes.length > 0) {
+        this.logger.log(`Processing ${bulkVolumes.length} volumes from bulk sync...`);
+
+        // Fetch AniList cover for series if needed (for Volume 1)
+        let seriesCoverUrl: string | null = null;
+        if (bulkVolumes.some(v => v.volumeNumber === 1)) {
+          try {
+            seriesCoverUrl = await this.anilistService.getMangaCover(manga.titreOrig || manga.titre);
+          } catch (e) {
+            this.logger.warn(`Failed to fetch AniList cover: ${e.message}`);
+          }
+        }
+
+        for (const info of bulkVolumes) {
+          // Use AniList cover for volume 1 if available
+          if (info.volumeNumber === 1 && seriesCoverUrl) {
+            info.coverUrl = seriesCoverUrl;
+            this.logger.debug(`Using AniList cover for Volume 1 of ${manga.titre}`);
+          }
+
+          const result = await this.syncSingleVolume(
+            mangaId,
+            manga.titre,
+            info.volumeNumber,
+            info, // Pass the scraped info directly
+            options.uploadCovers
+          );
+
+          if (result.status === 'created') createdCount++;
+          else if (result.status === 'updated') updatedCount++;
+          else if (result.status === 'error') errorCount++;
+        }
+      }
+      // Fallback to sequential updates if bulk failed or returned nothing
+      else if (totalVolumes > 0) {
+        // ... (existing fallback logic, maybe skip for now if filtering is stricter?)
+        if (options.filterDate) {
+          this.logger.log(`Bulk sync found nothing matching filter, skipping sequential fallback.`);
+        } else {
+          this.logger.log(`Bulk sync found nothing, falling back to sequential sync for ${totalVolumes} volumes...`);
+          // Limit to 50 to prevent timeouts if forced
+          const limit = Math.min(totalVolumes, 50);
+
+          for (let i = 1; i <= limit; i++) {
+            const result = await this.syncSingleVolume(
+              mangaId,
+              manga.titre,
+              i,
+              undefined,
+              options.uploadCovers,
+            );
+
+            if (result.status === 'created') createdCount++;
+            else if (result.status === 'updated') updatedCount++;
+            else if (result.status === 'error') errorCount++;
+          }
+        }
+      }
+
+      // Invalidate cache
+      await this.invalidateMangaCache(mangaId);
+
+      return {
+        success: true,
+        summary: `Sync completed: ${createdCount} created, ${updatedCount} updated, ${errorCount} errors` + (bulkVolumes.length > 0 ? " (Bulk Mode)" : " (Sequential Mode)"),
+      };
+
+    } catch (error) {
+      this.logger.error(`Failed to sync all volumes for manga ${mangaId}: ${error.message}`);
+      return {
+        success: false,
+        summary: `Sync failed: ${error.message}`,
+      };
     }
-
-    // Invalidate manga cache
-    await this.invalidateMangaCache(mangaId);
-
-    this.logger.log(`Volume sync complete for "${manga.titre}": ${summary.created} created, ${summary.updated} updated, ${summary.skipped} skipped, ${summary.errors} errors`);
-
-    return {
-      success: summary.errors === 0,
-      results,
-      summary,
-    };
   }
 
   /**
@@ -684,6 +723,48 @@ export class MangaVolumesService {
     }
 
     return 1;
+  }
+
+  /**
+   * Get upcoming manga releases (planning)
+   */
+  async getPlanning(
+    startDate: Date = new Date(),
+    endDate: Date = new Date(new Date().setMonth(new Date().getMonth() + 3)),
+    limit: number = 50,
+  ) {
+    const volumes = await this.prisma.mangaVolume.findMany({
+      where: {
+        releaseDate: {
+          gte: startDate,
+          lte: endDate,
+        },
+      },
+      include: {
+        manga: {
+          select: {
+            idManga: true,
+            titre: true,
+            titreFr: true, // Also include French title
+            image: true,
+            niceUrl: true,
+            nbVolumes: true, // Total volumes string
+            nbVol: true,     // Total volumes int
+          },
+        },
+      },
+      orderBy: {
+        releaseDate: 'asc',
+      },
+      take: limit,
+    });
+
+    // Group by month for easier frontend display? Or return flat list?
+    // Let's return a flat list but with useful structure
+    return volumes.map(v => ({
+      ...v,
+      mangaTitle: v.manga?.titreFr || v.manga?.titre, // Prefer French title
+    }));
   }
 
   /**

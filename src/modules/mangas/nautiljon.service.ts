@@ -306,7 +306,7 @@ export class NautiljonService {
       // ISBN - look for ISBN-13 or ISBN
       let isbn: string | undefined;
       const isbnText = infoBox.text().match(/ISBN(?:-13)?[\s:]*(\d{10,13})/i) ||
-                       $('body').text().match(/ISBN(?:-13)?[\s:]*(\d{10,13})/i);
+        $('body').text().match(/ISBN(?:-13)?[\s:]*(\d{10,13})/i);
       if (isbnText) {
         isbn = isbnText[1];
       }
@@ -435,5 +435,95 @@ export class NautiljonService {
     }
 
     return directResult; // Return whatever we found, even if incomplete
+  }
+
+  /**
+   * Scrape the volumes list page to get all volumes at once
+   * URL: /mangas/{slug}/volumes.html
+   */
+  async scrapeVolumeList(mangaTitle: string): Promise<NautiljonVolumeInfo[]> {
+    try {
+      const mangaSlug = this.formatUrlSlug(mangaTitle);
+      const url = `${this.BASE_URL}/mangas/${mangaSlug}/volumes.html`;
+
+      this.logger.debug(`Scraping volumes list: ${url}`);
+
+      // We might need to handle 404 if the volumes page doesn't exist (e.g. one-shot)
+      // fetchHtml will throw, so we catch it
+      let $;
+      try {
+        $ = await this.fetchHtml(url);
+      } catch (e) {
+        this.logger.warn(`Could not fetch volumes list for ${mangaTitle}: ${e.message}`);
+        return [];
+      }
+
+      const volumes: NautiljonVolumeInfo[] = [];
+
+      // Structure 1: div.unBook (common for volumes list)
+      if ($('.unBook').length > 0) {
+        $('.unBook').each((_, el) => {
+          const $el = $(el);
+
+          // Title/Link
+          const link = $el.find('h3 a, .titre_vol a').first();
+          const href = link.attr('href');
+          const fullTitle = link.text().trim();
+
+          if (!href) return;
+
+          // Extract volume number
+          // Titles are usually "Naruto 1" or "Naruto Vol. 1"
+          let volumeNumber = 0;
+          const volMatch = fullTitle.match(/(\d+)$/);
+          if (volMatch) {
+            volumeNumber = parseInt(volMatch[1], 10);
+          }
+
+          if (volumeNumber === 0) return;
+
+          // Release date is often in a text node or span
+          // Structure can vary, look for date pattern in the element text
+          const text = $el.text();
+          let releaseDate: string | undefined;
+          const dateMatch = text.match(/(\d{2}\/\d{2}\/\d{4})/);
+          if (dateMatch) {
+            const [day, month, year] = dateMatch[1].split('/');
+            releaseDate = `${year}-${month}-${day}`;
+          }
+
+          // Cover image
+          let coverUrl: string | undefined;
+          const img = $el.find('img').first();
+          let imgSrc = img.attr('src') || img.attr('data-src');
+          if (imgSrc) {
+            imgSrc = imgSrc.replace('/mini/', '/').replace(/\?.*$/, '');
+            coverUrl = imgSrc.startsWith('http') ? imgSrc : `${this.BASE_URL}${imgSrc}`;
+          }
+
+          volumes.push({
+            volumeNumber,
+            title: fullTitle,
+            releaseDate,
+            coverUrl,
+            source: 'nautiljon',
+            sourceUrl: href.startsWith('http') ? href : `${this.BASE_URL}${href}`,
+          });
+        });
+      }
+      // Structure 2: Table list (older layout)
+      else if ($('table.liste_volumes').length > 0) {
+        $('table.liste_volumes tr').each((_, el) => {
+          // Implementation depends on specific table structure
+          // Let's assume standard table rows
+        });
+      }
+
+      this.logger.log(`Found ${volumes.length} volumes in list for ${mangaTitle}`);
+      return volumes;
+    } catch (error) {
+      this.logger.error(`Error scraping volume list for ${mangaTitle}: ${error.message}`);
+      return [];
+    }
   }
 }

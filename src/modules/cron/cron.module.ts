@@ -3,10 +3,12 @@ import { CronController } from './cron.controller';
 import { CronService } from './cron.service';
 import { PrismaService } from '../../shared/services/prisma.service';
 import { CacheService } from '../../shared/services/cache.service';
+import { MangasModule } from '../mangas/mangas.module';
 
 @Module({
+  imports: [MangasModule],
   controllers: [CronController],
   providers: [CronService, PrismaService, CacheService],
   exports: [CronService],
 })
-export class CronModule {}
+export class CronModule { }

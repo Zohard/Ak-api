@@ -38,6 +38,7 @@ import { AdminGuard } from '../../common/guards/admin.guard';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { R2Service } from '../media/r2.service';
 import { ScrapeService } from '../scrape/scrape.service';
+import { MangaVolumesService } from './manga-volumes.service';
 
 @ApiTags('Mangas')
 @Controller('mangas')
@@ -47,6 +48,7 @@ export class MangasController {
     private readonly r2Service: R2Service,
     private readonly googleBooksService: GoogleBooksService,
     private readonly scrapeService: ScrapeService,
+    private readonly mangaVolumesService: MangaVolumesService,
   ) { }
 
   @Get()
@@ -693,6 +695,25 @@ export class MangasController {
     @Body('imageUrl') imageUrl: string,
   ) {
     return this.mangasService.updateMangaImageFromUrl(id, imageUrl);
+  }
+
+  @Get('planning')
+  @ApiOperation({ summary: 'Calendrier des sorties manga (Planning)' })
+  @ApiQuery({ name: 'startDate', required: false, description: 'Date de début (YYYY-MM-DD)', example: '2024-05-01' })
+  @ApiQuery({ name: 'endDate', required: false, description: 'Date de fin (YYYY-MM-DD)', example: '2024-08-01' })
+  @ApiQuery({ name: 'limit', required: false, description: 'Nombre max de résultats', example: 100 })
+  @ApiResponse({ status: 200, description: 'Liste des sorties prévues' })
+  async getPlanning(
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+    @Query('limit') limit?: string,
+  ) {
+    const start = startDate ? new Date(startDate) : new Date();
+    // Default: 3 months ahead
+    const end = endDate ? new Date(endDate) : new Date(new Date().setMonth(new Date().getMonth() + 3));
+    const parsedLimit = limit ? parseInt(limit) : 100;
+
+    return this.mangaVolumesService.getPlanning(start, end, parsedLimit);
   }
 
   // ==================== CROSS-MEDIA RELATIONS ENDPOINTS ====================

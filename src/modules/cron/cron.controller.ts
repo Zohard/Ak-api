@@ -221,4 +221,21 @@ export class CronController {
       throw error;
     }
   }
+
+  @Post('sync-manga-volumes')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Sync manga volumes (French releases)',
+    description: 'Fetches release info for active mangas from Nautiljon. Requires CRON_API_KEY.',
+  })
+  @ApiHeader({
+    name: 'X-Cron-Key',
+    description: 'API key for authenticating cron job requests',
+    required: true,
+  })
+  @ApiResponse({ status: 200, description: 'Sync started' })
+  async syncMangaVolumes(@Headers('x-cron-key') apiKey: string) {
+    this.validateApiKey(apiKey);
+    return this.cronService.syncMangaVolumes(10); // Sync 10 mangas per run
+  }
 }

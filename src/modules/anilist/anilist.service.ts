@@ -1236,4 +1236,37 @@ export class AniListService {
       throw new Error('Failed to connect to AniList API');
     }
   }
+  /**
+   * Search for a manga cover image (extraLarge)
+   */
+  async getMangaCover(title: string): Promise<string | null> {
+    const graphqlQuery = `
+      query ($search: String) {
+        Media(search: $search, type: MANGA, sort: POPULARITY_DESC) {
+          coverImage {
+            extraLarge
+            large
+            medium
+          }
+        }
+      }
+    `;
+
+    try {
+      const response = await this.httpClient.post('', {
+        query: graphqlQuery,
+        variables: {
+          search: title,
+        },
+      });
+
+      if (response.data.errors) return null;
+
+      const media = response.data.data.Media;
+      return media?.coverImage?.extraLarge || media?.coverImage?.large || null;
+    } catch (error) {
+      this.logger.warn(`Failed to fetch manga cover from AniList for ${title}: ${error.message}`);
+      return null;
+    }
+  }
 }

@@ -198,8 +198,6 @@ export class AdminMangasController {
     @Query('force') force?: string,
   ) {
     return this.mangaVolumesService.syncAllVolumes(id, {
-      fromVolume: fromVolume ? parseInt(fromVolume, 10) : undefined,
-      toVolume: toVolume ? parseInt(toVolume, 10) : undefined,
       uploadCovers: uploadCovers !== 'false',
       force: force === 'true',
     });

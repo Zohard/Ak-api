@@ -64,7 +64,7 @@ export class PrismaService
         const u = new URL(originalUrl);
         const isSupabase = u.hostname.includes('supabase.com');
         const isNeon = u.hostname.includes('neon.tech');
-        const isRailway = u.hostname.includes('railway.app') || u.hostname.includes('railway.internal');
+        const isRailway = u.hostname.includes('railway.app') || u.hostname.includes('railway.internal') || u.hostname.includes('rlwy.net');
         const isPooler = u.hostname.includes('pooler');
 
         const params = u.searchParams;
