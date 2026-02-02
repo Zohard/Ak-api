@@ -158,11 +158,11 @@ export class MangaVolumesService {
           this.logger.debug(`[Nautiljon] Found volume info for "${title}": ISBN ${nautiljonResult.isbn || 'N/A'}, Date ${nautiljonResult.releaseDate || 'N/A'}`);
           return {
             volumeNumber: nautiljonResult.volumeNumber,
-            title: nautiljonResult.title,
+            title: `Volume ${nautiljonResult.volumeNumber || volumeNumber}`, // Simple title without copyright content
             isbn: nautiljonResult.isbn,
             releaseDate: nautiljonResult.releaseDate,
             coverUrl: nautiljonResult.coverUrl,
-            description: nautiljonResult.description,
+            // Note: description intentionally omitted due to copyright concerns
             publisher: nautiljonResult.publisher,
             source: 'nautiljon',
           };
@@ -246,11 +246,11 @@ export class MangaVolumesService {
           if (!isDuplicate) {
             allCandidates.push({
               volumeNumber: nautiljonResult.volumeNumber,
-              title: nautiljonResult.title,
+              title: `Volume ${nautiljonResult.volumeNumber || volumeNumber}`, // Simple title without copyright content
               isbn: nautiljonResult.isbn,
               releaseDate: nautiljonResult.releaseDate,
               coverUrl: nautiljonResult.coverUrl,
-              description: nautiljonResult.description,
+              // Note: description intentionally omitted due to copyright concerns
               publisher: nautiljonResult.publisher,
               source: 'nautiljon',
             });

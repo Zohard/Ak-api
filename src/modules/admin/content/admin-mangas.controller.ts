@@ -575,11 +575,11 @@ export class AdminMangasController {
 
         const volumeResult = await this.mangaVolumesService.importVolume(mangaId, {
           volumeNumber: volNum,
-          title: result.title || `Tome ${volNum}`,
+          title: `Volume ${volNum}`, // Simple title without copyright content
           isbn: result.isbn,
           releaseDate: result.releaseDate,
           coverUrl: finalCoverUrl, // Use the uploaded R2 URL
-          description: result.description,
+          // Note: description intentionally omitted due to copyright concerns
         });
 
         volumeCreated = volumeResult.status === 'created' || volumeResult.status === 'updated';
