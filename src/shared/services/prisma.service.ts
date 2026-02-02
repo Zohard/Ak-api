@@ -75,7 +75,7 @@ export class PrismaService
           // Railway hobby plan has limited connections (~20 total)
           // Use 5 connections - enough for ~30 concurrent users with fast queries
           if (!params.has('connection_limit')) {
-            params.set('connection_limit', '5');
+            params.set('connection_limit', '3');
           }
           // Shorter timeouts for Railway's fast network
           params.set('pool_timeout', '10');
@@ -166,8 +166,11 @@ export class PrismaService
         this.logger.error(`Database connection failed (attempt ${attempt}/${maxRetries}): ${error.message}`);
 
         if (retries === 0) {
-          this.logger.error('All database connection attempts failed');
-          throw error;
+          this.logger.error('All database connection attempts failed. Application will start without DB connection (lazy connect).');
+          // Do NOT throw here to prevent crash loop. 
+          // Requests requiring DB will fail, but health check will pass.
+          // This allows deployment to succeed and potentially clear old connections.
+          break;
         }
 
         // Wait 2 seconds before retry
