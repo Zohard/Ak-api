@@ -101,7 +101,7 @@ export interface AniListManga {
   countryOfOrigin?: string;
   startDate?: { year?: number; month?: number; day?: number };
   endDate?: { year?: number; month?: number; day?: number };
-  coverImage: { extraLarge?: string; large: string; medium: string };
+  coverImage: { extraLarge?: string; large?: string; medium?: string };
   bannerImage?: string;
   genres: string[];
   chapters?: number;
@@ -914,7 +914,7 @@ export class AniListService {
             countryOfOrigin
             startDate { year month day }
             endDate { year month day }
-            coverImage { large medium }
+            coverImage { extraLarge large medium }
             bannerImage
             genres
             tags {
@@ -970,7 +970,7 @@ export class AniListService {
           countryOfOrigin
           startDate { year month day }
           endDate { year month day }
-          coverImage { large medium }
+          coverImage { extraLarge large medium }
           bannerImage
           genres
           tags {
@@ -1189,7 +1189,7 @@ export class AniListService {
             countryOfOrigin
             startDate { year month day }
             endDate { year month day }
-            coverImage { large medium }
+            coverImage { extraLarge large medium }
             bannerImage
             genres
             chapters
