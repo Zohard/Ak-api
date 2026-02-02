@@ -731,6 +731,7 @@ export class CacheService implements OnModuleInit {
       game: 'game:*',
       business: 'business:*',
       homepage: 'homepage:*',
+      mobile_homepage: 'mobile-homepage:*',
       season: 'season:*',
       season_animes: 'season_animes:*',
       episodes_schedule: 'episodes_schedule:*',

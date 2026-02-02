@@ -144,8 +144,9 @@ export class MobileHomePageService {
 
   private async fetchRecentMangas() {
     try {
+      this.logger.log('Fetching recent mangas (statut=1)...');
       const mangas = await this.prisma.akManga.findMany({
-        where: { statut: 1, dateAjout: { not: null } },
+        where: { statut: 1 },
         orderBy: { dateAjout: 'desc' },
         take: 15,
         select: {
@@ -158,8 +159,23 @@ export class MobileHomePageService {
           origine: true,
           dateAjout: true,
           moyenneNotes: true,
+          statut: true,
         },
       });
+
+      this.logger.log(`Found ${mangas.length} recent mangas matching criteria`);
+      if (mangas.length === 0) {
+        const totalMangas = await this.prisma.akManga.count();
+        const activeMangas = await this.prisma.akManga.count({ where: { statut: 1 } });
+        this.logger.warn(`DEBUG INFO: Total mangas: ${totalMangas}, Mangas with statut=1: ${activeMangas}`);
+
+        if (activeMangas === 0 && totalMangas > 0) {
+          const sampleStatus = await this.prisma.akManga.findFirst({ select: { statut: true } });
+          this.logger.warn(`Sample manga has statut: ${sampleStatus?.statut}`);
+        }
+      } else {
+        this.logger.log(`Recent mangas: ${mangas.slice(0, 3).map(m => m.titre).join(', ')}`);
+      }
 
       return mangas.map((m: any) => ({
         id: m.idManga,
