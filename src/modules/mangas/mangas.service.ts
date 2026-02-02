@@ -2387,8 +2387,10 @@ export class MangasService extends BaseContentService<
    * Create a new volume for a manga
    */
   async createVolume(mangaId: number, createVolumeDto: any) {
-    // Check if manga exists
-    const manga = await this.findOne(mangaId);
+    // Check if manga exists (direct query - no status filter for admin endpoints)
+    const manga = await this.prisma.akManga.findUnique({
+      where: { idManga: mangaId },
+    });
     if (!manga) {
       throw new NotFoundException(`Manga with ID ${mangaId} not found`);
     }
