@@ -264,6 +264,7 @@ export class RecommendationsService {
     const animes = await this.prisma.akAnime.findMany({
       where: {
         idAnime: { notIn: excludeIds },
+        moyenneNotes: { gte: 6 },
         businessRelations: {
           some: {
             business: {
@@ -362,6 +363,7 @@ export class RecommendationsService {
     const mangas = await this.prisma.akManga.findMany({
       where: {
         idManga: { notIn: excludeIds },
+        moyenneNotes: { gte: 6 },
         OR: [
           ...tagConditions,
           {

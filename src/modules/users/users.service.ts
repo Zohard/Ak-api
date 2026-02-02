@@ -796,6 +796,7 @@ export class UsersService {
           JOIN ak_tags t ON tf.id_tag = t.id_tag
           WHERE LOWER(t.tag_name) IN (${genresToUse.map(g => `'${g.toLowerCase().replace(/'/g, "''")}'`).join(',')})
             AND a.statut = 1
+            AND a.moyennenotes >= 6
             AND a.id_anime NOT IN (
               SELECT id_anime FROM ak_critique WHERE id_membre = ${id} AND id_anime IS NOT NULL
             )
@@ -829,6 +830,7 @@ export class UsersService {
           JOIN ak_tags t ON tf.id_tag = t.id_tag
           WHERE LOWER(t.tag_name) = ANY(ARRAY[${genresToUse.map(g => `'${g.toLowerCase().replace(/'/g, "''")}'`).join(',')}])
             AND a.statut = 1
+            AND a.moyennenotes >= 6
             AND a.id_anime NOT IN (
               SELECT id_anime FROM ak_critique WHERE id_membre = ${id} AND id_anime IS NOT NULL
             )
@@ -866,6 +868,7 @@ export class UsersService {
           JOIN ak_tags t ON tf.id_tag = t.id_tag
           WHERE LOWER(t.tag_name) IN (${genresToUse.map(g => `'${g.toLowerCase().replace(/'/g, "''")}'`).join(',')})
             AND m.statut = 1
+            AND m.moyennenotes >= 6
             AND m.id_manga NOT IN (
               SELECT id_manga FROM ak_critique WHERE id_membre = ${id} AND id_manga IS NOT NULL
             )
@@ -899,6 +902,7 @@ export class UsersService {
           JOIN ak_tags t ON tf.id_tag = t.id_tag
           WHERE LOWER(t.tag_name) = ANY(ARRAY[${genresToUse.map(g => `'${g.toLowerCase().replace(/'/g, "''")}'`).join(',')}])
             AND m.statut = 1
+            AND m.moyennenotes >= 6
             AND m.id_manga NOT IN (
               SELECT id_manga FROM ak_critique WHERE id_membre = ${id} AND id_manga IS NOT NULL
             )
@@ -952,6 +956,7 @@ export class UsersService {
         FROM ak_animes a
         ${animeGenreFilter}
         WHERE a.statut = 1
+          AND a.moyennenotes >= 6
           AND a.id_anime NOT IN (
             SELECT id_anime FROM ak_critique WHERE id_membre = ${id} AND id_anime IS NOT NULL
           )
@@ -981,6 +986,7 @@ export class UsersService {
         FROM ak_mangas m
         ${mangaGenreFilter}
         WHERE m.statut = 1
+          AND m.moyennenotes >= 6
           AND m.id_manga NOT IN (
             SELECT id_manga FROM ak_critique WHERE id_membre = ${id} AND id_manga IS NOT NULL
           )
