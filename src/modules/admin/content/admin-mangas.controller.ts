@@ -461,7 +461,7 @@ export class AdminMangasController {
   @Post('nautiljon/scrape-url')
   @ApiOperation({
     summary: 'Scrape volume info from a specific Nautiljon URL',
-    description: 'Directly scrape a Nautiljon volume page URL.'
+    description: 'Directly scrape a Nautiljon volume page URL. Optionally creates a manga_volumes entry.'
   })
   @ApiBody({
     schema: {
@@ -469,7 +469,8 @@ export class AdminMangasController {
       properties: {
         url: { type: 'string', description: 'Nautiljon volume page URL' },
         volumeNumber: { type: 'number', description: 'Expected volume number' },
-        mangaId: { type: 'number', description: 'Manga ID for attaching screenshot/cover' }
+        mangaId: { type: 'number', description: 'Manga ID for attaching screenshot/cover' },
+        createVolume: { type: 'boolean', description: 'Create/update manga_volumes entry (default: false)' }
       },
       required: ['url']
     }
@@ -490,11 +491,12 @@ export class AdminMangasController {
         publisher: { type: 'string' },
         source: { type: 'string', enum: ['nautiljon'] },
         sourceUrl: { type: 'string' },
+        volumeCreated: { type: 'boolean', description: 'Whether a manga_volumes entry was created/updated' },
       }
     }
   })
   async scrapeNautiljonUrl(
-    @Body() body: { url: string; volumeNumber?: number; mangaId?: number },
+    @Body() body: { url: string; volumeNumber?: number; mangaId?: number; createVolume?: boolean },
   ) {
     if (!body.url) {
       return { found: false, message: 'URL is required' };
@@ -517,6 +519,8 @@ export class AdminMangasController {
 
     // Use a local variable so we can modify it
     let finalCoverUrl = result.coverUrl;
+    let volumeCreated = false;
+    let manga: any = null;
 
     // If we have a cover URL and a manga ID, upload it to our storage
     if (finalCoverUrl && body.mangaId) {
@@ -525,13 +529,11 @@ export class AdminMangasController {
         console.log(`[Scrape] Processing upload for Manga ID: ${mangaId}`);
 
         // Fetch manga title for filename generation
-        const manga = await this.service.getOne(mangaId);
+        manga = await this.service.getOne(mangaId);
 
         if (manga && manga.titre) {
           console.log(`[Scrape] Found manga: ${manga.titre}`);
-          // Generate filename: titre_(tome_number)_timestamp
-          // slugify using underscores instead of dashes?
-          // Manual robust slugify preserving underscores, or just replacing spaces.
+          // Generate filename: titre_tome_(number)_timestamp
           const safeTitle = manga.titre
             .toLowerCase()
             .normalize('NFD') // split accents
@@ -563,10 +565,35 @@ export class AdminMangasController {
       }
     }
 
+    // Create manga_volumes entry if requested
+    if (body.createVolume && body.mangaId && (result.volumeNumber || volumeNumber)) {
+      try {
+        const mangaId = Number(body.mangaId);
+        const volNum = result.volumeNumber || volumeNumber;
+
+        console.log(`[Scrape] Creating manga_volumes entry for Manga ${mangaId}, Volume ${volNum}`);
+
+        const volumeResult = await this.mangaVolumesService.importVolume(mangaId, {
+          volumeNumber: volNum,
+          title: result.title || `Tome ${volNum}`,
+          isbn: result.isbn,
+          releaseDate: result.releaseDate,
+          coverUrl: finalCoverUrl, // Use the uploaded R2 URL
+          description: result.description,
+        });
+
+        volumeCreated = volumeResult.status === 'created' || volumeResult.status === 'updated';
+        console.log(`[Scrape] Volume entry result: ${volumeResult.status} - ${volumeResult.message || ''}`);
+      } catch (e) {
+        console.error('Failed to create manga_volumes entry:', e);
+      }
+    }
+
     return {
       found: true,
       ...result,
-      coverUrl: finalCoverUrl
+      coverUrl: finalCoverUrl,
+      volumeCreated,
     };
   }
 }
