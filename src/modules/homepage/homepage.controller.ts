@@ -35,8 +35,11 @@ export class HomePageController {
   @ApiOperation({ summary: 'Clear homepage cache for debugging' })
   @ApiResponse({ status: 200, description: 'Cache cleared successfully' })
   async clearCache() {
-    await this.cache.delByPattern('homepage:*');
-    return { message: 'Homepage cache cleared' };
+    await Promise.all([
+      this.cache.delByPattern('homepage:*'),
+      this.cache.delByPattern('mobile-homepage:*'),
+    ]);
+    return { message: 'Homepage and Mobile Homepage cache cleared' };
   }
 
   @Get('debug')
