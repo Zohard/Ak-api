@@ -120,7 +120,7 @@ export class MobileHomePageService {
   private async fetchRecentAnimes() {
     try {
       const animes = await this.prisma.akAnime.findMany({
-        where: { statut: 1, NOT: { dateAjout: null } },
+        where: { statut: 1, dateAjout: { not: null } },
         orderBy: { dateAjout: 'desc' },
         take: 15,
         select: {
@@ -145,7 +145,7 @@ export class MobileHomePageService {
   private async fetchRecentMangas() {
     try {
       const mangas = await this.prisma.akManga.findMany({
-        where: { statut: 1, NOT: { dateAjout: null } },
+        where: { statut: 1, dateAjout: { not: null } },
         orderBy: { dateAjout: 'desc' },
         take: 15,
         select: {

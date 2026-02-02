@@ -505,9 +505,15 @@ export class CacheService implements OnModuleInit {
       this.del('homepage:articles'),
       this.del('homepage:season'),
       this.del('homepage:forum'),
-      this.del('homepage:stats')
+      this.del('homepage:stats'),
+      this.del('mobile-homepage:aggregated'),
     ]);
     this.logger.debug('Invalidated all homepage cache');
+  }
+
+  async invalidateMobileHomepage(): Promise<void> {
+    await this.del('mobile-homepage:aggregated');
+    this.logger.debug('Invalidated mobile-homepage cache');
   }
 
   // Articles cache methods
