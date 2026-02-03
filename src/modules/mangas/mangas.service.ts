@@ -1261,6 +1261,7 @@ export class MangasService extends BaseContentService<
         }
 
         // Search for existing manga
+        // Check for existing manga
         const existing = await this.prisma.akManga.findFirst({
           where: {
             OR: orConditions,
@@ -1274,6 +1275,28 @@ export class MangasService extends BaseContentService<
           },
         });
 
+        // Check for volume existence if manga exists
+        let volumeExists = false;
+        let volumeNumber: number | null = null;
+
+        if (existing) {
+          // Extract volume number from title
+          const volumeMatch = booknodeManga.titre.match(/(?:Tome|Volume|Vol\.?|T\.?)\s+(\d+)/i);
+          if (volumeMatch) {
+            volumeNumber = parseInt(volumeMatch[1], 10);
+
+            // Check if volume exists in database
+            const volume = await this.prisma.akMangaVolume.findFirst({
+              where: {
+                idManga: existing.idManga,
+                volumeNumber: volumeNumber
+              }
+            });
+
+            volumeExists = !!volume;
+          }
+        }
+
         return {
           titre: booknodeManga.titre,
           baseTitre, // Include base title for debugging
@@ -1283,6 +1306,8 @@ export class MangasService extends BaseContentService<
           booknodeUrl: booknodeManga.booknodeUrl,
           exists: !!existing,
           existingMangaId: existing?.idManga || null,
+          volumeExists,
+          volumeNumber
         };
       }),
     );
