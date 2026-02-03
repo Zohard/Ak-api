@@ -1281,9 +1281,10 @@ export class MangasService extends BaseContentService<
 
         if (existing) {
           // Extract volume number from title
-          const volumeMatch = booknodeManga.titre.match(/(?:Tome|Volume|Vol\.?|T\.?)\s+(\d+)/i);
+          // Support formats: "Tome 12", "Vol. 12", " #12", or just " 12" at the end
+          const volumeMatch = booknodeManga.titre.match(/(?:Tome|Volume|Vol\.?|T\.?)\s+(\d+)|(?:\s+#?(\d+))$/i);
           if (volumeMatch) {
-            volumeNumber = parseInt(volumeMatch[1], 10);
+            volumeNumber = parseInt(volumeMatch[1] || volumeMatch[2], 10);
 
             // Check if volume exists in database
             const volume = await this.prisma.mangaVolume.findFirst({
@@ -2421,19 +2422,31 @@ export class MangasService extends BaseContentService<
       throw new NotFoundException(`Manga with ID ${mangaId} not found`);
     }
 
+    let volumeNumber = createVolumeDto.volumeNumber;
+
+    // If volume number is not provided, auto-increment
+    if (!volumeNumber) {
+      const maxVol = await this.prisma.mangaVolume.findFirst({
+        where: { idManga: mangaId },
+        orderBy: { volumeNumber: 'desc' },
+        select: { volumeNumber: true },
+      });
+      volumeNumber = (maxVol?.volumeNumber || 0) + 1;
+    }
+
     // Check if volume number already exists for this manga
     const existingVolume = await this.prisma.mangaVolume.findUnique({
       where: {
         unique_manga_volume: {
           idManga: mangaId,
-          volumeNumber: createVolumeDto.volumeNumber,
+          volumeNumber: volumeNumber,
         },
       },
     });
 
     if (existingVolume) {
       throw new BadRequestException(
-        `Volume ${createVolumeDto.volumeNumber} already exists for this manga`,
+        `Volume ${volumeNumber} already exists for this manga`,
       );
     }
 
@@ -2453,7 +2466,7 @@ export class MangasService extends BaseContentService<
     const volume = await this.prisma.mangaVolume.create({
       data: {
         idManga: mangaId,
-        volumeNumber: createVolumeDto.volumeNumber,
+        volumeNumber: volumeNumber,
         isbn: createVolumeDto.isbn,
         coverImage: createVolumeDto.coverImage,
         title: createVolumeDto.title,
