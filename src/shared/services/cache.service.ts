@@ -686,6 +686,22 @@ export class CacheService implements OnModuleInit {
     this.logger.debug(`Invalidated forum board cache for ID: ${boardId}`);
   }
 
+  // Invalidate user-specific forum board cache (for mark as read)
+  async invalidateUserForumBoard(boardId: number, userId: number): Promise<void> {
+    const pages = [1, 2, 3, 4, 5];
+    const limits = [20, 50];
+
+    const keysToDelete: Promise<void>[] = [];
+    for (const page of pages) {
+      for (const limit of limits) {
+        keysToDelete.push(this.del(`forums:board:${boardId}:page${page}:limit${limit}:user${userId}`));
+      }
+    }
+
+    await Promise.all(keysToDelete);
+    this.logger.debug(`Invalidated user forum board cache for board ${boardId}, user ${userId}`);
+  }
+
   // OPTIMIZED: Let forums expire via TTL instead of SCAN
   async invalidateAllForums(): Promise<void> {
     // Forums have short TTL (1-10 min), let them expire naturally

@@ -230,6 +230,91 @@ export class ActivityTrackerService {
   }
 
   /**
+   * Get users viewing a specific board
+   */
+  async getBoardViewers(boardId: number): Promise<any> {
+    try {
+      const fifteenMinutesAgo = Math.floor(Date.now() / 1000) - (15 * 60);
+
+      const onlineEntries = await this.prisma.smfLogOnline.findMany({
+        where: {
+          logTime: {
+            gte: fifteenMinutesAgo
+          }
+        },
+        orderBy: {
+          logTime: 'desc'
+        }
+      });
+
+      // Filter entries viewing this board
+      const boardViewers = onlineEntries.filter(entry => {
+        try {
+          const action = JSON.parse(entry.url);
+          return action.action === 'forum_board' && action.board === boardId;
+        } catch {
+          return false;
+        }
+      });
+
+      // Get unique member IDs
+      const uniqueMemberIds = [...new Set(boardViewers.filter(e => e.idMember > 0).map(e => e.idMember))];
+
+      // Fetch member data
+      const members = uniqueMemberIds.length > 0 ? await this.prisma.smfMember.findMany({
+        where: {
+          idMember: { in: uniqueMemberIds }
+        },
+        include: {
+          membergroup: true
+        }
+      }) : [];
+
+      const memberMap = new Map(members.map(m => [m.idMember, m]));
+
+      // Build response
+      const users: any[] = [];
+      const seenMemberIds = new Set<number>();
+      let guestCount = 0;
+
+      for (const entry of boardViewers) {
+        if (entry.idMember === 0) {
+          guestCount++;
+        } else if (!seenMemberIds.has(entry.idMember)) {
+          seenMemberIds.add(entry.idMember);
+          const member = memberMap.get(entry.idMember);
+          if (member) {
+            users.push({
+              id: member.idMember,
+              username: member.memberName,
+              realName: member.realName || member.memberName,
+              avatar: member.avatar,
+              group: {
+                id: member.idGroup,
+                name: member.membergroup?.groupName || 'Member',
+                color: member.membergroup?.onlineColor || null
+              }
+            });
+          }
+        }
+      }
+
+      return {
+        users,
+        guestCount,
+        totalCount: users.length + guestCount
+      };
+    } catch (error) {
+      this.logger.error('Error getting board viewers:', error);
+      return {
+        users: [],
+        guestCount: 0,
+        totalCount: 0
+      };
+    }
+  }
+
+  /**
    * Get online statistics (for homepage widget)
    */
   async getOnlineStats(): Promise<any> {

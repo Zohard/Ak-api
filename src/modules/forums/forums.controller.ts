@@ -559,6 +559,14 @@ export class ForumsController {
     return await this.activityTracker.getOnlineStats();
   }
 
+  @Get('boards/:boardId/viewers')
+  @ApiOperation({ summary: 'Get users currently viewing a specific board' })
+  @ApiParam({ name: 'boardId', type: 'number', description: 'Board ID' })
+  @ApiResponse({ status: 200, description: 'Board viewers retrieved successfully' })
+  async getBoardViewers(@Param('boardId', ParseIntPipe) boardId: number) {
+    return await this.activityTracker.getBoardViewers(boardId);
+  }
+
   @Get('users/:userId/posts')
   @ApiOperation({ summary: 'Get all forum posts from a specific user' })
   @ApiParam({ name: 'userId', type: 'number', description: 'User ID' })

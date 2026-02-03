@@ -100,6 +100,60 @@ export class ForumsService {
         ])
       );
 
+      // Fetch board unread status for authenticated users
+      // Get all board IDs first
+      const allBoardIds = categories.flatMap(cat => cat.boards.map(b => b.idBoard));
+      let boardUnreadMap = new Map<number, boolean>();
+
+      if (userId && allBoardIds.length > 0) {
+        // Get all topics with their last message IDs for all boards
+        const topicsWithLastMsg = await this.prisma.smfTopic.findMany({
+          where: { idBoard: { in: allBoardIds } },
+          select: {
+            idTopic: true,
+            idBoard: true,
+            idLastMsg: true
+          }
+        });
+
+        // Get user's read logs for these topics
+        const topicIds = topicsWithLastMsg.map(t => t.idTopic);
+        const readLogs = await this.prisma.smfLogTopics.findMany({
+          where: {
+            idMember: userId,
+            idTopic: { in: topicIds }
+          },
+          select: {
+            idTopic: true,
+            idMsg: true
+          }
+        });
+
+        const readLogsMap = new Map(readLogs.map(log => [log.idTopic, log.idMsg]));
+
+        // Calculate hasUnread for each board
+        const boardTopicsMap = new Map<number, { idTopic: number; idLastMsg: number }[]>();
+        for (const topic of topicsWithLastMsg) {
+          if (!boardTopicsMap.has(topic.idBoard)) {
+            boardTopicsMap.set(topic.idBoard, []);
+          }
+          boardTopicsMap.get(topic.idBoard)!.push(topic);
+        }
+
+        for (const [boardId, topics] of boardTopicsMap.entries()) {
+          const hasUnread = topics.some(topic => {
+            const lastReadMsgId = readLogsMap.get(topic.idTopic);
+            if (lastReadMsgId === undefined) {
+              // No read log entry = topic is unread
+              return true;
+            }
+            // Topic has new messages since last read
+            return topic.idLastMsg > lastReadMsgId;
+          });
+          boardUnreadMap.set(boardId, hasUnread);
+        }
+      }
+
       // Filter boards based on access permissions
       const filteredCategories = categories.map(category => {
         // Build all board objects with their data (NO async needed - all data already fetched!)
@@ -124,6 +178,9 @@ export class ForumsService {
           // Get last message from pre-fetched map (no extra query!)
           const lastMessage = board.idLastMsg ? lastMessagesMap.get(board.idLastMsg) || null : null;
 
+          // Get hasUnreadTopics from pre-calculated map (only for authenticated users)
+          const hasUnreadTopics = userId ? (boardUnreadMap.get(board.idBoard) ?? false) : false;
+
           return {
             id: board.idBoard,
             name: board.name,
@@ -132,7 +189,8 @@ export class ForumsService {
             numPosts: board.numPosts,
             redirect: board.redirect,
             lastMessage: lastMessage,
-            idParent: board.idParent
+            idParent: board.idParent,
+            hasUnreadTopics
           };
         });
 
@@ -171,8 +229,11 @@ export class ForumsService {
       // Filter out categories with no accessible boards
       const categoriesWithBoards = filteredCategories.filter(category => category.boards.length > 0);
 
-      // Cache for 10 minutes (600 seconds)
-      await this.cacheService.setForumCategories(categoriesWithBoards, userId, 600);
+      // Cache for different durations based on authentication
+      // User-specific caches (with hasUnreadTopics) expire faster (60s) for timely unread updates
+      // Public cache (no unread status) can be longer (10 min)
+      const cacheTtl = userId ? 60 : 600;
+      await this.cacheService.setForumCategories(categoriesWithBoards, userId, cacheTtl);
 
       return categoriesWithBoards;
     } catch (error) {
@@ -1210,6 +1271,7 @@ export class ForumsService {
       ]);
       // OPTIMIZED: Delete known latest messages keys instead of SCAN
       await Promise.all([
+        this.cacheService.del('forums:messages:latest:limit2:offset0:all'), // Homepage uses limit 2
         this.cacheService.del('forums:messages:latest:limit10:offset0:all'),
         this.cacheService.del('forums:messages:latest:limit20:offset0:all'),
         this.cacheService.del('forums:messages:latest:limit50:offset0:all'),
@@ -1329,11 +1391,14 @@ export class ForumsService {
       await this.cacheService.invalidateForumBoard(topic.idBoard);
       // OPTIMIZED: Delete known latest messages keys instead of SCAN
       await Promise.all([
+        this.cacheService.del('forums:messages:latest:limit2:offset0:all'), // Homepage uses limit 2
         this.cacheService.del('forums:messages:latest:limit10:offset0:all'),
         this.cacheService.del('forums:messages:latest:limit20:offset0:all'),
         this.cacheService.del('forums:messages:latest:limit50:offset0:all'),
       ]);
       await this.cacheService.invalidateHomepageForum(); // Invalidate homepage forum
+      // Invalidate categories cache so "Dernier message" and unread status update
+      await this.cacheService.del('forums:categories:public');
 
       return {
         messageId: result.idMsg,
@@ -2727,106 +2792,108 @@ export class ForumsService {
   // Unread messages functionality
   async getUnreadTopics(userId: number, boardId?: number, limit: number = 20, offset: number = 0): Promise<any> {
     try {
-      const user = await this.prisma.smfMember.findUnique({
-        where: { idMember: userId },
-        select: { lastLogin: true, previousLogin: true }
+      // Get all boards user has access to
+      const categories = await this.getCategories(userId);
+      const accessibleBoardIds = categories.flatMap(cat => cat.boards.map(b => b.id));
+
+      if (accessibleBoardIds.length === 0) {
+        return { topics: [], total: 0, limit, offset };
+      }
+
+      // Filter by specific board if provided
+      const boardIds = boardId ? [boardId].filter(id => accessibleBoardIds.includes(id)) : accessibleBoardIds;
+
+      if (boardIds.length === 0) {
+        return { topics: [], total: 0, limit, offset };
+      }
+
+      // Get all topics from accessible boards
+      const allTopics = await this.prisma.smfTopic.findMany({
+        where: {
+          idBoard: { in: boardIds },
+          idLastMsg: { gt: 0 }
+        },
+        include: {
+          firstMessage: true,
+          lastMessage: {
+            include: {
+              member: true
+            }
+          },
+          board: {
+            include: {
+              category: true
+            }
+          },
+          starter: true
+        },
+        orderBy: [
+          { isSticky: 'desc' },
+          { idLastMsg: 'desc' }
+        ]
       });
 
-      if (!user) {
-        return { topics: [], total: 0, limit, offset };
-      }
-
-      // Use previousLogin if available, otherwise fall back to lastLogin
-      const referenceTime = user.previousLogin || user.lastLogin;
-
-      if (!referenceTime) {
-        return { topics: [], total: 0, limit, offset };
-      }
-
-      const whereClause: any = {
-        idLastMsg: {
-          gt: 0
+      // Get user's read logs for these topics
+      const topicIds = allTopics.map(t => t.idTopic);
+      const readLogs = await this.prisma.smfLogTopics.findMany({
+        where: {
+          idMember: userId,
+          idTopic: { in: topicIds }
         },
-        lastMessage: {
-          posterTime: {
-            gt: referenceTime
-          }
+        select: {
+          idTopic: true,
+          idMsg: true
         }
-      };
+      });
 
-      if (boardId) {
-        whereClause.idBoard = boardId;
-      }
+      const readLogsMap = new Map(readLogs.map(log => [log.idTopic, log.idMsg]));
 
-      // Check board access
-      const [topics, totalTopics] = await Promise.all([
-        this.prisma.smfTopic.findMany({
-          where: whereClause,
-          skip: offset,
-          take: limit,
-          orderBy: [
-            { isSticky: 'desc' },
-            { idLastMsg: 'desc' }
-          ],
-          include: {
-            firstMessage: true,
-            lastMessage: {
-              include: {
-                member: true
-              }
-            },
-            board: {
-              include: {
-                category: true
-              }
-            },
-            starter: true
-          }
-        }),
-        this.prisma.smfTopic.count({
-          where: whereClause
-        })
-      ]);
-
-      // Filter by board access
-      const accessibleTopics: any[] = [];
-      for (const topic of topics) {
-        const hasAccess = await this.checkBoardAccess(topic.idBoard, userId);
-        if (hasAccess) {
-          accessibleTopics.push({
-            id: topic.idTopic,
-            subject: topic.firstMessage?.subject || 'Untitled',
-            isSticky: Boolean(topic.isSticky),
-            locked: Boolean(topic.locked),
-            hasPoll: topic.idPoll > 0,
-            numReplies: topic.numReplies,
-            numViews: topic.numViews,
-            board: {
-              id: topic.board.idBoard,
-              name: topic.board.name,
-              categoryName: topic.board.category.name
-            },
-            starter: {
-              id: topic.starter?.idMember || 0,
-              name: topic.starter?.memberName || topic.firstMessage?.posterName || 'Unknown'
-            },
-            lastMessage: topic.lastMessage ? {
-              id: topic.lastMessage.idMsg,
-              time: topic.lastMessage.posterTime,
-              author: topic.lastMessage.member?.memberName || topic.lastMessage.posterName,
-              isNew: topic.lastMessage.posterTime > referenceTime
-            } : null,
-            firstMessageTime: topic.firstMessage?.posterTime || 0
-          });
+      // Filter to only unread topics
+      const unreadTopics = allTopics.filter(topic => {
+        const lastReadMsgId = readLogsMap.get(topic.idTopic);
+        if (lastReadMsgId === undefined) {
+          // No read log entry = topic is unread
+          return true;
         }
-      }
+        // Topic has new messages since last read
+        return topic.idLastMsg > lastReadMsgId;
+      });
+
+      // Get total count and apply pagination
+      const total = unreadTopics.length;
+      const paginatedTopics = unreadTopics.slice(offset, offset + limit);
+
+      // Format the response
+      const formattedTopics = paginatedTopics.map(topic => ({
+        id: topic.idTopic,
+        subject: topic.firstMessage?.subject || 'Untitled',
+        isSticky: Boolean(topic.isSticky),
+        locked: Boolean(topic.locked),
+        hasPoll: topic.idPoll > 0,
+        numReplies: topic.numReplies,
+        numViews: topic.numViews,
+        board: {
+          id: topic.board.idBoard,
+          name: topic.board.name,
+          categoryName: topic.board.category.name
+        },
+        starter: {
+          id: topic.starter?.idMember || 0,
+          name: topic.starter?.memberName || topic.firstMessage?.posterName || 'Unknown'
+        },
+        lastMessage: topic.lastMessage ? {
+          id: topic.lastMessage.idMsg,
+          time: topic.lastMessage.posterTime,
+          author: topic.lastMessage.member?.memberName || topic.lastMessage.posterName
+        } : null,
+        firstMessageTime: topic.firstMessage?.posterTime || 0
+      }));
 
       return {
-        topics: accessibleTopics,
-        total: totalTopics,
+        topics: formattedTopics,
+        total,
         limit,
-        offset,
-        lastLoginTime: user.lastLogin
+        offset
       };
     } catch (error) {
       this.logger.error('Error fetching unread topics:', error);
@@ -2836,15 +2903,6 @@ export class ForumsService {
 
   async getUnreadCount(userId: number): Promise<{ count: number }> {
     try {
-      const user = await this.prisma.smfMember.findUnique({
-        where: { idMember: userId },
-        select: { lastLogin: true }
-      });
-
-      if (!user || !user.lastLogin) {
-        return { count: 0 };
-      }
-
       // Get all boards user has access to
       const categories = await this.getCategories(userId);
       const boardIds = categories.flatMap(cat => cat.boards.map(b => b.id));
@@ -2853,19 +2911,41 @@ export class ForumsService {
         return { count: 0 };
       }
 
-      // Count topics with new messages since last login
-      const count = await this.prisma.smfTopic.count({
+      // Get all topics from accessible boards
+      const allTopics = await this.prisma.smfTopic.findMany({
         where: {
-          idBoard: {
-            in: boardIds
-          },
-          lastMessage: {
-            posterTime: {
-              gt: user.lastLogin
-            }
-          }
+          idBoard: { in: boardIds },
+          idLastMsg: { gt: 0 }
+        },
+        select: {
+          idTopic: true,
+          idLastMsg: true
         }
       });
+
+      // Get user's read logs for these topics
+      const topicIds = allTopics.map(t => t.idTopic);
+      const readLogs = await this.prisma.smfLogTopics.findMany({
+        where: {
+          idMember: userId,
+          idTopic: { in: topicIds }
+        },
+        select: {
+          idTopic: true,
+          idMsg: true
+        }
+      });
+
+      const readLogsMap = new Map(readLogs.map(log => [log.idTopic, log.idMsg]));
+
+      // Count unread topics
+      const count = allTopics.filter(topic => {
+        const lastReadMsgId = readLogsMap.get(topic.idTopic);
+        if (lastReadMsgId === undefined) {
+          return true; // No read log = unread
+        }
+        return topic.idLastMsg > lastReadMsgId; // New messages since last read
+      }).length;
 
       return { count };
     } catch (error) {
@@ -2913,14 +2993,50 @@ export class ForumsService {
 
   async markAllAsRead(userId: number): Promise<{ success: boolean }> {
     try {
-      // Update lastLogin to current time so all previous messages appear as read
-      // This is the ONLY legitimate use case for updating lastLogin outside of actual login
-      const currentTime = Math.floor(Date.now() / 1000);
-
-      await this.prisma.smfMember.update({
-        where: { idMember: userId },
-        data: { lastLogin: currentTime }
+      // Get all topics with their last message IDs and board IDs
+      const topics = await this.prisma.smfTopic.findMany({
+        select: {
+          idTopic: true,
+          idLastMsg: true,
+          idBoard: true
+        }
       });
+
+      if (topics.length === 0) {
+        return { success: true };
+      }
+
+      // Create/update smfLogTopics entries for all topics
+      const upsertPromises = topics.map(topic =>
+        this.prisma.smfLogTopics.upsert({
+          where: {
+            idTopic_idMember: {
+              idTopic: topic.idTopic,
+              idMember: userId
+            }
+          },
+          update: {
+            idMsg: topic.idLastMsg
+          },
+          create: {
+            idTopic: topic.idTopic,
+            idMember: userId,
+            idMsg: topic.idLastMsg
+          }
+        })
+      );
+
+      // Execute all upserts in parallel
+      await Promise.all(upsertPromises);
+
+      // Get unique board IDs to invalidate their caches
+      const boardIds = [...new Set(topics.map(t => t.idBoard))];
+
+      // Invalidate user-specific forum caches to reflect the read status change
+      await Promise.all([
+        this.cacheService.del(`forums:categories:user${userId}`),
+        ...boardIds.map(boardId => this.cacheService.invalidateUserForumBoard(boardId, userId))
+      ]);
 
       return { success: true };
     } catch (error) {
@@ -2966,6 +3082,13 @@ export class ForumsService {
 
       // Execute all upserts in parallel
       await Promise.all(upsertPromises);
+
+      // Invalidate user-specific caches to reflect the read status change
+      await Promise.all([
+        this.cacheService.del(`forums:categories:user${userId}`),
+        this.cacheService.invalidateForumBoard(boardId),
+        this.cacheService.invalidateUserForumBoard(boardId, userId)
+      ]);
 
       return { success: true, count: topics.length };
     } catch (error) {
