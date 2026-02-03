@@ -383,6 +383,8 @@ model MangaVolume {
   @@unique([isbn], name: "unique_isbn")
   @@index([idManga])
   @@index([isbn])
+  @@index([releaseDate])
+  @@index([idManga, releaseDate], name: "idx_manga_volumes_manga_release")
   @@map("manga_volumes")
 }
 

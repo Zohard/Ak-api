@@ -125,6 +125,25 @@ export class MangasController {
     return this.mangasService.getRandomManga();
   }
 
+  @Get('planning')
+  @ApiOperation({ summary: 'Calendrier des sorties manga (Planning)' })
+  @ApiQuery({ name: 'startDate', required: false, description: 'Date de début (YYYY-MM-DD)', example: '2024-05-01' })
+  @ApiQuery({ name: 'endDate', required: false, description: 'Date de fin (YYYY-MM-DD)', example: '2024-08-01' })
+  @ApiQuery({ name: 'limit', required: false, description: 'Nombre max de résultats', example: 100 })
+  @ApiResponse({ status: 200, description: 'Liste des sorties prévues' })
+  async getPlanning(
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+    @Query('limit') limit?: string,
+  ) {
+    const start = startDate ? new Date(startDate) : new Date();
+    // Default: 3 months ahead
+    const end = endDate ? new Date(endDate) : new Date(new Date().setMonth(new Date().getMonth() + 3));
+    const parsedLimit = limit ? parseInt(limit) : 100;
+
+    return this.mangaVolumesService.getPlanning(start, end, parsedLimit);
+  }
+
   @Get('genres')
   @ApiOperation({ summary: 'Liste de tous les genres disponibles' })
   @ApiResponse({ status: 200, description: 'Liste des genres' })
@@ -697,24 +716,7 @@ export class MangasController {
     return this.mangasService.updateMangaImageFromUrl(id, imageUrl);
   }
 
-  @Get('planning')
-  @ApiOperation({ summary: 'Calendrier des sorties manga (Planning)' })
-  @ApiQuery({ name: 'startDate', required: false, description: 'Date de début (YYYY-MM-DD)', example: '2024-05-01' })
-  @ApiQuery({ name: 'endDate', required: false, description: 'Date de fin (YYYY-MM-DD)', example: '2024-08-01' })
-  @ApiQuery({ name: 'limit', required: false, description: 'Nombre max de résultats', example: 100 })
-  @ApiResponse({ status: 200, description: 'Liste des sorties prévues' })
-  async getPlanning(
-    @Query('startDate') startDate?: string,
-    @Query('endDate') endDate?: string,
-    @Query('limit') limit?: string,
-  ) {
-    const start = startDate ? new Date(startDate) : new Date();
-    // Default: 3 months ahead
-    const end = endDate ? new Date(endDate) : new Date(new Date().setMonth(new Date().getMonth() + 3));
-    const parsedLimit = limit ? parseInt(limit) : 100;
 
-    return this.mangaVolumesService.getPlanning(start, end, parsedLimit);
-  }
 
   // ==================== CROSS-MEDIA RELATIONS ENDPOINTS ====================
 

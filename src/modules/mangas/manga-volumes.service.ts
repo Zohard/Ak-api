@@ -428,15 +428,10 @@ export class MangaVolumesService {
       return {
         volumeNumber,
         status: 'created',
-        coverUploaded,
       };
-    } catch (error) {
-      this.logger.error(`Error syncing volume ${volumeNumber} for manga ${mangaId}: ${error.message}`);
-      return {
-        volumeNumber,
-        status: 'error',
-        message: error.message,
-      };
+    } finally {
+      // Invalidate planning cache whenever a volume is synced/modified
+      await this.cacheService.invalidateMangaPlanning();
     }
   }
 
@@ -572,6 +567,7 @@ export class MangaVolumesService {
 
       // Invalidate cache
       await this.invalidateMangaCache(mangaId);
+      await this.cacheService.invalidateMangaPlanning();
 
       return {
         success: true,
@@ -733,6 +729,15 @@ export class MangaVolumesService {
     endDate: Date = new Date(new Date().setMonth(new Date().getMonth() + 3)),
     limit: number = 50,
   ) {
+    // Generate cache key
+    const cacheKey = `${startDate.toISOString().split('T')[0]}_${endDate.toISOString().split('T')[0]}_${limit}`;
+
+    // Check cache
+    const cached = await this.cacheService.getMangaPlanning(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
     const volumes = await this.prisma.mangaVolume.findMany({
       where: {
         releaseDate: {
@@ -761,10 +766,15 @@ export class MangaVolumesService {
 
     // Group by month for easier frontend display? Or return flat list?
     // Let's return a flat list but with useful structure
-    return volumes.map(v => ({
+    const result = volumes.map(v => ({
       ...v,
       mangaTitle: v.manga?.titreFr || v.manga?.titre, // Prefer French title
     }));
+
+    // Set cache (2 hours = 7200s)
+    await this.cacheService.setMangaPlanning(cacheKey, result, 7200);
+
+    return result;
   }
 
   /**

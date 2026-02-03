@@ -1286,7 +1286,7 @@ export class MangasService extends BaseContentService<
             volumeNumber = parseInt(volumeMatch[1], 10);
 
             // Check if volume exists in database
-            const volume = await this.prisma.akMangaVolume.findFirst({
+            const volume = await this.prisma.mangaVolume.findFirst({
               where: {
                 idManga: existing.idManga,
                 volumeNumber: volumeNumber
@@ -2330,6 +2330,7 @@ export class MangasService extends BaseContentService<
     await this.cacheService.invalidateSearchCache();
     await this.cacheService.invalidateRankings('manga');
     await this.cacheService.invalidateHomepageStats(); // Invalidate homepage stats (manga count)
+    await this.cacheService.invalidateMangaPlanning();
   }
 
   // Utility method to create consistent cache keys
@@ -2449,7 +2450,7 @@ export class MangasService extends BaseContentService<
       }
     }
 
-    return this.prisma.mangaVolume.create({
+    const volume = await this.prisma.mangaVolume.create({
       data: {
         idManga: mangaId,
         volumeNumber: createVolumeDto.volumeNumber,
@@ -2462,6 +2463,9 @@ export class MangasService extends BaseContentService<
         description: createVolumeDto.description,
       },
     });
+
+    await this.cacheService.invalidateMangaPlanning();
+    return volume;
   }
 
   /**
@@ -2487,7 +2491,7 @@ export class MangasService extends BaseContentService<
       }
     }
 
-    return this.prisma.mangaVolume.update({
+    const updatedVolume = await this.prisma.mangaVolume.update({
       where: { idVolume: volumeId },
       data: {
         ...updateVolumeDto,
@@ -2496,6 +2500,9 @@ export class MangasService extends BaseContentService<
           : undefined,
       },
     });
+
+    await this.cacheService.invalidateMangaPlanning();
+    return updatedVolume;
   }
 
   /**
@@ -2508,6 +2515,8 @@ export class MangasService extends BaseContentService<
     await this.prisma.mangaVolume.delete({
       where: { idVolume: volumeId },
     });
+
+    await this.cacheService.invalidateMangaPlanning();
 
     return { message: 'Volume deleted successfully' };
   }
@@ -2617,6 +2626,8 @@ export class MangasService extends BaseContentService<
         coverImage: coverImagePath,
       },
     });
+
+    await this.cacheService.invalidateMangaPlanning();
 
     return {
       volume,

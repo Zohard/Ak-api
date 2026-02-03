@@ -188,6 +188,20 @@ export class CacheService implements OnModuleInit {
     await this.set(`manga_list:${key}`, mangas, ttl); // 5 minutes
   }
 
+  // Manga Planning cache
+  async getMangaPlanning(key: string): Promise<any> {
+    return this.get(`planning:manga:${key}`);
+  }
+
+  async setMangaPlanning(key: string, data: any, ttl = 7200): Promise<void> {
+    await this.set(`planning:manga:${key}`, data, ttl); // 2 hours
+  }
+
+  async invalidateMangaPlanning(): Promise<void> {
+    await this.delByPattern('planning:manga:*');
+    this.logger.debug('Invalidated manga planning cache');
+  }
+
   // User collections cache methods
   async getUserCollections(userId: number, key: string): Promise<any> {
     return this.get(`user_collections:${userId}:${key}`);
@@ -728,6 +742,7 @@ export class CacheService implements OnModuleInit {
       anilist_data: 'anilist_season_data:*',
       anilist_search: 'anilist_search:*',
       manga: 'manga:*',
+      planning_manga: 'planning:manga:*',
       game: 'game:*',
       business: 'business:*',
       homepage: 'homepage:*',
@@ -825,6 +840,7 @@ export class CacheService implements OnModuleInit {
       anilist_data: 'anilist_season_data:*',
       anilist_search: 'anilist_search:*',
       manga: 'manga:*',
+      planning_manga: 'planning:manga:*',
       game: 'game:*',
       business: 'business:*',
       homepage: 'homepage:*',
