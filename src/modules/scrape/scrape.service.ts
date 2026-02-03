@@ -1215,11 +1215,37 @@ export class ScrapeService {
     const series = $('span:contains("Série")').next('a').text().trim() ||
       $('span:contains("Collection")').next('a').text().trim();
 
-    // Volume number (extract from title if present)
+    // Volume number - try dedicated fields first, then fallback to title extraction
     let volumeNumber: number | null = null;
-    const volMatch = title.match(/tome\s*(\d+)|vol\.?\s*(\d+)|t\.?\s*(\d+)/i);
-    if (volMatch) {
-      volumeNumber = parseInt(volMatch[1] || volMatch[2] || volMatch[3], 10);
+
+    // Strategy 1: Look for dedicated "Tome" or "Numéro" field on Booknode
+    const tomeText = $('span:contains("Tome")').parent().text() ||
+      $('span:contains("Numéro dans la série")').parent().text() ||
+      $('span:contains("Numéro")').parent().text() ||
+      $('[itemprop="position"]').text().trim() ||
+      $('[itemprop="bookEdition"]').text().trim();
+
+    if (tomeText) {
+      const tomeMatch = tomeText.match(/(?:Tome|Numéro(?:\s+dans la série)?|#)\s*:?\s*(\d+)/i);
+      if (tomeMatch) {
+        volumeNumber = parseInt(tomeMatch[1], 10);
+      }
+    }
+
+    // Strategy 2: Extract from series field if it contains the volume number
+    if (!volumeNumber && series) {
+      const seriesVolMatch = series.match(/,?\s*(?:Tome|Vol\.?|T\.?|#)\s*(\d+)/i);
+      if (seriesVolMatch) {
+        volumeNumber = parseInt(seriesVolMatch[1], 10);
+      }
+    }
+
+    // Strategy 3: Fallback to extracting from title
+    if (!volumeNumber) {
+      const volMatch = title.match(/tome\s*(\d+)|vol\.?\s*(\d+)|t\.?\s*(\d+)/i);
+      if (volMatch) {
+        volumeNumber = parseInt(volMatch[1] || volMatch[2] || volMatch[3], 10);
+      }
     }
 
     return {
