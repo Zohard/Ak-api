@@ -553,10 +553,12 @@ export class ForumsController {
   }
 
   @Get('online/stats')
+  @UseGuards(OptionalJwtAuthGuard)
   @ApiOperation({ summary: 'Get online users statistics' })
   @ApiResponse({ status: 200, description: 'Online stats retrieved successfully' })
-  async getOnlineStats() {
-    return await this.activityTracker.getOnlineStats();
+  async getOnlineStats(@Request() req) {
+    const userId = req?.user?.id || null;
+    return await this.activityTracker.getOnlineStats(userId);
   }
 
   @Get('boards/:boardId/viewers')

@@ -316,8 +316,9 @@ export class ActivityTrackerService {
 
   /**
    * Get online statistics (for homepage widget)
+   * @param userId Optional user ID to calculate friend count among online members
    */
-  async getOnlineStats(): Promise<any> {
+  async getOnlineStats(userId?: number): Promise<any> {
     try {
       const fifteenMinutesAgo = Math.floor(Date.now() / 1000) - (15 * 60);
 
@@ -347,8 +348,22 @@ export class ActivityTrackerService {
       // Create a map for quick lookup
       const memberMap = new Map(membersData.map(m => [m.idMember, m]));
 
+      // Get user's friend list if userId is provided
+      let friendIds: Set<number> = new Set();
+      if (userId) {
+        const user = await this.prisma.smfMember.findUnique({
+          where: { idMember: userId },
+          select: { buddyList: true }
+        });
+        if (user?.buddyList) {
+          const ids = user.buddyList.split(',').map(id => parseInt(id.trim())).filter(id => !isNaN(id) && id > 0);
+          friendIds = new Set(ids);
+        }
+      }
+
       const members: any[] = [];
       let guestCount = 0;
+      let friendCount = 0;
 
       for (const entry of onlineEntries) {
         if (entry.idMember === 0) {
@@ -356,11 +371,15 @@ export class ActivityTrackerService {
         } else {
           const member = memberMap.get(entry.idMember);
           if (member) {
+            const isFriend = friendIds.has(member.idMember);
+            if (isFriend) friendCount++;
+
             members.push({
               id: member.idMember,
               username: member.memberName,
               realName: member.realName || member.memberName,
               avatar: member.avatar,
+              isFriend,
               group: {
                 name: member.membergroup?.groupName || 'Member',
                 color: member.membergroup?.onlineColor || null
@@ -375,11 +394,15 @@ export class ActivityTrackerService {
         index === self.findIndex((m) => m.id === member.id)
       );
 
+      // Recalculate friend count from unique members
+      const uniqueFriendCount = uniqueMembers.filter(m => m.isFriend).length;
+
       return {
         totalOnline: uniqueMembers.length + guestCount,
         members: uniqueMembers,
         memberCount: uniqueMembers.length,
-        guestCount: guestCount
+        guestCount: guestCount,
+        friendCount: uniqueFriendCount
       };
     } catch (error) {
       this.logger.error('Error getting online stats:', error);
@@ -387,7 +410,8 @@ export class ActivityTrackerService {
         totalOnline: 0,
         members: [],
         memberCount: 0,
-        guestCount: 0
+        guestCount: 0,
+        friendCount: 0
       };
     }
   }
