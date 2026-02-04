@@ -109,7 +109,10 @@ export abstract class BaseContentService<T, CreateDto, UpdateDto, QueryDto> {
     }
 
     const where: any = {
-      titre: { contains: query, mode: 'insensitive' },
+      OR: [
+        { titre: { contains: query, mode: 'insensitive' } },
+        { titreOrig: { contains: query, mode: 'insensitive' } },
+      ],
       statut: statusFilter,
     };
 
@@ -138,13 +141,21 @@ export abstract class BaseContentService<T, CreateDto, UpdateDto, QueryDto> {
     const queryLower = query.toLowerCase();
     const rankedItems = items
       .map((item: any) => {
-        const titreLower = item.titre.toLowerCase();
-        let rank = 3; // Default: contains
+        const titreLower = item.titre?.toLowerCase() || '';
+        const titreOrigLower = item.titreOrig?.toLowerCase() || '';
+        let rank = 4; // Default: contains in original title
 
+        // Check main title first (higher priority)
         if (titreLower === queryLower) {
-          rank = 1; // Exact match
+          rank = 1; // Exact match on main title
         } else if (titreLower.startsWith(queryLower)) {
-          rank = 2; // Starts with
+          rank = 2; // Starts with main title
+        } else if (titreLower.includes(queryLower)) {
+          rank = 3; // Contains in main title
+        } else if (titreOrigLower === queryLower) {
+          rank = 2; // Exact match on original title
+        } else if (titreOrigLower.startsWith(queryLower)) {
+          rank = 3; // Starts with original title
         }
 
         return { ...item, _rank: rank };

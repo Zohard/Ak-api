@@ -62,6 +62,7 @@ export class AnimesService extends BaseContentService<
     return {
       idAnime: true,
       titre: true,
+      titreOrig: true,
       annee: true,
       image: true,
     };

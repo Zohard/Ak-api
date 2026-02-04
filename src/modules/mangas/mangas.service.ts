@@ -58,6 +58,7 @@ export class MangasService extends BaseContentService<
     return {
       idManga: true,
       titre: true,
+      titreOrig: true,
       annee: true,
       auteur: true,
       image: true,
