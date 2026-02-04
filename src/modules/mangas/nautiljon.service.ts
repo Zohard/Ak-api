@@ -381,14 +381,14 @@ export class NautiljonService {
         }
       }
 
-      // Description
+      // Description extraction disabled by user request
       let description: string | undefined;
-      const descElement = $('div.description').first().clone();
-      descElement.find('div.fader').remove();
-      const descText = descElement.text().trim();
-      if (descText && descText.length > 10) {
-        description = descText;
-      }
+      // const descElement = $('div.description').first().clone();
+      // descElement.find('div.fader').remove();
+      // const descText = descElement.text().trim();
+      // if (descText && descText.length > 10) {
+      //   description = descText;
+      // }
 
       // Publisher
       let publisher: string | undefined;

@@ -51,4 +51,23 @@ export class NotificationsCronController {
             message: `Checked releases for ${date.toISOString().split('T')[0]}. Found ${result.episodesFound} episodes, sent ${result.notificationsSent} notifications.`
         };
     }
+
+    @Post('check-manga-releases')
+    @UseGuards(OptionalJwtAuthGuard, CronAuthGuard)
+    @ApiHeader({
+        name: 'x-cron-api-key',
+        description: 'API Key for external cron jobs',
+        required: false,
+    })
+    @ApiOperation({ summary: 'Trigger check for new manga volumes (Cron/Manual)' })
+    @ApiResponse({ status: 200, description: 'Check completed' })
+    async checkMangaReleases(@Query('date') dateStr?: string) {
+        const date = dateStr ? new Date(dateStr) : new Date();
+        const result = await this.notificationsService.checkAndNotifyReleasedVolumes(date);
+        return {
+            success: true,
+            data: result,
+            message: `Checked volume releases for ${date.toISOString().split('T')[0]}. Found ${result.volumesFound} volumes, sent ${result.notificationsSent} notifications.`
+        };
+    }
 }

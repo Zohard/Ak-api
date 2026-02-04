@@ -3,6 +3,7 @@ import { PrismaService } from '../../shared/services/prisma.service';
 import * as nodemailer from 'nodemailer';
 import { ConfigService } from '@nestjs/config';
 import { EpisodesService } from '../animes/episodes/episodes.service';
+import { MangaVolumesService } from '../mangas/manga-volumes.service';
 
 export interface EmailTemplate {
   subject: string;
@@ -49,7 +50,9 @@ export interface NotificationData {
   | 'event_voting_started'
   | 'event_voting_ended'
   | 'related_content_added'
-  | 'episode_release';
+  | 'related_content_added'
+  | 'episode_release'
+  | 'volume_release';
   title: string;
   message: string;
   data?: any;
@@ -65,6 +68,7 @@ export class NotificationsService {
     private prisma: PrismaService,
     private configService: ConfigService,
     private episodesService: EpisodesService,
+    private mangaVolumesService: MangaVolumesService,
   ) {
     this.initializeEmailTransporter();
   }
@@ -474,6 +478,9 @@ export class NotificationsService {
       case 'episode_release':
         // Reuse new season anime preference for episode releases
         return preferences.webNewSeasonAnime;
+      case 'volume_release':
+        // Reuse new season anime preference (or new review?) - Let's reuse new season anime for now as "New Content"
+        return preferences.webNewSeasonAnime;
       default:
         return true;
     }
@@ -507,6 +514,8 @@ export class NotificationsService {
       case 'event_voting_ended':
         return preferences.emailEventVoting;
       case 'episode_release':
+        return preferences.emailNewSeasonAnime;
+      case 'volume_release':
         return preferences.emailNewSeasonAnime;
       default:
         return false;
@@ -689,6 +698,29 @@ export class NotificationsService {
               </div>
               <div style="background-color: #f9fafb; padding: 20px; text-align: center; border-top: 1px solid #e5e7eb; font-size: 12px; color: #6b7280;">
                 Vous recevez cet email car vous avez cet anime dans votre collection.
+              </div>
+            </div>
+          `,
+          text: `${data.title}. ${data.message}`,
+        };
+
+      case 'volume_release':
+        return {
+          subject: `${data.title}`,
+          html: `
+            <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden;">
+              <div style="background-color: #f97316; padding: 20px; text-align: center;">
+                <h1 style="color: white; margin: 0; font-size: 24px;">📚 Nouveau Tome !</h1>
+              </div>
+              <div style="padding: 30px; line-height: 1.6; color: #374151;">
+                <h2 style="margin-top: 0;">Un nouveau volume est disponible</h2>
+                <p>${data.message}</p>
+                <div style="text-align: center; margin-top: 30px;">
+                  <a href="${baseUrl}/manga/${data.data?.mangaSlug || data.data?.mangaId}" style="background-color: #f97316; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">Voir la fiche</a>
+                </div>
+              </div>
+              <div style="background-color: #f9fafb; padding: 20px; text-align: center; border-top: 1px solid #e5e7eb; font-size: 12px; color: #6b7280;">
+                Vous recevez cet email car vous avez ce manga dans votre collection.
               </div>
             </div>
           `,
@@ -934,6 +966,74 @@ export class NotificationsService {
       return { episodesFound: episodes.length, notificationsSent };
     } catch (error) {
       this.logger.error(`Error checking episode releases: ${error.message}`);
+      throw error;
+    }
+  }
+
+  /**
+   * Check for manga volumes released on a specific date and notify users.
+   */
+  async checkAndNotifyReleasedVolumes(date: Date = new Date()): Promise<{ volumesFound: number; notificationsSent: number }> {
+    this.logger.log(`Checking volume releases for ${date.toISOString()}...`);
+    let notificationsSent = 0;
+
+    try {
+      // 1. Get volumes released on the date
+      const volumes = await this.mangaVolumesService.getVolumesReleasedOn(date);
+
+      if (volumes.length === 0) {
+        this.logger.log('No volumes released on this date.');
+        return { volumesFound: 0, notificationsSent: 0 };
+      }
+
+      this.logger.log(`Found ${volumes.length} volumes released.`);
+
+      for (const volume of volumes) {
+        if (!volume.manga) continue;
+
+        // 2. Find users who have this manga in their collection
+        // Status 1 = Reading, 2 = Plan to Read, 3 = On Hold
+        let users: { idMembre: number }[] = [];
+        try {
+          users = await this.prisma.collectionManga.findMany({
+            where: {
+              idManga: volume.idManga,
+              type: { in: [1, 2, 3] }
+            },
+            select: { idMembre: true }
+          });
+        } catch (e) {
+          this.logger.error(`Error querying users for manga ${volume.idManga}: ${e.message}`);
+          continue;
+        }
+
+        if (users.length === 0) continue;
+
+        this.logger.log(`Notifying ${users.length} users for ${volume.manga.titre} Volume ${volume.volumeNumber}`);
+
+        // 3. Send notifications
+        for (const user of users) {
+          const sent = await this.sendNotification({
+            userId: user.idMembre,
+            type: 'volume_release',
+            title: `Nouveau tome : ${volume.manga.titre}`,
+            message: `Le volume ${volume.volumeNumber} de ${volume.manga.titre} est sorti !`,
+            data: {
+              mangaId: volume.idManga,
+              mangaSlug: volume.manga.niceUrl,
+              volumeId: volume.idVolume,
+              volumeNum: volume.volumeNumber,
+              image: volume.coverImage || volume.manga.image
+            },
+            priority: 'medium'
+          });
+          if (sent) notificationsSent++;
+        }
+      }
+
+      return { volumesFound: volumes.length, notificationsSent };
+    } catch (error) {
+      this.logger.error(`Error checking volume releases: ${error.message}`);
       throw error;
     }
   }

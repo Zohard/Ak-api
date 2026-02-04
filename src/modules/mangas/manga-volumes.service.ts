@@ -744,6 +744,9 @@ export class MangaVolumesService {
           gte: startDate,
           lte: endDate,
         },
+        manga: {
+          statut: 1, // Only published/validated manga
+        },
       },
       include: {
         manga: {
@@ -775,6 +778,41 @@ export class MangaVolumesService {
     await this.cacheService.setMangaPlanning(cacheKey, result, 7200);
 
     return result;
+  }
+
+  /**
+   * Get volumes released on a specific date
+   * Used for daily notifications
+   */
+  async getVolumesReleasedOn(date: Date) {
+    const startOfDay = new Date(date);
+    startOfDay.setHours(0, 0, 0, 0);
+
+    const endOfDay = new Date(date);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    return this.prisma.mangaVolume.findMany({
+      where: {
+        releaseDate: {
+          gte: startOfDay,
+          lte: endOfDay,
+        },
+        manga: {
+          statut: 1, // Only published manga
+        },
+      },
+      include: {
+        manga: {
+          select: {
+            idManga: true,
+            titre: true,
+            titreFr: true,
+            image: true,
+            niceUrl: true,
+          },
+        },
+      },
+    });
   }
 
   /**
