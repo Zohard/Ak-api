@@ -1426,8 +1426,21 @@ export class ForumsService {
         return cached;
       }
 
-      // Get total messages, topics, and members
-      const [totalMessages, totalTopics, totalMembers, totalBoards, latestMember, latestMessage, topPosters, topBoards] = await Promise.all([
+      // Get all stats in parallel
+      const [
+        totalMessages,
+        totalTopics,
+        totalMembers,
+        totalBoards,
+        latestMember,
+        latestMessage,
+        topPosters,
+        topBoards,
+        topTopicsByReplies,
+        topTopicsByViews,
+        topTopicStarters,
+        topByTimeOnline
+      ] = await Promise.all([
         this.prisma.smfMessage.count(),
         this.prisma.smfTopic.count(),
         this.prisma.smfMember.count(),
@@ -1449,7 +1462,6 @@ export class ForumsService {
           }
         }),
         // Get latest message with topic and board info
-        // Use the topic's current board to ensure moved topics show the correct board
         this.prisma.smfMessage.findFirst({
           orderBy: { posterTime: 'desc' },
           where: {
@@ -1466,15 +1478,16 @@ export class ForumsService {
             topic: {
               include: {
                 firstMessage: true,
-                board: true  // Include the topic's board instead of message's board
+                board: true
               }
             }
           }
         }),
-        // Get top 5 posters
+        // Get top 10 posters
         this.prisma.smfMember.findMany({
           orderBy: { posts: 'desc' },
-          take: 5,
+          take: 10,
+          where: { posts: { gt: 0 } },
           select: {
             idMember: true,
             memberName: true,
@@ -1483,7 +1496,7 @@ export class ForumsService {
             avatar: true
           }
         }),
-        // Get top 5 boards by message count
+        // Get top 10 boards by message count
         this.prisma.smfBoard.findMany({
           where: {
             OR: [
@@ -1492,19 +1505,66 @@ export class ForumsService {
             ]
           },
           orderBy: { numPosts: 'desc' },
-          take: 5,
+          take: 10,
           select: {
             idBoard: true,
             name: true,
             numPosts: true,
             numTopics: true
           }
+        }),
+        // Get top 10 topics by replies
+        this.prisma.smfTopic.findMany({
+          orderBy: { numReplies: 'desc' },
+          take: 10,
+          include: {
+            firstMessage: {
+              select: { subject: true }
+            }
+          }
+        }),
+        // Get top 10 topics by views
+        this.prisma.smfTopic.findMany({
+          orderBy: { numViews: 'desc' },
+          take: 10,
+          include: {
+            firstMessage: {
+              select: { subject: true }
+            }
+          }
+        }),
+        // Get top 10 topic starters (members who started most topics)
+        this.prisma.$queryRaw`
+          SELECT m.id_member as id, m.member_name as name, m.real_name as realName, m.avatar,
+                 COUNT(t.id_topic) as topicCount
+          FROM smf_members m
+          JOIN smf_topics t ON t.id_member_started = m.id_member
+          GROUP BY m.id_member
+          ORDER BY topicCount DESC
+          LIMIT 10
+        `,
+        // Get top 10 by total time online
+        this.prisma.smfMember.findMany({
+          orderBy: { totalTimeLoggedIn: 'desc' },
+          take: 10,
+          where: { totalTimeLoggedIn: { gt: 0 } },
+          select: {
+            idMember: true,
+            memberName: true,
+            realName: true,
+            totalTimeLoggedIn: true,
+            avatar: true
+          }
         })
       ]);
 
-      // Calculate max posts for percentage calculations
+      // Calculate max values for percentage calculations
       const maxPosterPosts = topPosters.length > 0 ? topPosters[0].posts : 1;
       const maxBoardPosts = topBoards.length > 0 ? topBoards[0].numPosts : 1;
+      const maxTopicReplies = topTopicsByReplies.length > 0 ? topTopicsByReplies[0].numReplies : 1;
+      const maxTopicViews = topTopicsByViews.length > 0 ? topTopicsByViews[0].numViews : 1;
+      const maxTopicStarter = (topTopicStarters as any[]).length > 0 ? Number((topTopicStarters as any[])[0].topicCount) : 1;
+      const maxTimeOnline = topByTimeOnline.length > 0 ? topByTimeOnline[0].totalTimeLoggedIn : 1;
 
       const result = {
         totalMessages,
@@ -1522,8 +1582,8 @@ export class ForumsService {
           posterName: latestMessage.posterName,
           posterTime: latestMessage.posterTime,
           topicId: latestMessage.idTopic,
-          boardName: latestMessage.topic?.board?.name || 'Unknown',  // Use topic's board, not message's board
-          topicReplies: latestMessage.topic?.numReplies || 0  // Add reply count for page calculation
+          boardName: latestMessage.topic?.board?.name || 'Unknown',
+          topicReplies: latestMessage.topic?.numReplies || 0
         } : null,
         topPosters: topPosters.map(p => ({
           id: p.idMember,
@@ -1539,6 +1599,35 @@ export class ForumsService {
           posts: b.numPosts,
           topics: b.numTopics,
           percentage: Math.round((b.numPosts / maxBoardPosts) * 100)
+        })),
+        topTopicsByReplies: topTopicsByReplies.map(t => ({
+          id: t.idTopic,
+          subject: t.firstMessage?.subject || 'Sans titre',
+          replies: t.numReplies,
+          percentage: Math.round((t.numReplies / maxTopicReplies) * 100)
+        })),
+        topTopicsByViews: topTopicsByViews.map(t => ({
+          id: t.idTopic,
+          subject: t.firstMessage?.subject || 'Sans titre',
+          views: t.numViews,
+          percentage: Math.round((t.numViews / maxTopicViews) * 100)
+        })),
+        topTopicStarters: (topTopicStarters as any[]).map(s => ({
+          id: Number(s.id),
+          name: s.name,
+          realName: s.realName || s.name,
+          avatar: s.avatar,
+          topicCount: Number(s.topicCount),
+          percentage: Math.round((Number(s.topicCount) / maxTopicStarter) * 100)
+        })),
+        topByTimeOnline: topByTimeOnline.map(m => ({
+          id: m.idMember,
+          name: m.memberName,
+          realName: m.realName || m.memberName,
+          avatar: m.avatar,
+          totalTime: m.totalTimeLoggedIn,
+          formattedTime: this.formatTimeOnline(m.totalTimeLoggedIn),
+          percentage: Math.round((m.totalTimeLoggedIn / maxTimeOnline) * 100)
         }))
       };
 
@@ -1556,9 +1645,23 @@ export class ForumsService {
         latestMember: null,
         latestMessage: null,
         topPosters: [],
-        topBoards: []
+        topBoards: [],
+        topTopicsByReplies: [],
+        topTopicsByViews: [],
+        topTopicStarters: [],
+        topByTimeOnline: []
       };
     }
+  }
+
+  /**
+   * Format time in seconds to "Xj Yh Zm" format
+   */
+  private formatTimeOnline(seconds: number): string {
+    const days = Math.floor(seconds / 86400);
+    const hours = Math.floor((seconds % 86400) / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    return `${days}j ${hours}h ${minutes}m`;
   }
 
   async getOnlineUsers(): Promise<any> {
