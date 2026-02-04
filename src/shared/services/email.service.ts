@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Resend } from 'resend';
+import { parseBBCode } from '../utils/bbcode.util';
 
 @Injectable()
 export class EmailService {
@@ -77,11 +78,13 @@ export class EmailService {
     const messagesUrl = `${this.configService.get('FRONTEND_URL')}/messages`;
 
     try {
+      const parsedMessage = parseBBCode(messagePreview);
+
       const { data, error } = await this.resend.emails.send({
         from: this.fromEmail,
         to: recipientEmail,
         subject: `Nouveau message privé de ${senderName} - Anime-Kun`,
-        html: this.getPrivateMessageTemplate(recipientUsername, senderName, subject, messagePreview, messagesUrl),
+        html: this.getPrivateMessageTemplate(recipientUsername, senderName, subject, parsedMessage, messagesUrl),
       });
 
       if (error) {
