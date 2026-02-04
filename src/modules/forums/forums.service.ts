@@ -1414,10 +1414,18 @@ export class ForumsService {
   async getForumStats(): Promise<any> {
     try {
       // Get total messages, topics, and members
-      const [totalMessages, totalTopics, totalMembers, latestMember, latestMessage] = await Promise.all([
+      const [totalMessages, totalTopics, totalMembers, totalBoards, latestMember, latestMessage, topPosters, topBoards] = await Promise.all([
         this.prisma.smfMessage.count(),
         this.prisma.smfTopic.count(),
         this.prisma.smfMember.count(),
+        this.prisma.smfBoard.count({
+          where: {
+            OR: [
+              { redirect: null },
+              { redirect: '' }
+            ]
+          }
+        }),
         // Get latest member
         this.prisma.smfMember.findFirst({
           orderBy: { dateRegistered: 'desc' },
@@ -1449,13 +1457,47 @@ export class ForumsService {
               }
             }
           }
+        }),
+        // Get top 5 posters
+        this.prisma.smfMember.findMany({
+          orderBy: { posts: 'desc' },
+          take: 5,
+          select: {
+            idMember: true,
+            memberName: true,
+            realName: true,
+            posts: true,
+            avatar: true
+          }
+        }),
+        // Get top 5 boards by message count
+        this.prisma.smfBoard.findMany({
+          where: {
+            OR: [
+              { redirect: null },
+              { redirect: '' }
+            ]
+          },
+          orderBy: { numPosts: 'desc' },
+          take: 5,
+          select: {
+            idBoard: true,
+            name: true,
+            numPosts: true,
+            numTopics: true
+          }
         })
       ]);
+
+      // Calculate max posts for percentage calculations
+      const maxPosterPosts = topPosters.length > 0 ? topPosters[0].posts : 1;
+      const maxBoardPosts = topBoards.length > 0 ? topBoards[0].numPosts : 1;
 
       return {
         totalMessages,
         totalTopics,
         totalMembers,
+        totalBoards,
         latestMember: latestMember ? {
           id: latestMember.idMember,
           name: latestMember.memberName,
@@ -1469,7 +1511,22 @@ export class ForumsService {
           topicId: latestMessage.idTopic,
           boardName: latestMessage.topic?.board?.name || 'Unknown',  // Use topic's board, not message's board
           topicReplies: latestMessage.topic?.numReplies || 0  // Add reply count for page calculation
-        } : null
+        } : null,
+        topPosters: topPosters.map(p => ({
+          id: p.idMember,
+          name: p.memberName,
+          realName: p.realName || p.memberName,
+          posts: p.posts,
+          avatar: p.avatar,
+          percentage: Math.round((p.posts / maxPosterPosts) * 100)
+        })),
+        topBoards: topBoards.map(b => ({
+          id: b.idBoard,
+          name: b.name,
+          posts: b.numPosts,
+          topics: b.numTopics,
+          percentage: Math.round((b.numPosts / maxBoardPosts) * 100)
+        }))
       };
     } catch (error) {
       this.logger.error('Error fetching forum stats:', error);
@@ -1477,8 +1534,11 @@ export class ForumsService {
         totalMessages: 0,
         totalTopics: 0,
         totalMembers: 0,
+        totalBoards: 0,
         latestMember: null,
-        latestMessage: null
+        latestMessage: null,
+        topPosters: [],
+        topBoards: []
       };
     }
   }
