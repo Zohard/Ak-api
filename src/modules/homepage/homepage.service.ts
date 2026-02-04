@@ -86,7 +86,7 @@ export class HomePageService {
 
     if (!cachedForum) {
       this.logger.log('MISS: Forum');
-      promises.forum = this.forumsService.getLatestMessages({ limit: 2 } as any);
+      promises.forum = this.forumsService.getLatestMessages({ limit: 3 } as any);
     }
 
     if (!cachedStats) {
@@ -231,7 +231,7 @@ export class HomePageService {
     const reviews = promises.reviewsResult || cachedReviews || [];
     const articles = promises.articlesResult || cachedArticles || [];
     const season = promises.seasonResult || cachedSeason || { current: null, animes: [] };
-    const forum = promises.forumResult || cachedForum || { messages: [], total: 0, limit: 2, offset: 0 };
+    const forum = promises.forumResult || cachedForum || { messages: [], total: 0, limit: 3, offset: 0 };
     const stats = promises.statsResult || cachedStats || { animes: 0, mangas: 0, reviews: 0 };
     const recentAnimes = promises.recentAnimesResult || cachedRecentAnimes || [];
     const recentMangas = promises.recentMangasResult || cachedRecentMangas || [];
