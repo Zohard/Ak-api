@@ -146,7 +146,7 @@ export class HomePageService {
     if (!cachedRecentGames) {
       this.logger.log('MISS: Recent Games');
       promises.recentGames = this.prisma.akJeuxVideo.findMany({
-        where: { statut: 1, NOT: { dateAjout: null } },
+        where: { statut: 1, dateAjout: { not: null } },
         orderBy: { dateAjout: 'desc' },
         take: 3,
         select: {
