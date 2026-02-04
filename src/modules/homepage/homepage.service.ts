@@ -109,7 +109,7 @@ export class HomePageService {
     if (!cachedRecentAnimes) {
       this.logger.log('MISS: Recent Animes');
       promises.recentAnimes = this.prisma.akAnime.findMany({
-        where: { statut: 1, NOT: { dateAjout: null } },
+        where: { statut: 1, dateAjout: { not: null } },
         orderBy: { dateAjout: 'desc' },
         take: 3,
         select: {
@@ -127,7 +127,7 @@ export class HomePageService {
     if (!cachedRecentMangas) {
       this.logger.log('MISS: Recent Mangas');
       promises.recentMangas = this.prisma.akManga.findMany({
-        where: { statut: 1, NOT: { dateAjout: null } },
+        where: { statut: 1, dateAjout: { not: null } },
         orderBy: { dateAjout: 'desc' },
         take: 3,
         select: {
