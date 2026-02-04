@@ -763,6 +763,7 @@ export class ForumsService {
         isFirstMessage: Boolean(row.is_first_message),
         lastMessageTime: row.last_message_time ? Number(row.last_message_time) : undefined,
         lastPosterName: row.last_poster_name || undefined,
+        videoThumbnail: this.extractVideoThumbnail(row.body_excerpt || ''),
       }));
 
       const total = Number((countResult as any[])[0]?.total || 0);
@@ -1662,6 +1663,45 @@ export class ForumsService {
     const hours = Math.floor((seconds % 86400) / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
     return `${days}j ${hours}h ${minutes}m`;
+  }
+
+  /**
+   * Extract video thumbnail from BBCode body
+   * Supports YouTube and other common video formats
+   */
+  private extractVideoThumbnail(body: string): string | null {
+    if (!body) return null;
+
+    // YouTube BBCode patterns: [youtube]VIDEO_ID[/youtube] or [youtube]URL[/youtube]
+    const youtubeMatch = body.match(/\[youtube\](?:https?:\/\/(?:www\.)?youtube\.com\/watch\?v=)?([a-zA-Z0-9_-]{11})(?:[^\[]*)\[\/youtube\]/i);
+    if (youtubeMatch) {
+      return `https://img.youtube.com/vi/${youtubeMatch[1]}/mqdefault.jpg`;
+    }
+
+    // YouTube URL in video tag: [video]https://youtube.com/watch?v=VIDEO_ID[/video]
+    const videoYoutubeMatch = body.match(/\[video\]https?:\/\/(?:www\.)?youtube\.com\/watch\?v=([a-zA-Z0-9_-]{11})[^\[]*\[\/video\]/i);
+    if (videoYoutubeMatch) {
+      return `https://img.youtube.com/vi/${videoYoutubeMatch[1]}/mqdefault.jpg`;
+    }
+
+    // YouTube short URL: youtu.be/VIDEO_ID
+    const youtubeShortMatch = body.match(/\[(?:youtube|video)\]https?:\/\/youtu\.be\/([a-zA-Z0-9_-]{11})[^\[]*\[\/(?:youtube|video)\]/i);
+    if (youtubeShortMatch) {
+      return `https://img.youtube.com/vi/${youtubeShortMatch[1]}/mqdefault.jpg`;
+    }
+
+    // Plain YouTube URL in body (not in BBCode tag)
+    const plainYoutubeMatch = body.match(/https?:\/\/(?:www\.)?youtube\.com\/watch\?v=([a-zA-Z0-9_-]{11})/i);
+    if (plainYoutubeMatch) {
+      return `https://img.youtube.com/vi/${plainYoutubeMatch[1]}/mqdefault.jpg`;
+    }
+
+    const plainYoutubeShort = body.match(/https?:\/\/youtu\.be\/([a-zA-Z0-9_-]{11})/i);
+    if (plainYoutubeShort) {
+      return `https://img.youtube.com/vi/${plainYoutubeShort[1]}/mqdefault.jpg`;
+    }
+
+    return null;
   }
 
   async getOnlineUsers(): Promise<any> {

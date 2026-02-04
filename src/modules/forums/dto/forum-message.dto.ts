@@ -36,6 +36,7 @@ export interface ForumMessage {
   isFirstMessage: boolean;
   lastMessageTime?: number;
   lastPosterName?: string;
+  videoThumbnail?: string | null;
 }
 
 export interface ForumMessageResponse {
