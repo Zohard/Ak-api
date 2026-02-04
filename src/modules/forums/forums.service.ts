@@ -3054,7 +3054,7 @@ export class ForumsService {
         ]
       });
 
-      // Get user's read logs for these topics
+      // Get user's topic-specific read logs
       const topicIds = allTopics.map(t => t.idTopic);
       const readLogs = await this.prisma.smfLogTopics.findMany({
         where: {
@@ -3067,17 +3067,42 @@ export class ForumsService {
         }
       });
 
-      const readLogsMap = new Map(readLogs.map(log => [log.idTopic, log.idMsg]));
+      // Get user's board-level mark-read entries (from "mark all as read")
+      const markReadLogs = await this.prisma.smfLogMarkRead.findMany({
+        where: {
+          idMember: userId,
+          idBoard: { in: boardIds }
+        },
+        select: {
+          idBoard: true,
+          idMsg: true
+        }
+      });
+
+      const topicReadMap = new Map(readLogs.map(log => [log.idTopic, log.idMsg]));
+      const boardMarkReadMap = new Map(markReadLogs.map(log => [log.idBoard, log.idMsg]));
 
       // Filter to only unread topics
       const unreadTopics = allTopics.filter(topic => {
-        const lastReadMsgId = readLogsMap.get(topic.idTopic);
-        if (lastReadMsgId === undefined) {
-          // No read log entry = topic is unread
+        // Check topic-specific read entry first
+        const topicLastRead = topicReadMap.get(topic.idTopic);
+        if (topicLastRead !== undefined && topic.idLastMsg <= topicLastRead) {
+          return false; // Read via topic-specific entry
+        }
+
+        // Check board-level mark-read entry
+        const boardMarkRead = boardMarkReadMap.get(topic.idBoard);
+        if (boardMarkRead !== undefined && topic.idLastMsg <= boardMarkRead) {
+          return false; // Read via board mark-all-as-read
+        }
+
+        // If topic has a specific entry but new messages exist, it's unread
+        if (topicLastRead !== undefined && topic.idLastMsg > topicLastRead) {
           return true;
         }
-        // Topic has new messages since last read
-        return topic.idLastMsg > lastReadMsgId;
+
+        // No read entry at all = unread
+        return true;
       });
 
       // Get total count and apply pagination
@@ -3132,7 +3157,7 @@ export class ForumsService {
         return { count: 0 };
       }
 
-      // Get all topics from accessible boards
+      // Get all topics from accessible boards with their board ID
       const allTopics = await this.prisma.smfTopic.findMany({
         where: {
           idBoard: { in: boardIds },
@@ -3140,11 +3165,12 @@ export class ForumsService {
         },
         select: {
           idTopic: true,
+          idBoard: true,
           idLastMsg: true
         }
       });
 
-      // Get user's read logs for these topics
+      // Get user's topic-specific read logs
       const topicIds = allTopics.map(t => t.idTopic);
       const readLogs = await this.prisma.smfLogTopics.findMany({
         where: {
@@ -3157,15 +3183,42 @@ export class ForumsService {
         }
       });
 
-      const readLogsMap = new Map(readLogs.map(log => [log.idTopic, log.idMsg]));
+      // Get user's board-level mark-read entries (from "mark all as read")
+      const markReadLogs = await this.prisma.smfLogMarkRead.findMany({
+        where: {
+          idMember: userId,
+          idBoard: { in: boardIds }
+        },
+        select: {
+          idBoard: true,
+          idMsg: true
+        }
+      });
+
+      const topicReadMap = new Map(readLogs.map(log => [log.idTopic, log.idMsg]));
+      const boardMarkReadMap = new Map(markReadLogs.map(log => [log.idBoard, log.idMsg]));
 
       // Count unread topics
       const count = allTopics.filter(topic => {
-        const lastReadMsgId = readLogsMap.get(topic.idTopic);
-        if (lastReadMsgId === undefined) {
-          return true; // No read log = unread
+        // Check topic-specific read entry first
+        const topicLastRead = topicReadMap.get(topic.idTopic);
+        if (topicLastRead !== undefined && topic.idLastMsg <= topicLastRead) {
+          return false; // Read via topic-specific entry
         }
-        return topic.idLastMsg > lastReadMsgId; // New messages since last read
+
+        // Check board-level mark-read entry
+        const boardMarkRead = boardMarkReadMap.get(topic.idBoard);
+        if (boardMarkRead !== undefined && topic.idLastMsg <= boardMarkRead) {
+          return false; // Read via board mark-all-as-read
+        }
+
+        // If topic has a specific entry but new messages exist, it's unread
+        if (topicLastRead !== undefined && topic.idLastMsg > topicLastRead) {
+          return true;
+        }
+
+        // No read entry at all = unread
+        return true;
       }).length;
 
       return { count };
