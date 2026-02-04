@@ -1277,6 +1277,8 @@ export class ForumsService {
         this.cacheService.del('forums:messages:latest:limit50:offset0:all'),
       ]);
       await this.cacheService.invalidateHomepageForum(); // Invalidate homepage forum
+      // Invalidate stats cache since topic/message count and latest message changed
+      await this.cacheService.del('forums:stats');
 
       return {
         topicId: result.topic.idTopic,
@@ -1399,6 +1401,8 @@ export class ForumsService {
       await this.cacheService.invalidateHomepageForum(); // Invalidate homepage forum
       // Invalidate categories cache so "Dernier message" and unread status update
       await this.cacheService.del('forums:categories:public');
+      // Invalidate stats cache since message count and latest message changed
+      await this.cacheService.del('forums:stats');
 
       return {
         messageId: result.idMsg,
@@ -1412,7 +1416,16 @@ export class ForumsService {
   }
 
   async getForumStats(): Promise<any> {
+    const cacheKey = 'forums:stats';
+    const CACHE_TTL = 5 * 60 * 60; // 5 hours
+
     try {
+      // Check cache first
+      const cached = await this.cacheService.get(cacheKey);
+      if (cached) {
+        return cached;
+      }
+
       // Get total messages, topics, and members
       const [totalMessages, totalTopics, totalMembers, totalBoards, latestMember, latestMessage, topPosters, topBoards] = await Promise.all([
         this.prisma.smfMessage.count(),
@@ -1493,7 +1506,7 @@ export class ForumsService {
       const maxPosterPosts = topPosters.length > 0 ? topPosters[0].posts : 1;
       const maxBoardPosts = topBoards.length > 0 ? topBoards[0].numPosts : 1;
 
-      return {
+      const result = {
         totalMessages,
         totalTopics,
         totalMembers,
@@ -1528,6 +1541,11 @@ export class ForumsService {
           percentage: Math.round((b.numPosts / maxBoardPosts) * 100)
         }))
       };
+
+      // Cache the result for 5 hours
+      await this.cacheService.set(cacheKey, result, CACHE_TTL);
+
+      return result;
     } catch (error) {
       this.logger.error('Error fetching forum stats:', error);
       return {
