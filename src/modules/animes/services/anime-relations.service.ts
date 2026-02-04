@@ -330,7 +330,10 @@ export class AnimeRelationsService {
 
   async getAnimeSeason(id: number): Promise<{ season: string; year: number; id: number } | null> {
     try {
-      // Query to find the season where this anime ID is in the json_data
+      // Query to find the season where this anime ID is in the json_data array
+      // json_data is stored as ["397","398",...] - search for exact "id" in array
+      const idStr = String(id);
+      const searchPattern = `%"${idStr}"%`;
       const seasons = await this.prisma.$queryRaw<Array<{
         id_saison: number;
         saison: number;
@@ -339,7 +342,8 @@ export class AnimeRelationsService {
       }>>`
         SELECT id_saison, saison, annee, json_data
         FROM ak_animes_saisons
-        WHERE json_data::text LIKE ${`%"animes":%${id}%`}
+        WHERE json_data LIKE ${searchPattern}
+        ORDER BY annee ASC, saison ASC
         LIMIT 1
       `;
 
