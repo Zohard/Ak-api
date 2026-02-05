@@ -1537,11 +1537,11 @@ export class ForumsService {
         // Get top 10 topic starters (members who started most topics)
         this.prisma.$queryRaw`
           SELECT m.id_member as id, m.member_name as name, m.real_name as realName, m.avatar,
-                 COUNT(t.id_topic) as topicCount
+                 CAST(COUNT(t.id_topic) AS INTEGER) as "topicCount"
           FROM smf_members m
           JOIN smf_topics t ON t.id_member_started = m.id_member
-          GROUP BY m.id_member
-          ORDER BY topicCount DESC
+          GROUP BY m.id_member, m.member_name, m.real_name, m.avatar
+          ORDER BY "topicCount" DESC
           LIMIT 10
         `,
         // Get top 10 by total time online
