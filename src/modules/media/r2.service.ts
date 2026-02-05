@@ -104,12 +104,13 @@ export class R2Service {
         fileBuffer = file;
       }
 
-      // Upload to R2
+      // Upload to R2 with cache headers for optimal performance
       const command = new PutObjectCommand({
         Bucket: this.bucketName,
         Key: fileKey,
         Body: fileBuffer,
         ContentType: contentType,
+        CacheControl: 'public, max-age=31536000, immutable',
       });
 
       await this.r2Client.send(command);
