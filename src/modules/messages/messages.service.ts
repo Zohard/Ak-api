@@ -321,7 +321,7 @@ export class MessagesService {
         thread_id: message.idPmHead,
         sender_id: message.idMemberFrom,
         sender_name: message.fromName,
-        sender_username: message.sender.memberName,
+        sender_username: message.sender?.memberName || message.fromName, // Handle system messages with no sender
         subject: message.subject,
         message: this.encryptionService.decrypt(message.body), // Decrypt message body
         created_at: new Date(message.msgtime * 1000).toISOString(),
@@ -419,13 +419,13 @@ export class MessagesService {
         thread_id: message.idPmHead,
         sender_id: message.idMemberFrom,
         sender_name: message.fromName,
-        sender_username: message.sender.memberName,
+        sender_username: message.sender?.memberName || message.fromName, // Handle system messages
         subject: message.subject,
         message: this.encryptionService.decrypt(message.body), // Decrypt message body
         created_at: new Date(message.msgtime * 1000).toISOString(),
         is_read: message.recipients.find(r => r.idMember === userId)?.isRead || 0,
         recipient_id: message.recipients[0]?.idMember || 0,
-        recipient_username: message.recipients[0]?.member.memberName || '',
+        recipient_username: message.recipients[0]?.member?.memberName || '',
         conversation_url: message.conversationUrl || undefined
       }));
     } catch (error) {

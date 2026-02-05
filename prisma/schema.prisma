@@ -1058,8 +1058,8 @@ model SmfPersonalMessage {
   deletedBySender Int      @default(0) @map("deleted_by_sender")
   conversationUrl String?  @map("conversation_url") @db.VarChar(500)
 
-  // Relations
-  sender          SmfMember @relation("SentMessages", fields: [idMemberFrom], references: [idMember], onDelete: Cascade)
+  // Relations - sender is optional because system messages (Robot AK) have id_member_from = 0
+  sender          SmfMember? @relation("SentMessages", fields: [idMemberFrom], references: [idMember], onDelete: Cascade)
   recipients      SmfPmRecipient[]
 
   @@map("smf_personal_messages")
