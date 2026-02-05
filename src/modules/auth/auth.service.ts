@@ -16,6 +16,7 @@ import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
+import { CaptchaService } from '../../shared/services/captcha.service';
 
 @Injectable()
 export class AuthService {
@@ -25,6 +26,7 @@ export class AuthService {
     private readonly configService: ConfigService,
     private readonly emailService: EmailService,
     private readonly metricsService: MetricsService,
+    private readonly captchaService: CaptchaService,
   ) { }
 
   async validateUser(emailOrUsername: string, password: string): Promise<any> {
@@ -160,6 +162,11 @@ export class AuthService {
     ipAddress?: string,
     userAgent?: string,
   ) {
+    // Verify captcha if token is provided
+    if (registerDto.captchaToken) {
+      await this.captchaService.verifyCaptcha(registerDto.captchaToken, ipAddress);
+    }
+
     // Check if user exists
     const existingUser = await this.prisma.smfMember.findFirst({
       where: {

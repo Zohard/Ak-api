@@ -22,6 +22,8 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { IsOptional, IsString } from 'class-validator';
+import { ApiPropertyOptional } from '@nestjs/swagger';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
@@ -29,7 +31,10 @@ import { ResetPasswordDto } from './dto/reset-password.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 
 export class LogoutDto {
-  refreshToken: string;
+  @ApiPropertyOptional({ description: 'Refresh token to revoke' })
+  @IsOptional()
+  @IsString()
+  refreshToken?: string;
 }
 
 @ApiTags('Authentication')

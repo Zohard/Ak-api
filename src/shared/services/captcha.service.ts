@@ -58,10 +58,11 @@ export class CaptchaService {
         throw new BadRequestException('Captcha verification failed. Please try again.');
       }
 
-      // Optional: Check score for reCAPTCHA v3 (score between 0.0 and 1.0)
-      // if (data.score && data.score < 0.5) {
-      //   throw new BadRequestException('Captcha verification failed. Please try again.');
-      // }
+      // Check score for reCAPTCHA v3 (score between 0.0 and 1.0)
+      if (data.score !== undefined && data.score < 0.5) {
+        console.warn(`reCAPTCHA v3 score too low: ${data.score}`);
+        throw new BadRequestException('Captcha verification failed. Please try again.');
+      }
 
       return true;
     } catch (error) {
