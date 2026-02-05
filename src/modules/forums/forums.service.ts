@@ -2051,16 +2051,16 @@ export class ForumsService {
         await this.cacheService.invalidateForumTopic(message.idTopic);
         await this.cacheService.invalidateForumBoard(message.idBoard);
         // OPTIMIZED: Delete known category keys instead of SCAN
-      await Promise.all([
-        this.cacheService.del('forums:categories:public'),
-        this.cacheService.del('forums:categories'),
-      ]);
+        await Promise.all([
+          this.cacheService.del('forums:categories:public'),
+          this.cacheService.del('forums:categories'),
+        ]);
         // OPTIMIZED: Delete known latest messages keys instead of SCAN
-      await Promise.all([
-        this.cacheService.del('forums:messages:latest:limit10:offset0:all'),
-        this.cacheService.del('forums:messages:latest:limit20:offset0:all'),
-        this.cacheService.del('forums:messages:latest:limit50:offset0:all'),
-      ]);
+        await Promise.all([
+          this.cacheService.del('forums:messages:latest:limit10:offset0:all'),
+          this.cacheService.del('forums:messages:latest:limit20:offset0:all'),
+          this.cacheService.del('forums:messages:latest:limit50:offset0:all'),
+        ]);
         await this.cacheService.del('homepage:forum'); // Invalidate homepage cache
 
         return {
@@ -2147,11 +2147,11 @@ export class ForumsService {
         await this.cacheService.invalidateForumTopic(message.idTopic);
         await this.cacheService.invalidateForumBoard(message.idBoard);
         // OPTIMIZED: Delete known latest messages keys instead of SCAN
-      await Promise.all([
-        this.cacheService.del('forums:messages:latest:limit10:offset0:all'),
-        this.cacheService.del('forums:messages:latest:limit20:offset0:all'),
-        this.cacheService.del('forums:messages:latest:limit50:offset0:all'),
-      ]);
+        await Promise.all([
+          this.cacheService.del('forums:messages:latest:limit10:offset0:all'),
+          this.cacheService.del('forums:messages:latest:limit20:offset0:all'),
+          this.cacheService.del('forums:messages:latest:limit50:offset0:all'),
+        ]);
         await this.cacheService.del('homepage:forum'); // Invalidate homepage cache
 
         return {
@@ -3086,18 +3086,18 @@ export class ForumsService {
       const unreadTopics = allTopics.filter(topic => {
         // Check topic-specific read entry first
         const topicLastRead = topicReadMap.get(topic.idTopic);
-        if (topicLastRead !== undefined && topic.idLastMsg <= topicLastRead) {
+        if (topicLastRead !== undefined && topic.idLastMsg <= (topicLastRead as any)) {
           return false; // Read via topic-specific entry
         }
 
         // Check board-level mark-read entry
         const boardMarkRead = boardMarkReadMap.get(topic.idBoard);
-        if (boardMarkRead !== undefined && topic.idLastMsg <= boardMarkRead) {
+        if (boardMarkRead !== undefined && topic.idLastMsg <= (boardMarkRead as any)) {
           return false; // Read via board mark-all-as-read
         }
 
         // If topic has a specific entry but new messages exist, it's unread
-        if (topicLastRead !== undefined && topic.idLastMsg > topicLastRead) {
+        if (topicLastRead !== undefined && topic.idLastMsg > (topicLastRead as any)) {
           return true;
         }
 
@@ -3202,18 +3202,18 @@ export class ForumsService {
       const count = allTopics.filter(topic => {
         // Check topic-specific read entry first
         const topicLastRead = topicReadMap.get(topic.idTopic);
-        if (topicLastRead !== undefined && topic.idLastMsg <= topicLastRead) {
+        if (topicLastRead !== undefined && topic.idLastMsg <= (topicLastRead as any)) {
           return false; // Read via topic-specific entry
         }
 
         // Check board-level mark-read entry
         const boardMarkRead = boardMarkReadMap.get(topic.idBoard);
-        if (boardMarkRead !== undefined && topic.idLastMsg <= boardMarkRead) {
+        if (boardMarkRead !== undefined && topic.idLastMsg <= (boardMarkRead as any)) {
           return false; // Read via board mark-all-as-read
         }
 
         // If topic has a specific entry but new messages exist, it's unread
-        if (topicLastRead !== undefined && topic.idLastMsg > topicLastRead) {
+        if (topicLastRead !== undefined && topic.idLastMsg > (topicLastRead as any)) {
           return true;
         }
 

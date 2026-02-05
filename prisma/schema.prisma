@@ -1287,6 +1287,16 @@ model SmfLogTopics {
   @@map("smf_log_topics")
 }
 
+// SMF Board Mark Read Tracking Log
+model SmfLogMarkRead {
+  idMember Int @map("id_member")
+  idBoard  Int @map("id_board")
+  idMsg    Int @map("id_msg") @default(0)
+
+  @@id([idMember, idBoard])
+  @@map("smf_log_mark_read")
+}
+
 // SMF Online Activity Log
 model SmfLogOnline {
   session   String  @id @db.VarChar(128)
