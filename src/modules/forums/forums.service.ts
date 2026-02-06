@@ -3126,7 +3126,8 @@ export class ForumsService {
         lastMessage: topic.lastMessage ? {
           id: topic.lastMessage.idMsg,
           time: topic.lastMessage.posterTime,
-          author: topic.lastMessage.member?.memberName || topic.lastMessage.posterName
+          author: topic.lastMessage.member?.memberName || topic.lastMessage.posterName,
+          excerpt: this.stripSmfBBCode(topic.lastMessage.body).substring(0, 160)
         } : null,
         firstMessageTime: topic.firstMessage?.posterTime || 0
       }));
