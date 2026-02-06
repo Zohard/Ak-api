@@ -271,6 +271,13 @@ export class AnimeRankingsService {
   // --- Weekly Ranking (Internal Data) ---
 
   async getWeeklyRanking(year: number, season: string, week: number) {
+    // Try cache first (10 min TTL — rankings only change once per week)
+    const cacheKey = `rankings:weekly:${year}:${season}:${week}`;
+    const cached = await this.cacheService.get(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
     const rankings = await this.prisma.animeWeeklyRanking.findMany({
       where: {
         year,
@@ -294,7 +301,7 @@ export class AnimeRankingsService {
       }
     });
 
-    return rankings.map(r => ({
+    const result = rankings.map(r => ({
       ...r,
       // Calculate trend icon/color purely on frontend based on 'trend' value
       anime: {
@@ -302,6 +309,13 @@ export class AnimeRankingsService {
         image: r.anime.image ? (typeof r.anime.image === 'string' && /^https?:\/\//.test(r.anime.image) ? r.anime.image : `/api/media/serve/anime/${r.anime.image}`) : null
       }
     }));
+
+    // Cache for 10 minutes (rankings change weekly)
+    if (result.length > 0) {
+      await this.cacheService.set(cacheKey, result, 600);
+    }
+
+    return result;
   }
 
   async generateWeeklyRanking(year: number, season: string, week: number) {
@@ -408,6 +422,9 @@ export class AnimeRankingsService {
         DO UPDATE SET rank = EXCLUDED.rank, trend = EXCLUDED.trend
       `;
     }
+
+    // Invalidate the cache for this week
+    await this.cacheService.del(`rankings:weekly:${year}:${season}:${week}`);
 
     return { success: true, count: rankingEntries.length };
   }

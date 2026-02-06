@@ -166,6 +166,14 @@ export class AdminForumsController {
     return results;
   }
 
+  @Post('recompute-last-messages')
+  @ApiOperation({ summary: 'Recompute id_last_msg and id_first_msg on all topics and boards based on actual messages' })
+  @ApiResponse({ status: 200, description: 'Last messages recomputed successfully' })
+  @HttpCode(HttpStatus.OK)
+  async recomputeLastMessages() {
+    return this.adminForumsService.recomputeLastMessages();
+  }
+
   @Post('boards/bulk-template/:templateName')
   @ApiOperation({ summary: 'Apply a template to multiple boards at once' })
   @ApiParam({

@@ -258,6 +258,76 @@ export class AdminForumsService {
     }
   }
 
+  async recomputeLastMessages(): Promise<{ topicsUpdated: number; boardsUpdated: number }> {
+    this.logger.log('Starting recomputation of last messages for topics and boards...');
+
+    // Fix topics: set id_first_msg and id_last_msg based on actual messages
+    const topicResult = await this.prisma.$executeRawUnsafe(`
+      UPDATE smf_topics
+      SET id_first_msg = m.first_msg,
+          id_last_msg = m.last_msg
+      FROM (
+        SELECT id_topic,
+               MIN(id_msg) AS first_msg,
+               MAX(id_msg) AS last_msg
+        FROM smf_messages
+        GROUP BY id_topic
+      ) m
+      WHERE smf_topics.id_topic = m.id_topic
+    `);
+
+    this.logger.log(`Topics updated: ${topicResult}`);
+
+    // Fix boards: set id_last_msg based on actual messages in that board
+    const boardResult = await this.prisma.$executeRawUnsafe(`
+      UPDATE smf_boards
+      SET id_last_msg = m.last_msg
+      FROM (
+        SELECT id_board,
+               MAX(id_msg) AS last_msg
+        FROM smf_messages
+        GROUP BY id_board
+      ) m
+      WHERE smf_boards.id_board = m.id_board
+    `);
+
+    this.logger.log(`Boards updated: ${boardResult}`);
+
+    // Also fix num_replies on topics (num_replies = total messages - 1 for the first message)
+    await this.prisma.$executeRawUnsafe(`
+      UPDATE smf_topics
+      SET num_replies = m.reply_count
+      FROM (
+        SELECT id_topic, COUNT(*) - 1 AS reply_count
+        FROM smf_messages
+        GROUP BY id_topic
+      ) m
+      WHERE smf_topics.id_topic = m.id_topic
+    `);
+
+    // Fix num_topics and num_posts on boards
+    await this.prisma.$executeRawUnsafe(`
+      UPDATE smf_boards
+      SET num_topics = m.topic_count,
+          num_posts = m.post_count
+      FROM (
+        SELECT id_board,
+               COUNT(DISTINCT id_topic) AS topic_count,
+               COUNT(*) AS post_count
+        FROM smf_messages
+        GROUP BY id_board
+      ) m
+      WHERE smf_boards.id_board = m.id_board
+    `);
+
+    this.logger.log('Recomputation of last messages completed.');
+
+    return {
+      topicsUpdated: topicResult as number,
+      boardsUpdated: boardResult as number,
+    };
+  }
+
   private async getGroupNames(groupIds?: string): Promise<string[]> {
     if (!groupIds || !groupIds.trim()) {
       return [];
