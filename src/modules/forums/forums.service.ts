@@ -1927,19 +1927,17 @@ export class ForumsService {
         throw new Error('Message not found');
       }
 
-      // Check if user owns this message (or is admin)
-      if (message.idMember !== userId) {
-        // Check if user is admin
-        const userGroups = await this.getUserGroups(userId);
-        const isAdmin = userGroups.includes(1); // Group 1 is admin
+      // Check if user is in moderator groups (1=Admin, 2=Global Mod, 3=Moderator)
+      const userGroups = await this.getUserGroups(userId);
+      const isModerator = userGroups.some(group => [1, 2, 3].includes(group));
 
-        if (!isAdmin) {
-          throw new Error('You can only edit your own messages');
-        }
+      // Check if user owns this message (or is moderator)
+      if (message.idMember !== userId && !isModerator) {
+        throw new Error('You do not have permission to edit this message');
       }
 
-      // Check if topic is locked
-      if (message.topic.locked) {
+      // Check if topic is locked (moderators can bypass this)
+      if (message.topic.locked && !isModerator) {
         throw new Error('Cannot edit message in a locked topic');
       }
 
@@ -2004,15 +2002,13 @@ export class ForumsService {
         throw new Error('Message not found');
       }
 
-      // Check if user owns this message (or is admin)
-      if (message.idMember !== userId) {
-        // Check if user is admin
-        const userGroups = await this.getUserGroups(userId);
-        const isAdmin = userGroups.includes(1); // Group 1 is admin
+      // Check if user is in moderator groups (1=Admin, 2=Global Mod, 3=Moderator)
+      const userGroups = await this.getUserGroups(userId);
+      const isModerator = userGroups.some(group => [1, 2, 3].includes(group));
 
-        if (!isAdmin) {
-          throw new Error('You can only delete your own messages');
-        }
+      // Check if user owns this message (or is moderator)
+      if (message.idMember !== userId && !isModerator) {
+        throw new Error('You do not have permission to delete this message');
       }
 
       // Check if this is the first message of the topic
