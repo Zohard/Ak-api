@@ -973,6 +973,7 @@ export class ReviewsService {
         popularite: true,
         idAnime: true,
         idManga: true,
+        idJeu: true,
       },
     });
 
@@ -1155,6 +1156,7 @@ export class ReviewsService {
         idMembre: true,
         idAnime: true,
         idManga: true,
+        idJeu: true,
         questions: true,
         nbClics: true,
         notation: true,
