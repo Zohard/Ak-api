@@ -25,6 +25,7 @@ import { CreateReviewDto } from './dto/create-review.dto';
 import { UpdateReviewDto } from './dto/update-review.dto';
 import { ReviewQueryDto } from './dto/review-query.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { OptionalJwtAuthGuard } from '../../common/guards/optional-jwt-auth.guard';
 import { AdminGuard } from '../../common/guards/admin.guard';
 
 @ApiTags('Reviews')
@@ -130,6 +131,7 @@ export class ReviewsController {
   }
 
   @Get(':id')
+  @UseGuards(OptionalJwtAuthGuard)
   @ApiOperation({ summary: 'Récupérer une critique par ID' })
   @ApiParam({ name: 'id', description: 'ID de la critique', type: 'number' })
   @ApiResponse({ status: 200, description: 'Détails de la critique' })
@@ -140,6 +142,7 @@ export class ReviewsController {
   }
 
   @Get('slug/:slug')
+  @UseGuards(OptionalJwtAuthGuard)
   @ApiOperation({ summary: 'Récupérer une critique par slug (niceUrl)' })
   @ApiParam({ name: 'slug', description: 'Slug de la critique', type: 'string' })
   @ApiResponse({ status: 200, description: 'Détails de la critique' })

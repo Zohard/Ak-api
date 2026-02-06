@@ -152,7 +152,7 @@ export class ReviewsService {
     }
 
     // Invalidate user review cache after creation
-    await this.invalidateReviewCache(review.idCritique, idAnime, idManga, userId);
+    await this.invalidateReviewCache(review.idCritique, idAnime, idManga, userId, idJeu);
 
     return this.formatReview(review);
   }
@@ -668,6 +668,15 @@ export class ReviewsService {
             },
           }
           : false,
+        jeuxVideo: review.idJeu
+          ? {
+            select: {
+              idJeu: true,
+              titre: true,
+              image: true,
+            },
+          }
+          : false,
       },
     });
 
@@ -699,7 +708,7 @@ export class ReviewsService {
     }
 
     // Invalidate caches after update
-    await this.invalidateReviewCache(id, review.idAnime, review.idManga, userId);
+    await this.invalidateReviewCache(id, review.idAnime, review.idManga, userId, review.idJeu);
 
     return this.formatReview(updatedReview);
   }
@@ -744,7 +753,7 @@ export class ReviewsService {
     );
 
     // Invalidate caches after removal
-    await this.invalidateReviewCache(id, review.idAnime, review.idManga, userId);
+    await this.invalidateReviewCache(id, review.idAnime, review.idManga, userId, review.idJeu);
 
     return { message: 'Critique supprimée avec succès' };
   }
@@ -1008,7 +1017,7 @@ export class ReviewsService {
     });
 
     // Invalidate related caches
-    await this.invalidateReviewCache(reviewId, review.idAnime, review.idManga);
+    await this.invalidateReviewCache(reviewId, review.idAnime, review.idManga, undefined, review.idJeu);
 
     // Return updated stats
     return {
@@ -1218,7 +1227,7 @@ export class ReviewsService {
     });
 
     // Invalidate caches
-    await this.invalidateReviewCache(reviewId, review.idAnime, review.idManga);
+    await this.invalidateReviewCache(reviewId, review.idAnime, review.idManga, undefined, review.idJeu);
 
     // Calculate current totals and expose the caller's ratings
     const allQuestions = this.parseQuestions(updatedQuestionsJson);
@@ -1516,7 +1525,7 @@ export class ReviewsService {
 
   // Cache invalidation methods
   // OPTIMIZED: Reduced Redis operations to minimize Upstash costs
-  async invalidateReviewCache(reviewId: number, animeId?: number, mangaId?: number, userId?: number): Promise<void> {
+  async invalidateReviewCache(reviewId: number, animeId?: number, mangaId?: number, userId?: number, jeuId?: number): Promise<void> {
     // Batch all deletions in parallel to minimize round trips
     const deletions: Promise<void>[] = [
       this.cacheService.del(`review:${reviewId}`),
@@ -1530,6 +1539,9 @@ export class ReviewsService {
       if (mangaId) {
         deletions.push(this.cacheService.del(`user_review:${userId}:manga:${mangaId}`));
       }
+      if (jeuId) {
+        deletions.push(this.cacheService.del(`user_review:${userId}:game:${jeuId}`));
+      }
     }
 
     // Invalidate specific content cache (not full invalidation)
@@ -1538,6 +1550,9 @@ export class ReviewsService {
     }
     if (mangaId) {
       deletions.push(this.cacheService.del(`reviews:manga:${mangaId}`));
+    }
+    if (jeuId) {
+      deletions.push(this.cacheService.del(`reviews:game:${jeuId}`));
     }
 
     // Invalidate critical homepage/reviews caches
@@ -1636,7 +1651,7 @@ export class ReviewsService {
     }
 
     // Invalidate review cache
-    await this.invalidateReviewCache(id, review.idAnime, review.idManga, review.idMembre);
+    await this.invalidateReviewCache(id, review.idAnime, review.idManga, review.idMembre, review.idJeu);
 
     // Send email notification for rejection
     if (moderateDto.action === 'reject' && review.membre?.emailAddress && causeSuppr) {
