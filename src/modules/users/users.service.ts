@@ -99,6 +99,7 @@ export class UsersService {
         websiteTitle: true,
         websiteUrl: true,
         birthdate: true,
+        forumPostOrder: true,
       },
     });
 
@@ -258,6 +259,7 @@ export class UsersService {
         websiteTitle: true,
         websiteUrl: true,
         birthdate: true,
+        forumPostOrder: true,
       },
     });
 
