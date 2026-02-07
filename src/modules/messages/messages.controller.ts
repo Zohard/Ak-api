@@ -14,7 +14,7 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { MessagesService } from './messages.service';
 import { CreateMessageDto } from './dto/create-message.dto';
-import { GetMessagesDto, SearchMessagesDto, MarkReadDto, DeleteMessageDto, BulkDeleteMessagesDto, BulkMarkImportantDto, GetMessagesWithFilterDto } from './dto/get-messages.dto';
+import { GetMessagesDto, SearchMessagesDto, MarkReadDto, MarkThreadReadDto, DeleteMessageDto, BulkDeleteMessagesDto, BulkMarkImportantDto, GetMessagesWithFilterDto } from './dto/get-messages.dto';
 import { SmfMessage, MessageUser, MessageResponse, ConversationMessage } from './interfaces/message.interface';
 
 @Controller('messages')
@@ -53,6 +53,13 @@ export class MessagesController {
   async markAsRead(@Body() markReadDto: MarkReadDto): Promise<{ success: boolean }> {
     await this.messagesService.markAsRead(markReadDto);
     return { success: true };
+  }
+
+  @Post('mark-thread-read')
+  @HttpCode(HttpStatus.OK)
+  async markThreadAsRead(@Body() dto: MarkThreadReadDto): Promise<{ success: boolean; markedCount: number }> {
+    const markedCount = await this.messagesService.markThreadAsRead(dto.threadId, dto.userId);
+    return { success: true, markedCount };
   }
 
   @Post('delete')

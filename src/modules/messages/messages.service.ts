@@ -14,7 +14,7 @@ export class MessagesService {
     private readonly prisma: PrismaService,
     private readonly emailService: EmailService,
     private readonly encryptionService: EncryptionService,
-  ) {}
+  ) { }
 
   async sendMessage(createMessageDto: CreateMessageDto): Promise<MessageResponse> {
     const { senderId, recipientId, subject, message, threadId, bccRecipientIds, conversationUrl } = createMessageDto;
@@ -483,6 +483,59 @@ export class MessagesService {
     } catch (error) {
       this.logger.error('Failed to mark message as read:', error);
       throw new BadRequestException('Failed to mark message as read');
+    }
+  }
+
+  async markThreadAsRead(threadId: number, userId: number): Promise<number> {
+    try {
+      return await this.prisma.$transaction(async (prisma) => {
+        // Find all unread messages in this thread for this user
+        const unreadRecipients = await prisma.smfPmRecipient.findMany({
+          where: {
+            idMember: userId,
+            isRead: 0,
+            message: {
+              idPmHead: threadId
+            }
+          },
+          select: { idPm: true }
+        });
+
+        if (unreadRecipients.length === 0) return 0;
+
+        const unreadPmIds = unreadRecipients.map(r => r.idPm);
+
+        // Mark all as read
+        await prisma.smfPmRecipient.updateMany({
+          where: {
+            idMember: userId,
+            idPm: { in: unreadPmIds }
+          },
+          data: {
+            isRead: 1,
+            isNew: 0
+          }
+        });
+
+        // Decrement user's unread count
+        const user = await prisma.smfMember.findUnique({
+          where: { idMember: userId },
+          select: { unreadMessages: true }
+        });
+
+        if (user) {
+          const newCount = Math.max(0, user.unreadMessages - unreadPmIds.length);
+          await prisma.smfMember.update({
+            where: { idMember: userId },
+            data: { unreadMessages: newCount }
+          });
+        }
+
+        return unreadPmIds.length;
+      });
+    } catch (error) {
+      this.logger.error('Failed to mark thread as read:', error);
+      throw new BadRequestException('Failed to mark thread as read');
     }
   }
 

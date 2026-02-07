@@ -92,6 +92,16 @@ export class BulkMarkImportantDto {
   isImportant: boolean;
 }
 
+export class MarkThreadReadDto {
+  @IsInt()
+  @Type(() => Number)
+  threadId: number;
+
+  @IsInt()
+  @Type(() => Number)
+  userId: number;
+}
+
 export class GetMessagesWithFilterDto extends GetMessagesDto {
   @IsOptional()
   @Transform(({ value }) => {
