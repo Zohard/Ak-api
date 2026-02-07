@@ -1514,3 +1514,15 @@ model AkSystemSetting {
 
   @@map("ak_system_settings")
 }
+
+// Contact Form Messages
+model AkContactMessage {
+  idContact  Int      @id @default(autoincrement()) @map("id_contact")
+  name       String   @db.VarChar(255)
+  email      String   @db.VarChar(255)
+  message    String   @db.Text
+  isRead     Boolean  @default(false) @map("is_read")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@map("ak_contact_messages")
+}

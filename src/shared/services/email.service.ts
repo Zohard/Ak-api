@@ -100,6 +100,28 @@ export class EmailService {
     }
   }
 
+  async sendContactEmail(name: string, email: string, message: string): Promise<void> {
+    const contactEmail = this.configService.get<string>('CONTACT_EMAIL') || 'contact@anime-kun.fr';
+
+    try {
+      const { data, error } = await this.resend.emails.send({
+        from: this.fromEmail,
+        to: contactEmail,
+        replyTo: email,
+        subject: `Nouveau message de contact de ${name} - Anime-Kun`,
+        html: this.getContactEmailTemplate(name, email, message),
+      });
+
+      if (error) {
+        console.error('❌ Error sending contact email:', error);
+        throw error;
+      }
+    } catch (error) {
+      console.error('❌ Error sending contact email:', error);
+      throw error;
+    }
+  }
+
   async sendReviewRejectionEmail(
     recipientEmail: string,
     recipientUsername: string,
@@ -853,6 +875,90 @@ export class EmailService {
             <p>Si vous avez des questions concernant cette décision, n'hésitez pas à contacter notre équipe de modération.</p>
             <p>Cet email a été envoyé automatiquement, merci de ne pas y répondre.</p>
             <p><strong>L'équipe Anime-Kun</strong></p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+  }
+
+  private getContactEmailTemplate(name: string, email: string, message: string): string {
+    const escapedName = name.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const escapedEmail = email.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const escapedMessage = message.replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>');
+
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <title>Nouveau message de contact</title>
+        <style>
+          body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+          }
+          .header {
+            background-color: #2563eb;
+            color: white;
+            padding: 20px;
+            text-align: center;
+            border-radius: 8px 8px 0 0;
+          }
+          .content {
+            background-color: #f8fafc;
+            padding: 30px;
+            border-radius: 0 0 8px 8px;
+          }
+          .sender-info {
+            background-color: #dbeafe;
+            border: 1px solid #3b82f6;
+            padding: 15px;
+            border-radius: 6px;
+            margin: 20px 0;
+          }
+          .message-box {
+            background-color: white;
+            border-left: 4px solid #2563eb;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+          }
+          .footer {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #e5e7eb;
+            font-size: 14px;
+            color: #6b7280;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1>🎌 Anime-Kun</h1>
+          <h2>Nouveau message de contact</h2>
+        </div>
+        <div class="content">
+          <p>Un nouveau message a été envoyé via le formulaire de contact.</p>
+
+          <div class="sender-info">
+            <strong>👤 Nom :</strong> ${escapedName}<br>
+            <strong>📧 Email :</strong> <a href="mailto:${escapedEmail}">${escapedEmail}</a>
+          </div>
+
+          <div class="message-box">
+            <strong>📝 Message :</strong>
+            <p style="margin: 10px 0 0 0; color: #1f2937;">${escapedMessage}</p>
+          </div>
+
+          <p style="color: #6b7280; font-size: 14px;">Vous pouvez répondre directement à cet email pour contacter l'expéditeur.</p>
+
+          <div class="footer">
+            <p>Ce message a été envoyé depuis le formulaire de contact d'Anime-Kun.</p>
           </div>
         </div>
       </body>
