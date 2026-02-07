@@ -608,9 +608,9 @@ export class ArticlesService {
     const postName =
       articleData.niceUrl || this.generateNiceUrl(articleData.titre);
 
-    // Ensure URL uniqueness
+    // Ensure URL uniqueness (only check actual posts, not attachments/revisions)
     const existingArticle = await this.prisma.wpPost.findFirst({
-      where: { postName },
+      where: { postName, postType: 'post' },
     });
 
     if (existingArticle) {
