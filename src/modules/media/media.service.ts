@@ -126,7 +126,7 @@ export class MediaService {
       } else if (type === 'business') {
         typeFolder = 'business';
       } else if (type === 'article') {
-        typeFolder = 'articles';
+        typeFolder = 'webzine';
       } else {
         typeFolder = `${type}s`;
       }
@@ -368,7 +368,7 @@ export class MediaService {
       } else if (type === 'business') {
         typeFolder = 'business';
       } else if (type === 'article') {
-        typeFolder = 'articles';
+        typeFolder = 'webzine';
       } else {
         typeFolder = `${type}s`;
       }
