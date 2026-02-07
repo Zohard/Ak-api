@@ -72,6 +72,19 @@ export class CreateReviewDto {
   idJeu?: number;
 
   @ApiPropertyOptional({
+    description: 'Statut (0 = publié, 1 = brouillon/privé, 2 = refusé)',
+    example: 0,
+    minimum: 0,
+    maximum: 2,
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(2)
+  @Type(() => Number)
+  statut?: number;
+
+  @ApiPropertyOptional({
     description: 'Afficher avec des illustrations/screenshots (0 ou 1)',
     example: 1,
     minimum: 0,
