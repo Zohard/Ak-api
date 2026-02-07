@@ -104,6 +104,10 @@ export class ArticlesService {
       where.postStatus = 'draft';
     } else if (status === 'archived') {
       where.postStatus = 'trash';
+    } else if (status === 'all') {
+      // For 'all', we don't restrict postStatus, but we usually want to exclude 'trash' unless specifically asked
+      // In WordPress context, 'all' usually means everything visible in the admin list
+      where.postStatus = { in: ['publish', 'draft', 'pending', 'future', 'private'] };
     } else {
       // Default to published posts for public
       where.postStatus = 'publish';
@@ -1271,19 +1275,8 @@ export class ArticlesService {
   private transformImageUrl(imageUrl: string | null): string | null {
     if (!imageUrl) return null;
 
-    // If it's already a full URL, return as is
-    if (imageUrl.startsWith('http')) {
-      return imageUrl;
-    }
-
-    // If it's an R2 path, generate the full URL
-    // For articles, we expect images to be in images/webzine/ if no path is provided
-    let finalPath = imageUrl;
-    if (!finalPath.startsWith('images/') && !finalPath.includes('/')) {
-      finalPath = `images/webzine/${finalPath}`;
-    }
-
-    return this.imagekitService.getImageUrl(finalPath);
+    // Return as-is — frontend handles URL resolution via getArticleImageUrl
+    return imageUrl;
   }
 
   private extractFirstImageFromContent(content: string | null): string | null {

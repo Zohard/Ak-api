@@ -378,8 +378,21 @@ export class ForumsService {
     }
   }
 
-  async getTopicWithPosts(topicId: number, page: number = 1, limit: number = 15, userId?: number) {
+  async getTopicWithPosts(topicId: number, page: number = 1, limit: number = 15, userId?: number, order?: 'asc' | 'desc') {
     try {
+      // If order is not provided, try to get it from user preferences
+      if (!order && userId) {
+        const user = await this.prisma.smfMember.findUnique({
+          where: { idMember: userId },
+          select: { forumPostOrder: true }
+        });
+        if (user?.forumPostOrder === 'desc') {
+          order = 'desc';
+        }
+      }
+
+      // Default to 'asc' if still not set
+      const finalOrder = order || 'asc';
       const offset = (page - 1) * limit;
 
       const [topic, posts, totalPosts] = await Promise.all([
@@ -398,7 +411,7 @@ export class ForumsService {
           where: { idTopic: topicId },
           skip: offset,
           take: limit,
-          orderBy: { idMsg: 'asc' },
+          orderBy: { idMsg: finalOrder },
           include: {
             member: {
               include: {
@@ -482,7 +495,7 @@ export class ForumsService {
           posterTime: post.posterTime,
           modifiedTime: post.modifiedTime || null,
           modifiedName: post.modifiedName || null,
-          postNumber: offset + index + 1,
+          postNumber: finalOrder === 'desc' ? totalPosts - (offset + index) : offset + index + 1,
           author: {
             id: post.member?.idMember || 0,
             memberName: post.member?.memberName || post.posterName,
@@ -3487,8 +3500,21 @@ export class ForumsService {
    * Get the page number where a specific message appears in its topic
    * Used for navigating directly to a message from reports/links
    */
-  async getMessagePage(messageId: number, userId?: number): Promise<{ page: number; topicId: number; messagePosition: number }> {
+  async getMessagePage(messageId: number, userId?: number, order?: 'asc' | 'desc'): Promise<{ page: number; topicId: number; messagePosition: number }> {
     try {
+      // If order is not provided, try to get it from user preferences
+      if (!order && userId) {
+        const user = await this.prisma.smfMember.findUnique({
+          where: { idMember: userId },
+          select: { forumPostOrder: true }
+        });
+        if (user?.forumPostOrder === 'desc') {
+          order = 'desc';
+        }
+      }
+
+      // Default to 'asc' if still not set
+      const finalOrder = order || 'asc';
       // Get the message with topic info
       const message = await this.prisma.smfMessage.findUnique({
         where: { idMsg: messageId },
@@ -3529,16 +3555,24 @@ export class ForumsService {
         }
       });
 
+      // Get total messages in topic to calculate position in reverse order
+      const totalMessages = await this.prisma.smfMessage.count({
+        where: { idTopic: message.idTopic }
+      });
+
+      // Calculate the final position based on order
+      const finalPosition = order === 'desc' ? totalMessages - messagePosition + 1 : messagePosition;
+
       // Calculate page number (15 messages per page, matching the frontend)
       const messagesPerPage = 15;
-      const page = Math.ceil(messagePosition / messagesPerPage);
+      const page = Math.ceil(finalPosition / messagesPerPage);
 
-      this.logger.log(`Message ${messageId} is at position ${messagePosition} in topic ${message.idTopic}, page ${page}`);
+      this.logger.log(`Message ${messageId} is at position ${finalPosition} (order: ${finalOrder}) in topic ${message.idTopic}, page ${page}`);
 
       return {
         page,
         topicId: message.idTopic,
-        messagePosition
+        messagePosition: finalPosition
       };
     } catch (error) {
       this.logger.error('Error getting message page:', error);

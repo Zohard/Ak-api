@@ -117,4 +117,12 @@ export class UpdateProfileDto {
   @IsOptional()
   @IsString()
   bannerImage?: string;
+
+  @ApiPropertyOptional({
+    description: "Ordre des messages sur le forum (asc ou desc)",
+    example: 'asc',
+  })
+  @IsOptional()
+  @IsString()
+  forumPostOrder?: 'asc' | 'desc';
 }

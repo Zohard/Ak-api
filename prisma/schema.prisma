@@ -62,6 +62,7 @@ model SmfMember {
   newPm            Int      @default(0) @map("new_pm")
   buddyList        String?  @map("buddy_list") @db.Text
   totalTimeLoggedIn Int      @default(0) @map("total_time_logged_in")
+  forumPostOrder    String   @default("asc") @map("forum_post_order") @db.VarChar(10)
 
   // Email verification
   emailVerified    Boolean  @default(false) @map("email_verified")

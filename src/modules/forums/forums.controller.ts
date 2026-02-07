@@ -84,10 +84,11 @@ export class ForumsController {
     @Param('topicId', ParseIntPipe) topicId: number,
     @Query('page') page: string = '1',
     @Query('limit') limit: string = '15',
+    @Query('order') order: 'asc' | 'desc' = 'asc',
     @Request() req?
   ) {
     const userId = req?.user?.id || null;
-    return this.forumsService.getTopicWithPosts(topicId, parseInt(page), parseInt(limit), userId);
+    return this.forumsService.getTopicWithPosts(topicId, parseInt(page), parseInt(limit), userId, order);
   }
 
   @Post('topics/:topicId/view')
@@ -130,10 +131,11 @@ export class ForumsController {
   @ApiResponse({ status: 404, description: 'Message not found' })
   async getMessagePage(
     @Param('messageId', ParseIntPipe) messageId: number,
+    @Query('order') order: 'asc' | 'desc' = 'asc',
     @Request() req?
   ) {
     const userId = req?.user?.id || null;
-    return await this.forumsService.getMessagePage(messageId, userId);
+    return await this.forumsService.getMessagePage(messageId, userId, order);
   }
 
   @Get('boards')
