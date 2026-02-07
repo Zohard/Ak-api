@@ -834,62 +834,79 @@ export class ArticlesService {
     }
 
     // Handle image update if provided
-    if (updateData.img) {
+    if (updateData.img !== undefined) {
       this.logger.debug(`Updating image for article: ${id} with image: ${updateData.img}`);
       try {
-        // First check if an image entry already exists for this article
-        const existingImage = await this.prisma.akWebzineImg.findFirst({
-          where: { idArt: BigInt(id) },
-        });
-
-        if (existingImage) {
-          // Update existing image
-          this.logger.debug(`Updating existing ak_webzine_img entry: ${existingImage.idImg}`);
-          await this.prisma.akWebzineImg.update({
-            where: { idImg: existingImage.idImg },
-            data: { urlImg: updateData.img },
+        if (!updateData.img) {
+          // If image is empty/null, remove it
+          this.logger.debug(`Removing image for article: ${id}`);
+          await this.prisma.akWebzineImg.deleteMany({
+            where: { idArt: BigInt(id) },
           });
-          this.logger.debug('Successfully updated ak_webzine_img entry');
-        } else {
-          // Create new entry
-          this.logger.debug(`Creating new ak_webzine_img entry for article: ${id}`);
-          const imageEntry = await this.prisma.akWebzineImg.create({
-            data: {
-              idArt: BigInt(id),
-              urlImg: updateData.img,
-            },
-          });
-          this.logger.debug(`Successfully created ak_webzine_img entry: ${JSON.stringify(imageEntry)}`);
-        }
 
-        // Sync with wp_postmeta for compatibility with older systems
-        const metaToUpdate = [
-          { key: 'imgunebig', value: updateData.img },
-          { key: 'img', value: updateData.img },
-          { key: 'ak_img', value: updateData.img }
-        ];
-
-        for (const meta of metaToUpdate) {
-          const existingMeta = await this.prisma.wpPostMeta.findFirst({
+          // Clear legacy metadata
+          const metaToClear = ['imgunebig', 'img', 'ak_img'];
+          await this.prisma.wpPostMeta.deleteMany({
             where: {
               postId: BigInt(id),
-              metaKey: meta.key
+              metaKey: { in: metaToClear }
             }
           });
+        } else {
+          // First check if an image entry already exists for this article
+          const existingImage = await this.prisma.akWebzineImg.findFirst({
+            where: { idArt: BigInt(id) },
+          });
 
-          if (existingMeta) {
-            await this.prisma.wpPostMeta.update({
-              where: { metaId: existingMeta.metaId },
-              data: { metaValue: meta.value }
+          if (existingImage) {
+            // Update existing image
+            this.logger.debug(`Updating existing ak_webzine_img entry: ${existingImage.idImg}`);
+            await this.prisma.akWebzineImg.update({
+              where: { idImg: existingImage.idImg },
+              data: { urlImg: updateData.img },
             });
+            this.logger.debug('Successfully updated ak_webzine_img entry');
           } else {
-            await this.prisma.wpPostMeta.create({
+            // Create new entry
+            this.logger.debug(`Creating new ak_webzine_img entry for article: ${id}`);
+            const imageEntry = await this.prisma.akWebzineImg.create({
               data: {
+                idArt: BigInt(id),
+                urlImg: updateData.img,
+              },
+            });
+            this.logger.debug(`Successfully created ak_webzine_img entry: ${JSON.stringify(imageEntry)}`);
+          }
+
+          // Sync with wp_postmeta for compatibility with older systems
+          const metaToUpdate = [
+            { key: 'imgunebig', value: updateData.img },
+            { key: 'img', value: updateData.img },
+            { key: 'ak_img', value: updateData.img }
+          ];
+
+          for (const meta of metaToUpdate) {
+            const existingMeta = await this.prisma.wpPostMeta.findFirst({
+              where: {
                 postId: BigInt(id),
-                metaKey: meta.key,
-                metaValue: meta.value
+                metaKey: meta.key
               }
             });
+
+            if (existingMeta) {
+              await this.prisma.wpPostMeta.update({
+                where: { metaId: existingMeta.metaId },
+                data: { metaValue: meta.value }
+              });
+            } else {
+              await this.prisma.wpPostMeta.create({
+                data: {
+                  postId: BigInt(id),
+                  metaKey: meta.key,
+                  metaValue: meta.value
+                }
+              });
+            }
           }
         }
       } catch (error) {
@@ -1260,7 +1277,13 @@ export class ArticlesService {
     }
 
     // If it's an R2 path, generate the full URL
-    return this.imagekitService.getImageUrl(imageUrl);
+    // For articles, we expect images to be in images/webzine/ if no path is provided
+    let finalPath = imageUrl;
+    if (!finalPath.startsWith('images/') && !finalPath.includes('/')) {
+      finalPath = `images/webzine/${finalPath}`;
+    }
+
+    return this.imagekitService.getImageUrl(finalPath);
   }
 
   private extractFirstImageFromContent(content: string | null): string | null {
@@ -1289,7 +1312,7 @@ export class ArticlesService {
 
     try {
       const fileName = customFileName || `article-${articleId}-${Date.now()}`;
-      const folder = 'webzine/articles';
+      const folder = 'images/webzine';
 
       const uploadResult = await this.imagekitService.uploadImageFromUrl(
         imageUrl,
