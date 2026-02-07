@@ -835,50 +835,59 @@ export class ReviewsService {
     return result;
   }
 
-  async getUserReviews(userId: number, limit = 20, requestingUserId?: number) {
+  async getUserReviews(userId: number, limit = 20, requestingUserId?: number, page = 1) {
     // Only show published reviews (statut: 0) unless the user is viewing their own reviews
     const isOwnReviews = requestingUserId && requestingUserId === userId;
 
-    const reviews = await this.prisma.akCritique.findMany({
-      where: {
-        idMembre: userId,
-        // Only filter by published status if viewing someone else's reviews
-        ...(isOwnReviews ? {} : { statut: 0 }),
-      },
-      orderBy: { dateCritique: 'desc' },
-      take: limit,
-      include: {
-        anime: {
-          select: {
-            idAnime: true,
-            titre: true,
-            image: true,
-            niceUrl: true,
+    const where = {
+      idMembre: userId,
+      // Only filter by published status if viewing someone else's reviews
+      ...(isOwnReviews ? {} : { statut: 0 }),
+    };
+
+    const [reviews, total] = await Promise.all([
+      this.prisma.akCritique.findMany({
+        where,
+        orderBy: { dateCritique: 'desc' },
+        take: limit,
+        skip: (page - 1) * limit,
+        include: {
+          anime: {
+            select: {
+              idAnime: true,
+              titre: true,
+              image: true,
+              niceUrl: true,
+            },
+          },
+          manga: {
+            select: {
+              idManga: true,
+              titre: true,
+              image: true,
+              niceUrl: true,
+            },
+          },
+          jeuxVideo: {
+            select: {
+              idJeu: true,
+              titre: true,
+              image: true,
+              annee: true,
+              niceUrl: true,
+            },
           },
         },
-        manga: {
-          select: {
-            idManga: true,
-            titre: true,
-            image: true,
-            niceUrl: true,
-          },
-        },
-        jeuxVideo: {
-          select: {
-            idJeu: true,
-            titre: true,
-            image: true,
-            annee: true,
-            niceUrl: true,
-          },
-        },
-      },
-    });
+      }),
+      this.prisma.akCritique.count({ where }),
+    ]);
 
     return {
       reviews: reviews.map(this.formatReview),
-      total: reviews.length,
+      total,
+      page,
+      limit,
+      hasMore: page * limit < total,
     };
   }
 

@@ -349,6 +349,12 @@ export class ArticlesService {
   }
 
   async getById(id: number, includeContent: boolean = true, skipCache: boolean = false) {
+    // Increment view count independent of cache
+    // Skip increment only if skipCache is true (admin requests)
+    if (!skipCache) {
+      await this.incrementViewCount(id);
+    }
+
     // Skip cache for admin requests to always get fresh data
     if (!skipCache) {
       const cached = await this.cacheService.getArticle(id);
@@ -441,6 +447,11 @@ export class ArticlesService {
     if (!isAdmin) {
       const cached = await this.cacheService.getArticleBySlug(niceUrl);
       if (cached) {
+        // Increment view count even for cached requests
+        // The ID is available in the cached article object
+        if (cached.idArt) {
+          await this.incrementViewCount(cached.idArt);
+        }
         return cached;
       }
     }
