@@ -272,13 +272,13 @@ export class ArticlesService {
           niceUrl: rel.termTaxonomy.term.slug,
         }));
 
-      // Get the best image URL (prioritize imgunebig, don't use _thumbnail_id as it's just an integer ID)
+      // Get the best image URL (prioritize webzineImageUrl from ak_webzine_img)
       const webzineImageUrl = post.images?.[0]?.urlImg;
       const imgunebig = imgunebigMeta?.metaValue;
       const imgunebig2 = imgunebig2Meta?.metaValue;
-      const imageUrl = imgunebig ||
+      const imageUrl = webzineImageUrl ||
+        imgunebig ||
         imgunebig2 ||
-        webzineImageUrl ||
         akImgMeta?.metaValue ||
         imgMeta?.metaValue ||
         this.extractFirstImageFromContent(post.postContent);
@@ -861,6 +861,37 @@ export class ArticlesService {
           });
           this.logger.debug(`Successfully created ak_webzine_img entry: ${JSON.stringify(imageEntry)}`);
         }
+
+        // Sync with wp_postmeta for compatibility with older systems
+        const metaToUpdate = [
+          { key: 'imgunebig', value: updateData.img },
+          { key: 'img', value: updateData.img },
+          { key: 'ak_img', value: updateData.img }
+        ];
+
+        for (const meta of metaToUpdate) {
+          const existingMeta = await this.prisma.wpPostMeta.findFirst({
+            where: {
+              postId: BigInt(id),
+              metaKey: meta.key
+            }
+          });
+
+          if (existingMeta) {
+            await this.prisma.wpPostMeta.update({
+              where: { metaId: existingMeta.metaId },
+              data: { metaValue: meta.value }
+            });
+          } else {
+            await this.prisma.wpPostMeta.create({
+              data: {
+                postId: BigInt(id),
+                metaKey: meta.key,
+                metaValue: meta.value
+              }
+            });
+          }
+        }
       } catch (error) {
         console.error('Error handling image update:', error);
         throw error;
@@ -1159,8 +1190,8 @@ export class ArticlesService {
           webzineImg, akImg, img, imgunebig, imgunebig2, extracted
         });
 
-        // Prioritize imgunebig over other sources, don't use _thumbnail_id (it's just an integer ID)
-        return this.transformImageUrl(imgunebig || imgunebig2 || webzineImg || akImg || img || extracted);
+        // Prioritize webzineImg (from ak_webzine_img) as it's the new source of truth for the admin panel
+        return this.transformImageUrl(webzineImg || imgunebig || imgunebig2 || akImg || img || extracted);
       })(),
       imgunebig: this.transformImageUrl(imgunebigMeta?.metaValue),
       imgunebig2: this.transformImageUrl(imgunebig2Meta?.metaValue),
