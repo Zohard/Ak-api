@@ -61,10 +61,10 @@ export class MediaController {
       throw new BadRequestException('Media type is required');
     }
 
-    const validTypes = ['anime', 'manga', 'avatar', 'cover', 'game', 'business'];
+    const validTypes = ['anime', 'manga', 'avatar', 'cover', 'game', 'business', 'article'];
     if (!validTypes.includes(type)) {
       throw new BadRequestException(
-        'Invalid media type. Must be one of: anime, manga, avatar, cover, game, business',
+        'Invalid media type. Must be one of: anime, manga, avatar, cover, game, business, article',
       );
     }
 

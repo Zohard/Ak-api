@@ -39,7 +39,7 @@ export class MediaService {
 
   async uploadImage(
     file: Express.Multer.File,
-    type: 'anime' | 'manga' | 'avatar' | 'cover' | 'game' | 'business',
+    type: 'anime' | 'manga' | 'avatar' | 'cover' | 'game' | 'business' | 'article',
     relatedId?: number,
     isScreenshot?: boolean,
     title?: string,
@@ -125,6 +125,8 @@ export class MediaService {
         typeFolder = 'games';
       } else if (type === 'business') {
         typeFolder = 'business';
+      } else if (type === 'article') {
+        typeFolder = 'articles';
       } else {
         typeFolder = `${type}s`;
       }
@@ -238,7 +240,7 @@ export class MediaService {
 
   async uploadImageFromUrl(
     imageUrl: string,
-    type: 'anime' | 'manga' | 'avatar' | 'cover' | 'game' | 'business',
+    type: 'anime' | 'manga' | 'avatar' | 'cover' | 'game' | 'business' | 'article',
     relatedId?: number,
     saveAsScreenshot: boolean = false,
     title?: string,
@@ -365,6 +367,8 @@ export class MediaService {
         typeFolder = 'games';
       } else if (type === 'business') {
         typeFolder = 'business';
+      } else if (type === 'article') {
+        typeFolder = 'articles';
       } else {
         typeFolder = `${type}s`;
       }
