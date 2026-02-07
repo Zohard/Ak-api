@@ -44,9 +44,6 @@ export class ForumsService {
               idLastMsg: true,
               idParent: true, // Include idParent to identify child boards
               memberGroups: true, // Include for permission checking (no extra query needed!)
-              _count: {
-                select: { topics: true, messages: true }
-              }
             }
           }
         }
