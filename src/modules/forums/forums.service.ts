@@ -3127,6 +3127,7 @@ export class ForumsService {
           id: topic.lastMessage.idMsg,
           time: topic.lastMessage.posterTime,
           author: topic.lastMessage.member?.memberName || topic.lastMessage.posterName,
+          body: topic.lastMessage.body,
           excerpt: this.stripSmfBBCode(topic.lastMessage.body).substring(0, 160)
         } : null,
         firstMessageTime: topic.firstMessage?.posterTime || 0
