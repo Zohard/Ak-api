@@ -484,6 +484,7 @@ export class CollectionBrowseService {
             const where: any = {
                 idAnime: mediaId,
                 isPublic: true,
+                idMembre: { gt: 0 }, // Exclude orphaned collections
             };
 
             // Query for main data
@@ -542,6 +543,7 @@ export class CollectionBrowseService {
             const where: any = {
                 idManga: mediaId,
                 isPublic: true,
+                idMembre: { gt: 0 }, // Exclude orphaned collections
             };
 
             // Query for main data
