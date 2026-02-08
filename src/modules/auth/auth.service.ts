@@ -60,7 +60,7 @@ export class AuthService {
     return result;
   }
 
-  private async verifyPassword(
+  public async verifyPassword(
     password: string,
     hashedPassword: string,
     username: string,

@@ -11,12 +11,14 @@ import { UpdateProfileDto } from './dto/update-profile.dto';
 import { UserQueryDto } from './dto/user-query.dto';
 import { CreateUserDto } from './dto/create-user.dto';
 import * as bcrypt from 'bcryptjs';
+import { AuthService } from '../auth/auth.service';
 
 @Injectable()
 export class UsersService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly cacheService: CacheService,
+    private readonly authService: AuthService,
   ) { }
 
   async findAll(query: UserQueryDto) {
@@ -145,10 +147,12 @@ export class UsersService {
         );
       }
 
-      // Verify current password
-      const isPasswordValid = await bcrypt.compare(
+      // Verify current password (support legacy hashes)
+      const isPasswordValid = await this.authService.verifyPassword(
         currentPassword,
         user.passwd,
+        user.memberName,
+        user.passwordSalt || undefined,
       );
       if (!isPasswordValid) {
         throw new BadRequestException('Mot de passe actuel incorrect');
@@ -177,10 +181,12 @@ export class UsersService {
         );
       }
 
-      // Verify current password
-      const isPasswordValid = await bcrypt.compare(
+      // Verify current password (support legacy hashes)
+      const isPasswordValid = await this.authService.verifyPassword(
         currentPassword,
         user.passwd,
+        user.memberName,
+        user.passwordSalt || undefined,
       );
       if (!isPasswordValid) {
         throw new BadRequestException('Mot de passe actuel incorrect');

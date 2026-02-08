@@ -255,8 +255,9 @@ export class AdminAnimesService {
     }
 
     // Map lienforum from DTO to lienForum for Prisma
-    if (typeof lienforum === 'number') {
-      data.lienForum = lienforum;
+    // Accept null/0 to clear the forum link
+    if (typeof lienforum === 'number' || lienforum === null) {
+      data.lienForum = lienforum ?? 0;
     }
 
     // Handle synopsis validation - append user attribution if synopsis is being updated

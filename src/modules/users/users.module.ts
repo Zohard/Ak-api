@@ -5,9 +5,10 @@ import { PrismaService } from '../../shared/services/prisma.service';
 import { CacheService } from '../../shared/services/cache.service';
 
 import { FavoritesModule } from './favorites/favorites.module';
+import { AuthModule } from '../auth/auth.module';
 
 @Module({
-  imports: [FavoritesModule],
+  imports: [FavoritesModule, AuthModule],
   controllers: [UsersController],
   providers: [UsersService, PrismaService, CacheService],
   exports: [UsersService],
