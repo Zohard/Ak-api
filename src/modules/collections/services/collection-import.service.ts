@@ -208,9 +208,9 @@ export class CollectionImportService {
 
     private normalizeMalScore(score?: number | null): number | undefined {
         if (score == null) return undefined;
-        const s = Math.max(0, Math.min(10, Math.round(Number(score))));
-        // Convert to our 0-5 integer scale
-        return Math.round(s / 2);
+        const s = Math.max(0, Math.min(10, Number(score)));
+        // Convert to our 0-5 scale (supporting 0.5 increments)
+        return s / 2;
     }
 
     /**
