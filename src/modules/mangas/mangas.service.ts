@@ -65,9 +65,20 @@ export class MangasService extends BaseContentService<
     };
   }
 
+  protected mapRawToModel(row: any) {
+    return {
+      idManga: row.id_manga,
+      titre: row.titre,
+      titreOrig: row.titre_orig,
+      annee: row.annee,
+      auteur: row.auteur,
+      image: row.image,
+    };
+  }
+
   protected formatAutocompleteItem(manga: any) {
     return {
-      id_manga: manga.idManga,
+      id_manga: manga.idManga || manga.id_manga,
       titre: manga.titre,
       annee: manga.annee,
       auteur: manga.auteur,
@@ -235,12 +246,21 @@ export class MangasService extends BaseContentService<
     const skip = ((page || 1) - 1) * (limit || 20);
 
     const where: any = {};
+    const searchIds: number[] = [];
+    let searchActive = false;
 
     if (search) {
-      where.OR = [
-        { titre: { contains: search, mode: 'insensitive' } },
-        { synopsis: { contains: search, mode: 'insensitive' } },
-      ];
+      searchActive = true;
+      const searchTerm = `%${search}%`;
+      const matchingIds = await this.prisma.$queryRaw<Array<{ id_manga: number }>>`
+        SELECT id_manga FROM ak_mangas
+        WHERE unaccent(titre) ILIKE unaccent(${searchTerm})
+        OR unaccent(COALESCE(titre_orig, '')) ILIKE unaccent(${searchTerm})
+        OR unaccent(COALESCE(titre_fr, '')) ILIKE unaccent(${searchTerm})
+        OR unaccent(COALESCE(titres_alternatifs, '')) ILIKE unaccent(${searchTerm})
+        OR unaccent(COALESCE(synopsis, '')) ILIKE unaccent(${searchTerm})
+      `;
+      searchIds.push(...matchingIds.map(r => r.id_manga));
     }
 
     if (auteur) {
@@ -294,6 +314,15 @@ export class MangasService extends BaseContentService<
         where.idManga = { in: mangaIds };
       } else {
         where.idManga = { in: [] };
+      }
+    }
+
+    // Intersect fallback: if search is active, intersect with whatever is already in where.idManga
+    if (searchActive) {
+      if (where.idManga?.in) {
+        where.idManga.in = where.idManga.in.filter(id => searchIds.includes(id));
+      } else {
+        where.idManga = { in: searchIds };
       }
     }
 

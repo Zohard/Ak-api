@@ -108,14 +108,12 @@ export abstract class BaseContentService<T, CreateDto, UpdateDto, QueryDto> {
       return { data: [] };
     }
 
-    const where: any = {
-      OR: [
-        { titre: { contains: query, mode: 'insensitive' } },
-        { titreOrig: { contains: query, mode: 'insensitive' } },
-      ],
-      statut: statusFilter,
-    };
+    const searchTerm = `%${query}%`;
+    const idCol = this.idField === 'idAnime' ? 'id_anime' : 'id_manga';
+    const table = this.tableName;
 
+    // Build exclude clause
+    let excludeClause = '';
     if (exclude) {
       const excludeIds = exclude
         .split(',')
@@ -123,56 +121,68 @@ export abstract class BaseContentService<T, CreateDto, UpdateDto, QueryDto> {
         .filter((id) => !isNaN(id));
 
       if (excludeIds.length > 0) {
-        where[this.idField] = { notIn: excludeIds };
+        excludeClause = `AND ${idCol} NOT IN (${excludeIds.join(',')})`;
       }
     }
 
-    const selectFields = this.getAutocompleteSelectFields();
+    // Use raw SQL with unaccent for accent-insensitive search
+    const items: any[] = await this.prisma.$queryRawUnsafe(`
+      SELECT *
+      FROM ${table}
+      WHERE statut = ${statusFilter}
+      AND (unaccent(titre) ILIKE unaccent($1)
+           OR unaccent(COALESCE(titre_orig, '')) ILIKE unaccent($1))
+      ${excludeClause}
+      ORDER BY titre ASC
+      LIMIT ${limit * 3}
+    `, searchTerm);
 
-    // Fetch more items than needed to allow for better ranking
-    const items = await this.model.findMany({
-      where,
-      select: selectFields,
-      orderBy: { titre: 'asc' },
-      take: limit * 3, // Fetch 3x to have more candidates for ranking
-    });
-
-    // Rank results by match quality
+    // Rank results by match quality (using unaccented comparison)
     const queryLower = query.toLowerCase();
     const rankedItems = items
       .map((item: any) => {
         const titreLower = item.titre?.toLowerCase() || '';
-        const titreOrigLower = item.titreOrig?.toLowerCase() || '';
-        let rank = 4; // Default: contains in original title
+        const titreOrigLower = item.titre_orig?.toLowerCase() || '';
+        let rank = 4;
 
-        // Check main title first (higher priority)
         if (titreLower === queryLower) {
-          rank = 1; // Exact match on main title
+          rank = 1;
         } else if (titreLower.startsWith(queryLower)) {
-          rank = 2; // Starts with main title
+          rank = 2;
         } else if (titreLower.includes(queryLower)) {
-          rank = 3; // Contains in main title
+          rank = 3;
         } else if (titreOrigLower === queryLower) {
-          rank = 2; // Exact match on original title
+          rank = 2;
         } else if (titreOrigLower.startsWith(queryLower)) {
-          rank = 3; // Starts with original title
+          rank = 3;
         }
 
-        return { ...item, _rank: rank };
+        // Map snake_case DB columns to camelCase for formatAutocompleteItem
+        return {
+          ...this.mapRawToModel(item),
+          _rank: rank,
+        };
       })
       .sort((a, b) => {
-        // Sort by rank first, then alphabetically
         if (a._rank !== b._rank) {
           return a._rank - b._rank;
         }
-        return a.titre.localeCompare(b.titre);
+        return (a.titre || '').localeCompare(b.titre || '');
       })
-      .slice(0, limit) // Take only the requested limit
-      .map(({ _rank, ...item }) => item); // Remove the rank field
+      .slice(0, limit)
+      .map(({ _rank, ...item }) => item);
 
     return {
       data: rankedItems.map(this.formatAutocompleteItem.bind(this)),
     };
+  }
+
+  /**
+   * Map raw SQL snake_case row to camelCase model fields.
+   * Subclasses can override for custom mappings.
+   */
+  protected mapRawToModel(row: any): any {
+    return row;
   }
 
   async getTags(id: number, type: string, statusFilter = 1) {

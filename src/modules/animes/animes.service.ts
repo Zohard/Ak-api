@@ -68,9 +68,19 @@ export class AnimesService extends BaseContentService<
     };
   }
 
+  protected mapRawToModel(row: any) {
+    return {
+      idAnime: row.id_anime,
+      titre: row.titre,
+      titreOrig: row.titre_orig,
+      annee: row.annee,
+      image: row.image,
+    };
+  }
+
   protected formatAutocompleteItem(anime: any) {
     return {
-      id_anime: anime.idAnime,
+      id_anime: anime.idAnime || anime.id_anime,
       titre: anime.titre,
       annee: anime.annee,
       image: anime.image,
@@ -257,14 +267,20 @@ export class AnimesService extends BaseContentService<
 
     // Build where clause
     const where: any = {};
+    const searchIds: number[] = [];
+    let searchActive = false;
 
     if (search) {
-      where.OR = [
-        { titre: { contains: search, mode: 'insensitive' } },
-        { titreOrig: { contains: search, mode: 'insensitive' } },
-        { titreFr: { contains: search, mode: 'insensitive' } },
-        { titresAlternatifs: { contains: search, mode: 'insensitive' } },
-      ];
+      searchActive = true;
+      const searchTerm = `%${search}%`;
+      const matchingIds = await this.prisma.$queryRaw<Array<{ id_anime: number }>>`
+        SELECT id_anime FROM ak_animes
+        WHERE unaccent(titre) ILIKE unaccent(${searchTerm})
+        OR unaccent(COALESCE(titre_orig, '')) ILIKE unaccent(${searchTerm})
+        OR unaccent(COALESCE(titre_fr, '')) ILIKE unaccent(${searchTerm})
+        OR unaccent(COALESCE(titres_alternatifs, '')) ILIKE unaccent(${searchTerm})
+      `;
+      searchIds.push(...matchingIds.map(r => r.id_anime));
     }
 
     if (studio) {
@@ -332,6 +348,15 @@ export class AnimesService extends BaseContentService<
       } else {
         // If no animes found with these genres, return empty result
         where.idAnime = { in: [] };
+      }
+    }
+
+    // Intersect fallback: if search is active, intersect with whatever is already in where.idAnime
+    if (searchActive) {
+      if (where.idAnime?.in) {
+        where.idAnime.in = where.idAnime.in.filter(id => searchIds.includes(id));
+      } else {
+        where.idAnime = { in: searchIds };
       }
     }
 

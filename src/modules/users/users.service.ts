@@ -594,15 +594,15 @@ export class UsersService {
         c.id_critique as id,
         c.nice_url as "reviewSlug",
         CASE
-          WHEN c.id_anime IS NOT NULL THEN CONCAT(a.nice_url, '-', a.id_anime)
-          WHEN c.id_manga IS NOT NULL THEN CONCAT(m.nice_url, '-', m.id_manga)
-          WHEN c.id_jeu IS NOT NULL THEN CONCAT(jv.nice_url, '-', jv.id_jeu)
+          WHEN c.id_anime > 0 THEN CONCAT(a.nice_url, '-', a.id_anime)
+          WHEN c.id_manga > 0 THEN CONCAT(m.nice_url, '-', m.id_manga)
+          WHEN c.id_jeu > 0 THEN CONCAT(jv.nice_url, '-', jv.id_jeu)
           ELSE NULL
         END as "niceUrl",
         CASE
-          WHEN c.id_anime IS NOT NULL THEN 'anime'
-          WHEN c.id_manga IS NOT NULL THEN 'manga'
-          WHEN c.id_jeu IS NOT NULL THEN 'jeu_video'
+          WHEN c.id_anime > 0 THEN 'anime'
+          WHEN c.id_manga > 0 THEN 'manga'
+          WHEN c.id_jeu > 0 THEN 'jeu_video'
           ELSE NULL
         END as "mediaType"
       FROM ak_critique c
@@ -628,7 +628,7 @@ export class UsersService {
       LEFT JOIN ak_animes a ON ca.id_anime = a.id_anime
       WHERE ca.id_membre = ${id}
       ORDER BY ca.created_at DESC
-      LIMIT ${Math.ceil(limit / 2)})
+      LIMIT ${Math.ceil(limit / 3)})
       UNION ALL
       (SELECT
         'manga_added' as type,
@@ -642,7 +642,21 @@ export class UsersService {
       LEFT JOIN ak_mangas m ON cm.id_manga = m.id_manga
       WHERE cm.id_membre = ${id}
       ORDER BY cm.created_at DESC
-      LIMIT ${Math.floor(limit / 2)})
+      LIMIT ${Math.floor(limit / 3)})
+      UNION ALL
+      (SELECT
+        'game_added' as type,
+        EXTRACT(EPOCH FROM cj.date_created) as date,
+        jv.titre as title,
+        cj.id_jeu as id,
+        NULL::text as "reviewSlug",
+        CONCAT(jv.nice_url, '-', jv.id_jeu) as "niceUrl",
+        'jeu_video' as "mediaType"
+      FROM collection_jeuxvideo cj
+      LEFT JOIN ak_jeux_video jv ON cj.id_jeu = jv.id_jeu
+      WHERE cj.id_membre = ${id}
+      ORDER BY cj.date_created DESC
+      LIMIT ${Math.floor(limit / 3)})
     `;
 
     const allActivities = [

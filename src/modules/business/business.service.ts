@@ -314,49 +314,29 @@ export class BusinessService {
       return { data: [] };
     }
 
-    const businesses = await this.prisma.akBusiness.findMany({
-      where: {
-        statut: 1,
-        OR: [
-          {
-            denomination: {
-              contains: query.trim(),
-              mode: 'insensitive',
-            },
-          },
-          {
-            autresDenominations: {
-              contains: query.trim(),
-              mode: 'insensitive',
-            },
-          },
-        ],
-      },
-      select: {
-        idBusiness: true,
-        denomination: true,
-        type: true,
-        origine: true,
-        image: true,
-        niceUrl: true,
-      },
-      orderBy: [
-        { denomination: 'asc' },
-        { idBusiness: 'asc' }
-      ],
-      take: limit,
-    });
+    const searchTerm = `%${query.trim()}%`;
+
+    // Use raw SQL with unaccent for accent-insensitive search
+    const businesses: any[] = await this.prisma.$queryRawUnsafe(`
+      SELECT id_business, denomination, type, origine, image, nice_url
+      FROM ak_business
+      WHERE statut = 1
+      AND (unaccent(denomination) ILIKE unaccent($1)
+           OR unaccent(COALESCE(autres_denominations, '')) ILIKE unaccent($1))
+      ORDER BY denomination ASC, id_business ASC
+      LIMIT $2
+    `, searchTerm, limit);
 
     return {
       data: businesses.map(b => ({
-        id: b.idBusiness,
-        id_business: b.idBusiness,
-        idBusiness: b.idBusiness,
+        id: b.id_business,
+        id_business: b.id_business,
+        idBusiness: b.id_business,
         denomination: b.denomination,
         type: b.type,
         origine: b.origine,
         image: b.image,
-        niceUrl: b.niceUrl,
+        niceUrl: b.nice_url,
       }))
     };
   }

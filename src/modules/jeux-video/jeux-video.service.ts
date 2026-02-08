@@ -51,9 +51,19 @@ export class JeuxVideoService {
     const skip = (page - 1) * limit;
     const where: any = { statut: 1 }; // Only show published games
 
+    const searchIds: number[] = [];
+    let searchActive = false;
+
     // Search filter
     if (search) {
-      where.titre = { contains: search, mode: 'insensitive' };
+      searchActive = true;
+      const searchTerm = `%${search}%`;
+      const matchingIds = await this.prisma.$queryRaw<Array<{ id_jeu: number }>>`
+        SELECT id_jeu FROM ak_jeux_video
+        WHERE unaccent(titre) ILIKE unaccent(${searchTerm})
+        OR unaccent(COALESCE(description, '')) ILIKE unaccent(${searchTerm})
+      `;
+      searchIds.push(...matchingIds.map(r => r.id_jeu));
     }
 
     // Platform filter
@@ -88,6 +98,15 @@ export class JeuxVideoService {
           }
         }
       };
+    }
+
+    // Intersect fallback: if search is active, intersect with whatever is already in where.idJeu
+    if (searchActive) {
+      if (where.idJeu?.in) {
+        where.idJeu.in = where.idJeu.in.filter(id => searchIds.includes(id));
+      } else {
+        where.idJeu = { in: searchIds };
+      }
     }
 
     // REMOVED: No need to filter out null values since columns are NOT NULL
@@ -648,11 +667,10 @@ export class JeuxVideoService {
       return { data: [] };
     }
 
-    const where: any = {
-      titre: { contains: query, mode: 'insensitive' },
-      statut: 1,
-    };
+    const searchTerm = `%${query}%`;
 
+    // Build exclude clause
+    let excludeClause = '';
     if (exclude) {
       const excludeIds = exclude
         .split(',')
@@ -660,54 +678,54 @@ export class JeuxVideoService {
         .filter((id) => !isNaN(id));
 
       if (excludeIds.length > 0) {
-        where.idJeu = { notIn: excludeIds };
+        excludeClause = `AND id_jeu NOT IN (${excludeIds.join(',')})`;
       }
     }
 
-    // Fetch more items than needed to allow for better ranking
-    const results = await this.prisma.akJeuxVideo.findMany({
-      where,
-      take: limit * 3, // Fetch 3x to have more candidates for ranking
-      orderBy: { titre: 'asc' },
-      select: {
-        idJeu: true,
-        titre: true,
-        niceUrl: true,
-        image: true,
-        annee: true,
-        moyenneNotes: true,
-      },
-    });
+    // Use raw SQL with unaccent for accent-insensitive search
+    const results: any[] = await this.prisma.$queryRawUnsafe(`
+      SELECT id_jeu, titre, nice_url, image, annee, moyenne_notes
+      FROM ak_jeux_video
+      WHERE statut = 1
+      AND unaccent(titre) ILIKE unaccent($1)
+      ${excludeClause}
+      ORDER BY titre ASC
+      LIMIT ${limit * 3}
+    `, searchTerm);
 
     // Rank results by match quality
     const queryLower = query.toLowerCase();
     const rankedResults = results
       .map((item) => {
         const titreLower = (item.titre || '').toLowerCase();
-        let rank = 3; // Default: contains
+        let rank = 3;
 
         if (titreLower === queryLower) {
-          rank = 1; // Exact match
+          rank = 1;
         } else if (titreLower.startsWith(queryLower)) {
-          rank = 2; // Starts with
+          rank = 2;
         }
 
         return { ...item, _rank: rank };
       })
       .sort((a, b) => {
-        // Sort by rank first, then alphabetically
         if (a._rank !== b._rank) {
           return a._rank - b._rank;
         }
         return (a.titre || '').localeCompare(b.titre || '');
       })
-      .slice(0, limit) // Take only the requested limit
-      .map(({ _rank, ...item }) => item); // Remove the rank field
+      .slice(0, limit)
+      .map(({ _rank, ...item }) => item);
 
-    // Map idJeu to id for frontend consistency
+    // Map snake_case to camelCase for frontend consistency
     const mappedResults = rankedResults.map(item => ({
-      ...item,
-      id: item.idJeu,
+      idJeu: item.id_jeu,
+      id: item.id_jeu,
+      titre: item.titre,
+      niceUrl: item.nice_url,
+      image: item.image,
+      annee: item.annee,
+      moyenneNotes: item.moyenne_notes,
     }));
 
     return { data: mappedResults };

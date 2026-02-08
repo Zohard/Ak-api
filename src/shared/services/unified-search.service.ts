@@ -37,7 +37,7 @@ export class UnifiedSearchService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly cacheService: CacheService,
-  ) {}
+  ) { }
 
   async search(searchQuery: UnifiedSearchQuery): Promise<{
     results: SearchResult[];
@@ -86,23 +86,15 @@ export class UnifiedSearchService {
     const promises: Promise<any[]>[] = [];
 
     if (type === 'all' || type === 'anime') {
-      promises.push(this.searchAnimes(searchConditions, limit));
+      promises.push(this.searchAnimes(query, limit, minRating, yearFrom, yearTo));
     }
 
     if (type === 'all' || type === 'manga') {
-      promises.push(this.searchMangas(searchConditions, limit));
+      promises.push(this.searchMangas(query, limit, minRating, yearFrom, yearTo));
     }
 
     if (type === 'all' || type === 'jeu_video') {
-      const jeuVideoConditions = this.buildJeuVideoSearchConditions(
-        query,
-        minRating,
-        yearFrom,
-        yearTo,
-        plateforme,
-        editeur,
-      );
-      promises.push(this.searchJeuxVideo(jeuVideoConditions, limit));
+      promises.push(this.searchJeuxVideo(query, limit, minRating, yearFrom, yearTo, plateforme, editeur));
     }
 
     const results = await Promise.all(promises);
@@ -298,30 +290,75 @@ export class UnifiedSearchService {
     return conditions;
   }
 
-  private async searchAnimes(conditions: any, limit: number) {
-    return this.prisma.executeWithRetry(() =>
-      this.prisma.akAnime.findMany({
-        where: conditions,
+  private async searchAnimes(query: string, limit: number, minRating: number, yearFrom?: number, yearTo?: number) {
+    if (!query) {
+      return this.prisma.akAnime.findMany({
+        where: { statut: 1, moyenneNotes: { gte: minRating }, annee: { gte: yearFrom, lte: yearTo } },
         orderBy: [{ dateAjout: 'desc' }],
-        take: Math.ceil(limit / 3), // Split limit between types
-      })
-    );
+        take: Math.ceil(limit / 3),
+      });
+    }
+
+    const searchTerm = `%${query}%`;
+    return this.prisma.$queryRaw`
+      SELECT * FROM ak_animes
+      WHERE statut = 1
+      AND (unaccent(titre) ILIKE unaccent(${searchTerm}) 
+           OR unaccent(COALESCE(synopsis, '')) ILIKE unaccent(${searchTerm}))
+      ${minRating > 0 ? this.prisma.$queryRaw`AND moyenne_notes >= ${minRating}` : this.prisma.$queryRaw``}
+      ${yearFrom ? this.prisma.$queryRaw`AND annee >= ${yearFrom}` : this.prisma.$queryRaw``}
+      ${yearTo ? this.prisma.$queryRaw`AND annee <= ${yearTo}` : this.prisma.$queryRaw``}
+      ORDER BY date_ajout DESC
+      LIMIT ${Math.ceil(limit / 3)}
+    `;
   }
 
-  private async searchMangas(conditions: any, limit: number) {
-    return this.prisma.akManga.findMany({
-      where: conditions,
-      orderBy: [{ dateAjout: 'desc' }],
-      take: Math.ceil(limit / 3), // Split limit between types
-    });
+  private async searchMangas(query: string, limit: number, minRating: number, yearFrom?: number, yearTo?: number) {
+    if (!query) {
+      return this.prisma.akManga.findMany({
+        where: { statut: 1, moyenneNotes: { gte: minRating }, annee: { gte: yearFrom, lte: yearTo } },
+        orderBy: [{ dateAjout: 'desc' }],
+        take: Math.ceil(limit / 3),
+      });
+    }
+
+    const searchTerm = `%${query}%`;
+    return this.prisma.$queryRaw`
+      SELECT * FROM ak_mangas
+      WHERE statut = 1
+      AND (unaccent(titre) ILIKE unaccent(${searchTerm}) 
+           OR unaccent(COALESCE(synopsis, '')) ILIKE unaccent(${searchTerm}))
+      ${minRating > 0 ? this.prisma.$queryRaw`AND moyenne_notes >= ${minRating}` : this.prisma.$queryRaw``}
+      ${yearFrom ? this.prisma.$queryRaw`AND annee >= ${yearFrom}` : this.prisma.$queryRaw``}
+      ${yearTo ? this.prisma.$queryRaw`AND annee <= ${yearTo}` : this.prisma.$queryRaw``}
+      ORDER BY date_ajout DESC
+      LIMIT ${Math.ceil(limit / 3)}
+    `;
   }
 
-  private async searchJeuxVideo(conditions: any, limit: number) {
-    return this.prisma.akJeuxVideo.findMany({
-      where: conditions,
-      orderBy: [{ dateAjout: 'desc' }],
-      take: Math.ceil(limit / 3), // Split limit between types
-    });
+  private async searchJeuxVideo(query: string, limit: number, minRating: number, yearFrom?: number, yearTo?: number, plateforme?: string, editeur?: string) {
+    if (!query) {
+      return this.prisma.akJeuxVideo.findMany({
+        where: { statut: 1, moyenneNotes: { gte: minRating }, annee: { gte: yearFrom, lte: yearTo }, plateforme: { contains: plateforme, mode: 'insensitive' }, editeur: { contains: editeur, mode: 'insensitive' } },
+        orderBy: [{ dateAjout: 'desc' }],
+        take: Math.ceil(limit / 3),
+      });
+    }
+
+    const searchTerm = `%${query}%`;
+    return this.prisma.$queryRaw`
+      SELECT * FROM ak_jeux_video
+      WHERE statut = 1
+      AND (unaccent(titre) ILIKE unaccent(${searchTerm}) 
+           OR unaccent(COALESCE(description, '')) ILIKE unaccent(${searchTerm}))
+      ${minRating > 0 ? this.prisma.$queryRaw`AND moyenne_notes >= ${minRating}` : this.prisma.$queryRaw``}
+      ${yearFrom ? this.prisma.$queryRaw`AND annee >= ${yearFrom}` : this.prisma.$queryRaw``}
+      ${yearTo ? this.prisma.$queryRaw`AND annee <= ${yearTo}` : this.prisma.$queryRaw``}
+      ${plateforme ? this.prisma.$queryRaw`AND plateforme ILIKE ${'%' + plateforme + '%'}` : this.prisma.$queryRaw``}
+      ${editeur ? this.prisma.$queryRaw`AND editeur ILIKE ${'%' + editeur + '%'}` : this.prisma.$queryRaw``}
+      ORDER BY date_ajout DESC
+      LIMIT ${Math.ceil(limit / 3)}
+    `;
   }
 
   private formatAnimeResult(anime: any): SearchResult {
