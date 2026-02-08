@@ -484,7 +484,8 @@ export class CollectionBrowseService {
             const where: any = {
                 idAnime: mediaId,
                 isPublic: true,
-                idMembre: { gt: 0 }, // Exclude orphaned collections
+                idMembre: { gt: 0 },
+                user: { idMember: { gt: 0 } }, // Filter by user existence check
             };
 
             // Query for main data
@@ -543,7 +544,8 @@ export class CollectionBrowseService {
             const where: any = {
                 idManga: mediaId,
                 isPublic: true,
-                idMembre: { gt: 0 }, // Exclude orphaned collections
+                idMembre: { gt: 0 },
+                user: { idMember: { gt: 0 } }, // Filter by user existence check
             };
 
             // Query for main data
