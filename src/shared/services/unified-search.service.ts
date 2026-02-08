@@ -290,7 +290,7 @@ export class UnifiedSearchService {
     return conditions;
   }
 
-  private async searchAnimes(query: string, limit: number, minRating: number, yearFrom?: number, yearTo?: number) {
+  private async searchAnimes(query: string, limit: number, minRating: number, yearFrom?: number, yearTo?: number): Promise<any[]> {
     if (!query) {
       return this.prisma.akAnime.findMany({
         where: { statut: 1, moyenneNotes: { gte: minRating }, annee: { gte: yearFrom, lte: yearTo } },
@@ -313,10 +313,10 @@ export class UnifiedSearchService {
     `;
   }
 
-  private async searchMangas(query: string, limit: number, minRating: number, yearFrom?: number, yearTo?: number) {
+  private async searchMangas(query: string, limit: number, minRating: number, yearFrom?: number, yearTo?: number): Promise<any[]> {
     if (!query) {
       return this.prisma.akManga.findMany({
-        where: { statut: 1, moyenneNotes: { gte: minRating }, annee: { gte: yearFrom, lte: yearTo } },
+        where: { statut: 1, moyenneNotes: { gte: minRating }, annee: { gte: yearFrom?.toString(), lte: yearTo?.toString() } },
         orderBy: [{ dateAjout: 'desc' }],
         take: Math.ceil(limit / 3),
       });
@@ -336,7 +336,7 @@ export class UnifiedSearchService {
     `;
   }
 
-  private async searchJeuxVideo(query: string, limit: number, minRating: number, yearFrom?: number, yearTo?: number, plateforme?: string, editeur?: string) {
+  private async searchJeuxVideo(query: string, limit: number, minRating: number, yearFrom?: number, yearTo?: number, plateforme?: string, editeur?: string): Promise<any[]> {
     if (!query) {
       return this.prisma.akJeuxVideo.findMany({
         where: { statut: 1, moyenneNotes: { gte: minRating }, annee: { gte: yearFrom, lte: yearTo }, plateforme: { contains: plateforme, mode: 'insensitive' }, editeur: { contains: editeur, mode: 'insensitive' } },
