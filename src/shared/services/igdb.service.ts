@@ -326,7 +326,7 @@ export class IgdbService {
         editeur: publishers.length > 0 ? publishers.join(', ') : null,
         plateforme: igdbGame.platforms?.map(p => p.abbreviation || p.name).join(', ') || null,
         presentation: igdbGame.summary || null,
-        statut: 0, // Published (0 = visible)
+        statut: 1, // Published
         nbClicsDay: 0,
         nbClicsWeek: 0,
         nbClicsMonth: 0,
