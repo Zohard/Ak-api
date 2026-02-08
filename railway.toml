@@ -2,7 +2,7 @@
 builder = "DOCKERFILE"
 
 [deploy]
-restartPolicyType = "ON_FAILURE"
+restartPolicyType = "ALWAYS"
 restartPolicyMaxRetries = 10
 healthcheckPath = "/api/health"
 healthcheckTimeout = 300

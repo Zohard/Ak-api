@@ -41,16 +41,28 @@ export class JobsCronController {
     @ApiResponse({ status: 200, description: 'Daily recalculation completed' })
     async triggerDailyPopularity() {
         const startTime = Date.now();
-        await this.popularityJobService.recalculateRecentReviewsPopularity();
-        const duration = Date.now() - startTime;
+        try {
+            await this.popularityJobService.recalculateRecentReviewsPopularity();
+            const duration = Date.now() - startTime;
 
-        return {
-            success: true,
-            job: 'daily-popularity',
-            message: 'Daily popularity recalculation for recent reviews completed',
-            duration: `${duration}ms`,
-            timestamp: new Date().toISOString(),
-        };
+            return {
+                success: true,
+                job: 'daily-popularity',
+                message: 'Daily popularity recalculation for recent reviews completed',
+                duration: `${duration}ms`,
+                timestamp: new Date().toISOString(),
+            };
+        } catch (error) {
+            const duration = Date.now() - startTime;
+            this.logger.error(`Daily popularity job failed: ${error.message}`, error.stack);
+            return {
+                success: false,
+                job: 'daily-popularity',
+                message: `Job failed: ${error.message}`,
+                duration: `${duration}ms`,
+                timestamp: new Date().toISOString(),
+            };
+        }
     }
 
     @Post('popularity/weekly')
@@ -64,16 +76,28 @@ export class JobsCronController {
     @ApiResponse({ status: 200, description: 'Weekly recalculation completed' })
     async triggerWeeklyPopularity() {
         const startTime = Date.now();
-        await this.popularityJobService.recalculateAllReviewsPopularity();
-        const duration = Date.now() - startTime;
+        try {
+            await this.popularityJobService.recalculateAllReviewsPopularity();
+            const duration = Date.now() - startTime;
 
-        return {
-            success: true,
-            job: 'weekly-popularity',
-            message: 'Weekly popularity recalculation for all reviews completed',
-            duration: `${duration}ms`,
-            timestamp: new Date().toISOString(),
-        };
+            return {
+                success: true,
+                job: 'weekly-popularity',
+                message: 'Weekly popularity recalculation for all reviews completed',
+                duration: `${duration}ms`,
+                timestamp: new Date().toISOString(),
+            };
+        } catch (error) {
+            const duration = Date.now() - startTime;
+            this.logger.error(`Weekly popularity job failed: ${error.message}`, error.stack);
+            return {
+                success: false,
+                job: 'weekly-popularity',
+                message: `Job failed: ${error.message}`,
+                duration: `${duration}ms`,
+                timestamp: new Date().toISOString(),
+            };
+        }
     }
 
     @Post('counters/reset-daily')
@@ -86,14 +110,24 @@ export class JobsCronController {
     @ApiOperation({ summary: 'Reset daily view counters' })
     @ApiResponse({ status: 200, description: 'Daily counters reset' })
     async resetDailyCounters() {
-        await this.popularityJobService.resetDailyCounters();
+        try {
+            await this.popularityJobService.resetDailyCounters();
 
-        return {
-            success: true,
-            job: 'reset-daily-counters',
-            message: 'Daily view counters reset completed',
-            timestamp: new Date().toISOString(),
-        };
+            return {
+                success: true,
+                job: 'reset-daily-counters',
+                message: 'Daily view counters reset completed',
+                timestamp: new Date().toISOString(),
+            };
+        } catch (error) {
+            this.logger.error(`Reset daily counters failed: ${error.message}`, error.stack);
+            return {
+                success: false,
+                job: 'reset-daily-counters',
+                message: `Job failed: ${error.message}`,
+                timestamp: new Date().toISOString(),
+            };
+        }
     }
 
     @Post('counters/reset-weekly')
@@ -106,14 +140,24 @@ export class JobsCronController {
     @ApiOperation({ summary: 'Reset weekly view counters' })
     @ApiResponse({ status: 200, description: 'Weekly counters reset' })
     async resetWeeklyCounters() {
-        await this.popularityJobService.resetWeeklyCounters();
+        try {
+            await this.popularityJobService.resetWeeklyCounters();
 
-        return {
-            success: true,
-            job: 'reset-weekly-counters',
-            message: 'Weekly view counters reset completed',
-            timestamp: new Date().toISOString(),
-        };
+            return {
+                success: true,
+                job: 'reset-weekly-counters',
+                message: 'Weekly view counters reset completed',
+                timestamp: new Date().toISOString(),
+            };
+        } catch (error) {
+            this.logger.error(`Reset weekly counters failed: ${error.message}`, error.stack);
+            return {
+                success: false,
+                job: 'reset-weekly-counters',
+                message: `Job failed: ${error.message}`,
+                timestamp: new Date().toISOString(),
+            };
+        }
     }
 
     @Post('counters/reset-monthly')
@@ -126,14 +170,24 @@ export class JobsCronController {
     @ApiOperation({ summary: 'Reset monthly view counters' })
     @ApiResponse({ status: 200, description: 'Monthly counters reset' })
     async resetMonthlyCounters() {
-        await this.popularityJobService.resetMonthlyCounters();
+        try {
+            await this.popularityJobService.resetMonthlyCounters();
 
-        return {
-            success: true,
-            job: 'reset-monthly-counters',
-            message: 'Monthly view counters reset completed',
-            timestamp: new Date().toISOString(),
-        };
+            return {
+                success: true,
+                job: 'reset-monthly-counters',
+                message: 'Monthly view counters reset completed',
+                timestamp: new Date().toISOString(),
+            };
+        } catch (error) {
+            this.logger.error(`Reset monthly counters failed: ${error.message}`, error.stack);
+            return {
+                success: false,
+                job: 'reset-monthly-counters',
+                message: `Job failed: ${error.message}`,
+                timestamp: new Date().toISOString(),
+            };
+        }
     }
 
     @Get('stats')
@@ -267,19 +321,28 @@ export class JobsCronController {
     @ApiOperation({ summary: 'Trigger manga volume sync' })
     @ApiResponse({ status: 200, description: 'Manga volume sync started' })
     async triggerMangaVolumeSync() {
-        // Run sync for 10 mangas
-        const result = await this.cronService.syncMangaVolumes(10);
-        const titles = result.results.map(r => r.title).join(', ');
-        return {
-            success: true,
-            job: 'manga-sync-volumes',
-            message: `Processed ${result.processed} mangas: ${titles}`,
-            stats: {
-                processed: result.processed,
-                results: result.results
-            },
-            timestamp: new Date().toISOString(),
-        };
+        try {
+            const result = await this.cronService.syncMangaVolumes(10);
+            const titles = result.results.map(r => r.title).join(', ');
+            return {
+                success: true,
+                job: 'manga-sync-volumes',
+                message: `Processed ${result.processed} mangas: ${titles}`,
+                stats: {
+                    processed: result.processed,
+                    results: result.results
+                },
+                timestamp: new Date().toISOString(),
+            };
+        } catch (error) {
+            this.logger.error(`Manga volume sync failed: ${error.message}`, error.stack);
+            return {
+                success: false,
+                job: 'manga-sync-volumes',
+                message: `Job failed: ${error.message}`,
+                timestamp: new Date().toISOString(),
+            };
+        }
     }
 
     @Post('general/anime-popularity')
@@ -292,14 +355,24 @@ export class JobsCronController {
     @ApiOperation({ summary: 'Trigger anime popularity update' })
     @ApiResponse({ status: 200, description: 'Anime popularity updated' })
     async triggerAnimePopularity() {
-        const result = await this.cronService.updateAnimePopularity();
-        return {
-            success: true,
-            job: 'anime-popularity',
-            message: result.message,
-            stats: result.stats,
-            timestamp: new Date().toISOString(),
-        };
+        try {
+            const result = await this.cronService.updateAnimePopularity();
+            return {
+                success: true,
+                job: 'anime-popularity',
+                message: result.message,
+                stats: result.stats,
+                timestamp: new Date().toISOString(),
+            };
+        } catch (error) {
+            this.logger.error(`Anime popularity job failed: ${error.message}`, error.stack);
+            return {
+                success: false,
+                job: 'anime-popularity',
+                message: `Job failed: ${error.message}`,
+                timestamp: new Date().toISOString(),
+            };
+        }
     }
 
     @Post('general/manga-popularity')
@@ -312,14 +385,24 @@ export class JobsCronController {
     @ApiOperation({ summary: 'Trigger manga popularity update' })
     @ApiResponse({ status: 200, description: 'Manga popularity updated' })
     async triggerMangaPopularity() {
-        const result = await this.cronService.updateMangaPopularity();
-        return {
-            success: true,
-            job: 'manga-popularity',
-            message: result.message,
-            stats: result.stats,
-            timestamp: new Date().toISOString(),
-        };
+        try {
+            const result = await this.cronService.updateMangaPopularity();
+            return {
+                success: true,
+                job: 'manga-popularity',
+                message: result.message,
+                stats: result.stats,
+                timestamp: new Date().toISOString(),
+            };
+        } catch (error) {
+            this.logger.error(`Manga popularity job failed: ${error.message}`, error.stack);
+            return {
+                success: false,
+                job: 'manga-popularity',
+                message: `Job failed: ${error.message}`,
+                timestamp: new Date().toISOString(),
+            };
+        }
     }
 
     @Post('general/anime-episode-count')
@@ -332,15 +415,24 @@ export class JobsCronController {
     @ApiOperation({ summary: 'Trigger anime episode count update' })
     @ApiResponse({ status: 200, description: 'Anime episode count updated' })
     async triggerAnimeEpisodeCount() {
-        // Cast as any if method is not yet recognized by TS in this context
-        const result = await (this.cronService as any).updateAnimeEpisodeCount();
-        return {
-            success: true,
-            job: 'anime-episode-count',
-            message: result.message,
-            stats: result.stats,
-            timestamp: new Date().toISOString(),
-        };
+        try {
+            const result = await (this.cronService as any).updateAnimeEpisodeCount();
+            return {
+                success: true,
+                job: 'anime-episode-count',
+                message: result.message,
+                stats: result.stats,
+                timestamp: new Date().toISOString(),
+            };
+        } catch (error) {
+            this.logger.error(`Anime episode count job failed: ${error.message}`, error.stack);
+            return {
+                success: false,
+                job: 'anime-episode-count',
+                message: `Job failed: ${error.message}`,
+                timestamp: new Date().toISOString(),
+            };
+        }
     }
 
     @Post('rankings/weekly')
@@ -354,22 +446,34 @@ export class JobsCronController {
     @ApiResponse({ status: 200, description: 'Weekly rankings generated' })
     async generateWeeklyRankings() {
         const startTime = Date.now();
-        const { year, season, week } = this.getCurrentSeasonInfo();
+        try {
+            const { year, season, week } = this.getCurrentSeasonInfo();
 
-        const result = await this.animeRankingsService.generateWeeklyRanking(year, season, week);
-        const duration = Date.now() - startTime;
+            const result = await this.animeRankingsService.generateWeeklyRanking(year, season, week);
+            const duration = Date.now() - startTime;
 
-        return {
-            success: true,
-            job: 'weekly-rankings',
-            message: `Weekly anime rankings generated for ${season} ${year} week ${week}`,
-            year,
-            season,
-            week,
-            count: result.count || 0,
-            duration: `${duration}ms`,
-            timestamp: new Date().toISOString(),
-        };
+            return {
+                success: true,
+                job: 'weekly-rankings',
+                message: `Weekly anime rankings generated for ${season} ${year} week ${week}`,
+                year,
+                season,
+                week,
+                count: result.count || 0,
+                duration: `${duration}ms`,
+                timestamp: new Date().toISOString(),
+            };
+        } catch (error) {
+            const duration = Date.now() - startTime;
+            this.logger.error(`Weekly rankings job failed: ${error.message}`, error.stack);
+            return {
+                success: false,
+                job: 'weekly-rankings',
+                message: `Job failed: ${error.message}`,
+                duration: `${duration}ms`,
+                timestamp: new Date().toISOString(),
+            };
+        }
     }
 
     @Post('reviews/rankings')
@@ -386,18 +490,30 @@ export class JobsCronController {
     @ApiResponse({ status: 200, description: 'Review rankings updated successfully' })
     async updateReviewRankings() {
         const startTime = Date.now();
-        const result = await this.popularityJobService.updateReviewRankings();
-        const duration = Date.now() - startTime;
+        try {
+            const result = await this.popularityJobService.updateReviewRankings();
+            const duration = Date.now() - startTime;
 
-        return {
-            success: result.success,
-            job: 'review-rankings',
-            message: result.message,
-            stats: result.stats,
-            top10: result.top10,
-            duration: `${duration}ms`,
-            timestamp: new Date().toISOString(),
-        };
+            return {
+                success: result.success,
+                job: 'review-rankings',
+                message: result.message,
+                stats: result.stats,
+                top10: result.top10,
+                duration: `${duration}ms`,
+                timestamp: new Date().toISOString(),
+            };
+        } catch (error) {
+            const duration = Date.now() - startTime;
+            this.logger.error(`Review rankings job failed: ${error.message}`, error.stack);
+            return {
+                success: false,
+                job: 'review-rankings',
+                message: `Job failed: ${error.message}`,
+                duration: `${duration}ms`,
+                timestamp: new Date().toISOString(),
+            };
+        }
     }
 
     @Get('debug/sentry')
