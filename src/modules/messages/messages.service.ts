@@ -464,20 +464,22 @@ export class MessagesService {
             }
           });
 
-          // Update user's unread count (only if currently > 0)
-          const user = await prisma.smfMember.findUnique({
-            where: { idMember: userId },
-            select: { unreadMessages: true }
+          // Sync SmfMember flags based on remaining unread messages
+          const unreadCount = await prisma.smfPmRecipient.count({
+            where: {
+              idMember: userId,
+              isRead: 0,
+              deleted: 0
+            }
           });
 
-          if (user && user.unreadMessages > 0) {
-            await prisma.smfMember.update({
-              where: { idMember: userId },
-              data: {
-                unreadMessages: { decrement: 1 }
-              }
-            });
-          }
+          await prisma.smfMember.update({
+            where: { idMember: userId },
+            data: {
+              unreadMessages: unreadCount,
+              newPm: unreadCount > 0 ? 1 : 0
+            }
+          });
         }
       });
     } catch (error) {
@@ -517,19 +519,22 @@ export class MessagesService {
           }
         });
 
-        // Decrement user's unread count
-        const user = await prisma.smfMember.findUnique({
-          where: { idMember: userId },
-          select: { unreadMessages: true }
+        // Recalculate and sync user's unread count
+        const remainingUnreadCount = await prisma.smfPmRecipient.count({
+          where: {
+            idMember: userId,
+            isRead: 0,
+            deleted: 0
+          }
         });
 
-        if (user) {
-          const newCount = Math.max(0, user.unreadMessages - unreadPmIds.length);
-          await prisma.smfMember.update({
-            where: { idMember: userId },
-            data: { unreadMessages: newCount }
-          });
-        }
+        await prisma.smfMember.update({
+          where: { idMember: userId },
+          data: {
+            unreadMessages: remainingUnreadCount,
+            newPm: remainingUnreadCount > 0 ? 1 : 0
+          }
+        });
 
         return unreadPmIds.length;
       });
@@ -541,12 +546,17 @@ export class MessagesService {
 
   async getUnreadCount(userId: number): Promise<number> {
     try {
-      const user = await this.prisma.smfMember.findUnique({
-        where: { idMember: userId },
-        select: { unreadMessages: true }
+      // DYNAMIC COUNT: Instead of relying on SmfMember.unreadMessages which gets out of sync
+      // we count directly from smfPmRecipient
+      const unreadCount = await this.prisma.smfPmRecipient.count({
+        where: {
+          idMember: userId,
+          isRead: 0,
+          deleted: 0
+        }
       });
 
-      return user?.unreadMessages || 0;
+      return unreadCount;
     } catch (error) {
       this.logger.error('Failed to get unread count:', error);
       throw new BadRequestException('Failed to get unread count');
