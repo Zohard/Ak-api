@@ -1948,6 +1948,7 @@ export class UsersService {
         EXTRACT(DAY FROM birthdate) as day
       FROM smf_members
       WHERE birthdate IS NOT NULL
+        AND EXTRACT(YEAR FROM birthdate) > 1
         AND EXTRACT(MONTH FROM birthdate) = ${month}
       ORDER BY EXTRACT(DAY FROM birthdate), member_name
     `;
