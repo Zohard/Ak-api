@@ -61,7 +61,7 @@ export class JeuxVideoService {
       const matchingIds = await this.prisma.$queryRaw<Array<{ id_jeu: number }>>`
         SELECT id_jeu FROM ak_jeux_video
         WHERE unaccent(titre) ILIKE unaccent(${searchTerm})
-        OR unaccent(COALESCE(description, '')) ILIKE unaccent(${searchTerm})
+        OR unaccent(COALESCE(presentation, '')) ILIKE unaccent(${searchTerm})
       `;
       searchIds.push(...matchingIds.map(r => r.id_jeu));
     }
