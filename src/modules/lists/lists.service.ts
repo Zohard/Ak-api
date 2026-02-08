@@ -127,9 +127,6 @@ export class ListsService {
         jsonData: {
           contains: mediaIdStr,
         },
-        membre: {
-          idMember: { gt: 0 }
-        }
       },
       orderBy: { popularite: 'desc' },
       include: {
