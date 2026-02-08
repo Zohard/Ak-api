@@ -119,9 +119,17 @@ export class ListsService {
   }
 
   async getListsByMedia(mediaType: string, mediaId: number) {
+    // Check cache first
+    const cachedLists = await this.cacheService.getListsByMedia(mediaType, mediaId);
+    if (cachedLists) {
+      return cachedLists;
+    }
+
     try {
-      const mediaIdStr = `"${mediaId}"`;
-      const rows = await this.prisma.akListesTop.findMany({
+      const mediaIdStr = String(mediaId);
+      // We search for the ID as a string. This might return false positives (e.g. searching for "1" finds "12").
+      // We will filter strictly in memory afterwards.
+      const candidateRows = await this.prisma.akListesTop.findMany({
         where: {
           statut: 1,
           animeOrManga: mediaType,
@@ -147,15 +155,32 @@ export class ListsService {
         },
       });
 
+      // Strict in-memory filtering to remove false positives and handle both [123] and ["123"] formats
+      const rows = candidateRows.filter(row => {
+        try {
+          const items = JSON.parse(row.jsonData || '[]');
+          if (!Array.isArray(items)) return false;
+          // Check if mediaId exists in the array (handling both string/number types)
+          return items.some(item => String(item) === mediaIdStr);
+        } catch (e) {
+          return false;
+        }
+      });
+
       // Batch fetch first item images
       const imageMap = await this.batchFetchFirstItemImages(rows);
 
       // Map images to lists
-      return rows.map((r) => {
+      const result = rows.map((r) => {
         const formatted = this.formatList(r) as any;
         formatted.firstItemImage = imageMap.get(r.idListe) || null;
         return formatted;
       });
+
+      // Cache the result
+      await this.cacheService.setListsByMedia(mediaType, mediaId, result);
+
+      return result;
     } catch (error) {
       console.error('Error in getListsByMedia:', error);
       throw new Error(`Failed to fetch lists for ${mediaType} ${mediaId}: ${error.message}`);

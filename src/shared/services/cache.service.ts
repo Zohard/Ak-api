@@ -285,6 +285,14 @@ export class CacheService implements OnModuleInit {
     await this.set(`lists:${mediaType}:${sort}:${limit}`, lists, ttl); // 4 hours (14400 seconds)
   }
 
+  async getListsByMedia(mediaType: string, mediaId: number): Promise<any> {
+    return this.get(`lists:media:${mediaType}:${mediaId}`);
+  }
+
+  async setListsByMedia(mediaType: string, mediaId: number, lists: any, ttl = 3600): Promise<void> {
+    await this.set(`lists:media:${mediaType}:${mediaId}`, lists, ttl); // 1 hour (3600 seconds)
+  }
+
   // Reviews cache
   async getReviews(animeId: number, mangaId: number): Promise<any> {
     const id = animeId || mangaId;
