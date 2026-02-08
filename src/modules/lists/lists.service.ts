@@ -128,7 +128,7 @@ export class ListsService {
           jsonData: {
             contains: mediaIdStr,
           },
-          idMembre: { gt: 0 }, // Filter out orphaned lists with invalid member references
+          membre: { idMember: { gt: 0 } },
         },
         orderBy: { popularite: 'desc' },
         include: {

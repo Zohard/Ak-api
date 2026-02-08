@@ -673,7 +673,7 @@ model AkListesTop {
   statut        Int       @default(0) @db.SmallInt // 0=draft,1=published
 
   // Relations
-  membre        SmfMember @relation(fields: [idMembre], references: [idMember], onDelete: Cascade)
+  membre        SmfMember? @relation(fields: [idMembre], references: [idMember], onDelete: Cascade)
 
   @@map("ak_listes_top")
 }
