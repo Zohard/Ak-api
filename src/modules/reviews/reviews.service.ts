@@ -192,6 +192,9 @@ export class ReviewsService {
       where.OR = [
         { titre: { contains: search, mode: 'insensitive' } },
         { critique: { contains: search, mode: 'insensitive' } },
+        { anime: { titre: { contains: search, mode: 'insensitive' } } },
+        { manga: { titre: { contains: search, mode: 'insensitive' } } },
+        { jeuxVideo: { titre: { contains: search, mode: 'insensitive' } } },
       ];
     }
 
