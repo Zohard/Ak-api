@@ -15,7 +15,7 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 @ApiTags('IGDB')
 @Controller('igdb')
 export class IgdbController {
-  constructor(private readonly igdbService: IgdbService) {}
+  constructor(private readonly igdbService: IgdbService) { }
 
   @Get('search')
   @ApiOperation({ summary: 'Search games on IGDB' })
@@ -30,26 +30,38 @@ export class IgdbController {
       throw new BadRequestException('Search query is required');
     }
 
-    const parsedLimit = limit ? parseInt(limit) : 10;
-    const games = await this.igdbService.searchGames(query, parsedLimit);
+    try {
+      const userLimit = limit ? parseInt(limit) : 10;
+      // Request at least 50 items to ensure we find valid matches after filtering (category, etc.)
+      // IGDB search 'where' clause filters *after* finding candidates, so we need a larger pool.
+      const igdbLimit = Math.max(userLimit, 50);
 
-    // Transform IGDB format to match MediaSelector expectations
-    return games.map(game => ({
-      id: game.id,
-      externalId: game.id,
-      title: game.name,
-      mediaType: 'game',
-      source: 'igdb',
-      image: game.cover?.image_id
-        ? `https://images.igdb.com/igdb/image/upload/t_cover_big/${game.cover.image_id}.jpg`
-        : null,
-      year: game.first_release_date
-        ? new Date(game.first_release_date * 1000).getFullYear()
-        : null,
-      summary: game.summary,
-      platforms: game.platforms?.map(p => p.name).join(', '),
-      genres: game.genres?.map(g => g.name).join(', '),
-    }));
+      const games = await this.igdbService.searchGames(query.trim(), igdbLimit);
+
+      // Slice the results to match the user's requested limit
+      const limitedGames = games.slice(0, userLimit);
+
+      // Transform IGDB format to match MediaSelector expectations
+      return limitedGames.map(game => ({
+        id: game.id,
+        externalId: game.id,
+        title: game.name,
+        mediaType: 'game',
+        source: 'igdb',
+        image: game.cover?.image_id
+          ? `https://images.igdb.com/igdb/image/upload/t_cover_big/${game.cover.image_id}.jpg`
+          : null,
+        year: game.first_release_date
+          ? new Date(game.first_release_date * 1000).getFullYear()
+          : null,
+        summary: game.summary,
+        platforms: game.platforms?.map(p => p.name).join(', '),
+        genres: game.genres?.map(g => g.name).join(', '),
+      }));
+    } catch (error) {
+      console.error('IGDB Search Error:', error);
+      throw error;
+    }
   }
 
   @Post('import/:id')
