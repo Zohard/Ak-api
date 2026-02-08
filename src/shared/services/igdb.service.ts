@@ -110,12 +110,13 @@ export class IgdbService {
         },
         body: `
           search "${query}";
-          fields name, summary, first_release_date, cover.url, cover.image_id,
+          fields name, summary, first_release_date, category, cover.url, cover.image_id,
                  screenshots.image_id,
                  videos.video_id, videos.name,
                  genres.name, platforms.name, platforms.abbreviation,
                  involved_companies.company.name, involved_companies.company.logo.image_id, involved_companies.publisher, involved_companies.developer,
                  release_dates.date, release_dates.region, release_dates.platform;
+          where category = (0,2,4,8,9,10,11);
           limit ${limit};
         `,
       });
@@ -250,14 +251,10 @@ export class IgdbService {
       });
     }
 
-    // Download cover image if available
-    let coverImageBase64: string | null = null;
-    if (igdbGame.cover?.image_id) {
-      const imageBuffer = await this.downloadCoverImage(igdbGame.cover.image_id);
-      if (imageBuffer) {
-        coverImageBase64 = imageBuffer.toString('base64');
-      }
-    }
+    // Build cover URL from IGDB image ID
+    const coverUrl = igdbGame.cover?.image_id
+      ? `https://images.igdb.com/igdb/image/upload/t_cover_big/${igdbGame.cover.image_id}.jpg`
+      : null;
 
     // Extract first release date
     const firstReleaseYear = igdbGame.first_release_date
@@ -320,7 +317,7 @@ export class IgdbService {
       data: {
         titre: igdbGame.name,
         niceUrl,
-        image: coverImageBase64 ? `data:image/jpeg;base64,${coverImageBase64}` : null,
+        image: coverUrl,
         annee: firstReleaseYear,
         dateSortieJapon,
         dateSortieUsa,
@@ -330,7 +327,7 @@ export class IgdbService {
         editeur: publishers.length > 0 ? publishers.join(', ') : null,
         plateforme: igdbGame.platforms?.map(p => p.abbreviation || p.name).join(', ') || null,
         presentation: igdbGame.summary || null,
-        statut: 1, // Published
+        statut: 0, // Published (0 = visible)
         nbClicsDay: 0,
         nbClicsWeek: 0,
         nbClicsMonth: 0,

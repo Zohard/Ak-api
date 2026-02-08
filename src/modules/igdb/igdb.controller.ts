@@ -6,9 +6,11 @@ import {
   Param,
   ParseIntPipe,
   BadRequestException,
+  UseGuards,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
 import { IgdbService } from '../../shared/services/igdb.service';
+import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 
 @ApiTags('IGDB')
 @Controller('igdb')
@@ -51,11 +53,18 @@ export class IgdbController {
   }
 
   @Post('import/:id')
+  @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Import a game from IGDB to local database' })
   @ApiResponse({ status: 201, description: 'Game imported successfully' })
   @ApiResponse({ status: 400, description: 'Invalid request' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
   async import(@Param('id', ParseIntPipe) igdbId: number) {
     const game = await this.igdbService.importGame(igdbId);
-    return game;
+    return {
+      id: game.idJeu,
+      titre: game.titre,
+      image: game.image,
+      annee: game.annee,
+    };
   }
 }
