@@ -252,15 +252,33 @@ export class MangasService extends BaseContentService<
     if (search) {
       searchActive = true;
       const searchTerm = `%${search}%`;
-      const matchingIds = await this.prisma.$queryRaw<Array<{ id_manga: number }>>`
-        SELECT id_manga FROM ak_mangas
-        WHERE unaccent(titre) ILIKE unaccent(${searchTerm})
-        OR unaccent(COALESCE(titre_orig, '')) ILIKE unaccent(${searchTerm})
-        OR unaccent(COALESCE(titre_fr, '')) ILIKE unaccent(${searchTerm})
-        OR unaccent(COALESCE(titres_alternatifs, '')) ILIKE unaccent(${searchTerm})
-        OR unaccent(COALESCE(synopsis, '')) ILIKE unaccent(${searchTerm})
-      `;
-      searchIds.push(...matchingIds.map(r => r.id_manga));
+      try {
+        const matchingIds = await this.prisma.$queryRaw<Array<{ id_manga: number }>>`
+          SELECT id_manga FROM ak_mangas
+          WHERE unaccent(titre) ILIKE unaccent(${searchTerm})
+          OR unaccent(COALESCE(titre_orig, '')) ILIKE unaccent(${searchTerm})
+          OR unaccent(COALESCE(titre_fr, '')) ILIKE unaccent(${searchTerm})
+          OR unaccent(COALESCE(titres_alternatifs, '')) ILIKE unaccent(${searchTerm})
+          OR unaccent(COALESCE(synopsis, '')) ILIKE unaccent(${searchTerm})
+        `;
+        searchIds.push(...matchingIds.map(r => r.id_manga));
+      } catch (error) {
+        // Fallback if unaccent extension is missing
+        this.logger.warn(`Search with unaccent failed, falling back to standard ILIKE: ${error.message}`);
+        const matchingIds = await this.prisma.akManga.findMany({
+          where: {
+            OR: [
+              { titre: { contains: search, mode: 'insensitive' } },
+              { titreOrig: { contains: search, mode: 'insensitive' } },
+              { titreFr: { contains: search, mode: 'insensitive' } },
+              { titresAlternatifs: { contains: search, mode: 'insensitive' } },
+              { synopsis: { contains: search, mode: 'insensitive' } },
+            ]
+          },
+          select: { idManga: true }
+        });
+        searchIds.push(...matchingIds.map(item => item.idManga));
+      }
     }
 
     if (auteur) {

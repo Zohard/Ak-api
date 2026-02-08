@@ -26,42 +26,34 @@ export class IgdbController {
     @Query('q') query: string,
     @Query('limit') limit?: string,
   ) {
+    console.log('[IGDB Controller] Received query:', query, 'limit:', limit);
+
     if (!query) {
       throw new BadRequestException('Search query is required');
     }
 
-    try {
-      const userLimit = limit ? parseInt(limit) : 10;
-      // Request at least 50 items to ensure we find valid matches after filtering (category, etc.)
-      // IGDB search 'where' clause filters *after* finding candidates, so we need a larger pool.
-      const igdbLimit = Math.max(userLimit, 50);
+    const parsedLimit = limit ? parseInt(limit) : 10;
+    console.log('[IGDB Controller] Calling searchGames with query:', query, 'limit:', parsedLimit);
+    const games = await this.igdbService.searchGames(query, parsedLimit);
+    console.log('[IGDB Controller] Received games:', games.length);
 
-      const games = await this.igdbService.searchGames(query.trim(), igdbLimit);
-
-      // Slice the results to match the user's requested limit
-      const limitedGames = games.slice(0, userLimit);
-
-      // Transform IGDB format to match MediaSelector expectations
-      return limitedGames.map(game => ({
-        id: game.id,
-        externalId: game.id,
-        title: game.name,
-        mediaType: 'game',
-        source: 'igdb',
-        image: game.cover?.image_id
-          ? `https://images.igdb.com/igdb/image/upload/t_cover_big/${game.cover.image_id}.jpg`
-          : null,
-        year: game.first_release_date
-          ? new Date(game.first_release_date * 1000).getFullYear()
-          : null,
-        summary: game.summary,
-        platforms: game.platforms?.map(p => p.name).join(', '),
-        genres: game.genres?.map(g => g.name).join(', '),
-      }));
-    } catch (error) {
-      console.error('IGDB Search Error:', error);
-      throw error;
-    }
+    // Transform IGDB format to match MediaSelector expectations
+    return games.map(game => ({
+      id: game.id,
+      externalId: game.id,
+      title: game.name,
+      mediaType: 'game',
+      source: 'igdb',
+      image: game.cover?.image_id
+        ? `https://images.igdb.com/igdb/image/upload/t_cover_big/${game.cover.image_id}.jpg`
+        : null,
+      year: game.first_release_date
+        ? new Date(game.first_release_date * 1000).getFullYear()
+        : null,
+      summary: game.summary,
+      platforms: game.platforms?.map(p => p.name).join(', '),
+      genres: game.genres?.map(g => g.name).join(', '),
+    }));
   }
 
   @Post('import/:id')

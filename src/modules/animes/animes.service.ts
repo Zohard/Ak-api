@@ -273,14 +273,31 @@ export class AnimesService extends BaseContentService<
     if (search) {
       searchActive = true;
       const searchTerm = `%${search}%`;
-      const matchingIds = await this.prisma.$queryRaw<Array<{ id_anime: number }>>`
-        SELECT id_anime FROM ak_animes
-        WHERE unaccent(titre) ILIKE unaccent(${searchTerm})
-        OR unaccent(COALESCE(titre_orig, '')) ILIKE unaccent(${searchTerm})
-        OR unaccent(COALESCE(titre_fr, '')) ILIKE unaccent(${searchTerm})
-        OR unaccent(COALESCE(titres_alternatifs, '')) ILIKE unaccent(${searchTerm})
-      `;
-      searchIds.push(...matchingIds.map(r => r.id_anime));
+      try {
+        const matchingIds = await this.prisma.$queryRaw<Array<{ id_anime: number }>>`
+          SELECT id_anime FROM ak_animes
+          WHERE unaccent(titre) ILIKE unaccent(${searchTerm})
+          OR unaccent(COALESCE(titre_orig, '')) ILIKE unaccent(${searchTerm})
+          OR unaccent(COALESCE(titre_fr, '')) ILIKE unaccent(${searchTerm})
+          OR unaccent(COALESCE(titres_alternatifs, '')) ILIKE unaccent(${searchTerm})
+        `;
+        searchIds.push(...matchingIds.map(r => r.id_anime));
+      } catch (error) {
+        // Fallback if unaccent extension is missing
+        console.warn(`Search with unaccent failed, falling back to standard ILIKE: ${error.message}`);
+        const matchingIds = await this.prisma.akAnime.findMany({
+          where: {
+            OR: [
+              { titre: { contains: search, mode: 'insensitive' } },
+              { titreOrig: { contains: search, mode: 'insensitive' } },
+              { titreFr: { contains: search, mode: 'insensitive' } },
+              { titresAlternatifs: { contains: search, mode: 'insensitive' } },
+            ]
+          },
+          select: { idAnime: true }
+        });
+        searchIds.push(...matchingIds.map(item => item.idAnime));
+      }
     }
 
     if (studio) {

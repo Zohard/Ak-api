@@ -116,7 +116,6 @@ export class IgdbService {
                  genres.name, platforms.name, platforms.abbreviation,
                  involved_companies.company.name, involved_companies.company.logo.image_id, involved_companies.publisher, involved_companies.developer,
                  release_dates.date, release_dates.region, release_dates.platform;
-          where category = (0,2,4,8,9,10,11);
           limit ${limit};
         `,
       });
