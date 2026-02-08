@@ -119,41 +119,47 @@ export class ListsService {
   }
 
   async getListsByMedia(mediaType: string, mediaId: number) {
-    const mediaIdStr = `"${mediaId}"`;
-    const rows = await this.prisma.akListesTop.findMany({
-      where: {
-        statut: 1,
-        animeOrManga: mediaType,
-        jsonData: {
-          contains: mediaIdStr,
+    try {
+      const mediaIdStr = `"${mediaId}"`;
+      const rows = await this.prisma.akListesTop.findMany({
+        where: {
+          statut: 1,
+          animeOrManga: mediaType,
+          jsonData: {
+            contains: mediaIdStr,
+          },
+          idMembre: { gt: 0 }, // Filter out orphaned lists with invalid member references
         },
-      },
-      orderBy: { popularite: 'desc' },
-      include: {
-        membre: {
-          select: {
-            idMember: true,
-            memberName: true,
-            avatar: true,
-            realName: true,
-            dateRegistered: true,
-            lastLogin: true,
-            location: true,
-            personalText: true,
+        orderBy: { popularite: 'desc' },
+        include: {
+          membre: {
+            select: {
+              idMember: true,
+              memberName: true,
+              avatar: true,
+              realName: true,
+              dateRegistered: true,
+              lastLogin: true,
+              location: true,
+              personalText: true,
+            },
           },
         },
-      },
-    });
+      });
 
-    // Batch fetch first item images
-    const imageMap = await this.batchFetchFirstItemImages(rows);
+      // Batch fetch first item images
+      const imageMap = await this.batchFetchFirstItemImages(rows);
 
-    // Map images to lists
-    return rows.map((r) => {
-      const formatted = this.formatList(r) as any;
-      formatted.firstItemImage = imageMap.get(r.idListe) || null;
-      return formatted;
-    });
+      // Map images to lists
+      return rows.map((r) => {
+        const formatted = this.formatList(r) as any;
+        formatted.firstItemImage = imageMap.get(r.idListe) || null;
+        return formatted;
+      });
+    } catch (error) {
+      console.error('Error in getListsByMedia:', error);
+      throw new Error(`Failed to fetch lists for ${mediaType} ${mediaId}: ${error.message}`);
+    }
   }
 
   async getUserLists(userId: number, type?: 'liste' | 'top' | 'top1', mediaType?: 'anime' | 'manga' | 'jeu-video') {

@@ -31,7 +31,7 @@ import { AdminGuard } from '../../common/guards/admin.guard';
 @ApiTags('Reviews')
 @Controller('reviews')
 export class ReviewsController {
-  constructor(private readonly reviewsService: ReviewsService) {}
+  constructor(private readonly reviewsService: ReviewsService) { }
 
   @Get()
   @ApiOperation({ summary: 'Liste des critiques avec pagination et filtres' })
@@ -70,8 +70,8 @@ export class ReviewsController {
   })
   async getUserReviews(
     @Param('userId', ParseIntPipe) userId: number,
-    @Query('limit', ParseIntPipe) limit = 20,
-    @Query('page', ParseIntPipe) page = 1,
+    @Query('limit', new ParseIntPipe({ optional: true })) limit = 20,
+    @Query('page', new ParseIntPipe({ optional: true })) page = 1,
     @Request() req?,
   ) {
     // Pass requesting user ID if authenticated (to show unpublished reviews for own profile)
@@ -86,8 +86,8 @@ export class ReviewsController {
   @ApiResponse({ status: 200, description: 'Liste de mes critiques' })
   async getMyReviews(
     @Request() req,
-    @Query('limit', ParseIntPipe) limit = 20,
-    @Query('page', ParseIntPipe) page = 1,
+    @Query('limit', new ParseIntPipe({ optional: true })) limit = 20,
+    @Query('page', new ParseIntPipe({ optional: true })) page = 1,
   ) {
     // Pass user ID as requesting user to show all reviews including unpublished
     return this.reviewsService.getUserReviews(req.user.id, limit, req.user.id, page);
@@ -99,17 +99,17 @@ export class ReviewsController {
   @ApiOperation({ summary: 'Vérifier si l\'utilisateur a déjà une critique pour ce contenu' })
   @ApiParam({ name: 'type', description: 'Type de contenu (anime, manga ou jeu vidéo)', enum: ['anime', 'manga', 'game'] })
   @ApiParam({ name: 'id', description: 'ID du contenu', type: 'number' })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: 'Statut de la critique utilisateur',
     schema: {
       type: 'object',
       properties: {
         hasReview: { type: 'boolean', description: 'L\'utilisateur a-t-il déjà une critique' },
-        review: { 
-          type: 'object', 
-          nullable: true, 
-          description: 'Données de la critique existante si elle existe' 
+        review: {
+          type: 'object',
+          nullable: true,
+          description: 'Données de la critique existante si elle existe'
         }
       }
     }
@@ -237,7 +237,7 @@ export class ReviewsController {
   @ApiResponse({ status: 404, description: 'Critique introuvable' })
   @ApiResponse({ status: 403, description: 'Impossible d\'évaluer sa propre critique' })
   async rateReview(
-    @Param('id', ParseIntPipe) id: number, 
+    @Param('id', ParseIntPipe) id: number,
     @Param('type') type: 'c' | 'a' | 'o' | 'y' | 'n',
     @Request() req
   ) {
