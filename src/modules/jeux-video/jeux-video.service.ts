@@ -58,12 +58,27 @@ export class JeuxVideoService {
     if (search) {
       searchActive = true;
       const searchTerm = `%${search}%`;
-      const matchingIds = await this.prisma.$queryRaw<Array<{ id_jeu: number }>>`
-        SELECT id_jeu FROM ak_jeux_video
-        WHERE unaccent(titre) ILIKE unaccent(${searchTerm})
-        OR unaccent(COALESCE(presentation, '')) ILIKE unaccent(${searchTerm})
-      `;
-      searchIds.push(...matchingIds.map(r => r.id_jeu));
+      try {
+        const matchingIds = await this.prisma.$queryRaw<Array<{ id_jeu: number }>>`
+          SELECT id_jeu FROM ak_jeux_video
+          WHERE unaccent(titre) ILIKE unaccent(${searchTerm})
+          OR unaccent(COALESCE(presentation, '')) ILIKE unaccent(${searchTerm})
+        `;
+        searchIds.push(...matchingIds.map(r => r.id_jeu));
+      } catch (error) {
+        // Fallback if unaccent extension is missing
+        console.warn('Search with unaccent failed, falling back to standard ILIKE:', error);
+        const matchingIds = await this.prisma.akJeuxVideo.findMany({
+          where: {
+            OR: [
+              { titre: { contains: search, mode: 'insensitive' } },
+              { presentation: { contains: search, mode: 'insensitive' } }
+            ]
+          },
+          select: { idJeu: true }
+        });
+        searchIds.push(...matchingIds.map(item => item.idJeu));
+      }
     }
 
     // Platform filter

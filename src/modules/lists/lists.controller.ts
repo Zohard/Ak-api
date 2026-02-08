@@ -191,6 +191,17 @@ export class ListsController {
     );
   }
 
+  @Get('media/:mediaType/:mediaId')
+  @ApiOperation({ summary: 'Obtenir les listes contenant un média spécifique' })
+  @ApiParam({ name: 'mediaType', enum: ['anime', 'manga', 'jeu-video'] })
+  @ApiParam({ name: 'mediaId', type: 'number' })
+  getListsByMedia(
+    @Param('mediaType') mediaType: 'anime' | 'manga' | 'jeu-video',
+    @Param('mediaId', ParseIntPipe) mediaId: number,
+  ) {
+    return this.listsService.getListsByMedia(mediaType, mediaId);
+  }
+
   // POST /lists/recalculate-popularity - Admin utility endpoint
   @Post('recalculate-popularity')
   @ApiOperation({ summary: 'Recalculer la popularité de toutes les listes (admin)' })

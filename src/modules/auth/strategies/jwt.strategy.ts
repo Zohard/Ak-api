@@ -43,6 +43,8 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         hasAdminAccess(user.idGroup) ||
         user.idMember === 1 ||
         user.idMember === 17667,
+      avatar: user.avatar,
+      pseudo: user.realName,
     };
   }
 }

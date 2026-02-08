@@ -118,6 +118,39 @@ export class ListsService {
     return resultMap;
   }
 
+  async getListsByMedia(mediaType: string, mediaId: number) {
+    const mediaIdStr = `"${mediaId}"`;
+    const rows = await this.prisma.akListesTop.findMany({
+      where: {
+        statut: 1,
+        animeOrManga: mediaType,
+        jsonData: {
+          contains: mediaIdStr,
+        },
+      },
+      orderBy: { popularite: 'desc' },
+      include: {
+        membre: {
+          select: {
+            idMember: true,
+            memberName: true,
+            avatar: true,
+          },
+        },
+      },
+    });
+
+    // Batch fetch first item images
+    const imageMap = await this.batchFetchFirstItemImages(rows);
+
+    // Map images to lists
+    return rows.map((r) => {
+      const formatted = this.formatList(r) as any;
+      formatted.firstItemImage = imageMap.get(r.idListe) || null;
+      return formatted;
+    });
+  }
+
   async getUserLists(userId: number, type?: 'liste' | 'top' | 'top1', mediaType?: 'anime' | 'manga' | 'jeu-video') {
     const rows = await this.prisma.akListesTop.findMany({
       where: {
