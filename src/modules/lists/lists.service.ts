@@ -127,6 +127,9 @@ export class ListsService {
         jsonData: {
           contains: mediaIdStr,
         },
+        membre: {
+          idMember: { gt: 0 }
+        }
       },
       orderBy: { popularite: 'desc' },
       include: {
@@ -135,6 +138,11 @@ export class ListsService {
             idMember: true,
             memberName: true,
             avatar: true,
+            realName: true,
+            dateRegistered: true,
+            lastLogin: true,
+            location: true,
+            personalText: true,
           },
         },
       },
@@ -159,7 +167,20 @@ export class ListsService {
         ...(mediaType ? { animeOrManga: mediaType } : {}),
       },
       orderBy: { idListe: 'desc' },
-      include: { membre: { select: { idMember: true, memberName: true } } },
+      include: {
+        membre: {
+          select: {
+            idMember: true,
+            memberName: true,
+            avatar: true,
+            realName: true,
+            dateRegistered: true,
+            lastLogin: true,
+            location: true,
+            personalText: true,
+          }
+        }
+      },
     });
 
     // Batch fetch first item images
@@ -286,7 +307,20 @@ export class ListsService {
         },
         orderBy: { dateCreation: 'desc' },
         take: limit,
-        include: { membre: { select: { idMember: true, memberName: true } } },
+        include: {
+          membre: {
+            select: {
+              idMember: true,
+              memberName: true,
+              avatar: true,
+              realName: true,
+              dateRegistered: true,
+              lastLogin: true,
+              location: true,
+              personalText: true,
+            }
+          }
+        },
       });
       result = rows.map((r) => this.formatList(r));
     } else {
@@ -338,7 +372,16 @@ export class ListsService {
         take: limit,
         include: {
           membre: {
-            select: { idMember: true, memberName: true }
+            select: {
+              idMember: true,
+              memberName: true,
+              avatar: true,
+              realName: true,
+              dateRegistered: true,
+              lastLogin: true,
+              location: true,
+              personalText: true,
+            }
           }
         }
       }),

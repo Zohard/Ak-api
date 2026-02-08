@@ -25,19 +25,7 @@ import { UpdateItemsDto } from './dto/update-items.dto';
 export class ListsController {
   constructor(private readonly listsService: ListsService) { }
 
-  // GET /lists/:userId
-  @Get(':userId')
-  @ApiOperation({ summary: "Listes d'un utilisateur" })
-  @ApiParam({ name: 'userId', type: 'number' })
-  @ApiQuery({ name: 'type', required: false, enum: ['liste', 'top'] })
-  @ApiQuery({ name: 'mediaType', required: false, enum: ['anime', 'manga', 'jeu-video'] })
-  getUserLists(
-    @Param('userId', ParseIntPipe) userId: number,
-    @Query('type') type?: 'liste' | 'top',
-    @Query('mediaType') mediaType?: 'anime' | 'manga' | 'jeu-video',
-  ) {
-    return this.listsService.getUserLists(userId, type, mediaType);
-  }
+
 
   // POST /lists
   @Post()
@@ -208,6 +196,20 @@ export class ListsController {
   @ApiResponse({ status: 200, description: 'Popularité recalculée avec succès' })
   recalculatePopularity() {
     return this.listsService.recalculateAllPopularity();
+  }
+
+  // GET /lists/:userId
+  @Get(':userId')
+  @ApiOperation({ summary: "Listes d'un utilisateur" })
+  @ApiParam({ name: 'userId', type: 'number' })
+  @ApiQuery({ name: 'type', required: false, enum: ['liste', 'top'] })
+  @ApiQuery({ name: 'mediaType', required: false, enum: ['anime', 'manga', 'jeu-video'] })
+  getUserLists(
+    @Param('userId', ParseIntPipe) userId: number,
+    @Query('type') type?: 'liste' | 'top',
+    @Query('mediaType') mediaType?: 'anime' | 'manga' | 'jeu-video',
+  ) {
+    return this.listsService.getUserLists(userId, type, mediaType);
   }
 
 }
