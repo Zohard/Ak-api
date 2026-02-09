@@ -13,6 +13,7 @@ import {
     ApiHeader,
     ApiQuery,
 } from '@nestjs/swagger';
+import { SkipThrottle } from '@nestjs/throttler';
 import { PopularityJobService } from './popularity-job.service';
 import { AnimeRankingsService } from '../animes/services/anime-rankings.service';
 import { CronAuthGuard } from '../../common/guards/cron-auth.guard';
@@ -20,6 +21,7 @@ import { OptionalJwtAuthGuard } from '../../common/guards/optional-jwt-auth.guar
 import { CronService } from '../cron/cron.service';
 
 @ApiTags('Jobs Cron')
+@SkipThrottle()
 @Controller('jobs/cron')
 export class JobsCronController {
     private readonly logger = new NestLogger(JobsCronController.name);

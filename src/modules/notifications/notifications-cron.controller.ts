@@ -11,6 +11,7 @@ import {
     ApiResponse,
     ApiHeader,
 } from '@nestjs/swagger';
+import { SkipThrottle } from '@nestjs/throttler';
 import { NotificationsService } from './notifications.service';
 import { CronAuthGuard } from '../../common/guards/cron-auth.guard';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -18,6 +19,7 @@ import { AdminGuard } from '../../common/guards/admin.guard';
 import { OptionalJwtAuthGuard } from '../../common/guards/optional-jwt-auth.guard';
 
 @ApiTags('Notifications Cron')
+@SkipThrottle()
 @Controller('notifications/cron')
 export class NotificationsCronController {
     constructor(private readonly notificationsService: NotificationsService) { }

@@ -8,8 +8,8 @@ if (process.env.SENTRY_DSN) {
     dsn: process.env.SENTRY_DSN,
     environment: process.env.RAILWAY_ENVIRONMENT_NAME || process.env.NODE_ENV || 'development',
 
-    // Performance Monitoring - lower sample rate in production for cost efficiency
-    tracesSampleRate: process.env.NODE_ENV === 'production' ? 0.2 : 1.0,
+    // Performance Monitoring - 1% in production to minimize egress
+    tracesSampleRate: process.env.NODE_ENV === 'production' ? 0.01 : 1.0,
 
     // Send default PII (IP address, user context)
     sendDefaultPii: true,
