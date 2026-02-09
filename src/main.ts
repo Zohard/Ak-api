@@ -6,6 +6,7 @@ import { ValidationPipe, Logger as NestLogger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AppModule } from './app.module';
 import * as express from 'express';
+import compression from 'compression';
 import cookieParser from 'cookie-parser';
 import { join } from 'path';
 import { setupSwagger } from './config/swagger.config';
@@ -67,6 +68,9 @@ async function bootstrap() {
     }
     next();
   });
+
+  // Gzip compression — reduces response sizes by ~70-80%
+  app.use(compression());
 
   // Increase body size limit for large imports (e.g., MAL XML imports)
   app.use(json({ limit: '50mb' }));
