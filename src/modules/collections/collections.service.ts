@@ -973,41 +973,44 @@ export class CollectionsService {
 
   async checkBulkInCollection(userId: number, mediaType: 'anime' | 'manga', mediaIds: number[]) {
     if (!mediaIds.length) {
-      return { foundIds: [] };
+      return {};
     }
 
     this.logger.debug(`🔍 [checkBulkInCollection] userId: ${userId}, mediaType: ${mediaType}, ids: ${mediaIds.length}`);
 
     // Direct DB query for efficiency
-    let foundIds: number[] = [];
+    // Return a map of { [mediaId]: { inCollection: true, type: number } }
+    const result: Record<number, { inCollection: boolean; type: number }> = {};
 
     await this.prisma.executeWithRetry(async () => {
       if (mediaType === 'anime') {
-        const results = await this.prisma.collectionAnime.findMany({
+        const items = await this.prisma.collectionAnime.findMany({
           where: {
             idMembre: userId,
             idAnime: { in: mediaIds }
           },
-          select: { idAnime: true }
+          select: { idAnime: true, type: true }
         });
-        foundIds = results.map(r => r.idAnime);
+
+        items.forEach(item => {
+          result[item.idAnime] = { inCollection: true, type: item.type };
+        });
       } else if (mediaType === 'manga') {
-        const results = await this.prisma.collectionManga.findMany({
+        const items = await this.prisma.collectionManga.findMany({
           where: {
             idMembre: userId,
             idManga: { in: mediaIds }
           },
-          select: { idManga: true }
+          select: { idManga: true, type: true }
         });
-        foundIds = results.map(r => r.idManga);
+
+        items.forEach(item => {
+          result[item.idManga] = { inCollection: true, type: item.type };
+        });
       }
     });
 
-    return {
-      userId,
-      mediaType,
-      foundIds
-    };
+    return result;
   }
 
   // Get user info with collection summary (optimized for single user)
