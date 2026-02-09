@@ -50,6 +50,7 @@ import { CacheService } from './shared/services/cache.service';
 import { ActivityTrackerService } from './shared/services/activity-tracker.service';
 import { DatabaseWarmupService } from './shared/services/database-warmup.service';
 import { ActivityTrackerMiddleware } from './common/middleware/activity-tracker.middleware';
+import { CacheControlMiddleware } from './common/middleware/cache-control.middleware';
 import databaseConfig from './config/database.config';
 import jwtConfig from './config/jwt.config';
 import redisConfig from './config/redis.config';
@@ -199,7 +200,9 @@ import redisConfig from './config/redis.config';
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
-    // Apply activity tracking middleware to all routes
+    consumer
+      .apply(CacheControlMiddleware)
+      .forRoutes('*');
     consumer
       .apply(ActivityTrackerMiddleware)
       .forRoutes('*');
