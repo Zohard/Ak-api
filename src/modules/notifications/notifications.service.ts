@@ -5,6 +5,9 @@ import { ConfigService } from '@nestjs/config';
 import { EpisodesService } from '../animes/episodes/episodes.service';
 import { MangaVolumesService } from '../mangas/manga-volumes.service';
 
+// Max users to notify per single content item (episode, volume, related content)
+const MAX_USERS_PER_CONTENT = 500;
+
 export interface EmailTemplate {
   subject: string;
   html: string;
@@ -522,6 +525,63 @@ export class NotificationsService {
     }
   }
 
+  /**
+   * Send notifications to many users at once using bulk DB insert.
+   * Skips per-user preference check and email sending to avoid N+1 queries.
+   * Returns the number of notifications actually inserted.
+   */
+  private async sendBulkNotifications(
+    userIds: number[],
+    notification: Omit<NotificationData, 'userId'>,
+    dedupeKey?: string,
+  ): Promise<number> {
+    if (userIds.length === 0) return 0;
+
+    const type = notification.type;
+    const jsonData = notification.data ? JSON.stringify(notification.data) : null;
+
+    // Bulk duplicate check: find users who already received this notification type + dedupeKey within 24h
+    let existingUserIds: Set<number> = new Set();
+    if (dedupeKey) {
+      try {
+        const existing = await this.prisma.$queryRaw<{ user_id: number }[]>`
+          SELECT DISTINCT user_id FROM user_notifications
+          WHERE user_id = ANY(${userIds}::int[])
+            AND type = ${type}
+            AND data->>${'episodeId'} = ${dedupeKey}
+            AND created_at > NOW() - INTERVAL '24 hours'
+        `;
+        existingUserIds = new Set(existing.map((r) => Number(r.user_id)));
+      } catch (error) {
+        this.logger.warn(`Bulk duplicate check failed: ${error.message}`);
+      }
+    }
+
+    const newUserIds = userIds.filter((id) => !existingUserIds.has(id));
+    if (newUserIds.length === 0) return 0;
+
+    // Bulk insert in batches of 500 using unnest for efficiency
+    const batchSize = 500;
+    let inserted = 0;
+
+    for (let i = 0; i < newUserIds.length; i += batchSize) {
+      const batch = newUserIds.slice(i, i + batchSize);
+      try {
+        await this.prisma.$executeRaw`
+          INSERT INTO user_notifications (user_id, type, title, message, data, priority, created_at)
+          SELECT unnest(${batch}::int[]),
+                 ${type}, ${notification.title}, ${notification.message},
+                 ${jsonData}::jsonb, ${notification.priority}, NOW()
+        `;
+        inserted += batch.length;
+      } catch (error) {
+        this.logger.error(`Bulk insert batch failed: ${error.message}`);
+      }
+    }
+
+    return inserted;
+  }
+
   private async storeNotification(data: NotificationData): Promise<void> {
     // Check for duplicate notification (same user, type, and key data within 24 hours)
     const isDuplicate = await this.checkDuplicateNotification(data);
@@ -911,7 +971,7 @@ export class NotificationsService {
           continue;
         }
 
-        // 2. Find users who have this anime in their collection
+        // 2. Find users who have this anime in their collection (capped)
         // Status 1 = Watching, 2 = Plan to Watch, 3 = On Hold
         let users: { idMembre: number }[] = [];
         try {
@@ -920,16 +980,17 @@ export class NotificationsService {
               idAnime: episode.idAnime,
               type: { in: [1, 2, 3] }
             },
-            select: { idMembre: true }
+            select: { idMembre: true },
+            take: MAX_USERS_PER_CONTENT,
           });
           this.logger.log(`Found ${users.length} users with anime ${episode.idAnime} (${episode.anime.titre}) in collection`);
         } catch (queryError) {
           this.logger.error(`Error querying users for anime ${episode.idAnime}: ${queryError.message}`);
-          // Fallback to raw query
           try {
             const rawUsers = await this.prisma.$queryRaw<{ id_membre: number }[]>`
               SELECT id_membre FROM collection_animes
               WHERE id_anime = ${episode.idAnime} AND type IN (1, 2, 3)
+              LIMIT ${MAX_USERS_PER_CONTENT}
             `;
             users = rawUsers.map(u => ({ idMembre: u.id_membre }));
             this.logger.log(`Fallback raw query found ${users.length} users`);
@@ -942,10 +1003,11 @@ export class NotificationsService {
 
         this.logger.log(`Notifying ${users.length} users for ${episode.anime.titre} episode ${episode.numero}`);
 
-        // 3. Send notifications
-        for (const user of users) {
-          const sent = await this.sendNotification({
-            userId: user.idMembre,
+        // 3. Bulk insert notifications (single query instead of per-user)
+        const userIds = users.map((u) => u.idMembre);
+        const sent = await this.sendBulkNotifications(
+          userIds,
+          {
             type: 'episode_release',
             title: `Nouvel épisode : ${episode.anime.titre}`,
             message: `L'épisode ${episode.numero} de ${episode.anime.titre} est disponible !`,
@@ -954,12 +1016,13 @@ export class NotificationsService {
               animeSlug: episode.anime.niceUrl,
               episodeId: episode.idEpisode,
               episodeNum: episode.numero,
-              image: episode.image || episode.anime.image
+              image: episode.image || episode.anime.image,
             },
-            priority: 'medium'
-          });
-          if (sent) notificationsSent++;
-        }
+            priority: 'medium',
+          },
+          String(episode.idEpisode),
+        );
+        notificationsSent += sent;
       }
 
       this.logger.log(`Episode notifications check completed. Sent ${notificationsSent} notifications.`);
@@ -991,7 +1054,7 @@ export class NotificationsService {
       for (const volume of volumes) {
         if (!volume.manga) continue;
 
-        // 2. Find users who have this manga in their collection
+        // 2. Find users who have this manga in their collection (capped)
         // Status 1 = Reading, 2 = Plan to Read, 3 = On Hold
         let users: { idMembre: number }[] = [];
         try {
@@ -1000,7 +1063,8 @@ export class NotificationsService {
               idManga: volume.idManga,
               type: { in: [1, 2, 3] }
             },
-            select: { idMembre: true }
+            select: { idMembre: true },
+            take: MAX_USERS_PER_CONTENT,
           });
         } catch (e) {
           this.logger.error(`Error querying users for manga ${volume.idManga}: ${e.message}`);
@@ -1011,10 +1075,11 @@ export class NotificationsService {
 
         this.logger.log(`Notifying ${users.length} users for ${volume.manga.titre} Volume ${volume.volumeNumber}`);
 
-        // 3. Send notifications
-        for (const user of users) {
-          const sent = await this.sendNotification({
-            userId: user.idMembre,
+        // 3. Bulk insert notifications
+        const userIds = users.map((u) => u.idMembre);
+        const sent = await this.sendBulkNotifications(
+          userIds,
+          {
             type: 'volume_release',
             title: `Nouveau tome : ${volume.manga.titre}`,
             message: `Le volume ${volume.volumeNumber} de ${volume.manga.titre} est sorti !`,
@@ -1023,12 +1088,13 @@ export class NotificationsService {
               mangaSlug: volume.manga.niceUrl,
               volumeId: volume.idVolume,
               volumeNum: volume.volumeNumber,
-              image: volume.coverImage || volume.manga.image
+              image: volume.coverImage || volume.manga.image,
             },
-            priority: 'medium'
-          });
-          if (sent) notificationsSent++;
-        }
+            priority: 'medium',
+          },
+          String(volume.idVolume),
+        );
+        notificationsSent += sent;
       }
 
       return { volumesFound: volumes.length, notificationsSent };
@@ -1080,34 +1146,27 @@ export class NotificationsService {
       const typeLabel =
         contentTypeLabels[newContent.type] || `Un ${newContent.type}`;
 
-      // Send notifications to all users in parallel (batched)
-      const batchSize = 50;
-      const userIdsArray = Array.from(allUserIds);
-
-      for (let i = 0; i < userIdsArray.length; i += batchSize) {
-        const batch = userIdsArray.slice(i, i + batchSize);
-        await Promise.all(
-          batch.map((userId) =>
-            this.sendNotification({
-              userId,
-              type: notificationType as any,
-              title: newContent.title,
-              message: `${typeLabel} "${newContent.title}" lié à vos favoris a été ajouté.`,
-              data: {
-                contentId: newContent.id,
-                contentType: newContent.type,
-                url: newContent.niceUrl,
-                relatedToId: relatedTo.id,
-                relatedToType: relatedTo.type,
-              },
-              priority: 'low',
-            }),
-          ),
-        );
-      }
+      // Bulk insert notifications
+      const userIdsArray = Array.from(allUserIds).slice(0, MAX_USERS_PER_CONTENT);
+      const sent = await this.sendBulkNotifications(
+        userIdsArray,
+        {
+          type: notificationType as any,
+          title: newContent.title,
+          message: `${typeLabel} "${newContent.title}" lié à vos favoris a été ajouté.`,
+          data: {
+            contentId: newContent.id,
+            contentType: newContent.type,
+            url: newContent.niceUrl,
+            relatedToId: relatedTo.id,
+            relatedToType: relatedTo.type,
+          },
+          priority: 'low',
+        },
+      );
 
       this.logger.log(
-        `Sent related content notifications to ${allUserIds.size} users for ${newContent.type} ${newContent.id}`,
+        `Sent ${sent} related content notifications for ${newContent.type} ${newContent.id}`,
       );
     } catch (error) {
       this.logger.error(
@@ -1130,16 +1189,19 @@ export class NotificationsService {
         result = await this.prisma.$queryRaw`
           SELECT DISTINCT user_id FROM ak_user_favorites
           WHERE anime_id = ${contentId} AND type = 'anime'
+          LIMIT ${MAX_USERS_PER_CONTENT}
         `;
       } else if (contentType === 'manga') {
         result = await this.prisma.$queryRaw`
           SELECT DISTINCT user_id FROM ak_user_favorites
           WHERE manga_id = ${contentId} AND type = 'manga'
+          LIMIT ${MAX_USERS_PER_CONTENT}
         `;
       } else if (contentType === 'jeu-video') {
         result = await this.prisma.$queryRaw`
           SELECT DISTINCT user_id FROM ak_user_favorites
           WHERE jeu_id = ${contentId} AND type = 'jeu-video'
+          LIMIT ${MAX_USERS_PER_CONTENT}
         `;
       } else {
         return [];
@@ -1168,18 +1230,21 @@ export class NotificationsService {
         result = await this.prisma.$queryRaw`
           SELECT DISTINCT id_membre FROM collection_animes
           WHERE id_anime = ${contentId}
+          LIMIT ${MAX_USERS_PER_CONTENT}
         `;
         return (result || []).map((row: any) => Number(row.id_membre));
       } else if (contentType === 'manga') {
         result = await this.prisma.$queryRaw`
           SELECT DISTINCT id_membre FROM collection_mangas
           WHERE id_manga = ${contentId}
+          LIMIT ${MAX_USERS_PER_CONTENT}
         `;
         return (result || []).map((row: any) => Number(row.id_membre));
       } else if (contentType === 'jeu-video') {
         result = await this.prisma.$queryRaw`
           SELECT DISTINCT id_membre FROM collection_jeuxvideo
           WHERE id_jeu = ${contentId}
+          LIMIT ${MAX_USERS_PER_CONTENT}
         `;
         return (result || []).map((row: any) => Number(row.id_membre));
       } else {
