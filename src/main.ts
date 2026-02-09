@@ -104,9 +104,8 @@ async function bootstrap() {
   logger.log(`Configured CORS origins for reference: ${JSON.stringify(corsOrigins)}`);
 
   app.enableCors({
-    // Relaxed CORS: Allow any origin (reflects request origin)
-    // This resolves issues where specific origins might be blocked or headers missing
-    origin: true,
+    // In production, restrict to configured origins. In dev, allow any origin.
+    origin: isProduction ? corsOrigins : true,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'HEAD', 'PATCH'],
     allowedHeaders: [
