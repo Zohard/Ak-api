@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from './prisma.service';
+import { Prisma } from '@prisma/client';
 import { CacheService } from './cache.service';
 
 export interface SearchResult {
@@ -306,9 +307,9 @@ export class UnifiedSearchService {
       WHERE statut = 1
       AND (unaccent(titre) ILIKE unaccent(${searchTerm}) 
            OR unaccent(COALESCE(synopsis, '')) ILIKE unaccent(${searchTerm}))
-      ${minRating > 0 ? this.prisma.$queryRaw`AND moyenne_notes >= ${minRating}` : this.prisma.$queryRaw``}
-      ${yearFrom ? this.prisma.$queryRaw`AND annee >= ${yearFrom}` : this.prisma.$queryRaw``}
-      ${yearTo ? this.prisma.$queryRaw`AND annee <= ${yearTo}` : this.prisma.$queryRaw``}
+      ${minRating > 0 ? Prisma.sql`AND moyenne_notes >= ${minRating}` : Prisma.empty}
+      ${yearFrom ? Prisma.sql`AND annee >= ${yearFrom}` : Prisma.empty}
+      ${yearTo ? Prisma.sql`AND annee <= ${yearTo}` : Prisma.empty}
       ORDER BY date_ajout DESC
       LIMIT ${Math.ceil(limit / 3)}
     `;
@@ -329,9 +330,9 @@ export class UnifiedSearchService {
       WHERE statut = 1
       AND (unaccent(titre) ILIKE unaccent(${searchTerm}) 
            OR unaccent(COALESCE(synopsis, '')) ILIKE unaccent(${searchTerm}))
-      ${minRating > 0 ? this.prisma.$queryRaw`AND moyenne_notes >= ${minRating}` : this.prisma.$queryRaw``}
-      ${yearFrom ? this.prisma.$queryRaw`AND annee >= ${yearFrom}` : this.prisma.$queryRaw``}
-      ${yearTo ? this.prisma.$queryRaw`AND annee <= ${yearTo}` : this.prisma.$queryRaw``}
+      ${minRating > 0 ? Prisma.sql`AND moyenne_notes >= ${minRating}` : Prisma.empty}
+      ${yearFrom ? Prisma.sql`AND annee >= ${yearFrom}` : Prisma.empty}
+      ${yearTo ? Prisma.sql`AND annee <= ${yearTo}` : Prisma.empty}
       ORDER BY date_ajout DESC
       LIMIT ${Math.ceil(limit / 3)}
     `;
@@ -352,11 +353,11 @@ export class UnifiedSearchService {
       WHERE statut = 1
       AND (unaccent(titre) ILIKE unaccent(${searchTerm}) 
            OR unaccent(COALESCE(description, '')) ILIKE unaccent(${searchTerm}))
-      ${minRating > 0 ? this.prisma.$queryRaw`AND moyenne_notes >= ${minRating}` : this.prisma.$queryRaw``}
-      ${yearFrom ? this.prisma.$queryRaw`AND annee >= ${yearFrom}` : this.prisma.$queryRaw``}
-      ${yearTo ? this.prisma.$queryRaw`AND annee <= ${yearTo}` : this.prisma.$queryRaw``}
-      ${plateforme ? this.prisma.$queryRaw`AND plateforme ILIKE ${'%' + plateforme + '%'}` : this.prisma.$queryRaw``}
-      ${editeur ? this.prisma.$queryRaw`AND editeur ILIKE ${'%' + editeur + '%'}` : this.prisma.$queryRaw``}
+      ${minRating > 0 ? Prisma.sql`AND moyenne_notes >= ${minRating}` : Prisma.empty}
+      ${yearFrom ? Prisma.sql`AND annee >= ${yearFrom}` : Prisma.empty}
+      ${yearTo ? Prisma.sql`AND annee <= ${yearTo}` : Prisma.empty}
+      ${plateforme ? Prisma.sql`AND plateforme ILIKE ${'%' + plateforme + '%'}` : Prisma.empty}
+      ${editeur ? Prisma.sql`AND editeur ILIKE ${'%' + editeur + '%'}` : Prisma.empty}
       ORDER BY date_ajout DESC
       LIMIT ${Math.ceil(limit / 3)}
     `;
