@@ -135,11 +135,11 @@ import redisConfig from './config/redis.config';
         };
       },
     }),
-    // Global rate limiting: 100 requests per 60s per IP
+    // Global rate limiting: 200 requests per second per IP (User request)
     ThrottlerModule.forRoot([
       {
-        ttl: 60000,
-        limit: 100,
+        ttl: 1000,
+        limit: 200,
       },
     ]),
     SentryModule.forRoot(),
