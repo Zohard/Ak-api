@@ -227,6 +227,15 @@ export class HomePageService {
       );
     }
 
+
+    // Helper to safely convert date to ISO string (handles both Date objects and strings from cache)
+    const toISOString = (date: any): string | null => {
+      if (!date) return null;
+      if (typeof date === 'string') return date;
+      if (date instanceof Date) return date.toISOString();
+      return null;
+    };
+
     // 4. Construct final payload using cached or fresh data
     const reviews = promises.reviewsResult || cachedReviews || [];
     const articles = promises.articlesResult || cachedArticles || [];
@@ -237,13 +246,21 @@ export class HomePageService {
     const recentMangas = promises.recentMangasResult || cachedRecentMangas || [];
     const recentGames = promises.recentGamesResult || cachedRecentGames || [];
 
-    // Helper to safely convert date to ISO string (handles both Date objects and strings from cache)
-    const toISOString = (date: any): string | null => {
-      if (!date) return null;
-      if (typeof date === 'string') return date;
-      if (date instanceof Date) return date.toISOString();
-      return null;
-    };
+    // Safety check: Ensure date fields are strings (if they came from cache as dates or strings)
+    // This prevents "reload failure" if cache restoration creates objects that serialization doesn't like
+    if (Array.isArray(reviews)) {
+      reviews.forEach((r: any) => {
+        if (r.dateCritique) r.dateCritique = toISOString(r.dateCritique);
+        if (r.reviewDate) r.reviewDate = toISOString(r.reviewDate);
+      });
+    }
+
+    if (Array.isArray(articles)) {
+      articles.forEach((a: any) => {
+        if (a.date) a.date = toISOString(a.date);
+        if (a.postDate) a.postDate = toISOString(a.postDate);
+      });
+    }
 
     return {
       hero: {
