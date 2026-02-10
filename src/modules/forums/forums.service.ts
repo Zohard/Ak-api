@@ -378,7 +378,7 @@ export class ForumsService {
     }
   }
 
-  async getTopicWithPosts(topicId: number, page: number = 1, limit: number = 15, userId?: number, order?: 'asc' | 'desc') {
+  async getTopicWithPosts(topicId: number, page: number = 1, limit: number = 20, userId?: number, order?: 'asc' | 'desc') {
     try {
       // If order is not provided, try to get it from user preferences
       if (!order && userId) {

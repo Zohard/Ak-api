@@ -115,7 +115,10 @@ export class NotificationsService {
       // Send email if user has email notifications enabled for this type
       const shouldSendEmail = this.shouldSendEmail(data.type, preferences);
       if (shouldSendEmail) {
-        await this.sendEmail(data);
+        // Run email sending in background to avoid blocking the response
+        this.sendEmail(data).catch(err =>
+          this.logger.error(`Background email sending failed: ${err.message}`)
+        );
       }
 
       this.logger.log(

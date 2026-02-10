@@ -83,7 +83,7 @@ export class ForumsController {
   async getTopicWithPosts(
     @Param('topicId', ParseIntPipe) topicId: number,
     @Query('page') page: string = '1',
-    @Query('limit') limit: string = '15',
+    @Query('limit') limit: string = '20',
     @Query('order') order?: 'asc' | 'desc',
     @Request() req?
   ) {
