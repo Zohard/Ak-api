@@ -139,7 +139,7 @@ import redisConfig from './config/redis.config';
     ThrottlerModule.forRoot([
       {
         ttl: 1000,
-        limit: 200,
+        limit: 2000,
       },
     ]),
     SentryModule.forRoot(),
