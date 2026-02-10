@@ -1,8 +1,7 @@
 import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
-import { APP_FILTER, APP_GUARD } from '@nestjs/core';
-import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { APP_FILTER } from '@nestjs/core';
 import { LoggerModule } from 'nestjs-pino';
 import { BullModule } from '@nestjs/bullmq';
 import { SentryModule, SentryGlobalFilter } from '@sentry/nestjs/setup';
@@ -135,13 +134,7 @@ import redisConfig from './config/redis.config';
         };
       },
     }),
-    // Global rate limiting: 200 requests per second per IP (User request)
-    ThrottlerModule.forRoot([
-      {
-        ttl: 1000,
-        limit: 2000,
-      },
-    ]),
+    // Global rate limiting removed per user request for 13k users
     SentryModule.forRoot(),
     AuthModule,
     UsersModule,
@@ -191,10 +184,6 @@ import redisConfig from './config/redis.config';
     {
       provide: APP_FILTER,
       useClass: SentryGlobalFilter,
-    },
-    {
-      provide: APP_GUARD,
-      useClass: ThrottlerGuard,
     },
   ],
 })

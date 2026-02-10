@@ -13,7 +13,6 @@ import {
   HttpStatus,
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
-import { ThrottlerGuard } from '@nestjs/throttler';
 import { GatewayService } from './gateway.service';
 import { RateLimitGuard } from './guards/rate-limit.guard';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -22,11 +21,10 @@ import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 
 @ApiTags('Gateway')
 @Controller('gateway')
-@UseGuards(ThrottlerGuard)
 export class GatewayController {
   private readonly logger = new Logger(GatewayController.name);
 
-  constructor(private readonly gatewayService: GatewayService) {}
+  constructor(private readonly gatewayService: GatewayService) { }
 
   @Get('health')
   @ApiOperation({ summary: 'Get gateway health status' })
@@ -47,15 +45,14 @@ export class GatewayController {
   }
 
   @All('*')
-  @UseGuards(RateLimitGuard)
   async handleRequest(@Req() req: Request, @Res() res: Response) {
     const { method, path: requestPath } = req;
     const cleanPath = requestPath.replace('/api/gateway', '');
-    
+
     this.logger.debug(`Gateway request: ${method} ${cleanPath}`);
 
     const route = this.gatewayService.findRoute(method, cleanPath);
-    
+
     if (!route) {
       this.logger.warn(`No route found for: ${method} ${cleanPath}`);
       return res.status(HttpStatus.NOT_FOUND).json({
@@ -68,12 +65,12 @@ export class GatewayController {
     try {
       const forwardedPath = cleanPath.replace(/^\/[^\/]+/, '');
       const targetUrl = `/api${forwardedPath}`;
-      
+
       req.url = targetUrl;
       req.originalUrl = targetUrl;
-      
+
       this.logger.debug(`Forwarding ${method} ${cleanPath} -> ${targetUrl}`);
-      
+
       return res.status(HttpStatus.OK).json({
         message: 'Request processed by gateway',
         route: route.target,
@@ -81,7 +78,7 @@ export class GatewayController {
         forwardedPath: targetUrl,
         timestamp: new Date().toISOString(),
       });
-      
+
     } catch (error) {
       this.logger.error(`Gateway error for ${method} ${cleanPath}:`, error);
       return res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
