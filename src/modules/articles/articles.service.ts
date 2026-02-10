@@ -352,6 +352,23 @@ export class ArticlesService {
     return result;
   }
 
+  async findByCategorySlug(slug: string, query: ArticleQueryDto) {
+    // Resolve slug to termId
+    const term = await this.prisma.wpTerm.findFirst({
+      where: {
+        slug,
+        termTaxonomies: { some: { taxonomy: 'category' } },
+      },
+    });
+
+    if (!term) {
+      throw new NotFoundException(`Category "${slug}" not found`);
+    }
+
+    query.categoryId = term.termId;
+    return this.findAll(query);
+  }
+
   async getById(id: number, includeContent: boolean = true, skipCache: boolean = false) {
     // Increment view count independent of cache
     // Skip increment only if skipCache is true (admin requests)

@@ -88,6 +88,18 @@ export class ArticlesController {
     return this.articlesService.findAll(query);
   }
 
+  @Get('category-slug/:slug')
+  @ApiOperation({ summary: 'Get articles by category slug' })
+  @ApiResponse({ status: 200, description: 'Articles retrieved successfully' })
+  @ApiResponse({ status: 404, description: 'Category not found' })
+  getByCategorySlug(
+    @Param('slug') slug: string,
+    @Query() query: ArticleQueryDto,
+  ) {
+    query.status = 'published';
+    return this.articlesService.findByCategorySlug(slug, query);
+  }
+
   @Get('author/:authorId')
   @ApiOperation({ summary: 'Get articles by author' })
   @ApiResponse({ status: 200, description: 'Articles retrieved successfully' })
