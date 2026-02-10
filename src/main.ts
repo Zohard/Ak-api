@@ -2,6 +2,7 @@
 import './instrument';
 
 import { NestFactory } from '@nestjs/core';
+import { NestExpressApplication } from '@nestjs/platform-express';
 import { ValidationPipe, Logger as NestLogger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AppModule } from './app.module';
@@ -20,9 +21,13 @@ async function bootstrap() {
     return Number(this);
   };
 
-  const app = await NestFactory.create(AppModule, {
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     bufferLogs: true, // Buffer logs until logger is ready
   });
+
+  // Trust proxy for Railway/Cloudflare (required for correct IP rate limiting)
+  app.set('trust proxy', 1);
+
   const configService = app.get(ConfigService);
 
   // Use Pino logger for structured logging (Railway-friendly)
