@@ -198,8 +198,8 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
     } catch (error) {
       this.logger.warn('Connection lost, attempting to reconnect...');
       try {
-        await this.$disconnect();
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        // Don't $disconnect() first — it tears down the engine and any concurrent
+        // request would fail with "Engine is not yet connected"
         await this.$connect();
       } catch (reconnectError) {
         this.logger.error('Failed to reconnect:', reconnectError);
@@ -270,26 +270,14 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
           this.logger.warn(`Database operation failed (attempt ${attempt}/${maxRetries}):`, error.message);
 
           if (attempt < maxRetries) {
-            // For max connections error, force disconnect to free up connections
-            if (error.message?.includes('Max client connections reached') || error.message?.includes('too many clients already')) {
-              try {
-                await this.$disconnect();
-                await new Promise(resolve => setTimeout(resolve, 500));
-              } catch (disconnectError) {
-                this.logger.warn('Failed to disconnect:', disconnectError.message);
-              }
-            }
-
             // Exponential backoff with jitter
             const baseDelay = Math.pow(2, attempt - 1) * 1000;
             const jitter = Math.random() * 1000;
             const delay = baseDelay + jitter;
             await new Promise(resolve => setTimeout(resolve, delay));
 
-            // Try to reconnect
+            // Try to reconnect without tearing down the engine first
             try {
-              await this.$disconnect();
-              await new Promise(resolve => setTimeout(resolve, 200));
               await this.$connect();
             } catch (reconnectError) {
               this.logger.error('Failed to reconnect:', reconnectError);

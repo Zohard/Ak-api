@@ -59,10 +59,9 @@ export class DatabaseWarmupService implements OnModuleInit, OnModuleDestroy {
       try {
         await this.prisma.$queryRaw`SELECT 1 as keepalive`;
       } catch (error: any) {
-        // Try to reconnect silently
+        // Try to reconnect without disconnecting first — $disconnect() tears down the
+        // engine and any concurrent request would fail with "Engine is not yet connected"
         try {
-          await this.prisma.$disconnect();
-          await this.sleep(1000);
           await this.prisma.$connect();
         } catch (reconnectError: any) {
           this.logger.error(`Keepalive reconnect failed: ${reconnectError.message}`);
