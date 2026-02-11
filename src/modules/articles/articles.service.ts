@@ -1292,7 +1292,13 @@ export class ArticlesService {
   private transformImageUrl(imageUrl: string | null): string | null {
     if (!imageUrl) return null;
 
-    // Return as-is — frontend handles URL resolution via getArticleImageUrl
+    // Transform old wp-content/uploads URLs to R2
+    const wpContentMatch = imageUrl.match(/webzine\/wp-content\/uploads\/(.+)/);
+    if (wpContentMatch && wpContentMatch[1]) {
+      const r2Base = process.env.R2_PUBLIC_URL || 'https://pub-b37473d0af014d50941768d98a9ec79d.r2.dev';
+      return `${r2Base}/images/webzine/${wpContentMatch[1]}`;
+    }
+
     return imageUrl;
   }
 

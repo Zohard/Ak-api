@@ -515,18 +515,23 @@ export class BusinessService {
     const offset = (currentPage - 1) * pageLimit;
 
     // Get DISTINCT anime IDs with their first relation type - only valid animes
-    const relations = await this.prisma.$queryRaw<Array<{ id_anime: number; type: string; precisions: string; min_relation: number }>>`
-      SELECT DISTINCT ON (bta.id_anime)
-        bta.id_anime,
-        bta.type,
-        bta.precisions,
-        bta.id_relation as min_relation
-      FROM ak_business_to_animes bta
-      INNER JOIN ak_animes a ON a.id_anime = bta.id_anime
-      WHERE bta.id_business = ${businessId}
-        AND bta.doublon = 0
-        AND a.statut = 1
-      ORDER BY bta.id_anime, bta.id_relation
+    const relations = await this.prisma.$queryRaw<Array<{ id_anime: number; type: string; precisions: string; min_relation: number; annee: string; titre: string }>>`
+      SELECT * FROM (
+        SELECT DISTINCT ON (bta.id_anime)
+          bta.id_anime,
+          bta.type,
+          bta.precisions,
+          bta.id_relation as min_relation,
+          a.annee,
+          a.titre
+        FROM ak_business_to_animes bta
+        INNER JOIN ak_animes a ON a.id_anime = bta.id_anime
+        WHERE bta.id_business = ${businessId}
+          AND bta.doublon = 0
+          AND a.statut = 1
+        ORDER BY bta.id_anime, bta.id_relation
+      ) sub
+      ORDER BY annee DESC NULLS LAST, titre ASC
       LIMIT ${pageLimit} OFFSET ${offset}
     `;
 
@@ -555,7 +560,7 @@ export class BusinessService {
     `;
 
     // Combine anime data with relation info
-    const data = animes.map(anime => {
+    const dataUnsorted = animes.map(anime => {
       const relation = relations.find(r => r.id_anime === anime.id_anime);
       return {
         id: anime.id_anime,
@@ -572,6 +577,11 @@ export class BusinessService {
         relationDetails: relation?.precisions
       };
     });
+
+    // Re-sort data based on relations order (Year DESC)
+    const data = relations
+      .map(r => dataUnsorted.find(d => d.id === r.id_anime))
+      .filter((d): d is any => !!d);
 
     return {
       data,
@@ -606,18 +616,23 @@ export class BusinessService {
     const offset = (currentPage - 1) * pageLimit;
 
     // Get DISTINCT manga IDs with their first relation type - only valid mangas
-    const relations = await this.prisma.$queryRaw<Array<{ id_manga: number; type: string; precisions: string; min_relation: number }>>`
-      SELECT DISTINCT ON (btm.id_manga)
-        btm.id_manga,
-        btm.type,
-        btm.precisions,
-        btm.id_relation as min_relation
-      FROM ak_business_to_mangas btm
-      INNER JOIN ak_mangas m ON m.id_manga = btm.id_manga
-      WHERE btm.id_business = ${businessId}
-        AND btm.doublon = 0
-        AND m.statut = 1
-      ORDER BY btm.id_manga, btm.id_relation
+    const relations = await this.prisma.$queryRaw<Array<{ id_manga: number; type: string; precisions: string; min_relation: number; annee: string; titre: string }>>`
+      SELECT * FROM (
+        SELECT DISTINCT ON (btm.id_manga)
+          btm.id_manga,
+          btm.type,
+          btm.precisions,
+          btm.id_relation as min_relation,
+          m.annee,
+          m.titre
+        FROM ak_business_to_mangas btm
+        INNER JOIN ak_mangas m ON m.id_manga = btm.id_manga
+        WHERE btm.id_business = ${businessId}
+          AND btm.doublon = 0
+          AND m.statut = 1
+        ORDER BY btm.id_manga, btm.id_relation
+      ) sub
+      ORDER BY annee DESC NULLS LAST, titre ASC
       LIMIT ${pageLimit} OFFSET ${offset}
     `;
 
@@ -645,7 +660,7 @@ export class BusinessService {
     `;
 
     // Combine manga data with relation info
-    const data = mangas.map(manga => {
+    const dataUnsorted = mangas.map(manga => {
       const relation = relations.find(r => r.id_manga === manga.id_manga);
       return {
         id: manga.id_manga,
@@ -661,6 +676,11 @@ export class BusinessService {
         relationDetails: relation?.precisions
       };
     });
+
+    // Re-sort data based on relations order (Year DESC)
+    const data = relations
+      .map(r => dataUnsorted.find(d => d.id === r.id_manga))
+      .filter((d): d is any => !!d);
 
     return {
       data,

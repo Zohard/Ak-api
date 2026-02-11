@@ -318,9 +318,9 @@ export class ListsService {
   }
 
   async getPublicLists(mediaType: 'anime' | 'manga' | 'jeu-video', sort: 'recent' | 'popular' = 'recent', limit = 10) {
-    // Check cache first
+    // Check cache first — discard empty arrays
     const cachedLists = await this.cacheService.getPublicLists(mediaType, sort, limit);
-    if (cachedLists) {
+    if (cachedLists && (!Array.isArray(cachedLists) || cachedLists.length > 0)) {
       return cachedLists;
     }
 
@@ -369,8 +369,10 @@ export class ListsService {
       result = rows.map((r) => this.formatList(r));
     }
 
-    // Cache the result for 4 hours
-    await this.cacheService.setPublicLists(mediaType, sort, limit, result);
+    // Cache the result for 24 hours — only if non-empty
+    if (result.length > 0) {
+      await this.cacheService.setPublicLists(mediaType, sort, limit, result, 86400);
+    }
 
     return result;
   }
