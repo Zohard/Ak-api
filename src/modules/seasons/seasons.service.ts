@@ -20,8 +20,7 @@ export class SeasonsService {
       throw new NotFoundException(`Season with ID ${seasonId} not found`);
     }
 
-    const data = this.normalizeJsonData(season.json_data);
-    const animeIds = [...new Set(data.animes)]; // Deduplicate IDs to prevent processing twice and frontend key collisions
+    const animeIds = [...new Set(this.normalizeJsonData(season.json_data))]; // Deduplicate IDs to prevent processing twice and frontend key collisions
 
     this.logger.log(`Syncing episodes for ${animeIds.length} animes in season ${seasonId}`);
 
@@ -183,27 +182,7 @@ export class SeasonsService {
         return [];
       }
 
-      let animeIds: number[] = [];
-
-      // Parse json_data to get anime IDs
-      if (season.json_data) {
-        try {
-          const jsonData = typeof season.json_data === 'string'
-            ? JSON.parse(season.json_data)
-            : season.json_data;
-
-          // Handle different possible JSON structures
-          if (Array.isArray(jsonData)) {
-            animeIds = jsonData;
-          } else if (jsonData.animes && Array.isArray(jsonData.animes)) {
-            animeIds = jsonData.animes;
-          } else if (jsonData.anime_ids && Array.isArray(jsonData.anime_ids)) {
-            animeIds = jsonData.anime_ids;
-          }
-        } catch (parseError) {
-          this.logger.error('Error parsing season json_data:', parseError);
-        }
-      }
+      const animeIds = this.normalizeJsonData(season.json_data);
 
       if (animeIds.length === 0) {
         const emptyResult = [];
@@ -263,7 +242,7 @@ export class SeasonsService {
     const json_auteurs = data.json_auteurs || ''
     const currentSeason = data.currentSeason === true ? true : false
     const created = (await this.prisma.$queryRaw`INSERT INTO ak_animes_saisons (annee, saison, statut, json_data, id_article, json_auteurs, current_season)
-      VALUES (${data.annee}, ${data.saison}, ${statut}, ${JSON.stringify({ animes: [] })}, ${id_article}, ${json_auteurs}, ${currentSeason})
+      VALUES (${data.annee}, ${data.saison}, ${statut}, ${this.serializeJsonData([])}, ${id_article}, ${json_auteurs}, ${currentSeason})
       RETURNING id_saison, saison, annee, statut, current_season, json_data, id_article, json_auteurs`) as any
 
     // Invalidate caches related to seasons lists/current
@@ -272,17 +251,22 @@ export class SeasonsService {
     return Array.isArray(created) ? created[0] : created
   }
 
-  private normalizeJsonData(json_data: any): { animes: number[] } {
+  private normalizeJsonData(json_data: any): number[] {
     let animeIds: number[] = []
     if (json_data) {
       try {
         const jd = typeof json_data === 'string' ? JSON.parse(json_data) : json_data
-        if (Array.isArray(jd)) animeIds = jd
-        else if (Array.isArray(jd.animes)) animeIds = jd.animes
-        else if (Array.isArray(jd.anime_ids)) animeIds = jd.anime_ids
+        if (Array.isArray(jd)) animeIds = jd.map(id => Number(id))
+        else if (Array.isArray(jd.animes)) animeIds = jd.animes.map(id => Number(id))
+        else if (Array.isArray(jd.anime_ids)) animeIds = jd.anime_ids.map(id => Number(id))
       } catch { }
     }
-    return { animes: animeIds }
+    return animeIds
+  }
+
+  /** Convert anime IDs array to the stored format: ["123","456",...] */
+  private serializeJsonData(animeIds: number[]): string {
+    return JSON.stringify(animeIds.map(id => String(id)))
   }
 
   /**
@@ -309,12 +293,12 @@ export class SeasonsService {
     const season = await this.findById(seasonId)
     if (!season) return null
 
-    const data = this.normalizeJsonData(season.json_data)
-    if (!data.animes.includes(animeId)) data.animes.push(animeId)
+    const animeIds = this.normalizeJsonData(season.json_data)
+    if (!animeIds.includes(animeId)) animeIds.push(animeId)
 
     await this.prisma.$executeRaw`
       UPDATE ak_animes_saisons
-      SET json_data = ${JSON.stringify(data)}::jsonb
+      SET json_data = ${this.serializeJsonData(animeIds)}
       WHERE id_saison = ${seasonId}
     `
 
@@ -334,14 +318,14 @@ export class SeasonsService {
     const season = await this.findById(seasonId)
     if (!season) return null
 
-    const data = this.normalizeJsonData(season.json_data)
-    const before = data.animes.length
-    data.animes = data.animes.filter((id) => id !== animeId)
+    const animeIds = this.normalizeJsonData(season.json_data)
+    const before = animeIds.length
+    const filtered = animeIds.filter((id) => id !== animeId)
 
-    if (data.animes.length !== before) {
+    if (filtered.length !== before) {
       await this.prisma.$executeRaw`
         UPDATE ak_animes_saisons
-        SET json_data = ${JSON.stringify(data)}::jsonb
+        SET json_data = ${this.serializeJsonData(filtered)}
         WHERE id_saison = ${seasonId}
       `
       await this.cacheService.del(`season:${seasonId}`)
