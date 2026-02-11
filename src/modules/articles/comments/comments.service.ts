@@ -3,6 +3,7 @@ import {
   NotFoundException,
   BadRequestException,
   ForbiddenException,
+  Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../../../shared/services/prisma.service';
 import { CacheService } from '../../../shared/services/cache.service';
@@ -13,10 +14,12 @@ import { ModerateCommentDto } from './dto/moderate-comment.dto';
 
 @Injectable()
 export class CommentsService {
+  private readonly logger = new Logger(CommentsService.name);
+
   constructor(
     private prisma: PrismaService,
     private cacheService: CacheService,
-  ) {}
+  ) { }
 
   /**
    * Convert WordPress comment_approved values to moderation status
@@ -399,7 +402,7 @@ export class CommentsService {
     });
 
     if (!comment) {
-      throw new NotFoundException('Comment not found');
+      throw new NotFoundException(`Comment with ID ${id} not found`);
     }
 
     let commentApproved = '0';
@@ -409,10 +412,32 @@ export class CommentsService {
       commentApproved = 'spam';
     }
 
-    await this.prisma.wpComment.update({
-      where: { commentID: BigInt(id) },
-      data: { commentApproved },
-    });
+    try {
+      await this.prisma.wpComment.update({
+        where: { commentID: BigInt(id) },
+        data: { commentApproved },
+      });
+    } catch (error) {
+      this.logger.error(
+        `Failed to moderate comment ${id}: ${error.message}`,
+        error.stack,
+      );
+
+      // Check if comment still exists
+      const stillExists = await this.prisma.wpComment.findUnique({
+        where: { commentID: BigInt(id) },
+      });
+
+      if (!stillExists) {
+        throw new NotFoundException(
+          `Comment ${id} was deleted before moderation could be applied`,
+        );
+      }
+
+      throw new Error(
+        `Failed to moderate comment: ${error.message}`,
+      );
+    }
 
     // Invalidate comments cache for this article
     await this.invalidateCommentsCache(Number(comment.commentPostID));
@@ -430,7 +455,7 @@ export class CommentsService {
     reason?: string,
   ): Promise<any> {
     const action = status === 'approved' ? 'approve' : status === 'rejected' ? 'reject' : 'pending';
-    
+
     const results = await Promise.all(
       commentIds.map(async (id) => {
         try {
