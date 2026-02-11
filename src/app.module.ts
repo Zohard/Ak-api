@@ -50,6 +50,7 @@ import { ActivityTrackerService } from './shared/services/activity-tracker.servi
 import { DatabaseWarmupService } from './shared/services/database-warmup.service';
 import { ActivityTrackerMiddleware } from './common/middleware/activity-tracker.middleware';
 import { CacheControlMiddleware } from './common/middleware/cache-control.middleware';
+import { BotProtectionMiddleware } from './common/middleware/bot-protection.middleware';
 import databaseConfig from './config/database.config';
 import jwtConfig from './config/jwt.config';
 import redisConfig from './config/redis.config';
@@ -189,6 +190,10 @@ import redisConfig from './config/redis.config';
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
+    // Bot protection runs FIRST — blocks bots before any DB/cache work
+    consumer
+      .apply(BotProtectionMiddleware)
+      .forRoutes('*');
     consumer
       .apply(CacheControlMiddleware)
       .forRoutes('*');
