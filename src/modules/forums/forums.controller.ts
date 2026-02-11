@@ -73,6 +73,42 @@ export class ForumsController {
     return this.forumsService.getTopicMetadata(topicId);
   }
 
+  @Get('topics/:topicId/search')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Search within a specific topic (admin only)' })
+  @ApiParam({ name: 'topicId', type: 'number', description: 'Topic ID' })
+  @ApiQuery({ name: 'q', required: true, type: String, description: 'Search query' })
+  @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Results per page (default: 20)' })
+  @ApiQuery({ name: 'offset', required: false, type: Number, description: 'Number of results to skip (default: 0)' })
+  @ApiResponse({ status: 200, description: 'Search results retrieved successfully' })
+  @ApiResponse({ status: 403, description: 'Access denied - admin only' })
+  async searchWithinTopic(
+    @Param('topicId', ParseIntPipe) topicId: number,
+    @Query('q') searchQuery: string,
+    @Query('limit') limit: string = '20',
+    @Query('offset') offset: string = '0',
+    @Request() req
+  ) {
+    const userId = req.user.id;
+    // Check if user is admin (group 1)
+    const userGroups = await this.forumsService['getUserGroups'](userId);
+    if (!userGroups.includes(1)) {
+      throw new Error('Access denied - admin only');
+    }
+
+    if (!searchQuery || searchQuery.trim().length === 0) {
+      return { results: [], total: 0 };
+    }
+    return await this.forumsService.searchWithinTopic(
+      topicId,
+      searchQuery,
+      parseInt(limit),
+      parseInt(offset),
+      userId
+    );
+  }
+
   @Get('topics/:topicId')
   @UseGuards(OptionalJwtAuthGuard)
   @ApiOperation({ summary: 'Get topic with posts' })

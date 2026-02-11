@@ -3497,6 +3497,114 @@ export class ForumsService {
     }
   }
 
+  async searchWithinTopic(topicId: number, searchQuery: string, limit: number, offset: number, userId?: number) {
+    try {
+      if (!searchQuery || searchQuery.trim().length === 0) {
+        return { results: [], total: 0 };
+      }
+
+      // Get the topic to verify it exists and check board access once
+      const topic = await this.prisma.smfTopic.findUnique({
+        where: { idTopic: topicId },
+        include: {
+          board: {
+            include: {
+              category: true
+            }
+          }
+        }
+      });
+
+      if (!topic || !topic.board) {
+        return { results: [], total: 0 };
+      }
+
+      const hasAccess = await this.checkBoardAccess(topic.board.idBoard, userId);
+      if (!hasAccess) {
+        return { results: [], total: 0 };
+      }
+
+      const whereClause = {
+        idTopic: topicId,
+        approved: 1,
+        OR: [
+          { subject: { contains: searchQuery, mode: 'insensitive' as const } },
+          { body: { contains: searchQuery, mode: 'insensitive' as const } }
+        ]
+      };
+
+      // Get total count (exact)
+      const totalCount = await this.prisma.smfMessage.count({
+        where: whereClause
+      });
+
+      // Fetch matching messages
+      const messages = await this.prisma.smfMessage.findMany({
+        where: whereClause,
+        orderBy: { posterTime: 'desc' },
+        take: limit,
+        skip: offset
+      });
+
+      // Format results
+      const results = await Promise.all(messages.map(async (msg) => {
+        // Create excerpt from body (remove BBCode tags and limit length)
+        let cleanBody = msg.body
+          .replace(/\[quote[^\]]*\][\s\S]*?\[\/quote\]/gi, '')
+          .replace(/\[spoiler[^\]]*\][\s\S]*?\[\/spoiler\]/gi, '[Spoiler]')
+          .replace(/\[code\][\s\S]*?\[\/code\]/gi, '[Code]')
+          .replace(/\[img[^\]]*\][^\[]*\[\/img\]/gi, '[Image]')
+          .replace(/\[url[^\]]*\][^\[]*\[\/url\]/gi, '')
+          .replace(/\[.*?\]/g, '')
+          .replace(/&nbsp;/g, ' ')
+          .replace(/&amp;/g, '&')
+          .replace(/&lt;/g, '<')
+          .replace(/&gt;/g, '>')
+          .replace(/&quot;/g, '"')
+          .replace(/&#039;/g, "'")
+          .replace(/\s+/g, ' ')
+          .trim();
+
+        const excerpt = cleanBody.length > 200
+          ? cleanBody.substring(0, 200) + '...'
+          : cleanBody;
+
+        // Calculate message position in topic (for pagination)
+        const messagePosition = await this.prisma.smfMessage.count({
+          where: {
+            idTopic: msg.idTopic,
+            posterTime: { lte: msg.posterTime },
+            idMsg: { lte: msg.idMsg }
+          }
+        });
+
+        return {
+          id: msg.idMsg,
+          subject: msg.subject,
+          excerpt,
+          posterName: msg.posterName,
+          posterTime: msg.posterTime,
+          topicId: msg.idTopic,
+          messagePosition,
+          numReplies: topic.numReplies || 0,
+          numViews: topic.numViews || 0,
+          isSticky: topic.isSticky === 1,
+          locked: topic.locked === 1,
+          board: {
+            id: topic.board.idBoard,
+            name: topic.board.name,
+            categoryName: topic.board.category?.name
+          }
+        };
+      }));
+
+      return { results, total: totalCount };
+    } catch (error) {
+      this.logger.error('Error searching within topic:', error);
+      return { results: [], total: 0 };
+    }
+  }
+
   /**
    * Get the page number where a specific message appears in its topic
    * Used for navigating directly to a message from reports/links
