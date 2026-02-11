@@ -1,6 +1,6 @@
 export interface RelatedContentItem {
   id: number;
-  type: 'anime' | 'manga' | 'article';
+  type: 'anime' | 'manga' | 'game' | 'article';
   title: string;
   image: string | null;
   year: number | string | null;

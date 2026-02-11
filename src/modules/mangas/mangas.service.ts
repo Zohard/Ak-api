@@ -1755,7 +1755,7 @@ export class MangasService extends BaseContentService<
     // Get BIDIRECTIONAL relations: where manga is source OR target
     // This matches the old PHP logic: WHERE id_fiche_depart = 'manga{id}' OR id_manga = {id}
     const relations = await this.prisma.$queryRaw`
-      SELECT id_relation, id_fiche_depart, id_anime, id_manga
+      SELECT id_relation, id_fiche_depart, id_anime, id_manga, id_jeu
       FROM ak_fiche_to_fiche
       WHERE id_fiche_depart = ${`manga${id}`} OR id_manga = ${id}
     ` as any[];
@@ -1818,12 +1818,37 @@ export class MangasService extends BaseContentService<
               relationType: 'related',
             });
           }
+        } else if (relation.id_jeu && relation.id_jeu > 0) {
+          // Related game
+          const relatedGame = await this.prisma.akJeuxVideo.findUnique({
+            where: { idJeu: relation.id_jeu, statut: 1 },
+            select: {
+              idJeu: true,
+              titre: true,
+              image: true,
+              annee: true,
+              niceUrl: true,
+            },
+          });
+
+          if (relatedGame) {
+            relatedContent.push({
+              id: relatedGame.idJeu,
+              type: 'game',
+              title: relatedGame.titre,
+              image: relatedGame.image,
+              year: relatedGame.annee,
+              rating: null,
+              niceUrl: relatedGame.niceUrl,
+              relationType: 'related',
+            });
+          }
         }
       }
       // Case 2: This manga is the TARGET (id_manga = {id}) - REVERSE relation
       // Need to fetch the SOURCE fiche from id_fiche_depart
       else if (relation.id_fiche_depart !== `manga${id}`) {
-        const ficheMatch = relation.id_fiche_depart.match(/^(anime|manga)(\d+)$/);
+        const ficheMatch = relation.id_fiche_depart.match(/^(anime|manga|jeu)(\d+)$/);
         if (ficheMatch) {
           const [, type, ficheId] = ficheMatch;
 
@@ -1874,6 +1899,30 @@ export class MangasService extends BaseContentService<
                 year: relatedManga.annee,
                 rating: relatedManga.moyenneNotes,
                 niceUrl: relatedManga.niceUrl,
+                relationType: 'related',
+              });
+            }
+          } else if (type === 'jeu') {
+            const relatedGame = await this.prisma.akJeuxVideo.findUnique({
+              where: { idJeu: parseInt(ficheId), statut: 1 },
+              select: {
+                idJeu: true,
+                titre: true,
+                image: true,
+                annee: true,
+                niceUrl: true,
+              },
+            });
+
+            if (relatedGame) {
+              relatedContent.push({
+                id: relatedGame.idJeu,
+                type: 'game',
+                title: relatedGame.titre,
+                image: relatedGame.image,
+                year: relatedGame.annee,
+                rating: null,
+                niceUrl: relatedGame.niceUrl,
                 relationType: 'related',
               });
             }

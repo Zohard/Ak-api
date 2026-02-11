@@ -34,7 +34,7 @@ export class AnimeRelationsService {
 
       // Get BIDIRECTIONAL relations: where anime is source OR target
       const relations = await this.prisma.$queryRaw`
-        SELECT id_relation, id_fiche_depart, id_anime, id_manga
+        SELECT id_relation, id_fiche_depart, id_anime, id_manga, id_jeu
         FROM ak_fiche_to_fiche
         WHERE id_fiche_depart = ${`anime${id}`} OR id_anime = ${id}
       ` as any[];
@@ -99,43 +99,68 @@ export class AnimeRelationsService {
                 relationType: 'related',
               });
             }
-          }
-        }
-        // Case 2: This anime is the TARGET
-        else if (relation.id_anime === id) {
-          const ficheMatch = relation.id_fiche_depart?.match(/^anime(\d+)$/);
-          if (ficheMatch) {
-            const sourceAnimeId = parseInt(ficheMatch[1]);
-            const sourceAnime = await this.prisma.akAnime.findUnique({
-              where: { idAnime: sourceAnimeId, statut: 1 },
+          } else if (relation.id_jeu && relation.id_jeu > 0) {
+            // Related game
+            const relatedGame = await this.prisma.akJeuxVideo.findUnique({
+              where: { idJeu: relation.id_jeu, statut: 1 },
               select: {
-                idAnime: true,
+                idJeu: true,
                 titre: true,
                 image: true,
                 annee: true,
-                moyenneNotes: true,
                 niceUrl: true,
               },
             });
 
-            if (sourceAnime) {
+            if (relatedGame) {
               relatedContent.push({
-                id: sourceAnime.idAnime,
-                type: 'anime',
-                title: sourceAnime.titre,
-                image: sourceAnime.image,
-                year: sourceAnime.annee,
-                rating: sourceAnime.moyenneNotes,
-                niceUrl: sourceAnime.niceUrl,
+                id: relatedGame.idJeu,
+                type: 'game',
+                title: relatedGame.titre,
+                image: relatedGame.image,
+                year: relatedGame.annee,
+                rating: null,
+                niceUrl: relatedGame.niceUrl,
                 relationType: 'related',
               });
             }
-          } else {
-            const mangaMatch = relation.id_fiche_depart?.match(/^manga(\d+)$/);
-            if (mangaMatch) {
-              const sourceMangaId = parseInt(mangaMatch[1]);
+          }
+        }
+        // Case 2: This anime is the TARGET
+        else if (relation.id_anime === id) {
+          const ficheMatch = relation.id_fiche_depart?.match(/^(anime|manga|jeu)(\d+)$/);
+          if (ficheMatch) {
+            const sourceType = ficheMatch[1];
+            const sourceId = parseInt(ficheMatch[2]);
+
+            if (sourceType === 'anime') {
+              const sourceAnime = await this.prisma.akAnime.findUnique({
+                where: { idAnime: sourceId, statut: 1 },
+                select: {
+                  idAnime: true,
+                  titre: true,
+                  image: true,
+                  annee: true,
+                  moyenneNotes: true,
+                  niceUrl: true,
+                },
+              });
+
+              if (sourceAnime) {
+                relatedContent.push({
+                  id: sourceAnime.idAnime,
+                  type: 'anime',
+                  title: sourceAnime.titre,
+                  image: sourceAnime.image,
+                  year: sourceAnime.annee,
+                  rating: sourceAnime.moyenneNotes,
+                  niceUrl: sourceAnime.niceUrl,
+                  relationType: 'related',
+                });
+              }
+            } else if (sourceType === 'manga') {
               const sourceManga = await this.prisma.akManga.findUnique({
-                where: { idManga: sourceMangaId, statut: 1 },
+                where: { idManga: sourceId, statut: 1 },
                 select: {
                   idManga: true,
                   titre: true,
@@ -155,6 +180,30 @@ export class AnimeRelationsService {
                   year: sourceManga.annee,
                   rating: sourceManga.moyenneNotes,
                   niceUrl: sourceManga.niceUrl,
+                  relationType: 'related',
+                });
+              }
+            } else if (sourceType === 'jeu') {
+              const sourceGame = await this.prisma.akJeuxVideo.findUnique({
+                where: { idJeu: sourceId, statut: 1 },
+                select: {
+                  idJeu: true,
+                  titre: true,
+                  image: true,
+                  annee: true,
+                  niceUrl: true,
+                },
+              });
+
+              if (sourceGame) {
+                relatedContent.push({
+                  id: sourceGame.idJeu,
+                  type: 'game',
+                  title: sourceGame.titre,
+                  image: sourceGame.image,
+                  year: sourceGame.annee,
+                  rating: null,
+                  niceUrl: sourceGame.niceUrl,
                   relationType: 'related',
                 });
               }
