@@ -65,6 +65,8 @@ export class AdminStaffAkService {
         wu.user_registered,
         wu.display_name,
         wu.user_status,
+        sm.id_member,
+        sm.id_group,
         (SELECT COUNT(*) FROM wp_posts WHERE post_author = wu."ID") as article_count
       FROM wp_users wu
       LEFT JOIN smf_members sm ON wu.user_login = sm.member_name
@@ -417,10 +419,11 @@ export class AdminStaffAkService {
   }
 
   async updateSmfMemberGroup(memberId: number, newGroupId: number, adminId: number) {
-    // Check if the member exists
-    const smfMember = await this.prisma.$queryRaw`
-      SELECT * FROM smf_members WHERE id_member = ${memberId}
-    `;
+    // Check if the member exists (use $queryRawUnsafe with explicit int cast to avoid Prisma type issues)
+    const smfMember = await this.prisma.$queryRawUnsafe(
+      `SELECT * FROM smf_members WHERE id_member = $1::integer`,
+      memberId,
+    );
 
     if (!smfMember || (smfMember as any[]).length === 0) {
       throw new NotFoundException(`SMF member with ID ${memberId} not found`);
@@ -430,11 +433,11 @@ export class AdminStaffAkService {
     const previousGroupId = member.id_group;
 
     // Update the member's group
-    await this.prisma.$executeRaw`
-      UPDATE smf_members
-      SET id_group = ${newGroupId}
-      WHERE id_member = ${memberId}
-    `;
+    await this.prisma.$executeRawUnsafe(
+      `UPDATE smf_members SET id_group = $1::integer WHERE id_member = $2::integer`,
+      newGroupId,
+      memberId,
+    );
 
     // Log the action
     await this.logStaffAkAction(

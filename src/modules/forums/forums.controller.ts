@@ -221,7 +221,7 @@ export class ForumsController {
   @UseGuards(OptionalJwtAuthGuard)
   @ApiOperation({ summary: 'Get today\'s birthdays' })
   @ApiResponse({ status: 200, description: 'Today\'s birthdays retrieved successfully' })
-  async getTodayBirthdays(@Req() req: any) {
+  async getTodayBirthdays(@Request() req: any) {
     const userId = req.user?.id || null;
     return await this.forumsService.getTodayBirthdays(userId);
   }
