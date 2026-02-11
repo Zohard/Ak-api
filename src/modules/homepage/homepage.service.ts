@@ -34,8 +34,8 @@ export class HomePageService {
 
     // 1. Try to get all parts from cache in parallel
     const [
-      cachedReviews,
-      cachedArticles,
+      rawCachedReviews,
+      rawCachedArticles,
       cachedSeason,
       cachedForum,
       cachedStats,
@@ -52,6 +52,17 @@ export class HomePageService {
       this.cache.get<any>(`homepage:${keys.recentMangas}`),
       this.cache.get<any>(`homepage:${keys.recentGames}`),
     ]);
+
+    // Discard cached empty arrays for reviews/articles (treat as cache miss)
+    const cachedReviews = (Array.isArray(rawCachedReviews) && rawCachedReviews.length === 0) ? null : rawCachedReviews;
+    const cachedArticles = (Array.isArray(rawCachedArticles) && rawCachedArticles.length === 0) ? null : rawCachedArticles;
+
+    if (rawCachedReviews && !cachedReviews) {
+      this.logger.warn('⚠️ Discarded cached empty [] for homepage:reviews — treating as MISS');
+    }
+    if (rawCachedArticles && !cachedArticles) {
+      this.logger.warn('⚠️ Discarded cached empty [] for homepage:articles — treating as MISS');
+    }
 
     // 2. Prepare data fetch promises for missing parts
     const promises: any = {};
