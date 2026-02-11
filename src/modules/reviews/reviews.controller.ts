@@ -245,6 +245,7 @@ export class ReviewsController {
   }
 
   @Get(':id/ratings')
+  @UseGuards(OptionalJwtAuthGuard)
   @ApiOperation({ summary: 'Récupérer les évaluations d\'une critique' })
   @ApiParam({ name: 'id', description: 'ID de la critique', type: 'number' })
   @ApiResponse({ status: 200, description: 'Évaluations de la critique' })
