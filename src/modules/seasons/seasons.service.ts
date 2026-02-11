@@ -71,7 +71,7 @@ export class SeasonsService {
       }
 
       const seasons = await this.prisma.$queryRaw`
-        SELECT id_saison, saison, annee, statut, current_season
+        SELECT id_saison, saison, annee, statut, current_season, json_data
         FROM ak_animes_saisons
         ORDER BY annee DESC, saison DESC, id_saison DESC
       `;
