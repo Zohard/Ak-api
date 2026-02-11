@@ -334,11 +334,11 @@ export class AnimeRankingsService {
       return { message: `No season found for ${season} ${year}` };
     }
 
-    // 3. Parse json_data to get anime IDs
+    // 3. Parse json_data to get anime IDs (stored as ["id1","id2",...])
     let animeIds: number[] = [];
     try {
       const jsonData = JSON.parse(saisonRecord.jsonData);
-      animeIds = jsonData.animes || [];
+      animeIds = Array.isArray(jsonData) ? jsonData.map(Number) : [];
     } catch (e) {
       return { message: 'Failed to parse season anime data' };
     }

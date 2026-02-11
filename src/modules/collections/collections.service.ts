@@ -1654,20 +1654,14 @@ export class CollectionsService {
 
     for (const season of seasons) {
       try {
+        // json_data is stored as ["id1","id2",...] - parse and convert to numbers
         const jsonData = typeof season.jsonData === 'string'
-          ? JSON.parse(season.jsonData)
-          : season.jsonData;
+          ? JSON.parse(season.jsonData || '[]')
+          : (season.jsonData || []);
 
-        let seasonAnimeIds: number[] = [];
-
-        // Handle different possible JSON structures
-        if (Array.isArray(jsonData)) {
-          seasonAnimeIds = jsonData;
-        } else if (jsonData.animes && Array.isArray(jsonData.animes)) {
-          seasonAnimeIds = jsonData.animes;
-        } else if (jsonData.anime_ids && Array.isArray(jsonData.anime_ids)) {
-          seasonAnimeIds = jsonData.anime_ids;
-        }
+        const seasonAnimeIds: number[] = Array.isArray(jsonData)
+          ? jsonData.map((id: any) => Number(id))
+          : [];
 
         // Map each anime ID in this season to the season info
         for (const animeId of seasonAnimeIds) {

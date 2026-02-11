@@ -61,23 +61,6 @@ export class BusinessService {
       where.statut = statut;
     }
 
-    if (search) {
-      where.OR = [
-        {
-          denomination: {
-            contains: search,
-            mode: 'insensitive',
-          },
-        },
-        {
-          autresDenominations: {
-            contains: search,
-            mode: 'insensitive',
-          },
-        },
-      ];
-    }
-
     if (type) {
       where.type = {
         contains: type,
@@ -98,6 +81,72 @@ export class BusinessService {
       };
     }
 
+    // If we have search, use raw query to support weighted prioritization
+    if (search) {
+      const conditions: string[] = [];
+      const params: any[] = [];
+      let pi = 1;
+
+      if (statut !== undefined) {
+        params.push(statut);
+        conditions.push(`statut = $${pi++}`);
+      }
+      if (type) {
+        params.push(`%${type}%`);
+        conditions.push(`type ILIKE $${pi++}`);
+      }
+      if (origine) {
+        params.push(`%${origine}%`);
+        conditions.push(`origine ILIKE $${pi++}`);
+      }
+      if (query.year) {
+        params.push(`%${query.year}%`);
+        conditions.push(`date ILIKE $${pi++}`);
+      }
+
+      const searchExact = search.trim();
+      const searchStart = `${searchExact}%`;
+      const searchPattern = `%${searchExact}%`;
+
+      const exactIdx = pi++;
+      const startIdx = pi++;
+      const patternIdx = pi++;
+      params.push(searchExact, searchStart, searchPattern);
+
+      conditions.push(`(denomination ILIKE $${patternIdx} OR autres_denominations ILIKE $${patternIdx})`);
+
+      const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
+      const countQuery = `SELECT COUNT(*)::int as count FROM ak_business ${whereClause}`;
+      const countResult = await (this.prisma as any).$queryRawUnsafe(countQuery, ...params);
+      const total = countResult[0]?.count || 0;
+
+      const dataQuery = `
+        SELECT * FROM ak_business
+        ${whereClause}
+        ORDER BY 
+          (CASE 
+            WHEN denomination ILIKE $${exactIdx} THEN 0
+            WHEN denomination ILIKE $${startIdx} THEN 1
+            ELSE 2
+          END),
+          denomination ASC
+        LIMIT $${pi++} OFFSET $${pi++}
+      `;
+
+      const businesses = await (this.prisma as any).$queryRawUnsafe(dataQuery, ...params, limit, skip);
+
+      return {
+        data: (businesses as any[]).map(b => this.formatBusinessRaw(b)),
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages: Math.ceil(total / limit),
+        },
+      };
+    }
+
     const [businesses, total] = await Promise.all([
       this.prisma.akBusiness.findMany({
         where,
@@ -109,7 +158,7 @@ export class BusinessService {
     ]);
 
     return {
-      data: businesses.map(this.formatBusiness),
+      data: businesses.map(b => this.formatBusiness(b)),
       pagination: {
         page,
         limit,
@@ -138,10 +187,19 @@ export class BusinessService {
       conditions.push(`b.statut = $${paramIndex++}`);
     }
 
+    let exactIdx = -1;
+    let startIdx = -1;
+
     if (search) {
-      const searchPattern = `%${search}%`;
-      params.push(searchPattern, searchPattern);
-      conditions.push(`(b.denomination ILIKE $${paramIndex++} OR b.autres_denominations ILIKE $${paramIndex++})`);
+      const searchExact = search.trim();
+      const searchStart = `${searchExact}%`;
+      const searchPattern = `%${searchExact}%`;
+
+      exactIdx = paramIndex++;
+      startIdx = paramIndex++;
+      const patternIdx = paramIndex++;
+      params.push(searchExact, searchStart, searchPattern);
+      conditions.push(`(b.denomination ILIKE $${patternIdx} OR b.autres_denominations ILIKE $${patternIdx})`);
     }
 
     if (origine) {
@@ -170,7 +228,7 @@ export class BusinessService {
       ${whereClause}
     `;
 
-    const countResult = await this.prisma.$queryRawUnsafe<Array<{ count: number }>>(countQuery, ...params);
+    const countResult = await (this.prisma as any).$queryRawUnsafe(countQuery, ...params);
     const total = countResult[0]?.count || 0;
 
     if (total === 0) {
@@ -181,6 +239,8 @@ export class BusinessService {
     }
 
     // Add pagination params
+    const limitIdx = paramIndex++;
+    const offsetIdx = paramIndex++;
     params.push(limit, offset);
 
     // Data query
@@ -193,14 +253,20 @@ export class BusinessService {
         SELECT DISTINCT btm.id_business FROM ak_business_to_mangas btm WHERE btm.type ILIKE $1
       )
       ${whereClause}
-      ORDER BY b.denomination ASC
-      LIMIT $${paramIndex++} OFFSET $${paramIndex++}
+      ORDER BY 
+        ${search ? `(CASE 
+          WHEN b.denomination ILIKE $${exactIdx} THEN 0
+          WHEN b.denomination ILIKE $${startIdx} THEN 1
+          ELSE 2
+        END),` : ''}
+        b.denomination ASC
+      LIMIT $${limitIdx} OFFSET $${offsetIdx}
     `;
 
-    const businesses = await this.prisma.$queryRawUnsafe<any[]>(dataQuery, ...params);
+    const businesses = await (this.prisma as any).$queryRawUnsafe(dataQuery, ...params);
 
     return {
-      data: businesses.map(b => this.formatBusinessRaw(b)),
+      data: (businesses as any[]).map(b => this.formatBusinessRaw(b)),
       pagination: {
         page,
         limit,
@@ -308,24 +374,31 @@ export class BusinessService {
 
     return { message: 'Entité business supprimée avec succès' };
   }
-
   async autocomplete(query: string, limit: number = 5) {
     if (!query || query.trim().length < 2) {
       return { data: [] };
     }
 
-    const searchTerm = `%${query.trim()}%`;
+    const searchTermPattern = `%${query.trim()}%`;
+    const searchExact = query.trim();
+    const searchStart = `${searchExact}%`;
 
     // Use raw SQL with unaccent for accent-insensitive search
-    const businesses: any[] = await this.prisma.$queryRawUnsafe(`
+    const businesses: any[] = await (this.prisma as any).$queryRawUnsafe(`
       SELECT id_business, denomination, type, origine, image, nice_url
       FROM ak_business
       WHERE statut = 1
       AND (unaccent(denomination) ILIKE unaccent($1)
            OR unaccent(COALESCE(autres_denominations, '')) ILIKE unaccent($1))
-      ORDER BY denomination ASC, id_business ASC
-      LIMIT $2
-    `, searchTerm, limit);
+      ORDER BY 
+        (CASE 
+          WHEN unaccent(denomination) ILIKE unaccent($2) THEN 0
+          WHEN unaccent(denomination) ILIKE unaccent($3) THEN 1
+          ELSE 2
+        END),
+        denomination ASC, id_business ASC
+      LIMIT $4
+    `, searchTermPattern, searchExact, searchStart, limit);
 
     return {
       data: businesses.map(b => ({
@@ -350,74 +423,32 @@ export class BusinessService {
     }
 
     const term = q.trim();
+    const searchExact = term;
+    const searchStart = `${term}%`;
+    const searchPattern = `%${term}%`;
 
-    // 1. Search for items starting with the query (Primary matches)
-    const startsWithMatches = await this.prisma.akBusiness.findMany({
-      where: {
-        statut: 1,
-        denomination: {
-          startsWith: term,
-          mode: 'insensitive',
-        },
-      },
-      select: {
-        idBusiness: true,
-        denomination: true,
-        type: true,
-        origine: true,
-        siteOfficiel: true,
-      },
-      orderBy: { denomination: 'asc' },
-      take: limit,
-    });
-
-    let finalBusinesses = [...startsWithMatches];
-
-    // 2. If we haven't reached the limit, search for other matches
-    if (finalBusinesses.length < limit) {
-      const remainingLimit = limit - finalBusinesses.length;
-      const existingIds = finalBusinesses.map(b => b.idBusiness);
-
-      const otherMatches = await this.prisma.akBusiness.findMany({
-        where: {
-          statut: 1,
-          idBusiness: { notIn: existingIds },
-          OR: [
-            {
-              denomination: {
-                contains: term,
-                mode: 'insensitive',
-              },
-            },
-            {
-              autresDenominations: {
-                contains: term,
-                mode: 'insensitive',
-              },
-            },
-          ],
-        },
-        select: {
-          idBusiness: true,
-          denomination: true,
-          type: true,
-          origine: true,
-          siteOfficiel: true,
-        },
-        orderBy: { denomination: 'asc' },
-        take: remainingLimit,
-      });
-
-      finalBusinesses = [...finalBusinesses, ...otherMatches];
-    }
+    const businesses: any[] = await (this.prisma as any).$queryRawUnsafe(`
+      SELECT id_business, denomination, type, origine, site_officiel
+      FROM ak_business
+      WHERE statut = 1
+      AND (denomination ILIKE $1 OR autres_denominations ILIKE $1)
+      ORDER BY 
+        (CASE 
+          WHEN denomination ILIKE $2 THEN 0
+          WHEN denomination ILIKE $3 THEN 1
+          ELSE 2
+        END),
+        denomination ASC
+      LIMIT $4
+    `, searchPattern, searchExact, searchStart, limit);
 
     return {
-      data: finalBusinesses.map((business) => ({
-        id: business.idBusiness,
+      data: businesses.map((business) => ({
+        id: business.id_business,
         denomination: business.denomination,
         type: business.type,
         origine: business.origine,
-        site_officiel: business.siteOfficiel,
+        site_officiel: business.site_officiel,
       })),
     };
   }

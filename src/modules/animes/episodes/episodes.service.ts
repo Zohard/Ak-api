@@ -228,16 +228,13 @@ export class EpisodesService {
         if (!season?.jsonData) return [];
 
         try {
+            // json_data is stored as ["id1","id2",...] - parse and convert to numbers
             const jsonData = typeof season.jsonData === 'string'
                 ? JSON.parse(season.jsonData)
                 : season.jsonData;
 
             if (Array.isArray(jsonData)) {
                 return jsonData.map(Number);
-            } else if (jsonData.animes && Array.isArray(jsonData.animes)) {
-                return jsonData.animes.map(Number);
-            } else if (jsonData.anime_ids && Array.isArray(jsonData.anime_ids)) {
-                return jsonData.anime_ids.map(Number);
             }
         } catch (e) {
             this.logger.error(`Error parsing season json_data: ${e.message}`);
