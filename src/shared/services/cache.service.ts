@@ -710,6 +710,14 @@ export class CacheService implements OnModuleInit {
     this.logger.debug(`Invalidated user forum board cache for board ${boardId}, user ${userId}`);
   }
 
+  async getForumBirthdays(): Promise<any> {
+    return this.get('forums:birthdays:today');
+  }
+
+  async setForumBirthdays(data: any, ttl = 3000): Promise<void> {
+    await this.set('forums:birthdays:today', data, ttl); // 50 minutes
+  }
+
   // OPTIMIZED: Let forums expire via TTL instead of SCAN
   async invalidateAllForums(): Promise<void> {
     // Forums have short TTL (1-10 min), let them expire naturally

@@ -1858,67 +1858,68 @@ export class ForumsService {
     }
   }
 
-  async getUpcomingBirthdays(): Promise<any> {
+  async getTodayBirthdays(userId?: number | null): Promise<any> {
     try {
-      const today = new Date();
-      const nextWeek = new Date();
-      nextWeek.setDate(today.getDate() + 7);
+      // Get base birthday list from cache (same for all users)
+      let baseBirthdays = await this.cacheService.getForumBirthdays();
 
-      // Get members with birthdays in the next 7 days
-      const members = await this.prisma.smfMember.findMany({
-        where: {
-          birthdate: {
-            not: null
+      if (!baseBirthdays) {
+        const today = new Date();
+        const todayMonth = today.getMonth();
+        const todayDay = today.getDate();
+
+        const members = await this.prisma.smfMember.findMany({
+          where: {
+            birthdate: { not: null }
+          },
+          select: {
+            idMember: true,
+            memberName: true,
+            birthdate: true
           }
-        },
-        select: {
-          idMember: true,
-          memberName: true,
-          birthdate: true
-        }
-      });
-
-      // Filter and calculate ages
-      const upcomingBirthdays = members
-        .filter(member => {
-          if (!member.birthdate) return false;
-
-          const birthDate = new Date(member.birthdate);
-          const thisYearBirthday = new Date(
-            today.getFullYear(),
-            birthDate.getMonth(),
-            birthDate.getDate()
-          );
-
-          // Check if birthday is within the next 7 days
-          return thisYearBirthday >= today && thisYearBirthday <= nextWeek;
-        })
-        .map(member => {
-          const birthDate = new Date(member.birthdate!);
-          const age = today.getFullYear() - birthDate.getFullYear();
-
-          return {
-            id: member.idMember,
-            name: member.memberName,
-            birthdate: member.birthdate,
-            age: age
-          };
-        })
-        .sort((a, b) => {
-          const aDate = new Date(a.birthdate!);
-          const bDate = new Date(b.birthdate!);
-          const aMonth = aDate.getMonth();
-          const bMonth = bDate.getMonth();
-          const aDay = aDate.getDate();
-          const bDay = bDate.getDate();
-
-          if (aMonth !== bMonth) return aMonth - bMonth;
-          return aDay - bDay;
         });
 
-      return upcomingBirthdays;
+        baseBirthdays = members
+          .filter(member => {
+            if (!member.birthdate) return false;
+            const birthDate = new Date(member.birthdate);
+            return birthDate.getMonth() === todayMonth && birthDate.getDate() === todayDay;
+          })
+          .map(member => {
+            const birthDate = new Date(member.birthdate!);
+            const age = today.getFullYear() - birthDate.getFullYear();
+            return { id: member.idMember, name: member.memberName, age };
+          })
+          .sort((a, b) => a.name.localeCompare(b.name));
+
+        await this.cacheService.setForumBirthdays(baseBirthdays, 3000);
+      }
+
+      // Apply isFriend flag per user (cheap query, not cached)
+      const result = baseBirthdays.map((b: any) => ({ ...b, isFriend: false }));
+
+      if (userId && result.length > 0) {
+        const user = await this.prisma.$queryRaw<Array<{ buddy_list: string }>>`
+          SELECT buddy_list FROM smf_members WHERE id_member = ${userId} LIMIT 1
+        `;
+        if (user.length && user[0].buddy_list) {
+          const friendIds = new Set(
+            user[0].buddy_list.split(',').map(id => parseInt(id.trim())).filter(id => !isNaN(id))
+          );
+          for (const birthday of result) {
+            birthday.isFriend = friendIds.has(birthday.id);
+          }
+          // Sort: friends first, then alphabetically
+          result.sort((a, b) => {
+            if (a.isFriend !== b.isFriend) return a.isFriend ? -1 : 1;
+            return a.name.localeCompare(b.name);
+          });
+        }
+      }
+
+      return result;
     } catch (error) {
-      this.logger.error('Error fetching upcoming birthdays:', error);
+      this.logger.error('Error fetching today birthdays:', error);
       return [];
     }
   }

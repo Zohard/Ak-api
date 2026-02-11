@@ -218,10 +218,12 @@ export class ForumsController {
   }
 
   @Get('birthdays')
-  @ApiOperation({ summary: 'Get upcoming birthdays' })
-  @ApiResponse({ status: 200, description: 'Upcoming birthdays retrieved successfully' })
-  async getUpcomingBirthdays() {
-    return await this.forumsService.getUpcomingBirthdays();
+  @UseGuards(OptionalJwtAuthGuard)
+  @ApiOperation({ summary: 'Get today\'s birthdays' })
+  @ApiResponse({ status: 200, description: 'Today\'s birthdays retrieved successfully' })
+  async getTodayBirthdays(@Req() req: any) {
+    const userId = req.user?.id || null;
+    return await this.forumsService.getTodayBirthdays(userId);
   }
 
   @Put('posts/:messageId')
