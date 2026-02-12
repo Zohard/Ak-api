@@ -8,6 +8,10 @@ import { AdminModerationService } from './moderation/admin-moderation.service';
 let dashboardCache: { data: any; timestamp: number } | null = null;
 const CACHE_TTL_MS = 60000; // 1 minute
 
+// Separate cache for chart data (longer TTL since historical data changes slowly)
+let chartsCache: { data: any; timestamp: number } | null = null;
+const CHARTS_CACHE_TTL_MS = 4 * 60 * 60 * 1000; // 4 hours
+
 @Injectable()
 export class AdminService {
   constructor(
@@ -49,6 +53,67 @@ export class AdminService {
     // Update cache
     dashboardCache = { data: result, timestamp: Date.now() };
 
+    return result;
+  }
+
+  async getChartData(refresh = false) {
+    // Check cache first (skip if refresh requested)
+    if (!refresh && chartsCache && Date.now() - chartsCache.timestamp < CHARTS_CACHE_TTL_MS) {
+      return chartsCache.data;
+    }
+
+    const [registrations, forumPosts, reviews, contentBreakdown] = await Promise.all([
+      // Registrations per day (7 days)
+      this.prisma.$queryRaw`
+        SELECT date_trunc('day', to_timestamp(date_registered)) AS day, COUNT(*)::int AS count
+        FROM smf_members
+        WHERE date_registered >= EXTRACT(EPOCH FROM NOW() - INTERVAL '7 days')::int
+        GROUP BY day ORDER BY day
+      `,
+      // Forum posts per day (7 days)
+      this.prisma.$queryRaw`
+        SELECT date_trunc('day', to_timestamp(poster_time)) AS day, COUNT(*)::int AS count
+        FROM smf_messages
+        WHERE poster_time >= EXTRACT(EPOCH FROM NOW() - INTERVAL '7 days')::int
+        GROUP BY day ORDER BY day
+      `,
+      // Reviews per day (7 days)
+      this.prisma.$queryRaw`
+        SELECT date_trunc('day', date_critique) AS day, COUNT(*)::int AS count
+        FROM ak_critique
+        WHERE date_critique >= NOW() - INTERVAL '7 days'
+        GROUP BY day ORDER BY day
+      `,
+      // Content breakdown totals
+      this.prisma.$queryRaw`
+        SELECT
+          (SELECT COUNT(*)::int FROM ak_animes WHERE statut = 0) AS animes,
+          (SELECT COUNT(*)::int FROM ak_mangas WHERE statut = 0) AS mangas,
+          (SELECT COUNT(*)::int FROM ak_jeux_video WHERE statut = 0) AS games
+      `,
+    ]);
+
+    const result = {
+      registrations: (registrations as any[]).map(r => ({
+        day: r.day,
+        count: Number(r.count),
+      })),
+      forumPosts: (forumPosts as any[]).map(r => ({
+        day: r.day,
+        count: Number(r.count),
+      })),
+      reviews: (reviews as any[]).map(r => ({
+        day: r.day,
+        count: Number(r.count),
+      })),
+      contentBreakdown: {
+        animes: Number((contentBreakdown as any[])[0]?.animes || 0),
+        mangas: Number((contentBreakdown as any[])[0]?.mangas || 0),
+        games: Number((contentBreakdown as any[])[0]?.games || 0),
+      },
+    };
+
+    chartsCache = { data: result, timestamp: Date.now() };
     return result;
   }
 

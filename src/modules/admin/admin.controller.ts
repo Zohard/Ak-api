@@ -121,6 +121,15 @@ export class AdminController {
     return this.adminService.getDashboardStats();
   }
 
+  @Get('dashboard/charts')
+  @ApiOperation({ summary: 'Get chart data for admin dashboard (7-day trends + content breakdown)' })
+  @ApiQuery({ name: 'refresh', required: false, description: 'Set to true to invalidate cache', type: Boolean })
+  @ApiResponse({ status: 200, description: 'Chart data retrieved successfully' })
+  @ApiResponse({ status: 403, description: 'Admin access required' })
+  async getChartData(@Query('refresh') refresh?: string) {
+    return this.adminService.getChartData(refresh === 'true');
+  }
+
   @Get('activity')
   @ApiOperation({ summary: 'Get recent admin and system activity' })
   @ApiQuery({
