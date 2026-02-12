@@ -12,230 +12,274 @@ export class ForumsService {
     private readonly cacheService: CacheService,
   ) { }
 
+  /**
+   * Returns the static category/board structure (without lastMessage/unread).
+   * Cached for 24h so the page skeleton always renders even if DB is slow.
+   */
+  async getCategoriesStructure(userId?: number) {
+    const cached = await this.cacheService.getForumCategoriesStructure(userId);
+    if (cached) {
+      return cached;
+    }
+
+    const userGroups = userId ? await this.getUserGroups(userId) : [0];
+
+    const categories = await this.prisma.smfCategory.findMany({
+      orderBy: { catOrder: 'asc' },
+      include: {
+        boards: {
+          where: {
+            OR: [
+              { redirect: null },
+              { redirect: '' }
+            ]
+          },
+          orderBy: { boardOrder: 'asc' },
+          select: {
+            idBoard: true,
+            name: true,
+            description: true,
+            numTopics: true,
+            numPosts: true,
+            redirect: true,
+            idLastMsg: true,
+            idParent: true,
+            memberGroups: true,
+          }
+        }
+      }
+    });
+
+    if (categories.length === 0) {
+      return [];
+    }
+
+    const filteredCategories = categories.map(category => {
+      const allBoardsWithData = category.boards.map(board => {
+        let allowedGroups: number[];
+        if (!board.memberGroups || board.memberGroups.trim() === '' || board.memberGroups.trim() === '0') {
+          allowedGroups = [-1, 0, 1, 2, 3, 4];
+        } else {
+          allowedGroups = board.memberGroups.split(',').map(g => parseInt(g.trim())).filter(g => !isNaN(g));
+          if (allowedGroups.length === 0) {
+            allowedGroups = [-1, 0, 1, 2, 3, 4];
+          }
+        }
+
+        const hasAccess = allowedGroups.includes(-1) || userGroups.some(group => allowedGroups.includes(group));
+        if (!hasAccess) return null;
+
+        return {
+          id: board.idBoard,
+          name: board.name,
+          description: board.description,
+          numTopics: board.numTopics,
+          numPosts: board.numPosts,
+          redirect: board.redirect,
+          lastMessage: null,
+          idParent: board.idParent,
+          idLastMsg: board.idLastMsg,
+          hasUnreadTopics: false
+        };
+      });
+
+      const accessibleBoards = allBoardsWithData.filter(board => board !== null);
+      const parentBoards = accessibleBoards.filter(board => board.idParent === 0);
+      const childBoards = accessibleBoards.filter(board => board.idParent > 0);
+
+      const boardsWithChildren = parentBoards.map(parentBoard => {
+        const children = childBoards.filter(child => child.idParent === parentBoard.id);
+        const { idParent: _, ...boardWithoutIdParent } = parentBoard;
+
+        return {
+          ...boardWithoutIdParent,
+          children: children.length > 0 ? children.map(child => {
+            const { idParent: __, ...childWithoutIdParent } = child;
+            return childWithoutIdParent;
+          }) : undefined
+        };
+      });
+
+      return {
+        id: category.idCat,
+        name: category.name,
+        catOrder: category.catOrder,
+        canCollapse: Boolean(category.canCollapse),
+        boards: boardsWithChildren
+      };
+    });
+
+    const categoriesWithBoards = filteredCategories.filter(category => category.boards.length > 0);
+    await this.cacheService.setForumCategoriesStructure(categoriesWithBoards, userId);
+    return categoriesWithBoards;
+  }
+
   async getCategories(userId?: number) {
     try {
-      // Try to get from cache first (10 minutes TTL)
+      // Try to get fully enriched result from short-TTL cache
       const cached = await this.cacheService.getForumCategories(userId);
       if (cached) {
         return cached;
       }
 
-      // Fetch user groups ONCE at the start (HUGE performance improvement!)
-      const userGroups = userId ? await this.getUserGroups(userId) : [0];
-
-      const categories = await this.prisma.smfCategory.findMany({
-        orderBy: { catOrder: 'asc' },
-        include: {
-          boards: {
-            where: {
-              OR: [
-                { redirect: null },
-                { redirect: '' }
-              ]
-            },
-            orderBy: { boardOrder: 'asc' },
-            select: {
-              idBoard: true,
-              name: true,
-              description: true,
-              numTopics: true,
-              numPosts: true,
-              redirect: true,
-              idLastMsg: true,
-              idParent: true, // Include idParent to identify child boards
-              memberGroups: true, // Include for permission checking (no extra query needed!)
-            }
-          }
-        }
-      });
-
-      if (categories.length === 0) {
+      // Always get the static structure first (24h cache — reliable)
+      const structure = await this.getCategoriesStructure(userId);
+      if (structure.length === 0) {
         return [];
       }
 
-      // Collect all last message IDs across all boards
-      const allLastMsgIds = categories.flatMap(cat =>
-        cat.boards.map(board => board.idLastMsg).filter(id => id !== null && id > 0)
-      );
+      // Try to enrich with dynamic data (last messages + unread status)
+      try {
+        // Collect all last message IDs and board IDs from the structure
+        const allLastMsgIds: number[] = [];
+        const allBoardIds: number[] = [];
 
-      // Fetch all last messages in a single query (HUGE performance improvement!)
-      // Only select the fields we actually need (better performance)
-      const lastMessages = allLastMsgIds.length > 0 ? await this.prisma.smfMessage.findMany({
-        where: { idMsg: { in: allLastMsgIds } },
-        select: {
-          idMsg: true,
-          subject: true,
-          posterName: true,
-          posterTime: true,
-          idTopic: true,
-          topic: {
-            select: {
-              numReplies: true,
-              firstMessage: {
-                select: {
-                  subject: true
+        for (const category of structure) {
+          for (const board of category.boards) {
+            if (board.idLastMsg && board.idLastMsg > 0) {
+              allLastMsgIds.push(board.idLastMsg);
+            }
+            allBoardIds.push(board.id);
+            if (board.children) {
+              for (const child of board.children) {
+                if (child.idLastMsg && child.idLastMsg > 0) {
+                  allLastMsgIds.push(child.idLastMsg);
                 }
+                allBoardIds.push(child.id);
               }
             }
           }
         }
-      }) : [];
 
-      // Create a map for quick lookup
-      const lastMessagesMap = new Map(
-        lastMessages.map(msg => [
-          msg.idMsg,
-          {
-            id: msg.idMsg,
-            subject: msg.subject,
-            topicId: msg.idTopic,
-            topicSubject: msg.topic?.firstMessage?.subject || msg.subject,
-            author: msg.posterName,
-            time: msg.posterTime,
-            numReplies: msg.topic?.numReplies
-          }
-        ])
-      );
-
-      // Fetch board unread status for authenticated users
-      // Get all board IDs first
-      const allBoardIds = categories.flatMap(cat => cat.boards.map(b => b.idBoard));
-      let boardUnreadMap = new Map<number, boolean>();
-
-      if (userId && allBoardIds.length > 0) {
-        // Get all topics with their last message IDs for all boards
-        const topicsWithLastMsg = await this.prisma.smfTopic.findMany({
-          where: { idBoard: { in: allBoardIds } },
+        // Fetch all last messages in a single query
+        const lastMessages = allLastMsgIds.length > 0 ? await this.prisma.smfMessage.findMany({
+          where: { idMsg: { in: allLastMsgIds } },
           select: {
+            idMsg: true,
+            subject: true,
+            posterName: true,
+            posterTime: true,
             idTopic: true,
-            idBoard: true,
-            idLastMsg: true
-          }
-        });
-
-        // Get user's read logs for these topics
-        const topicIds = topicsWithLastMsg.map(t => t.idTopic);
-        const readLogs = await this.prisma.smfLogTopics.findMany({
-          where: {
-            idMember: userId,
-            idTopic: { in: topicIds }
-          },
-          select: {
-            idTopic: true,
-            idMsg: true
-          }
-        });
-
-        const readLogsMap = new Map(readLogs.map(log => [log.idTopic, log.idMsg]));
-
-        // Calculate hasUnread for each board
-        const boardTopicsMap = new Map<number, { idTopic: number; idLastMsg: number }[]>();
-        for (const topic of topicsWithLastMsg) {
-          if (!boardTopicsMap.has(topic.idBoard)) {
-            boardTopicsMap.set(topic.idBoard, []);
-          }
-          boardTopicsMap.get(topic.idBoard)!.push(topic);
-        }
-
-        for (const [boardId, topics] of boardTopicsMap.entries()) {
-          const hasUnread = topics.some(topic => {
-            const lastReadMsgId = readLogsMap.get(topic.idTopic);
-            if (lastReadMsgId === undefined) {
-              // No read log entry = topic is unread
-              return true;
+            topic: {
+              select: {
+                numReplies: true,
+                firstMessage: {
+                  select: {
+                    subject: true
+                  }
+                }
+              }
             }
-            // Topic has new messages since last read
-            return topic.idLastMsg > lastReadMsgId;
+          }
+        }) : [];
+
+        const lastMessagesMap = new Map(
+          lastMessages.map(msg => [
+            msg.idMsg,
+            {
+              id: msg.idMsg,
+              subject: msg.subject,
+              topicId: msg.idTopic,
+              topicSubject: msg.topic?.firstMessage?.subject || msg.subject,
+              author: msg.posterName,
+              time: msg.posterTime,
+              numReplies: msg.topic?.numReplies
+            }
+          ])
+        );
+
+        // Fetch board unread status for authenticated users
+        let boardUnreadMap = new Map<number, boolean>();
+
+        if (userId && allBoardIds.length > 0) {
+          const topicsWithLastMsg = await this.prisma.smfTopic.findMany({
+            where: { idBoard: { in: allBoardIds } },
+            select: {
+              idTopic: true,
+              idBoard: true,
+              idLastMsg: true
+            }
           });
-          boardUnreadMap.set(boardId, hasUnread);
-        }
-      }
 
-      // Filter boards based on access permissions
-      const filteredCategories = categories.map(category => {
-        // Build all board objects with their data (NO async needed - all data already fetched!)
-        const allBoardsWithData = category.boards.map(board => {
-          // Check permissions inline (no database query!)
-          let allowedGroups: number[];
-          if (!board.memberGroups || board.memberGroups.trim() === '' || board.memberGroups.trim() === '0') {
-            // Default to public access
-            allowedGroups = [-1, 0, 1, 2, 3, 4];
-          } else {
-            allowedGroups = board.memberGroups.split(',').map(g => parseInt(g.trim())).filter(g => !isNaN(g));
-            if (allowedGroups.length === 0) {
-              allowedGroups = [-1, 0, 1, 2, 3, 4];
+          const topicIds = topicsWithLastMsg.map(t => t.idTopic);
+          const readLogs = await this.prisma.smfLogTopics.findMany({
+            where: {
+              idMember: userId,
+              idTopic: { in: topicIds }
+            },
+            select: {
+              idTopic: true,
+              idMsg: true
             }
+          });
+
+          const readLogsMap = new Map(readLogs.map(log => [log.idTopic, log.idMsg]));
+
+          const boardTopicsMap = new Map<number, { idTopic: number; idLastMsg: number }[]>();
+          for (const topic of topicsWithLastMsg) {
+            if (!boardTopicsMap.has(topic.idBoard)) {
+              boardTopicsMap.set(topic.idBoard, []);
+            }
+            boardTopicsMap.get(topic.idBoard)!.push(topic);
           }
 
-          // Check if user has access (group -1 means public, or user group matches)
-          const hasAccess = allowedGroups.includes(-1) || userGroups.some(group => allowedGroups.includes(group));
+          for (const [boardId, topics] of boardTopicsMap.entries()) {
+            const hasUnread = topics.some(topic => {
+              const lastReadMsgId = readLogsMap.get(topic.idTopic);
+              if (lastReadMsgId === undefined) return true;
+              return topic.idLastMsg > lastReadMsgId;
+            });
+            boardUnreadMap.set(boardId, hasUnread);
+          }
+        }
 
-          if (!hasAccess) return null;
-
-          // Get last message from pre-fetched map (no extra query!)
+        // Enrich the structure with dynamic data
+        const enrichBoard = (board: any) => {
           const lastMessage = board.idLastMsg ? lastMessagesMap.get(board.idLastMsg) || null : null;
-
-          // Get hasUnreadTopics from pre-calculated map (only for authenticated users)
-          const hasUnreadTopics = userId ? (boardUnreadMap.get(board.idBoard) ?? false) : false;
-
-          return {
-            id: board.idBoard,
-            name: board.name,
-            description: board.description,
-            numTopics: board.numTopics,
-            numPosts: board.numPosts,
-            redirect: board.redirect,
-            lastMessage: lastMessage,
-            idParent: board.idParent,
-            hasUnreadTopics
-          };
-        });
-
-        // Filter out null values (boards without access)
-        const accessibleBoards = allBoardsWithData.filter(board => board !== null);
-
-        // Separate parent boards (idParent === 0) from child boards (idParent > 0)
-        const parentBoards = accessibleBoards.filter(board => board.idParent === 0);
-        const childBoards = accessibleBoards.filter(board => board.idParent > 0);
-
-        // Nest child boards under their parent boards
-        const boardsWithChildren = parentBoards.map(parentBoard => {
-          const children = childBoards.filter(child => child.idParent === parentBoard.id);
-
-          // Remove idParent from the response (we don't need it in the frontend)
-          const { idParent: _, ...boardWithoutIdParent } = parentBoard;
-
-          return {
-            ...boardWithoutIdParent,
-            children: children.length > 0 ? children.map(child => {
-              const { idParent: __, ...childWithoutIdParent } = child;
-              return childWithoutIdParent;
-            }) : undefined
-          };
-        });
-
-        return {
-          id: category.idCat,
-          name: category.name,
-          catOrder: category.catOrder,
-          canCollapse: Boolean(category.canCollapse),
-          boards: boardsWithChildren
+          const hasUnreadTopics = userId ? (boardUnreadMap.get(board.id) ?? false) : false;
+          const { idLastMsg: _, ...rest } = board;
+          return { ...rest, lastMessage, hasUnreadTopics };
         };
-      });
 
-      // Filter out categories with no accessible boards
-      const categoriesWithBoards = filteredCategories.filter(category => category.boards.length > 0);
+        const enriched = structure.map(category => ({
+          ...category,
+          boards: category.boards.map(board => {
+            const enrichedBoard = enrichBoard(board);
+            if (enrichedBoard.children) {
+              enrichedBoard.children = enrichedBoard.children.map(enrichBoard);
+            }
+            return enrichedBoard;
+          })
+        }));
 
-      // Cache for different durations based on authentication
-      // User-specific caches (with hasUnreadTopics) expire faster (60s) for timely unread updates
-      // Public cache (no unread status) can be longer (10 min)
-      const cacheTtl = userId ? 60 : 600;
-      await this.cacheService.setForumCategories(categoriesWithBoards, userId, cacheTtl);
+        const cacheTtl = userId ? 60 : 600;
+        await this.cacheService.setForumCategories(enriched, userId, cacheTtl);
 
-      return categoriesWithBoards;
+        return enriched;
+      } catch (enrichError) {
+        // Dynamic data failed — return static structure (boards show "Aucun message")
+        this.logger.warn('Failed to enrich forum categories with dynamic data, returning static structure', enrichError);
+
+        // Strip idLastMsg from the structure before returning
+        const stripIdLastMsg = (board: any) => {
+          const { idLastMsg: _, ...rest } = board;
+          return rest;
+        };
+
+        return structure.map(category => ({
+          ...category,
+          boards: category.boards.map(board => {
+            const cleaned = stripIdLastMsg(board);
+            if (cleaned.children) {
+              cleaned.children = cleaned.children.map(stripIdLastMsg);
+            }
+            return cleaned;
+          })
+        }));
+      }
     } catch (error) {
       this.logger.error('=== ERROR in getCategories ===', error);
-      throw error; // Re-throw to see the full error in API response
+      throw error;
     }
   }
 
@@ -1279,6 +1323,7 @@ export class ForumsService {
       await Promise.all([
         this.cacheService.del('forums:categories:public'),
         this.cacheService.del('forums:categories'),
+        this.cacheService.del('forums:categories:structure:public'),
       ]);
       // OPTIMIZED: Delete known latest messages keys instead of SCAN
       await Promise.all([
@@ -1412,6 +1457,7 @@ export class ForumsService {
       await this.cacheService.invalidateHomepageForum(); // Invalidate homepage forum
       // Invalidate categories cache so "Dernier message" and unread status update
       await this.cacheService.del('forums:categories:public');
+      await this.cacheService.del('forums:categories:structure:public');
       // Invalidate stats cache since message count and latest message changed
       await this.cacheService.del('forums:stats');
 
@@ -2061,6 +2107,7 @@ export class ForumsService {
         await Promise.all([
           this.cacheService.del('forums:categories:public'),
           this.cacheService.del('forums:categories'),
+          this.cacheService.del('forums:categories:structure:public'),
         ]);
         // OPTIMIZED: Delete known latest messages keys instead of SCAN
         await Promise.all([

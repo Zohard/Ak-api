@@ -630,6 +630,16 @@ export class CacheService implements OnModuleInit {
     await this.set(`forums:categories${userKey}`, categories, ttl); // 10 minutes
   }
 
+  async getForumCategoriesStructure(userId?: number): Promise<any> {
+    const userKey = userId ? `:user${userId}` : ':public';
+    return this.get(`forums:categories:structure${userKey}`);
+  }
+
+  async setForumCategoriesStructure(data: any, userId?: number, ttl = 86400): Promise<void> {
+    const userKey = userId ? `:user${userId}` : ':public';
+    await this.set(`forums:categories:structure${userKey}`, data, ttl); // 24 hours
+  }
+
   async getForumBoard(boardId: number, page: number, limit: number, userId?: number): Promise<any> {
     const userKey = userId ? `:user${userId}` : ':public';
     return this.get(`forums:board:${boardId}:page${page}:limit${limit}${userKey}`);
@@ -795,6 +805,7 @@ export class CacheService implements OnModuleInit {
       events: 'events:*',
       forums: 'forums:*',
       forums_stats: 'forums:stats*',
+      forums_categories_structure: 'forums:categories:structure*',
       user_profiles: 'user_profile:*',
       user_stats: 'user_stats:*',
       user_reviews: 'user_reviews:*',
@@ -893,6 +904,7 @@ export class CacheService implements OnModuleInit {
       events: 'events:*',
       forums: 'forums:*',
       forums_stats: 'forums:stats*',
+      forums_categories_structure: 'forums:categories:structure*',
       user_profiles: 'user_profile:*',
       user_stats: 'user_stats:*',
       user_reviews: 'user_reviews:*',
