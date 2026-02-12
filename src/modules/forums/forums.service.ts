@@ -1,4 +1,5 @@
 import { Injectable, Logger, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../shared/services/prisma.service';
 import { CacheService } from '../../shared/services/cache.service';
 import { ForumMessageQueryDto, ForumMessage, ForumMessageResponse } from './dto/forum-message.dto';
@@ -522,10 +523,9 @@ export class ForumsService {
         pollData = await this.getPollData(topic.idPoll, userId);
       }
 
-      // Mark topic as read for authenticated users (track the last message they've seen on this page)
-      if (userId && posts.length > 0) {
-        const lastPostOnPage = posts[posts.length - 1];
-        // Update/create the read log entry with the last message ID visible on this page
+      // Mark topic as read for authenticated users
+      // Use the topic's actual last message so visiting the topic = fully read
+      if (userId && topic.idLastMsg > 0) {
         await this.prisma.smfLogTopics.upsert({
           where: {
             idTopic_idMember: {
@@ -534,12 +534,12 @@ export class ForumsService {
             }
           },
           update: {
-            idMsg: lastPostOnPage.idMsg
+            idMsg: topic.idLastMsg
           },
           create: {
             idTopic: topicId,
             idMember: userId,
-            idMsg: lastPostOnPage.idMsg
+            idMsg: topic.idLastMsg
           }
         }).catch(err => {
           // Don't fail the whole request if read tracking fails
@@ -3107,126 +3107,117 @@ export class ForumsService {
     try {
       // Get all boards user has access to
       const categories = await this.getCategories(userId);
-      const accessibleBoardIds = categories.flatMap(cat => cat.boards.map(b => b.id));
+      const accessibleBoardIds = categories.flatMap(cat =>
+        [
+          ...cat.boards.map(b => b.id),
+          ...cat.boards.flatMap(b => (b.children || []).map(c => c.id)),
+        ]
+      );
 
       if (accessibleBoardIds.length === 0) {
         return { topics: [], total: 0, limit, offset };
       }
 
-      // Filter by specific board if provided
       const boardIds = boardId ? [boardId].filter(id => accessibleBoardIds.includes(id)) : accessibleBoardIds;
-
       if (boardIds.length === 0) {
         return { topics: [], total: 0, limit, offset };
       }
 
-      // Get all topics from accessible boards
-      const allTopics = await this.prisma.smfTopic.findMany({
-        where: {
-          idBoard: { in: boardIds },
-          idLastMsg: { gt: 0 }
-        },
-        include: {
-          firstMessage: true,
-          lastMessage: {
-            include: {
-              member: true
-            }
-          },
-          board: {
-            include: {
-              category: true
-            }
-          },
-          starter: true
-        },
-        orderBy: [
-          { isSticky: 'desc' },
-          { idLastMsg: 'desc' }
-        ]
-      });
+      // Use SQL to filter unread topics at DB level with pagination
+      // A topic is unread if:
+      // - No entry in smf_log_topics AND no board-level mark-read covering it
+      // - OR topic's id_last_msg > the user's last read msg for that topic
+      // - AND topic's id_last_msg > the board-level mark-read (if any)
+      const countResult = await this.prisma.$queryRaw<[{ count: bigint }]>`
+        SELECT COUNT(*) as count
+        FROM smf_topics t
+        WHERE t.id_board IN (${Prisma.join(boardIds)})
+          AND t.id_last_msg > 0
+          AND t.id_last_msg > COALESCE(
+            (SELECT lt.id_msg FROM smf_log_topics lt WHERE lt.id_topic = t.id_topic AND lt.id_member = ${userId}),
+            0
+          )
+          AND t.id_last_msg > COALESCE(
+            (SELECT mr.id_msg FROM smf_log_mark_read mr WHERE mr.id_board = t.id_board AND mr.id_member = ${userId}),
+            0
+          )
+      `;
 
-      // Get user's topic-specific read logs
-      const topicIds = allTopics.map(t => t.idTopic);
-      const readLogs = await this.prisma.smfLogTopics.findMany({
-        where: {
-          idMember: userId,
-          idTopic: { in: topicIds }
-        },
-        select: {
-          idTopic: true,
-          idMsg: true
-        }
-      });
+      const total = Number(countResult[0]?.count || 0);
 
-      // Get user's board-level mark-read entries (from "mark all as read")
-      const markReadLogs = await this.prisma.smfLogMarkRead.findMany({
-        where: {
-          idMember: userId,
-          idBoard: { in: boardIds }
-        },
-        select: {
-          idBoard: true,
-          idMsg: true
-        }
-      });
+      if (total === 0) {
+        return { topics: [], total: 0, limit, offset };
+      }
 
-      const topicReadMap = new Map(readLogs.map(log => [log.idTopic, log.idMsg]));
-      const boardMarkReadMap = new Map(markReadLogs.map(log => [log.idBoard, log.idMsg]));
+      // Fetch paginated unread topics with all needed joins
+      const unreadRows = await this.prisma.$queryRaw<any[]>`
+        SELECT
+          t.id_topic,
+          t.id_board,
+          t.id_last_msg,
+          t.is_sticky,
+          t.locked,
+          t.id_poll,
+          t.num_replies,
+          t.num_views,
+          t.id_member_started,
+          fm.subject as first_subject,
+          fm.poster_name as first_poster_name,
+          fm.poster_time as first_poster_time,
+          lm.id_msg as last_msg_id,
+          lm.poster_name as last_poster_name,
+          lm.poster_time as last_poster_time,
+          lm.body as last_body,
+          lmm.member_name as last_member_name,
+          b.name as board_name,
+          c.name as category_name,
+          sm.member_name as starter_name
+        FROM smf_topics t
+        INNER JOIN smf_messages fm ON fm.id_msg = t.id_first_msg
+        INNER JOIN smf_messages lm ON lm.id_msg = t.id_last_msg
+        LEFT JOIN smf_members lmm ON lmm.id_member = lm.id_member
+        INNER JOIN smf_boards b ON b.id_board = t.id_board
+        INNER JOIN smf_categories c ON c.id_cat = b.id_cat
+        LEFT JOIN smf_members sm ON sm.id_member = t.id_member_started
+        WHERE t.id_board IN (${Prisma.join(boardIds)})
+          AND t.id_last_msg > 0
+          AND t.id_last_msg > COALESCE(
+            (SELECT lt.id_msg FROM smf_log_topics lt WHERE lt.id_topic = t.id_topic AND lt.id_member = ${userId}),
+            0
+          )
+          AND t.id_last_msg > COALESCE(
+            (SELECT mr.id_msg FROM smf_log_mark_read mr WHERE mr.id_board = t.id_board AND mr.id_member = ${userId}),
+            0
+          )
+        ORDER BY t.is_sticky DESC, t.id_last_msg DESC
+        LIMIT ${limit} OFFSET ${offset}
+      `;
 
-      // Filter to only unread topics
-      const unreadTopics = allTopics.filter(topic => {
-        // Check topic-specific read entry first
-        const topicLastRead = topicReadMap.get(topic.idTopic);
-        if (topicLastRead !== undefined && topic.idLastMsg <= (topicLastRead as any)) {
-          return false; // Read via topic-specific entry
-        }
-
-        // Check board-level mark-read entry
-        const boardMarkRead = boardMarkReadMap.get(topic.idBoard);
-        if (boardMarkRead !== undefined && topic.idLastMsg <= (boardMarkRead as any)) {
-          return false; // Read via board mark-all-as-read
-        }
-
-        // If topic has a specific entry but new messages exist, it's unread
-        if (topicLastRead !== undefined && topic.idLastMsg > (topicLastRead as any)) {
-          return true;
-        }
-
-        // No read entry at all = unread
-        return true;
-      });
-
-      // Get total count and apply pagination
-      const total = unreadTopics.length;
-      const paginatedTopics = unreadTopics.slice(offset, offset + limit);
-
-      // Format the response
-      const formattedTopics = paginatedTopics.map(topic => ({
-        id: topic.idTopic,
-        subject: topic.firstMessage?.subject || 'Untitled',
-        isSticky: Boolean(topic.isSticky),
-        locked: Boolean(topic.locked),
-        hasPoll: topic.idPoll > 0,
-        numReplies: topic.numReplies,
-        numViews: topic.numViews,
+      const formattedTopics = unreadRows.map(row => ({
+        id: row.id_topic,
+        subject: row.first_subject || 'Untitled',
+        isSticky: Boolean(row.is_sticky),
+        locked: Boolean(row.locked),
+        hasPoll: row.id_poll > 0,
+        numReplies: row.num_replies,
+        numViews: row.num_views,
         board: {
-          id: topic.board.idBoard,
-          name: topic.board.name,
-          categoryName: topic.board.category.name
+          id: row.id_board,
+          name: row.board_name,
+          categoryName: row.category_name
         },
         starter: {
-          id: topic.starter?.idMember || 0,
-          name: topic.starter?.memberName || topic.firstMessage?.posterName || 'Unknown'
+          id: row.id_member_started || 0,
+          name: row.starter_name || row.first_poster_name || 'Unknown'
         },
-        lastMessage: topic.lastMessage ? {
-          id: topic.lastMessage.idMsg,
-          time: topic.lastMessage.posterTime,
-          author: topic.lastMessage.member?.memberName || topic.lastMessage.posterName,
-          body: topic.lastMessage.body,
-          excerpt: this.stripSmfBBCode(topic.lastMessage.body).substring(0, 160)
+        lastMessage: row.last_msg_id ? {
+          id: row.last_msg_id,
+          time: row.last_poster_time,
+          author: row.last_member_name || row.last_poster_name,
+          body: row.last_body,
+          excerpt: this.stripSmfBBCode(row.last_body || '').substring(0, 160)
         } : null,
-        firstMessageTime: topic.firstMessage?.posterTime || 0
+        firstMessageTime: row.first_poster_time || 0
       }));
 
       return {
@@ -3245,77 +3236,33 @@ export class ForumsService {
     try {
       // Get all boards user has access to
       const categories = await this.getCategories(userId);
-      const boardIds = categories.flatMap(cat => cat.boards.map(b => b.id));
+      const boardIds = categories.flatMap(cat =>
+        [
+          ...cat.boards.map(b => b.id),
+          ...cat.boards.flatMap(b => (b.children || []).map(c => c.id)),
+        ]
+      );
 
       if (boardIds.length === 0) {
         return { count: 0 };
       }
 
-      // Get all topics from accessible boards with their board ID
-      const allTopics = await this.prisma.smfTopic.findMany({
-        where: {
-          idBoard: { in: boardIds },
-          idLastMsg: { gt: 0 }
-        },
-        select: {
-          idTopic: true,
-          idBoard: true,
-          idLastMsg: true
-        }
-      });
+      const countResult = await this.prisma.$queryRaw<[{ count: bigint }]>`
+        SELECT COUNT(*) as count
+        FROM smf_topics t
+        WHERE t.id_board IN (${Prisma.join(boardIds)})
+          AND t.id_last_msg > 0
+          AND t.id_last_msg > COALESCE(
+            (SELECT lt.id_msg FROM smf_log_topics lt WHERE lt.id_topic = t.id_topic AND lt.id_member = ${userId}),
+            0
+          )
+          AND t.id_last_msg > COALESCE(
+            (SELECT mr.id_msg FROM smf_log_mark_read mr WHERE mr.id_board = t.id_board AND mr.id_member = ${userId}),
+            0
+          )
+      `;
 
-      // Get user's topic-specific read logs
-      const topicIds = allTopics.map(t => t.idTopic);
-      const readLogs = await this.prisma.smfLogTopics.findMany({
-        where: {
-          idMember: userId,
-          idTopic: { in: topicIds }
-        },
-        select: {
-          idTopic: true,
-          idMsg: true
-        }
-      });
-
-      // Get user's board-level mark-read entries (from "mark all as read")
-      const markReadLogs = await this.prisma.smfLogMarkRead.findMany({
-        where: {
-          idMember: userId,
-          idBoard: { in: boardIds }
-        },
-        select: {
-          idBoard: true,
-          idMsg: true
-        }
-      });
-
-      const topicReadMap = new Map(readLogs.map(log => [log.idTopic, log.idMsg]));
-      const boardMarkReadMap = new Map(markReadLogs.map(log => [log.idBoard, log.idMsg]));
-
-      // Count unread topics
-      const count = allTopics.filter(topic => {
-        // Check topic-specific read entry first
-        const topicLastRead = topicReadMap.get(topic.idTopic);
-        if (topicLastRead !== undefined && topic.idLastMsg <= (topicLastRead as any)) {
-          return false; // Read via topic-specific entry
-        }
-
-        // Check board-level mark-read entry
-        const boardMarkRead = boardMarkReadMap.get(topic.idBoard);
-        if (boardMarkRead !== undefined && topic.idLastMsg <= (boardMarkRead as any)) {
-          return false; // Read via board mark-all-as-read
-        }
-
-        // If topic has a specific entry but new messages exist, it's unread
-        if (topicLastRead !== undefined && topic.idLastMsg > (topicLastRead as any)) {
-          return true;
-        }
-
-        // No read entry at all = unread
-        return true;
-      }).length;
-
-      return { count };
+      return { count: Number(countResult[0]?.count || 0) };
     } catch (error) {
       this.logger.error('Error getting unread count:', error);
       return { count: 0 };
