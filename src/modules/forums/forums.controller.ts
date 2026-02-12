@@ -8,6 +8,7 @@ import { UpdatePostDto } from './dto/update-post.dto';
 import { MoveTopicDto } from './dto/move-topic.dto';
 import { LockTopicDto } from './dto/lock-topic.dto';
 import { ReportMessageDto, GetReportsQueryDto } from './dto/report-message.dto';
+import { ForumSearchQueryDto } from './dto/forum-search-query.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { OptionalJwtAuthGuard } from '../../common/guards/optional-jwt-auth.guard';
 import { ActivityTrackerService } from '../../shared/services/activity-tracker.service';
@@ -631,20 +632,21 @@ export class ForumsController {
   @ApiQuery({ name: 'offset', required: false, type: Number, description: 'Number of results to skip (default: 0)' })
   @ApiResponse({ status: 200, description: 'Search results retrieved successfully' })
   async searchForums(
-    @Query('q') searchQuery: string,
-    @Query('limit') limit: string = '20',
-    @Query('offset') offset: string = '0',
+    @Query() query: ForumSearchQueryDto,
     @Request() req?
   ) {
+    const { q: searchQuery, limit, offset, searchIn, boardId } = query;
     if (!searchQuery || searchQuery.trim().length === 0) {
       return { results: [], total: 0 };
     }
     const userId = req?.user?.id || null;
     return await this.forumsService.searchForums(
       searchQuery,
-      parseInt(limit),
-      parseInt(offset),
-      userId
+      limit,
+      offset,
+      userId,
+      searchIn,
+      boardId
     );
   }
 }

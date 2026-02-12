@@ -3427,21 +3427,39 @@ export class ForumsService {
     }
   }
 
-  async searchForums(searchQuery: string, limit: number, offset: number, userId?: number) {
+  async searchForums(
+    searchQuery: string,
+    limit: number,
+    offset: number,
+    userId?: number,
+    searchIn: 'all' | 'subject' | 'content' = 'all',
+    boardId?: number
+  ) {
     try {
       const searchTerm = `%${searchQuery}%`;
 
-      // Search in both topics (first message) and regular messages
-      // Fetch more than needed to account for filtering
+      // Build search conditions
+      const searchConditions: any[] = [];
+      if (searchIn === 'all' || searchIn === 'subject') {
+        searchConditions.push({ subject: { contains: searchQuery, mode: 'insensitive' } });
+      }
+      if (searchIn === 'all' || searchIn === 'content') {
+        searchConditions.push({ body: { contains: searchQuery, mode: 'insensitive' } });
+      }
+
+      // Build where clause
+      const whereClause: any = {
+        OR: searchConditions,
+        approved: 1
+      };
+
+      // Add board filter if provided
+      if (boardId) {
+        whereClause.topic = { idBoard: boardId };
+      }
+
       const messages = await this.prisma.smfMessage.findMany({
-        where: {
-          OR: [
-            { subject: { contains: searchQuery, mode: 'insensitive' } },
-            { body: { contains: searchQuery, mode: 'insensitive' } }
-          ],
-          // Exclude deleted messages
-          approved: 1
-        },
+        where: whereClause,
         include: {
           topic: {
             include: {
