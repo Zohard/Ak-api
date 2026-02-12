@@ -537,6 +537,39 @@ export class ForumsController {
     return await this.forumsService.getUnreadCount(userId);
   }
 
+  @Get('unread/replies')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get unread topics where current user has posted (replies to my messages)' })
+  @ApiQuery({ name: 'boardId', required: false, type: Number, description: 'Filter by board ID (optional)' })
+  @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Topics per page (default: 20)' })
+  @ApiQuery({ name: 'offset', required: false, type: Number, description: 'Number to skip (default: 0)' })
+  @ApiResponse({ status: 200, description: 'Unread replies retrieved successfully' })
+  async getUnreadReplies(
+    @Request() req,
+    @Query('boardId') boardId?: string,
+    @Query('limit') limit: string = '20',
+    @Query('offset') offset: string = '0'
+  ) {
+    const userId = req.user.id;
+    return await this.forumsService.getUnreadReplies(
+      userId,
+      boardId ? parseInt(boardId) : undefined,
+      parseInt(limit),
+      parseInt(offset)
+    );
+  }
+
+  @Get('unread/replies/count')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get count of unread topics where current user has posted' })
+  @ApiResponse({ status: 200, description: 'Unread replies count retrieved successfully' })
+  async getUnreadRepliesCount(@Request() req) {
+    const userId = req.user.id;
+    return await this.forumsService.getUnreadRepliesCount(userId);
+  }
+
   @Post('topics/:topicId/mark-read')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()

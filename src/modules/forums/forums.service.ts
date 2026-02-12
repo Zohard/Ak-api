@@ -3269,6 +3269,176 @@ export class ForumsService {
     }
   }
 
+  async getUnreadReplies(userId: number, boardId?: number, limit: number = 20, offset: number = 0): Promise<any> {
+    try {
+      const categories = await this.getCategories(userId);
+      const accessibleBoardIds = categories.flatMap(cat =>
+        [
+          ...cat.boards.map(b => b.id),
+          ...cat.boards.flatMap(b => (b.children || []).map(c => c.id)),
+        ]
+      );
+
+      if (accessibleBoardIds.length === 0) {
+        return { topics: [], total: 0, limit, offset };
+      }
+
+      const boardIds = boardId ? [boardId].filter(id => accessibleBoardIds.includes(id)) : accessibleBoardIds;
+      if (boardIds.length === 0) {
+        return { topics: [], total: 0, limit, offset };
+      }
+
+      const countResult = await this.prisma.$queryRaw<[{ count: bigint }]>`
+        WITH user_topics AS (
+          SELECT DISTINCT id_topic FROM smf_messages WHERE id_member = ${userId}
+        )
+        SELECT COUNT(*) as count
+        FROM smf_topics t
+        INNER JOIN user_topics ut ON ut.id_topic = t.id_topic
+        WHERE t.id_board IN (${Prisma.join(boardIds)})
+          AND t.id_last_msg > 0
+          AND t.id_last_msg > COALESCE(
+            (SELECT lt.id_msg FROM smf_log_topics lt WHERE lt.id_topic = t.id_topic AND lt.id_member = ${userId}),
+            0
+          )
+          AND t.id_last_msg > COALESCE(
+            (SELECT mr.id_msg FROM smf_log_mark_read mr WHERE mr.id_board = t.id_board AND mr.id_member = ${userId}),
+            0
+          )
+      `;
+
+      const total = Number(countResult[0]?.count || 0);
+
+      if (total === 0) {
+        return { topics: [], total: 0, limit, offset };
+      }
+
+      const unreadRows = await this.prisma.$queryRaw<any[]>`
+        WITH user_topics AS (
+          SELECT DISTINCT id_topic FROM smf_messages WHERE id_member = ${userId}
+        )
+        SELECT
+          t.id_topic,
+          t.id_board,
+          t.id_last_msg,
+          t.is_sticky,
+          t.locked,
+          t.id_poll,
+          t.num_replies,
+          t.num_views,
+          t.id_member_started,
+          fm.subject as first_subject,
+          fm.poster_name as first_poster_name,
+          fm.poster_time as first_poster_time,
+          lm.id_msg as last_msg_id,
+          lm.poster_name as last_poster_name,
+          lm.poster_time as last_poster_time,
+          lm.body as last_body,
+          lmm.member_name as last_member_name,
+          b.name as board_name,
+          c.name as category_name,
+          sm.member_name as starter_name
+        FROM smf_topics t
+        INNER JOIN user_topics ut ON ut.id_topic = t.id_topic
+        INNER JOIN smf_messages fm ON fm.id_msg = t.id_first_msg
+        INNER JOIN smf_messages lm ON lm.id_msg = t.id_last_msg
+        LEFT JOIN smf_members lmm ON lmm.id_member = lm.id_member
+        INNER JOIN smf_boards b ON b.id_board = t.id_board
+        INNER JOIN smf_categories c ON c.id_cat = b.id_cat
+        LEFT JOIN smf_members sm ON sm.id_member = t.id_member_started
+        WHERE t.id_board IN (${Prisma.join(boardIds)})
+          AND t.id_last_msg > 0
+          AND t.id_last_msg > COALESCE(
+            (SELECT lt.id_msg FROM smf_log_topics lt WHERE lt.id_topic = t.id_topic AND lt.id_member = ${userId}),
+            0
+          )
+          AND t.id_last_msg > COALESCE(
+            (SELECT mr.id_msg FROM smf_log_mark_read mr WHERE mr.id_board = t.id_board AND mr.id_member = ${userId}),
+            0
+          )
+        ORDER BY t.is_sticky DESC, t.id_last_msg DESC
+        LIMIT ${limit} OFFSET ${offset}
+      `;
+
+      const formattedTopics = unreadRows.map(row => ({
+        id: row.id_topic,
+        subject: row.first_subject || 'Untitled',
+        isSticky: Boolean(row.is_sticky),
+        locked: Boolean(row.locked),
+        hasPoll: row.id_poll > 0,
+        numReplies: row.num_replies,
+        numViews: row.num_views,
+        board: {
+          id: row.id_board,
+          name: row.board_name,
+          categoryName: row.category_name
+        },
+        starter: {
+          id: row.id_member_started || 0,
+          name: row.starter_name || row.first_poster_name || 'Unknown'
+        },
+        lastMessage: row.last_msg_id ? {
+          id: row.last_msg_id,
+          time: row.last_poster_time,
+          author: row.last_member_name || row.last_poster_name,
+          body: row.last_body,
+          excerpt: this.stripSmfBBCode(row.last_body || '').substring(0, 160)
+        } : null,
+        firstMessageTime: row.first_poster_time || 0
+      }));
+
+      return {
+        topics: formattedTopics,
+        total,
+        limit,
+        offset
+      };
+    } catch (error) {
+      this.logger.error('Error fetching unread replies:', error);
+      return { topics: [], total: 0, limit, offset };
+    }
+  }
+
+  async getUnreadRepliesCount(userId: number): Promise<{ count: number }> {
+    try {
+      const categories = await this.getCategories(userId);
+      const boardIds = categories.flatMap(cat =>
+        [
+          ...cat.boards.map(b => b.id),
+          ...cat.boards.flatMap(b => (b.children || []).map(c => c.id)),
+        ]
+      );
+
+      if (boardIds.length === 0) {
+        return { count: 0 };
+      }
+
+      const countResult = await this.prisma.$queryRaw<[{ count: bigint }]>`
+        WITH user_topics AS (
+          SELECT DISTINCT id_topic FROM smf_messages WHERE id_member = ${userId}
+        )
+        SELECT COUNT(*) as count
+        FROM smf_topics t
+        INNER JOIN user_topics ut ON ut.id_topic = t.id_topic
+        WHERE t.id_board IN (${Prisma.join(boardIds)})
+          AND t.id_last_msg > 0
+          AND t.id_last_msg > COALESCE(
+            (SELECT lt.id_msg FROM smf_log_topics lt WHERE lt.id_topic = t.id_topic AND lt.id_member = ${userId}),
+            0
+          )
+          AND t.id_last_msg > COALESCE(
+            (SELECT mr.id_msg FROM smf_log_mark_read mr WHERE mr.id_board = t.id_board AND mr.id_member = ${userId}),
+            0
+          )
+      `;
+
+      return { count: Number(countResult[0]?.count || 0) };
+    } catch (error) {
+      this.logger.error('Error getting unread replies count:', error);
+      return { count: 0 };
+    }
+  }
+
   async markTopicAsRead(topicId: number, userId: number): Promise<{ success: boolean }> {
     try {
       // Get the topic to find its last message ID
