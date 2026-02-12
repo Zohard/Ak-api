@@ -12,6 +12,7 @@ import {
 } from './dto/content-relationship.dto';
 import { AdminLoggingService } from '../logging/admin-logging.service';
 import { NotificationsService } from '../../notifications/notifications.service';
+import { CacheService } from '../../../shared/services/cache.service';
 
 @Injectable()
 export class AdminContentService {
@@ -19,6 +20,7 @@ export class AdminContentService {
     private prisma: PrismaService,
     private adminLogging: AdminLoggingService,
     private notificationsService: NotificationsService,
+    private cacheService: CacheService,
   ) { }
 
   async getAllContent(query: ContentAdminQueryDto) {
@@ -603,6 +605,13 @@ export class AdminContentService {
         console.error('Failed to trigger related content notifications:', err),
       );
 
+      // Invalidate caches
+      await Promise.all([
+        this.cacheService.del(`${type}_relations:${id}`),
+        this.cacheService.del(`${related_type}_relations:${related_id}`),
+        related_type === 'article' ? this.cacheService.del(`${type}_articles:${id}`) : Promise.resolve(),
+      ]);
+
       return { message: 'Relationship created successfully' };
     } catch (error) {
       console.error('Error creating relationship:', error);
@@ -732,9 +741,32 @@ export class AdminContentService {
   }
 
   async deleteContentRelationship(relationshipId: number) {
+    // Get relationship details before deletion to know what to invalidate
+    const relationship = await this.prisma.$queryRawUnsafe<any[]>(
+      `SELECT id_fiche_depart, id_anime, id_manga, id_jeu FROM ak_fiche_to_fiche WHERE id_relation = $1 LIMIT 1`,
+      relationshipId,
+    );
+
     await this.prisma.$queryRaw`
       DELETE FROM ak_fiche_to_fiche WHERE id_relation = ${relationshipId}
     `;
+
+    if (relationship.length > 0) {
+      const rel = relationship[0];
+      const sourceKey = rel.id_fiche_depart; // e.g., 'anime123'
+      const sourceType = sourceKey.replace(/[0-9]/g, '');
+      const sourceId = parseInt(sourceKey.replace(/[^0-9]/g, ''), 10);
+
+      const invalidations = [
+        this.cacheService.del(`${sourceType}_relations:${sourceId}`),
+      ];
+
+      if (rel.id_anime) invalidations.push(this.cacheService.del(`anime_relations:${rel.id_anime}`));
+      if (rel.id_manga) invalidations.push(this.cacheService.del(`manga_relations:${rel.id_manga}`));
+      if (rel.id_jeu) invalidations.push(this.cacheService.del(`jeu-video_relations:${rel.id_jeu}`));
+
+      await Promise.all(invalidations);
+    }
 
     return { message: 'Relationship deleted successfully' };
   }

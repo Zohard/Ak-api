@@ -743,6 +743,12 @@ export class JeuxVideoService {
   }
 
   async getRelationships(id: number) {
+    const cacheKey = `jeu-video_relations:${id}`;
+    const cached = await this.cacheService.get<any[]>(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
     const sourceKey = `jeu${id}`;
 
     const sql = `
@@ -804,6 +810,10 @@ export class JeuxVideoService {
     `;
 
     const rows = await this.prisma.$queryRawUnsafe(sql, sourceKey, id);
+
+    // Cache for 12 hours (43200 seconds)
+    await this.cacheService.set(cacheKey, rows, 43200);
+
     return rows;
   }
 

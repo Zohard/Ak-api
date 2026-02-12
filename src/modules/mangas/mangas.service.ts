@@ -1752,6 +1752,13 @@ export class MangasService extends BaseContentService<
       throw new NotFoundException('Manga introuvable');
     }
 
+    // Try to get from cache first
+    const cacheKey = `manga_relations:${id}`;
+    const cached = await this.cacheService.get<RelationsResponse>(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
     // Get BIDIRECTIONAL relations: where manga is source OR target
     // This matches the old PHP logic: WHERE id_fiche_depart = 'manga{id}' OR id_manga = {id}
     const relations = await this.prisma.$queryRaw`
@@ -1993,11 +2000,16 @@ export class MangasService extends BaseContentService<
       }
     }
 
-    return {
+    const result = {
       manga_id: id,
       relations: relatedContent,
       total: relatedContent.length,
     };
+
+    // Cache for 12 hours (43200 seconds)
+    await this.cacheService.set(cacheKey, result, 43200);
+
+    return result;
   }
 
   async getMangaArticles(id: number) {
@@ -2009,6 +2021,13 @@ export class MangasService extends BaseContentService<
 
     if (!manga) {
       throw new NotFoundException('Manga introuvable');
+    }
+
+    // Try to get from cache first
+    const cacheKey = `manga_articles:${id}`;
+    const cached = await this.cacheService.get<any[]>(cacheKey);
+    if (cached) {
+      return cached;
     }
 
     // Get articles linked to this manga
@@ -2075,6 +2094,11 @@ export class MangasService extends BaseContentService<
           coverImage,
         };
       });
+
+    // Cache for 12 hours (43200 seconds)
+    await this.cacheService.set(cacheKey, formattedArticles, 43200);
+
+    return formattedArticles;
   }
 
   async getMangaStaff(id: number) {
@@ -2875,6 +2899,13 @@ export class MangasService extends BaseContentService<
           INSERT INTO ak_fiche_to_fiche (id_fiche_depart, id_anime, id_manga, id_ost, id_jeu, id_business)
           VALUES ('manga_${mangaId}', ${dto.mediaId}, 0, 0, 0, 0)
         `);
+
+        // Invalidate caches
+        await Promise.all([
+          this.cacheService.del(`manga_relations:${mangaId}`),
+          this.cacheService.del(`anime_relations:${dto.mediaId}`),
+        ]);
+
         return { success: true, message: 'Anime relation created' };
 
       case MediaRelationType.MANGA:
@@ -2891,6 +2922,13 @@ export class MangasService extends BaseContentService<
           INSERT INTO ak_fiche_to_fiche (id_fiche_depart, id_anime, id_manga, id_ost, id_jeu, id_business)
           VALUES ('manga_${mangaId}', 0, ${dto.mediaId}, 0, 0, 0)
         `);
+
+        // Invalidate caches
+        await Promise.all([
+          this.cacheService.del(`manga_relations:${mangaId}`),
+          this.cacheService.del(`manga_relations:${dto.mediaId}`),
+        ]);
+
         return { success: true, message: 'Manga relation created' };
 
       case MediaRelationType.GAME:
@@ -2907,6 +2945,13 @@ export class MangasService extends BaseContentService<
           INSERT INTO ak_fiche_to_fiche (id_fiche_depart, id_anime, id_manga, id_ost, id_jeu, id_business)
           VALUES ('manga_${mangaId}', 0, 0, 0, ${dto.mediaId}, 0)
         `);
+
+        // Invalidate caches
+        await Promise.all([
+          this.cacheService.del(`manga_relations:${mangaId}`),
+          this.cacheService.del(`jeu-video_relations:${dto.mediaId}`),
+        ]);
+
         return { success: true, message: 'Game relation created' };
 
       case MediaRelationType.BUSINESS:
@@ -2931,6 +2976,10 @@ export class MangasService extends BaseContentService<
           INSERT INTO ak_webzine_to_fiches (id_article, id_fiche, type_fiche)
           VALUES (${dto.mediaId}, ${mangaId}, 'manga')
         `);
+
+        // Invalidate articles cache
+        await this.cacheService.del(`manga_articles:${mangaId}`);
+
         return { success: true, message: 'Article relation created' };
 
       default:
@@ -2982,6 +3031,15 @@ export class MangasService extends BaseContentService<
       default:
         throw new BadRequestException(`Unsupported media type: ${mediaType}`);
     }
+
+    // Invalidate caches
+    const invalidations = [this.cacheService.del(`manga_relations:${mangaId}`)];
+    if (mediaType === 'article') {
+      invalidations.push(this.cacheService.del(`manga_articles:${mangaId}`));
+    } else {
+      invalidations.push(this.cacheService.del(`${mediaType === 'game' ? 'jeu-video' : mediaType}_relations:${mediaId}`));
+    }
+    await Promise.all(invalidations);
 
     return { success: true, message: 'Relation removed successfully' };
   }

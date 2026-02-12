@@ -279,8 +279,8 @@ export class AnimeRelationsService {
         total: relatedContent.length,
       };
 
-      // Cache for 15 minutes (900 seconds)
-      await this.cacheService.set(cacheKey, result, 900);
+      // Cache for 12 hours (43200 seconds)
+      await this.cacheService.set(cacheKey, result, 43200);
 
       return result;
     } catch (error) {
@@ -371,8 +371,8 @@ export class AnimeRelationsService {
         };
       });
 
-    // Cache for 10 minutes (600 seconds)
-    await this.cacheService.set(cacheKey, result, 600);
+    // Cache for 12 hours (43200 seconds)
+    await this.cacheService.set(cacheKey, result, 43200);
 
     return result;
   }
