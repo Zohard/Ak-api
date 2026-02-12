@@ -186,7 +186,7 @@ export class SeasonsService {
 
       if (animeIds.length === 0) {
         const emptyResult = [];
-        await this.cacheService.set(`season_animes:${seasonId}`, emptyResult, 14400);
+        await this.cacheService.set(`season_animes:${seasonId}`, emptyResult, 86400);
         return emptyResult;
       }
 
@@ -224,8 +224,8 @@ export class SeasonsService {
         studio: this.deduplicateStudios(anime.studio)
       }));
 
-      // Cache for 4 hours (14400 seconds) - season animes rarely change, invalidated on admin updates
-      await this.cacheService.set(`season_animes:${seasonId}`, result, 14400);
+      // Cache for 24 hours (86400 seconds) - season animes rarely change, invalidated on admin updates
+      await this.cacheService.set(`season_animes:${seasonId}`, result, 86400);
 
       return result;
 
