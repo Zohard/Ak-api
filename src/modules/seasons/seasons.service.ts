@@ -382,12 +382,13 @@ export class SeasonsService {
     }
 
     // Invalidate all season-related caches
-    await this.cacheService.del(`season:${seasonId}`)
-    await this.cacheService.del(`season_animes:${seasonId}`)
-    await this.cacheService.del('seasons:all')
-    await this.cacheService.del('seasons:current')
-    await this.cacheService.del('seasons:last-created')
-    await this.cacheService.invalidateHomepageSeason()
+    // Since setting a new current season affects multiple rows, it's safer to clear all season-related caches
+    await this.cacheService.delByPattern('season:*');
+    await this.cacheService.delByPattern('season_animes:*');
+    await this.cacheService.del('seasons:all');
+    await this.cacheService.del('seasons:current');
+    await this.cacheService.del('seasons:last-created');
+    await this.cacheService.invalidateHomepageSeason();
 
     return { success: true, seasonId, currentSeason: isCurrent }
   }
