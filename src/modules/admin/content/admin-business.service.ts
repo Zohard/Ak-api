@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../shared/services/prisma.service';
 import { AdminLoggingService } from '../logging/admin-logging.service';
 import { R2Service } from '../../media/r2.service';
@@ -32,6 +33,28 @@ export class AdminBusinessService {
     // Validate sortBy to prevent Prisma errors - only allow valid columns
     const validSortFields = ['dateAjout', 'denomination', 'type', 'statut', 'nbClics', 'origine', 'date', 'idBusiness'];
     const safeSortBy = validSortFields.includes(sortBy) ? sortBy : 'dateAjout';
+
+    // When searching, order by "starts with" first, then alphabetical
+    if (search) {
+      const conditions: Prisma.Sql[] = [Prisma.sql`denomination ILIKE ${'%' + search + '%'}`];
+      if (statut !== undefined) conditions.push(Prisma.sql`statut = ${statut}`);
+      if (type) conditions.push(Prisma.sql`type ILIKE ${'%' + type + '%'}`);
+
+      const whereClause = Prisma.sql`WHERE ${Prisma.join(conditions, ' AND ')}`;
+
+      const [items, total] = await Promise.all([
+        this.prisma.$queryRaw<any[]>`
+          SELECT * FROM ak_business
+          ${whereClause}
+          ORDER BY
+            CASE WHEN denomination ILIKE ${search + '%'} THEN 0 ELSE 1 END,
+            denomination ASC
+          LIMIT ${limit} OFFSET ${skip}
+        `,
+        this.prisma.akBusiness.count({ where }),
+      ]);
+      return { items, pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } };
+    }
 
     // Build dynamic orderBy
     const orderBy: any = {};
