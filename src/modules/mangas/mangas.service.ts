@@ -2066,7 +2066,7 @@ export class MangasService extends BaseContentService<
     });
 
     // Format the response
-    return articles
+    const formattedArticles = articles
       .filter((article) => article.wpPost !== null && article.wpPost.postStatus === 'publish')
       .map((article) => {
         // TypeScript now knows wpPost is not null due to the filter above
