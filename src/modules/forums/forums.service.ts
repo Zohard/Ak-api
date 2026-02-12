@@ -3189,7 +3189,7 @@ export class ForumsService {
             (SELECT mr.id_msg FROM smf_log_mark_read mr WHERE mr.id_board = t.id_board AND mr.id_member = ${userId}),
             0
           )
-        ORDER BY t.is_sticky DESC, t.id_last_msg DESC
+        ORDER BY t.id_last_msg DESC
         LIMIT ${limit} OFFSET ${offset}
       `;
 
@@ -3356,7 +3356,7 @@ export class ForumsService {
             (SELECT mr.id_msg FROM smf_log_mark_read mr WHERE mr.id_board = t.id_board AND mr.id_member = ${userId}),
             0
           )
-        ORDER BY t.is_sticky DESC, t.id_last_msg DESC
+        ORDER BY t.id_last_msg DESC
         LIMIT ${limit} OFFSET ${offset}
       `;
 
