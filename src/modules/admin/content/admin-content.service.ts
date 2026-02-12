@@ -686,10 +686,12 @@ export class AdminContentService {
           FROM ak_animes WHERE id_anime = ${id}
         `;
         if (result.length > 0) {
+          const slug = result[0].niceUrl || id.toString();
+          // Use singular /anime/ and append ID to slug
           return {
             title: result[0].title,
             status: result[0].status,
-            niceUrl: `/animes/${result[0].niceUrl || id}`,
+            niceUrl: `/anime/${slug}-${id}`,
           };
         }
       } else if (type === 'manga') {
@@ -698,10 +700,12 @@ export class AdminContentService {
           FROM ak_mangas WHERE id_manga = ${id}
         `;
         if (result.length > 0) {
+          const slug = result[0].niceUrl || id.toString();
+          // Use singular /manga/ and append ID to slug
           return {
             title: result[0].title,
             status: result[0].status,
-            niceUrl: `/mangas/${result[0].niceUrl || id}`,
+            niceUrl: `/manga/${slug}-${id}`,
           };
         }
       } else if (type === 'jeu-video') {
@@ -710,10 +714,12 @@ export class AdminContentService {
           FROM ak_jeux_video WHERE id_jeu = ${id}
         `;
         if (result.length > 0) {
+          const slug = result[0].niceUrl || id.toString();
+          // Use singular /jeu-video/ and append ID to slug
           return {
             title: result[0].title,
             status: result[0].status,
-            niceUrl: `/jeux-video/${result[0].niceUrl || id}`,
+            niceUrl: `/jeu-video/${slug}-${id}`,
           };
         }
       }
