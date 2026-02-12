@@ -130,22 +130,53 @@ export class ForumsService {
 
       // Try to enrich with dynamic data (last messages + unread status)
       try {
-        // Collect all last message IDs and board IDs from the structure
-        const allLastMsgIds: number[] = [];
+        // Collect all board IDs from the structure
         const allBoardIds: number[] = [];
 
+        for (const category of structure) {
+          for (const board of category.boards) {
+            allBoardIds.push(board.id);
+            if (board.children) {
+              for (const child of board.children) {
+                allBoardIds.push(child.id);
+              }
+            }
+          }
+        }
+
+        // Fetch current idLastMsg from database (not from 24h structure cache)
+        const freshBoards = allBoardIds.length > 0 ? await this.prisma.smfBoard.findMany({
+          where: { idBoard: { in: allBoardIds } },
+          select: { idBoard: true, idLastMsg: true },
+        }) : [];
+        const freshLastMsgMap = new Map(freshBoards.map(b => [b.idBoard, b.idLastMsg]));
+
+        // Override structure's stale idLastMsg with fresh values
+        for (const category of structure) {
+          for (const board of category.boards) {
+            const freshId = freshLastMsgMap.get(board.id);
+            if (freshId !== undefined) board.idLastMsg = freshId;
+            if (board.children) {
+              for (const child of board.children) {
+                const freshChildId = freshLastMsgMap.get(child.id);
+                if (freshChildId !== undefined) child.idLastMsg = freshChildId;
+              }
+            }
+          }
+        }
+
+        // Collect all last message IDs (now with fresh values)
+        const allLastMsgIds: number[] = [];
         for (const category of structure) {
           for (const board of category.boards) {
             if (board.idLastMsg && board.idLastMsg > 0) {
               allLastMsgIds.push(board.idLastMsg);
             }
-            allBoardIds.push(board.id);
             if (board.children) {
               for (const child of board.children) {
                 if (child.idLastMsg && child.idLastMsg > 0) {
                   allLastMsgIds.push(child.idLastMsg);
                 }
-                allBoardIds.push(child.id);
               }
             }
           }

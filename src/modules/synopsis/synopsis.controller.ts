@@ -23,6 +23,7 @@ import { SynopsisService } from './synopsis.service';
 import { CreateSynopsisDto } from './dto/create-synopsis.dto';
 import { SynopsisQueryDto } from './dto/synopsis-query.dto';
 import { ValidateSynopsisDto } from './dto/validate-synopsis.dto';
+import { BulkDeleteSynopsisDto } from './dto/bulk-delete-synopsis.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { AdminGuard } from '../../common/guards/admin.guard';
 
@@ -258,5 +259,29 @@ export class SynopsisController {
   })
   async rejectSynopsis(@Param('id', ParseIntPipe) id: number, @Request() req) {
     return this.synopsisService.validateSynopsis(id, 2, req.user.id);
+  }
+
+  @Post('bulk-delete')
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Supprimer en masse des synopsis rejetés (Admin seulement)' })
+  @ApiResponse({
+    status: 200,
+    description: 'Synopsis rejetés supprimés avec succès',
+    schema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean', example: true },
+        deletedCount: { type: 'number', example: 10 },
+      },
+    },
+  })
+  async bulkDelete(@Body() dto: BulkDeleteSynopsisDto) {
+    const result = await this.synopsisService.bulkDelete(dto.ids);
+    return {
+      success: true,
+      ...result,
+    };
   }
 }

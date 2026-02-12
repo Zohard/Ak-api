@@ -37,12 +37,14 @@ export class SynopsisService {
       }
     }
 
-    // Check if user has already submitted a synopsis for this item
+    // Check if user has already submitted a synopsis for this item (pending or validated)
+    // Rejected submissions (validation=2) don't block re-submission
     const existingSubmission = await this.prisma.akSynopsis.findFirst({
       where: {
         idMembre: userId,
         type,
         idFiche: id_fiche,
+        validation: { in: [0, 1] },
       },
     });
 
@@ -123,6 +125,7 @@ export class SynopsisService {
         idMembre: userId,
         type,
         idFiche: id_fiche,
+        validation: { in: [0, 1] }, // Only pending or validated — rejected (2) don't count
       },
     });
 
@@ -493,6 +496,18 @@ export class SynopsisService {
         customAuthor: customAuthor, // Return for frontend tracking
       },
     };
+  }
+
+  async bulkDelete(ids: number[]): Promise<{ deletedCount: number }> {
+    // Safety: only delete rejected synopsis (validation = 2)
+    const result = await this.prisma.akSynopsis.deleteMany({
+      where: {
+        idSynopsis: { in: ids },
+        validation: 2,
+      },
+    });
+
+    return { deletedCount: result.count };
   }
 
   private sanitizeSynopsis(synopsis: string): string {
