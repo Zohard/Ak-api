@@ -241,40 +241,22 @@ export class AuthService {
   async validateGoogleUser(googleUser: any, ipAddress?: string, userAgent?: string) {
     const { provider, providerId, email, firstName, lastName } = googleUser;
 
-    // 1. Check if we already have this social identity linked
-    let socialIdentity = await this.prisma.akSocialIdentity.findFirst({
-      where: { provider, providerId },
+    // 1. Try to find an existing user with this social identity
+    const socialIdentity = await this.prisma.akSocialIdentity.findUnique({
+      where: { provider_providerId: { provider, providerId } },
       include: { user: true },
     });
 
     let user = socialIdentity?.user;
 
-    // 2. If no identity linked, check if we have a user with same email
+    // 2. If no identity linked, find or create the user by email
     if (!user) {
       user = await this.prisma.smfMember.findFirst({
         where: { emailAddress: email },
       });
 
-      if (user) {
-        // Link existing user to this Google identity
-        await this.prisma.akSocialIdentity.create({
-          data: {
-            userId: user.idMember,
-            provider,
-            providerId,
-          },
-        });
-
-        // Mark email as verified if it wasn't already
-        if (!user.emailVerified) {
-          await this.prisma.smfMember.update({
-            where: { idMember: user.idMember },
-            data: { emailVerified: true, emailVerifiedAt: new Date() },
-          });
-        }
-      } else {
-        // 3. Create a new user
-        // Generate a unique username based on email or name
+      if (!user) {
+        // Create a new user
         const baseUsername = email.split('@')[0].replace(/[^a-zA-Z0-9]/g, '');
         let username = baseUsername;
         let counter = 1;
@@ -289,21 +271,32 @@ export class AuthService {
             memberName: username,
             realName: `${firstName} ${lastName}`.trim() || username,
             emailAddress: email,
-            passwd: await bcrypt.hash(crypto.randomBytes(16).toString('hex'), 12), // Random password
+            passwd: await bcrypt.hash(crypto.randomBytes(16).toString('hex'), 12),
             dateRegistered: Math.floor(Date.now() / 1000),
             idGroup: 0,
-            emailVerified: true, // Google emails are already verified
+            emailVerified: true,
             emailVerifiedAt: new Date(),
           } as any,
         });
+      }
 
-        // Link new user to Google identity
-        await this.prisma.akSocialIdentity.create({
-          data: {
-            userId: user.idMember,
-            provider,
-            providerId,
-          },
+      // Link the user to the social identity using upsert to prevent unique constraint errors
+      // if multiple requests try to link the same user/identity simultaneously
+      await this.prisma.akSocialIdentity.upsert({
+        where: { provider_providerId: { provider, providerId } },
+        update: { userId: user.idMember }, // Just in case it existed, update the link
+        create: {
+          userId: user.idMember,
+          provider,
+          providerId,
+        },
+      });
+
+      // Mark email as verified if it wasn't already (since Google verified it)
+      if (!user.emailVerified) {
+        user = await this.prisma.smfMember.update({
+          where: { idMember: user.idMember },
+          data: { emailVerified: true, emailVerifiedAt: new Date() },
         });
       }
     }

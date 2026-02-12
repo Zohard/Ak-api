@@ -7,16 +7,35 @@ import {
   HttpException,
   HttpStatus,
 } from '@nestjs/common';
-import { Observable, throwError } from 'rxjs';
-import { catchError } from 'rxjs/operators';
+import { Observable, throwError, timer } from 'rxjs';
+import { catchError, retry } from 'rxjs/operators';
 
 @Injectable()
 export class DatabaseRetryInterceptor implements NestInterceptor {
   private readonly logger = new Logger(DatabaseRetryInterceptor.name);
+  private static readonly MAX_RETRIES = 2;
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
     return next.handle().pipe(
-      // Only catch and transform database connection errors into proper HTTP errors
+      // Retry database connection errors up to MAX_RETRIES times with backoff
+      retry({
+        count: DatabaseRetryInterceptor.MAX_RETRIES,
+        delay: (error, retryCount) => {
+          if (this.isDatabaseConnectionError(error)) {
+            const request = context.switchToHttp().getRequest();
+            const method = request?.method || 'UNKNOWN';
+            const url = request?.url || 'unknown';
+            this.logger.warn(
+              `Database connection error on ${method} ${url}, tentative ${retryCount}/${DatabaseRetryInterceptor.MAX_RETRIES}...`
+            );
+            // Exponential backoff: 1s, 2s
+            return timer(retryCount * 1000);
+          }
+          // Non-DB errors: don't retry
+          throw error;
+        },
+      }),
+      // If all retries exhausted, transform DB errors into user-friendly 503
       catchError(error => {
         if (this.isDatabaseConnectionError(error)) {
           const request = context.switchToHttp().getRequest();
@@ -24,7 +43,7 @@ export class DatabaseRetryInterceptor implements NestInterceptor {
           const url = request?.url || 'unknown';
 
           this.logger.error(
-            `Database connection error on ${method} ${url}: ${error.message}`
+            `Database connection error on ${method} ${url} after ${DatabaseRetryInterceptor.MAX_RETRIES} retries: ${error.message}`
           );
 
           return throwError(
@@ -32,7 +51,8 @@ export class DatabaseRetryInterceptor implements NestInterceptor {
               new HttpException(
                 {
                   statusCode: HttpStatus.SERVICE_UNAVAILABLE,
-                  message: 'Database temporarily unavailable. Please try again.',
+                  message:
+                    'Le service est momentanément indisponible. Veuillez réessayer dans quelques instants.',
                   error: 'Service Unavailable',
                 },
                 HttpStatus.SERVICE_UNAVAILABLE
