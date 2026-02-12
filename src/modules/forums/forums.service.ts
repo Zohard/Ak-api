@@ -2030,6 +2030,13 @@ export class ForumsService {
         this.cacheService.del('forums:messages:latest:limit50:offset0:all'),
       ]);
 
+      // Invalidate forum categories cache to update "last message" on board list
+      // This ensures the /forums page shows the updated message immediately
+      await Promise.all([
+        this.cacheService.del(`forums:categories:user${userId}`),
+        this.cacheService.del('forums:categories:public'),
+      ]);
+
       return {
         messageId: updatedMessage.idMsg,
         subject: updatedMessage.subject,
