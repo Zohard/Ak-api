@@ -213,8 +213,8 @@ export class HomePageService {
             );
 
             if (shouldCache) {
-              // Season data cached for 4 hours (14400s), other homepage data for 2 hours (7200s)
-              const ttl = key === 'season' ? 14400 : 7200;
+              // Season data cached for 24 hours (86400s), other homepage data for 2 hours (7200s)
+              const ttl = key === 'season' ? 86400 : 7200;
               await this.cache.set(cacheKey, dataToCache, ttl);
               this.logger.log(`✅ Cached ${key} (TTL: ${ttl}s, ${Array.isArray(dataToCache) ? dataToCache.length : 'N/A'} items)`);
             } else if (key === 'reviews' || key === 'articles') {

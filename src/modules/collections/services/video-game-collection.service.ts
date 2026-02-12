@@ -259,6 +259,13 @@ export class VideoGameCollectionService {
         sortBy?: string,
         sortOrder: 'asc' | 'desc' = 'desc'
     ) {
+        // Cache key based on all query params
+        const cacheKey = `collection_jeuxvideo:${userId}:t${type ?? 'all'}:p${page}:l${limit}:y${year ?? 'all'}:s${sortBy ?? 'default'}:${sortOrder}`;
+        const cached = await this.cacheService.get(cacheKey);
+        if (cached) {
+            return cached;
+        }
+
         const where: any = { idMembre: userId };
         if (type !== undefined) {
             where.type = type;
@@ -313,7 +320,7 @@ export class VideoGameCollectionService {
             this.prisma.collectionJeuxVideo.count({ where })
         ]);
 
-        return {
+        const result = {
             data: collection,
             meta: {
                 totalCount,
@@ -322,6 +329,9 @@ export class VideoGameCollectionService {
                 hasMore: skip + collection.length < totalCount
             }
         };
+
+        await this.cacheService.set(cacheKey, result, 10800); // 3 hours
+        return result;
     }
 
     // Helper method to invalidate all collection-related cache for a user
