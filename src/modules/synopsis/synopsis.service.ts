@@ -133,6 +133,13 @@ export class SynopsisService {
   }
 
   // Admin/Moderation methods
+  async getPendingCount(): Promise<{ count: number }> {
+    const count = await this.prisma.akSynopsis.count({
+      where: { validation: 0 },
+    });
+    return { count };
+  }
+
   async findPendingSynopses() {
     const pendingSynopses = await this.prisma.akSynopsis.findMany({
       where: {

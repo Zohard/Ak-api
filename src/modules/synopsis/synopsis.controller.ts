@@ -148,6 +148,15 @@ export class SynopsisController {
     return this.synopsisService.findAllSynopses(page, limit, validation, search);
   }
 
+  @Get('pending/count')
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get count of pending synopsis (Admin only)' })
+  @ApiResponse({ status: 200, description: 'Pending synopsis count retrieved successfully' })
+  async getPendingCount() {
+    return this.synopsisService.getPendingCount();
+  }
+
   @Get('pending')
   @UseGuards(JwtAuthGuard, AdminGuard)
   @ApiBearerAuth()
