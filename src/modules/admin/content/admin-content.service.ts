@@ -325,6 +325,13 @@ export class AdminContentService {
         id,
       );
 
+      // Invalidate staff cache
+      if (type === 'manga') {
+        await this.cacheService.del(`manga_staff:${id}`);
+      } else if (type === 'anime') {
+        await this.cacheService.del(`anime_staff:${id}`);
+      }
+
       // Delete tags
       await this.prisma.$queryRawUnsafe(
         `DELETE FROM ak_tag2fiche WHERE id_fiche = $1 AND type = $2`,
@@ -865,6 +872,13 @@ export class AdminContentService {
         id,
         businessId,
       );
+    }
+
+    // Invalidate staff cache
+    if (type === 'manga') {
+      await this.cacheService.del(`manga_staff:${id}`);
+    } else if (type === 'anime') {
+      await this.cacheService.del(`anime_staff:${id}`);
     }
 
     // Log the action

@@ -1078,6 +1078,15 @@ export class UsersService {
     similarToType?: 'anime' | 'manga',
     tags?: string
   ) {
+    // Create cache key based on all parameters
+    const cacheKey = `manga_recommendations:${id}:${limit}:${page}:${genre || 'none'}:${sortBy || 'default'}:${similarTo || 'none'}:${similarToType || 'none'}:${tags || 'none'}`;
+
+    // Try to get from cache first
+    const cached = await this.cacheService.get<any>(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
     // Call the main recommendations method and filter for manga only
     const result = await this.getUserRecommendations(
       id,
@@ -1092,10 +1101,15 @@ export class UsersService {
 
     const mangaOnly = result.items.filter((item: any) => item.type === 'manga').slice(0, limit);
 
-    return {
+    const response = {
       items: mangaOnly,
       pagination: { page, limit }
     };
+
+    // Cache for 12 hours (43200 seconds)
+    await this.cacheService.set(cacheKey, response, 43200);
+
+    return response;
   }
 
   async getUserGameRecommendations(

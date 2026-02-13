@@ -583,7 +583,7 @@ export class MangasService extends BaseContentService<
       data: formattedManga,
       includeReviews,
     };
-    await this.cacheService.setManga(id, cacheData, 600); // 10 minutes
+    await this.cacheService.setManga(id, cacheData, 43200); // 12 hours
 
     return formattedManga;
   }
@@ -2112,9 +2112,16 @@ export class MangasService extends BaseContentService<
       throw new NotFoundException('Manga introuvable');
     }
 
+    // Try to get from cache first
+    const cacheKey = `manga_staff:${id}`;
+    const cached = await this.cacheService.get<any>(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
     // Get staff/business relations
     const staff = await this.prisma.$queryRaw`
-      SELECT 
+      SELECT
         bs.id_relation as idRelation,
         bs.id_manga as idManga,
         bs.id_business as idBusiness,
@@ -2135,7 +2142,7 @@ export class MangasService extends BaseContentService<
       ORDER BY bs.type, b.denomination
     ` as any[];
 
-    return {
+    const result = {
       manga_id: id,
       staff: staff.map((s: any) => ({
         ...s,
@@ -2153,6 +2160,16 @@ export class MangasService extends BaseContentService<
         },
       })),
     };
+
+    // Cache for 12 hours (43200 seconds)
+    await this.cacheService.set(cacheKey, result, 43200);
+
+    return result;
+  }
+
+  async invalidateMangaStaffCache(id: number) {
+    const cacheKey = `manga_staff:${id}`;
+    await this.cacheService.del(cacheKey);
   }
 
   async getRandomManga() {
