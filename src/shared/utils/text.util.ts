@@ -65,3 +65,15 @@ export function slugify(text: string): string {
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/(^-|-$)+/g, '');
 }
+
+/**
+ * Sanitize strings for PostgreSQL by removing null bytes (\0)
+ * which cause "invalid byte sequence for encoding UTF8: 0x00" errors.
+ */
+export function sanitizeForPostgres(text: string | null | undefined): string | null | undefined {
+  if (typeof text !== 'string') {
+    return text;
+  }
+  // eslint-disable-next-line no-control-regex
+  return text.replace(/\x00/g, '');
+}

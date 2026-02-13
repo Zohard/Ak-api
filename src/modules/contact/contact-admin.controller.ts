@@ -18,7 +18,7 @@ import { ContactService } from './contact.service';
 @UseGuards(JwtAuthGuard, AdminGuard)
 @ApiBearerAuth()
 export class ContactAdminController {
-  constructor(private readonly contactService: ContactService) {}
+  constructor(private readonly contactService: ContactService) { }
 
   @Get()
   @ApiOperation({ summary: 'List all contact messages (paginated)' })
@@ -30,6 +30,12 @@ export class ContactAdminController {
       page ? parseInt(page, 10) : 1,
       limit ? parseInt(limit, 10) : 20,
     );
+  }
+
+  @Get('unread-count')
+  @ApiOperation({ summary: 'Get number of unread contact messages' })
+  unreadCount() {
+    return this.contactService.countUnread();
   }
 
   @Patch(':id/read')

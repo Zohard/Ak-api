@@ -298,8 +298,8 @@ export class SynopsisService {
           END as content_nice_url
         FROM ak_synopsis s
         LEFT JOIN smf_members m ON s.id_membre = m.id_member
-        LEFT JOIN ak_animes a ON s.id_fiche = a.id_anime
-        LEFT JOIN ak_mangas ma ON s.id_fiche = ma.id_manga
+        LEFT JOIN ak_animes a ON s.type = 1 AND s.id_fiche = a.id_anime
+        LEFT JOIN ak_mangas ma ON s.type = 2 AND s.id_fiche = ma.id_manga
         WHERE (
           (s.type = 1 AND a.titre ILIKE ${searchTerm})
           OR (s.type = 2 AND ma.titre ILIKE ${searchTerm})
@@ -312,8 +312,8 @@ export class SynopsisService {
         countRaw = await this.prisma.$queryRaw<any[]>`
         SELECT COUNT(*) as count
         FROM ak_synopsis s
-        LEFT JOIN ak_animes a ON s.id_fiche = a.id_anime
-        LEFT JOIN ak_mangas ma ON s.id_fiche = ma.id_manga
+        LEFT JOIN ak_animes a ON s.type = 1 AND s.id_fiche = a.id_anime
+        LEFT JOIN ak_mangas ma ON s.type = 2 AND s.id_fiche = ma.id_manga
         WHERE (
           (s.type = 1 AND a.titre ILIKE ${searchTerm})
           OR (s.type = 2 AND ma.titre ILIKE ${searchTerm})
@@ -343,8 +343,8 @@ export class SynopsisService {
           END as content_nice_url
         FROM ak_synopsis s
         LEFT JOIN smf_members m ON s.id_membre = m.id_member
-        LEFT JOIN ak_animes a ON s.id_fiche = a.id_anime
-        LEFT JOIN ak_mangas ma ON s.id_fiche = ma.id_manga
+        LEFT JOIN ak_animes a ON s.type = 1 AND s.id_fiche = a.id_anime
+        LEFT JOIN ak_mangas ma ON s.type = 2 AND s.id_fiche = ma.id_manga
         WHERE (
           (s.type = 1 AND a.titre ILIKE ${searchTerm})
           OR (s.type = 2 AND ma.titre ILIKE ${searchTerm})
@@ -356,8 +356,8 @@ export class SynopsisService {
         countRaw = await this.prisma.$queryRaw<any[]>`
         SELECT COUNT(*) as count
         FROM ak_synopsis s
-        LEFT JOIN ak_animes a ON s.id_fiche = a.id_anime
-        LEFT JOIN ak_mangas ma ON s.id_fiche = ma.id_manga
+        LEFT JOIN ak_animes a ON s.type = 1 AND s.id_fiche = a.id_anime
+        LEFT JOIN ak_mangas ma ON s.type = 2 AND s.id_fiche = ma.id_manga
         WHERE (
           (s.type = 1 AND a.titre ILIKE ${searchTerm})
           OR (s.type = 2 AND ma.titre ILIKE ${searchTerm})
@@ -389,9 +389,10 @@ export class SynopsisService {
           END as content_nice_url
         FROM ak_synopsis s
         LEFT JOIN smf_members m ON s.id_membre = m.id_member
-        LEFT JOIN ak_animes a ON s.id_fiche = a.id_anime
-        LEFT JOIN ak_mangas ma ON s.id_fiche = ma.id_manga
+        LEFT JOIN ak_animes a ON s.type = 1 AND s.id_fiche = a.id_anime
+        LEFT JOIN ak_mangas ma ON s.type = 2 AND s.id_fiche = ma.id_manga
         WHERE s.validation = ${validation}
+          AND (a.id_anime IS NOT NULL OR ma.id_manga IS NOT NULL)
         ORDER BY s.date DESC
         LIMIT ${limit} OFFSET ${skip}
       `;
@@ -399,7 +400,10 @@ export class SynopsisService {
         countRaw = await this.prisma.$queryRaw<any[]>`
         SELECT COUNT(*) as count
         FROM ak_synopsis s
+        LEFT JOIN ak_animes a ON s.type = 1 AND s.id_fiche = a.id_anime
+        LEFT JOIN ak_mangas ma ON s.type = 2 AND s.id_fiche = ma.id_manga
         WHERE s.validation = ${validation}
+          AND (a.id_anime IS NOT NULL OR ma.id_manga IS NOT NULL)
       `;
       } else {
         synopsesRaw = await this.prisma.$queryRaw<any[]>`
@@ -424,8 +428,9 @@ export class SynopsisService {
           END as content_nice_url
         FROM ak_synopsis s
         LEFT JOIN smf_members m ON s.id_membre = m.id_member
-        LEFT JOIN ak_animes a ON s.id_fiche = a.id_anime
-        LEFT JOIN ak_mangas ma ON s.id_fiche = ma.id_manga
+        LEFT JOIN ak_animes a ON s.type = 1 AND s.id_fiche = a.id_anime
+        LEFT JOIN ak_mangas ma ON s.type = 2 AND s.id_fiche = ma.id_manga
+        WHERE (a.id_anime IS NOT NULL OR ma.id_manga IS NOT NULL)
         ORDER BY s.date DESC
         LIMIT ${limit} OFFSET ${skip}
       `;
@@ -433,6 +438,9 @@ export class SynopsisService {
         countRaw = await this.prisma.$queryRaw<any[]>`
         SELECT COUNT(*) as count
         FROM ak_synopsis s
+        LEFT JOIN ak_animes a ON s.type = 1 AND s.id_fiche = a.id_anime
+        LEFT JOIN ak_mangas ma ON s.type = 2 AND s.id_fiche = ma.id_manga
+        WHERE (a.id_anime IS NOT NULL OR ma.id_manga IS NOT NULL)
       `;
       }
     }

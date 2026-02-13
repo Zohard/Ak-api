@@ -10,7 +10,7 @@ export class ContactService {
   constructor(
     private readonly emailService: EmailService,
     private readonly prisma: PrismaService,
-  ) {}
+  ) { }
 
   async submitContact(dto: CreateContactDto): Promise<void> {
     this.logger.log(`Contact form submission from ${dto.email}`);
@@ -30,6 +30,12 @@ export class ContactService {
     } catch (error) {
       this.logger.error(`Failed to send contact email: ${error.message}`);
     }
+  }
+
+  async countUnread(): Promise<number> {
+    return this.prisma.akContactMessage.count({
+      where: { isRead: false },
+    });
   }
 
   async findAll(page = 1, limit = 20) {

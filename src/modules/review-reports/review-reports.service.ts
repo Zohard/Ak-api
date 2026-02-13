@@ -1,12 +1,17 @@
-import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../shared/services/prisma.service';
 import { CreateReviewReportDto } from './dto/create-review-report.dto';
+import { sanitizeForPostgres } from '../../shared/utils/text.util';
 
 @Injectable()
 export class ReviewReportsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) { }
 
   async create(createReviewReportDto: CreateReviewReportDto, userId: number) {
+    // Sanitize inputs to prevent PostgreSQL "invalid byte sequence for encoding UTF8: 0x00" errors
+    const reason = sanitizeForPostgres(createReviewReportDto.reason) as string;
+    const comment = sanitizeForPostgres(createReviewReportDto.comment) || null;
+
     // Check if review exists
     const review = await this.prisma.akCritique.findUnique({
       where: { idCritique: createReviewReportDto.id_critique },
@@ -34,8 +39,8 @@ export class ReviewReportsService {
       data: {
         idCritique: createReviewReportDto.id_critique,
         idReporter: userId,
-        reason: createReviewReportDto.reason,
-        comment: createReviewReportDto.comment || null,
+        reason,
+        comment,
       },
     });
 
