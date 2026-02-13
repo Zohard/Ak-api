@@ -602,9 +602,9 @@ export class CollectionBrowseService {
             }
         } else {
             // Video game collection
+            // Note: CollectionJeuxVideo doesn't have isPublic field (all game collections are public by default)
             const where: any = {
                 idJeu: mediaId,
-                isPublic: true,
                 idMembre: { gt: 0 },
                 user: { idMember: { gt: 0 } },
             };
