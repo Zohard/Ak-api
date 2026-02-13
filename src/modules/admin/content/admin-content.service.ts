@@ -998,7 +998,7 @@ export class AdminContentService {
         (SELECT COUNT(*) FROM ak_webzine_articles WHERE statut = 1) as active_articles,
         (SELECT COUNT(*) FROM ak_critique WHERE statut = 0) as pending_reviews,
         (SELECT COUNT(*) FROM ak_synopsis WHERE validation = 0) as pending_synopses,
-        (SELECT COUNT(*) FROM ak_contact_messages WHERE "isRead" = false) as unread_contact_messages
+        (SELECT COUNT(*) FROM ak_contact_messages WHERE is_read = false) as unread_contact_messages
     `;
 
     const result = (stats as any[])[0];
