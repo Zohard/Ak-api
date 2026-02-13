@@ -20,7 +20,7 @@ export class AddMediaRelationDto {
 
   @ApiProperty({
     description: 'ID of the related media',
-    example: 1234,
+    example: 1235,
   })
   @IsInt()
   mediaId: number;

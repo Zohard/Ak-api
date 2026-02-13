@@ -136,8 +136,8 @@ export class SynopsisService {
         : [],
     ]);
 
-    const animeMap = new Map<number, any>(animes.map((a: any) => [a.idAnime, a]));
-    const mangaMap = new Map<number, any>(mangas.map((m: any) => [m.idManga, m]));
+    const animeMap = new Map<number, any>(animes.map((a: any): [number, any] => [a.idAnime, a]));
+    const mangaMap = new Map<number, any>(mangas.map((m: any): [number, any] => [m.idManga, m]));
 
     const enrichedSubmissions = submissions.map((s) => {
       let content_title = 'Contenu introuvable';
