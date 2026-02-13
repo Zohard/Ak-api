@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../shared/services/prisma.service';
 import { CacheService } from '../../shared/services/cache.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { CreateSynopsisDto } from './dto/create-synopsis.dto';
 import { SynopsisQueryDto } from './dto/synopsis-query.dto';
 import * as crypto from 'crypto';
@@ -15,6 +16,7 @@ export class SynopsisService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly cacheService: CacheService,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   async create(createSynopsisDto: CreateSynopsisDto, userId: number) {
@@ -108,14 +110,64 @@ export class SynopsisService {
       orderBy: {
         date: 'desc',
       },
-      include: {
-        // Add relation to get anime/manga info if needed
-      },
+    });
+
+    // Bulk-fetch anime and manga titles (same pattern as findPendingSynopses)
+    const animeIds = submissions
+      .filter(s => s.type === 1 && s.idFiche)
+      .map(s => s.idFiche!);
+
+    const mangaIds = submissions
+      .filter(s => s.type === 2 && s.idFiche)
+      .map(s => s.idFiche!);
+
+    const [animes, mangas] = await Promise.all([
+      animeIds.length > 0
+        ? this.prisma.akAnime.findMany({
+            where: { idAnime: { in: animeIds } },
+            select: { idAnime: true, titre: true, niceUrl: true },
+          })
+        : [],
+      mangaIds.length > 0
+        ? this.prisma.akManga.findMany({
+            where: { idManga: { in: mangaIds } },
+            select: { idManga: true, titre: true, niceUrl: true },
+          })
+        : [],
+    ]);
+
+    const animeMap = new Map<number, any>(animes.map((a: any) => [a.idAnime, a]));
+    const mangaMap = new Map<number, any>(mangas.map((m: any) => [m.idManga, m]));
+
+    const enrichedSubmissions = submissions.map((s) => {
+      let content_title = 'Contenu introuvable';
+      let content_nice_url: string | null = null;
+
+      if (s.type === 1 && s.idFiche) {
+        const anime = animeMap.get(s.idFiche);
+        content_title = anime?.titre || 'Anime introuvable';
+        content_nice_url = anime?.niceUrl || null;
+      } else if (s.type === 2 && s.idFiche) {
+        const manga = mangaMap.get(s.idFiche);
+        content_title = manga?.titre || 'Manga introuvable';
+        content_nice_url = manga?.niceUrl || null;
+      }
+
+      return {
+        id_synopsis: s.idSynopsis,
+        synopsis: s.synopsis,
+        type: s.type,
+        id_fiche: s.idFiche,
+        validation: s.validation,
+        date: s.date,
+        content_title,
+        content_nice_url,
+      };
     });
 
     return {
       success: true,
-      submissions,
+      submissions: enrichedSubmissions,
     };
   }
 
@@ -238,7 +290,12 @@ export class SynopsisService {
             WHEN s.type = 1 THEN a.titre
             WHEN s.type = 2 THEN ma.titre
             ELSE 'Contenu introuvable'
-          END as content_title
+          END as content_title,
+          CASE
+            WHEN s.type = 1 THEN a.nice_url
+            WHEN s.type = 2 THEN ma.nice_url
+            ELSE NULL
+          END as content_nice_url
         FROM ak_synopsis s
         LEFT JOIN smf_members m ON s.id_membre = m.id_member
         LEFT JOIN ak_animes a ON s.id_fiche = a.id_anime
@@ -278,7 +335,12 @@ export class SynopsisService {
             WHEN s.type = 1 THEN a.titre
             WHEN s.type = 2 THEN ma.titre
             ELSE 'Contenu introuvable'
-          END as content_title
+          END as content_title,
+          CASE
+            WHEN s.type = 1 THEN a.nice_url
+            WHEN s.type = 2 THEN ma.nice_url
+            ELSE NULL
+          END as content_nice_url
         FROM ak_synopsis s
         LEFT JOIN smf_members m ON s.id_membre = m.id_member
         LEFT JOIN ak_animes a ON s.id_fiche = a.id_anime
@@ -319,7 +381,12 @@ export class SynopsisService {
             WHEN s.type = 1 THEN a.titre
             WHEN s.type = 2 THEN ma.titre
             ELSE 'Contenu introuvable'
-          END as content_title
+          END as content_title,
+          CASE
+            WHEN s.type = 1 THEN a.nice_url
+            WHEN s.type = 2 THEN ma.nice_url
+            ELSE NULL
+          END as content_nice_url
         FROM ak_synopsis s
         LEFT JOIN smf_members m ON s.id_membre = m.id_member
         LEFT JOIN ak_animes a ON s.id_fiche = a.id_anime
@@ -349,7 +416,12 @@ export class SynopsisService {
             WHEN s.type = 1 THEN a.titre
             WHEN s.type = 2 THEN ma.titre
             ELSE 'Contenu introuvable'
-          END as content_title
+          END as content_title,
+          CASE
+            WHEN s.type = 1 THEN a.nice_url
+            WHEN s.type = 2 THEN ma.nice_url
+            ELSE NULL
+          END as content_nice_url
         FROM ak_synopsis s
         LEFT JOIN smf_members m ON s.id_membre = m.id_member
         LEFT JOIN ak_animes a ON s.id_fiche = a.id_anime
@@ -376,6 +448,7 @@ export class SynopsisService {
       date: synopsis.date,
       author_name: synopsis.member_name || 'Utilisateur introuvable',
       content_title: synopsis.content_title || 'Contenu introuvable',
+      content_nice_url: synopsis.content_nice_url || null,
     }));
 
     return {
@@ -458,11 +531,78 @@ export class SynopsisService {
       await this.cacheService.del(cacheKey);
     }
 
+    // Send notification to the submitting user (fire-and-forget)
+    this.sendSynopsisNotification(synopsis, validation).catch((err) => {
+      // Silently log errors — don't block the response
+      console.error('Failed to send synopsis notification:', err);
+    });
+
     return {
       success: true,
       message: validation === 1 ? 'Synopsis validé et publié' : 'Synopsis rejeté',
       data: updatedSynopsis,
     };
+  }
+
+  async resetToPending(synopsisId: number, moderatorId: number) {
+    const synopsis = await this.prisma.akSynopsis.findUnique({
+      where: { idSynopsis: synopsisId },
+    });
+
+    if (!synopsis) {
+      throw new NotFoundException('Synopsis introuvable');
+    }
+
+    if (synopsis.validation !== 2) {
+      throw new BadRequestException('Seuls les synopsis rejetés peuvent être remis en attente');
+    }
+
+    await this.prisma.akSynopsis.update({
+      where: { idSynopsis: synopsisId },
+      data: { validation: 0 },
+    });
+
+    return {
+      success: true,
+      message: 'Synopsis remis en attente de validation',
+    };
+  }
+
+  private async sendSynopsisNotification(
+    synopsis: { idSynopsis: number; idMembre: number; type: number; idFiche: number | null },
+    validation: number,
+  ) {
+    // Fetch content title
+    let contentTitle = 'Contenu inconnu';
+    if (synopsis.type === 1 && synopsis.idFiche) {
+      const anime = await this.prisma.akAnime.findUnique({
+        where: { idAnime: synopsis.idFiche },
+        select: { titre: true },
+      });
+      contentTitle = anime?.titre || 'Anime inconnu';
+    } else if (synopsis.type === 2 && synopsis.idFiche) {
+      const manga = await this.prisma.akManga.findUnique({
+        where: { idManga: synopsis.idFiche },
+        select: { titre: true },
+      });
+      contentTitle = manga?.titre || 'Manga inconnu';
+    }
+
+    const isValidated = validation === 1;
+    await this.notificationsService.sendNotification({
+      userId: synopsis.idMembre,
+      type: 'review_moderated',
+      title: `Synopsis : ${contentTitle}`,
+      message: isValidated
+        ? `Votre synopsis pour ${contentTitle} a été validé et publié !`
+        : `Votre synopsis pour ${contentTitle} a été rejeté.`,
+      priority: 'medium',
+      data: {
+        synopsisId: synopsis.idSynopsis,
+        type: synopsis.type,
+        idFiche: synopsis.idFiche,
+      },
+    });
   }
 
   async updateSynopsisOnly(
@@ -502,6 +642,39 @@ export class SynopsisService {
         validation: updatedSynopsis.validation,
         customAuthor: customAuthor, // Return for frontend tracking
       },
+    };
+  }
+
+  async resubmitSynopsis(synopsisId: number, userId: number, newSynopsis: string) {
+    const synopsis = await this.prisma.akSynopsis.findUnique({
+      where: { idSynopsis: synopsisId },
+    });
+
+    if (!synopsis) {
+      throw new NotFoundException('Synopsis introuvable');
+    }
+
+    if (synopsis.idMembre !== userId) {
+      throw new BadRequestException('Vous ne pouvez modifier que vos propres synopsis');
+    }
+
+    if (synopsis.validation !== 2) {
+      throw new BadRequestException('Seuls les synopsis rejetés peuvent être resoumis');
+    }
+
+    const sanitized = this.sanitizeSynopsis(newSynopsis);
+
+    await this.prisma.akSynopsis.update({
+      where: { idSynopsis: synopsisId },
+      data: {
+        synopsis: sanitized,
+        validation: 0,
+      },
+    });
+
+    return {
+      success: true,
+      message: 'Synopsis resoumis avec succès. Il sera réexaminé par notre équipe.',
     };
   }
 

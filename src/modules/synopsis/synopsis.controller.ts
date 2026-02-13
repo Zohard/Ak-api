@@ -24,6 +24,7 @@ import { CreateSynopsisDto } from './dto/create-synopsis.dto';
 import { SynopsisQueryDto } from './dto/synopsis-query.dto';
 import { ValidateSynopsisDto } from './dto/validate-synopsis.dto';
 import { BulkDeleteSynopsisDto } from './dto/bulk-delete-synopsis.dto';
+import { ResubmitSynopsisDto } from './dto/resubmit-synopsis.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { AdminGuard } from '../../common/guards/admin.guard';
 
@@ -125,6 +126,23 @@ export class SynopsisController {
   ) {
     const hasSubmitted = await this.synopsisService.hasUserSubmitted(req.user.id, type, contentId);
     return { hasSubmitted };
+  }
+
+  @Patch(':id/resubmit')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Resoumettre un synopsis rejeté' })
+  @ApiParam({ name: 'id', description: 'ID du synopsis', type: 'number' })
+  @ApiResponse({
+    status: 200,
+    description: 'Synopsis resoumis avec succès',
+  })
+  async resubmitSynopsis(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: ResubmitSynopsisDto,
+    @Request() req,
+  ) {
+    return this.synopsisService.resubmitSynopsis(id, req.user.id, dto.synopsis);
   }
 
   // Admin endpoints
@@ -268,6 +286,19 @@ export class SynopsisController {
   })
   async rejectSynopsis(@Param('id', ParseIntPipe) id: number, @Request() req) {
     return this.synopsisService.validateSynopsis(id, 2, req.user.id);
+  }
+
+  @Patch(':id/reset')
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Remettre un synopsis rejeté en attente (Admin seulement)' })
+  @ApiParam({ name: 'id', description: 'ID du synopsis', type: 'number' })
+  @ApiResponse({
+    status: 200,
+    description: 'Synopsis remis en attente avec succès',
+  })
+  async resetToPending(@Param('id', ParseIntPipe) id: number, @Request() req) {
+    return this.synopsisService.resetToPending(id, req.user.id);
   }
 
   @Post('bulk-delete')
