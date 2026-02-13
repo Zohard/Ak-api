@@ -428,7 +428,7 @@ export class CollectionBrowseService {
      * Get users who have this anime/manga in their collection with their evaluations
      */
     async getUsersWithMedia(
-        mediaType: 'anime' | 'manga',
+        mediaType: 'anime' | 'manga' | 'game' | 'jeu-video',
         mediaId: number,
         page: number = 1,
         limit: number = 20,
@@ -540,7 +540,7 @@ export class CollectionBrowseService {
             } else {
                 friendsCount = 0;
             }
-        } else {
+        } else if (mediaType === 'manga') {
             const where: any = {
                 idManga: mediaId,
                 isPublic: true,
@@ -582,6 +582,65 @@ export class CollectionBrowseService {
             // If not filtering by friends but user is logged in, calculate friends count separately
             if (!friendsOnly && currentUserId && friendIds.length > 0) {
                 promises.push(this.prisma.collectionManga.count({
+                    where: {
+                        ...where,
+                        idMembre: { in: friendIds }
+                    }
+                }));
+            }
+
+            const results = await Promise.all(promises);
+            collections = results[0];
+            totalCount = results[1];
+
+            if (friendsOnly) {
+                friendsCount = totalCount;
+            } else if (results.length > 2) {
+                friendsCount = results[2];
+            } else {
+                friendsCount = 0;
+            }
+        } else {
+            // Video game collection
+            const where: any = {
+                idJeu: mediaId,
+                isPublic: true,
+                idMembre: { gt: 0 },
+                user: { idMember: { gt: 0 } },
+            };
+
+            const queryWhere = { ...where };
+            if (friendsOnly && friendIds.length > 0) {
+                queryWhere.idMembre = { in: friendIds };
+            }
+
+            const promises: any[] = [
+                this.prisma.collectionJeuxVideo.findMany({
+                    where: queryWhere,
+                    skip,
+                    take: limit,
+                    select: {
+                        idMembre: true,
+                        type: true,
+                        evaluation: true,
+                        user: {
+                            select: {
+                                idMember: true,
+                                memberName: true,
+                                avatar: true,
+                            }
+                        }
+                    },
+                    orderBy: [
+                        { evaluation: 'desc' },
+                        { user: { memberName: 'asc' } }
+                    ]
+                }),
+                this.prisma.collectionJeuxVideo.count({ where: queryWhere })
+            ];
+
+            if (!friendsOnly && currentUserId && friendIds.length > 0) {
+                promises.push(this.prisma.collectionJeuxVideo.count({
                     where: {
                         ...where,
                         idMembre: { in: friendIds }

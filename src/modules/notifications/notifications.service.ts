@@ -791,14 +791,19 @@ export class NotificationsService {
         };
 
       case 'review_moderated':
+        const isSynopsis = !!data.data?.synopsisId;
+        const redirectPath = isSynopsis ? '/profile/contributions' : '/profile/reviews';
+        const contentTypeLabel = isSynopsis ? 'synopsis' : 'critique';
+        const actionLabel = data.data?.status === 'approved' ? 'approuvée' : 'rejetée';
+
         return {
-          subject: `Votre critique a été ${data.data?.status === 'approved' ? 'approuvée' : 'rejetée'}`,
+          subject: `Votre ${contentTypeLabel} a été ${actionLabel}`,
           html: `
-            <h2>Statut de votre critique</h2>
-            <p>Votre critique pour <strong>${data.title}</strong> a été ${data.data?.status === 'approved' ? 'approuvée' : 'rejetée'}.</p>
+            <h2>Statut de votre ${contentTypeLabel}</h2>
+            <p>Votre ${contentTypeLabel} pour <strong>${data.title}</strong> a été ${actionLabel}.</p>
             <p>${data.message}</p>
             ${data.data?.reason ? `<p><strong>Raison:</strong> ${data.data.reason}</p>` : ''}
-            <a href="${baseUrl}/profile/reviews" style="background-color: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Voir mes critiques</a>
+            <a href="${baseUrl}${redirectPath}" style="background-color: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Voir mes ${isSynopsis ? 'contributions' : 'critiques'}</a>
           `,
         };
 

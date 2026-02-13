@@ -768,15 +768,15 @@ export class CollectionsController {
   }
 
   @Get('media/:mediaType/:mediaId/users')
-  @ApiOperation({ summary: 'Get users who have this anime/manga in their collection with their evaluations' })
-  @ApiParam({ name: 'mediaType', enum: ['anime', 'manga'], description: 'Type of media' })
+  @ApiOperation({ summary: 'Get users who have this anime/manga/game in their collection with their evaluations' })
+  @ApiParam({ name: 'mediaType', enum: ['anime', 'manga', 'game', 'jeu-video'], description: 'Type of media' })
   @ApiParam({ name: 'mediaId', type: 'number', description: 'Media ID' })
   @ApiQuery({ name: 'page', required: false, type: 'number', description: 'Page number (default: 1)' })
   @ApiQuery({ name: 'limit', required: false, type: 'number', description: 'Items per page (default: 20)' })
   @ApiQuery({ name: 'friendsOnly', required: false, type: 'boolean', description: 'Show only friends (default: false)' })
   @ApiResponse({ status: 200, description: 'Users with collections retrieved successfully' })
   getUsersWithMedia(
-    @Param('mediaType') mediaType: 'anime' | 'manga',
+    @Param('mediaType') mediaType: 'anime' | 'manga' | 'game' | 'jeu-video',
     @Param('mediaId', ParseIntPipe) mediaId: number,
     @Query('page', new ParseIntPipe({ optional: true })) page: number = 1,
     @Query('limit', new ParseIntPipe({ optional: true })) limit: number = 20,

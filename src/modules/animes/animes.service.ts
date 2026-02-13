@@ -620,7 +620,7 @@ export class AnimesService extends BaseContentService<
       includeEpisodes,
       includeTrailers,
     };
-    await this.cacheService.setAnime(id, cacheData, 600); // 10 minutes
+    await this.cacheService.setAnime(id, cacheData, 43200); // 12 hours
 
     return formattedAnime;
   }

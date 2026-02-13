@@ -266,18 +266,35 @@ export class AuthService {
           counter++;
         }
 
-        user = await this.prisma.smfMember.create({
-          data: {
-            memberName: username,
-            realName: `${firstName} ${lastName}`.trim() || username,
-            emailAddress: email,
-            passwd: await bcrypt.hash(crypto.randomBytes(16).toString('hex'), 12),
-            dateRegistered: Math.floor(Date.now() / 1000),
-            idGroup: 0,
-            emailVerified: true,
-            emailVerifiedAt: new Date(),
-          } as any,
-        });
+        try {
+          user = await this.prisma.smfMember.create({
+            data: {
+              memberName: username,
+              realName: `${firstName} ${lastName}`.trim() || username,
+              emailAddress: email,
+              passwd: await bcrypt.hash(crypto.randomBytes(16).toString('hex'), 12),
+              dateRegistered: Math.floor(Date.now() / 1000),
+              idGroup: 0,
+              emailVerified: true,
+              emailVerifiedAt: new Date(),
+            } as any,
+          });
+        } catch (error) {
+          // Handle race condition: if another request created the user simultaneously
+          // try to find the user again
+          if (error.code === 'P2002') {
+            user = await this.prisma.smfMember.findFirst({
+              where: { emailAddress: email },
+            });
+
+            if (!user) {
+              // If still not found, re-throw the error
+              throw error;
+            }
+          } else {
+            throw error;
+          }
+        }
       }
 
       // Link the user to the social identity using upsert to prevent unique constraint errors

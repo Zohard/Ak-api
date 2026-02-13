@@ -436,7 +436,7 @@ export class ReviewsService {
 
     // Cache the result if it's not user-specific or search-based
     if (!search && !idMembre && !pseudo) {
-      const ttl = idAnime || idManga ? 300 : 180; // 5 mins for specific anime/manga, 3 mins for general
+      const ttl = idAnime || idManga ? 14400 : 180; // 4 hours for specific anime/manga, 3 mins for general
       await this.cacheService.setReviewsList(cacheKey, result, ttl);
     }
 

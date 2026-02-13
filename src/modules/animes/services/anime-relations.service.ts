@@ -584,8 +584,8 @@ export class AnimeRelationsService {
       })),
     };
 
-    // Cache for 30 minutes (1800 seconds)
-    await this.cacheService.set(cacheKey, result, 1800);
+    // Cache for 12 hours (43200 seconds)
+    await this.cacheService.set(cacheKey, result, 43200);
 
     return result;
   }
