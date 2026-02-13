@@ -3545,28 +3545,41 @@ export class ForumsService {
         return { success: true, count: 0 };
       }
 
-      // Prepare data for bulk upsert
-      const upsertPromises = topics.map(topic =>
-        this.prisma.smfLogTopics.upsert({
-          where: {
-            idTopic_idMember: {
-              idTopic: topic.idTopic,
-              idMember: userId
-            }
-          },
-          update: {
-            idMsg: topic.idLastMsg
-          },
-          create: {
-            idTopic: topic.idTopic,
-            idMember: userId,
-            idMsg: topic.idLastMsg
-          }
-        })
-      );
+      this.logger.log(`Marking ${topics.length} topics as read in board ${boardId} for user ${userId}`);
 
-      // Execute all upserts in parallel
-      await Promise.all(upsertPromises);
+      // Process in batches of 50 to avoid overwhelming the database
+      const batchSize = 50;
+      let processedCount = 0;
+
+      for (let i = 0; i < topics.length; i += batchSize) {
+        const batch = topics.slice(i, i + batchSize);
+        const upsertPromises = batch.map(topic =>
+          this.prisma.smfLogTopics.upsert({
+            where: {
+              idTopic_idMember: {
+                idTopic: topic.idTopic,
+                idMember: userId
+              }
+            },
+            update: {
+              idMsg: topic.idLastMsg
+            },
+            create: {
+              idTopic: topic.idTopic,
+              idMember: userId,
+              idMsg: topic.idLastMsg
+            }
+          }).catch(err => {
+            this.logger.error(`Failed to mark topic ${topic.idTopic} as read:`, err);
+            return null;
+          })
+        );
+
+        await Promise.all(upsertPromises);
+        processedCount += batch.length;
+      }
+
+      this.logger.log(`Successfully marked ${processedCount} topics as read in board ${boardId}`);
 
       // Invalidate user-specific caches to reflect the read status change
       await Promise.all([
@@ -3575,9 +3588,9 @@ export class ForumsService {
         this.cacheService.invalidateUserForumBoard(boardId, userId)
       ]);
 
-      return { success: true, count: topics.length };
+      return { success: true, count: processedCount };
     } catch (error) {
-      this.logger.error('Error marking board as read:', error);
+      this.logger.error(`Error marking board ${boardId} as read for user ${userId}:`, error);
       return { success: false, count: 0 };
     }
   }
