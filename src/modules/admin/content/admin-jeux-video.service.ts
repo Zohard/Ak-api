@@ -81,15 +81,41 @@ export class AdminJeuxVideoService {
         statut
       FROM ak_jeux_video
       WHERE titre ILIKE ${q}
-      ORDER BY 
-        CASE 
-          WHEN titre ILIKE ${qStart} THEN 0 
-          ELSE 1 
+      ORDER BY
+        CASE
+          WHEN titre ILIKE ${qStart} THEN 0
+          ELSE 1
         END,
         titre
       LIMIT ${limit}
     `;
     return { items: rows };
+  }
+
+  /**
+   * Check which IGDB IDs already exist in the database
+   * Returns a mapping of IGDB ID → local game ID
+   */
+  async checkIgdbIds(igdbIds: number[]): Promise<{ exists: Record<number, number> }> {
+    const games = await this.prisma.akJeuxVideo.findMany({
+      where: {
+        igdbId: { in: igdbIds }
+      },
+      select: {
+        idJeu: true,
+        igdbId: true
+      }
+    });
+
+    // Build mapping: igdbId → idJeu
+    const exists: Record<number, number> = {};
+    for (const game of games) {
+      if (game.igdbId) {
+        exists[game.igdbId] = game.idJeu;
+      }
+    }
+
+    return { exists };
   }
 
   async getOne(id: number) {

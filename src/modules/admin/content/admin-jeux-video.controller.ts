@@ -31,6 +31,15 @@ export class AdminJeuxVideoController {
     return this.service.searchByName(q.trim(), lim);
   }
 
+  @Post('check-igdb-ids')
+  @ApiOperation({ summary: 'Check which IGDB IDs already exist in the database' })
+  async checkIgdbIds(@Body('igdbIds') igdbIds: number[]) {
+    if (!igdbIds || !Array.isArray(igdbIds) || igdbIds.length === 0) {
+      return { exists: {} };
+    }
+    return this.service.checkIgdbIds(igdbIds);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Obtenir une fiche jeu vidéo (admin)' })
   getOne(@Param('id', ParseIntPipe) id: number) {
