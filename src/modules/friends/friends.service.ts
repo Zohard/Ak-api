@@ -994,48 +994,53 @@ export class FriendsService {
       })));
     }
 
-    // Fetch social posts (wrapped in try-catch in case tables don't exist yet)
+    // Fetch social posts using Prisma models (gracefully handles empty results)
     if (typeFilter === 'all' || typeFilter === 'post') {
       try {
-        const posts = await this.prisma.$queryRaw<Array<{
-          id_post: number;
-          user_id: number;
-          content: string;
-          image_url: string;
-          created_at: Date;
-          real_name: string;
-          avatar: string;
-          likes_count: number;
-          comments_count: number;
-        }>>`
-          SELECT
-            p.id_post, p.user_id, p.content, p.image_url, p.created_at,
-            m.real_name, m.avatar,
-            (SELECT COUNT(*) FROM ak_social_likes l WHERE l.post_id = p.id_post) as likes_count,
-            (SELECT COUNT(*) FROM ak_social_comments c WHERE c.post_id = p.id_post) as comments_count
-          FROM ak_social_posts p
-          JOIN smf_members m ON p.user_id = m.id_member
-          WHERE p.user_id IN (${Prisma.join(friendIds)})
-          ORDER BY p.created_at DESC
-          LIMIT ${limit + 50}
-        `;
+        const posts = await this.prisma.akSocialPost.findMany({
+          where: {
+            userId: { in: friendIds }
+          },
+          include: {
+            user: {
+              select: {
+                idMember: true,
+                memberName: true,
+                realName: true,
+                avatar: true,
+              }
+            },
+            _count: {
+              select: {
+                likes: true,
+                comments: true
+              }
+            }
+          },
+          orderBy: {
+            createdAt: 'desc'
+          },
+          take: limit + 50
+        });
 
+        // Map posts to activity format (empty array if no posts)
         activities.push(...posts.map(p => ({
-          id: `post-${p.id_post}`,
+          id: `post-${p.idPost}`,
           type: 'post',
-          userId: p.user_id,
-          userName: p.real_name,
-          userAvatar: p.avatar || '../img/noavatar.png',
-          createdAt: p.created_at,
+          userId: p.userId,
+          userName: p.user.realName || p.user.memberName,
+          userAvatar: p.user.avatar || '../img/noavatar.png',
+          createdAt: p.createdAt,
           content: p.content,
-          image: p.image_url,
-          likesCount: Number(p.likes_count),
-          commentsCount: Number(p.comments_count),
+          image: p.imageUrl,
+          likesCount: p._count.likes,
+          commentsCount: p._count.comments,
           actionText: `a publié un message`
         })));
       } catch (error) {
-        // Silently fail if social tables don't exist yet - other activities will still show
-        this.logger.debug('Social posts query failed (tables may not exist yet):', error.message);
+        // Gracefully handle if social feature not available yet
+        // Other activities (ratings, reviews, lists) will still display
+        this.logger.debug('Social posts unavailable:', error.message);
       }
     }
 
