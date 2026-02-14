@@ -549,6 +549,13 @@ export class ReviewsService {
   }
 
   async findBySlug(slug: string, requestingUserId?: number) {
+    // Try to get from cache first (only for public/published reviews)
+    const cacheKey = `review:slug:${slug}`;
+    const cached = await this.cacheService.get(cacheKey);
+    if (cached && !requestingUserId) {
+      return cached;
+    }
+
     const review = await this.prisma.akCritique.findFirst({
       where: {
         niceUrl: slug,
@@ -623,6 +630,13 @@ export class ReviewsService {
         formatted = { ...formatted, membre: { ...formatted.membre, averageRating: Number(average) } }
       }
     } catch { }
+
+    // Cache the review for 10 minutes (600 seconds) - same as findOne
+    // Only cache if it's published (not user-specific)
+    if (review.statut === 0) {
+      await this.cacheService.set(cacheKey, formatted, 600);
+    }
+
     return formatted;
   }
 
@@ -1552,10 +1566,27 @@ export class ReviewsService {
   // Cache invalidation methods
   // OPTIMIZED: Reduced Redis operations to minimize Upstash costs
   async invalidateReviewCache(reviewId: number, animeId?: number, mangaId?: number, userId?: number, jeuId?: number): Promise<void> {
+    // Fetch the review's slug to invalidate slug-based cache
+    let reviewSlug: string | undefined;
+    try {
+      const review = await this.prisma.akCritique.findUnique({
+        where: { idCritique: reviewId },
+        select: { niceUrl: true },
+      });
+      reviewSlug = review?.niceUrl;
+    } catch {
+      // If we can't fetch the slug, continue with ID-based invalidation
+    }
+
     // Batch all deletions in parallel to minimize round trips
     const deletions: Promise<void>[] = [
       this.cacheService.del(`review:${reviewId}`),
     ];
+
+    // Invalidate slug-based cache if available
+    if (reviewSlug) {
+      deletions.push(this.cacheService.del(`review:slug:${reviewSlug}`));
+    }
 
     // Invalidate user review check cache
     if (userId) {
