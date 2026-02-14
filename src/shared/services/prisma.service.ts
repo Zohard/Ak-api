@@ -151,6 +151,14 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
         });
 
         this.$on('error', (e: Prisma.LogEvent) => {
+          // Suppress "terminating connection due to idle-session timeout" as it is expected behavior for Neon/Serverless
+          if (e.message && (
+            e.message.includes('idle-session timeout') ||
+            e.message.includes('terminating connection') ||
+            e.message.includes('the database system is shutting down')
+          )) {
+            return;
+          }
           this.logger.error(`Database error: ${e.message}`);
         });
 
@@ -165,7 +173,7 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
         this.logger.error(`Database connection failed (attempt ${attempt}/${maxRetries}): ${error.message}`);
 
         if (retries === 0) {
-          this.logger.error('All database connection attempts failed. Application will start without DB connection (lazy connect).');
+          this.logger.warn('All database connection attempts failed. Application will start without DB connection (lazy connect).');
           // Do NOT throw here to prevent crash loop. 
           // Requests requiring DB will fail, but health check will pass.
           // This allows deployment to succeed and potentially clear old connections.
