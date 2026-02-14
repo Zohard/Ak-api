@@ -71,6 +71,11 @@ export class IgdbController {
       throw new BadRequestException('Month must be between 1 and 12');
     }
 
+    // Warn if requesting future dates
+    const now = new Date();
+    const requestDate = new Date(year, month - 1, 1);
+    const isFuture = requestDate > now;
+
     const parsedLimit = limit ? parseInt(limit) : 50;
     const parsedOffset = offset ? parseInt(offset) : 0;
 
@@ -82,7 +87,7 @@ export class IgdbController {
     );
 
     // Transform IGDB format
-    return games.map(game => ({
+    const transformedGames = games.map(game => ({
       id: game.id,
       externalId: game.id,
       title: game.name,
@@ -109,6 +114,13 @@ export class IgdbController {
         ?.map(c => c.company.name)
         .join(', '),
     }));
+
+    // Add helpful message if no results and requesting future date
+    if (transformedGames.length === 0 && isFuture) {
+      console.log(`No games found for ${year}-${month}. Note: IGDB may not have release data for future months yet.`);
+    }
+
+    return transformedGames;
   }
 
   @Post('import/:id')

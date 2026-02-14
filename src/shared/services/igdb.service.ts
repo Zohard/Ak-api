@@ -182,7 +182,13 @@ export class IgdbService {
       }
 
       const games = await response.json();
-      this.logger.log(`Found ${games.length} games for ${year}-${String(month).padStart(2, '0')}`);
+      this.logger.log(`Found ${games.length} games for ${year}-${String(month).padStart(2, '0')} (${startTimestamp} to ${endTimestamp})`);
+
+      // Log if no games found to help with debugging
+      if (games.length === 0) {
+        this.logger.warn(`No games found for ${year}-${String(month).padStart(2, '0')}. This might be normal if IGDB doesn't have data for this period yet.`);
+      }
+
       return games;
     } catch (error) {
       this.logger.error(`Failed to get games for ${year}-${month}`, error);

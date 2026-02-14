@@ -46,7 +46,7 @@
     "@nestjs/schedule": "^5.0.1",
     "@nestjs/swagger": "^11.2.0",
     "@nestjs/throttler": "^6.4.0",
-    "@prisma/client": "^6.16.2",
+    "@prisma/client": "^6.14.0",
     "@prisma/extension-accelerate": "^2.0.2",
     "@sentry/nestjs": "^10.32.1",
     "@sentry/node": "^10.32.1",
