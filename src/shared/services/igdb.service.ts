@@ -133,6 +133,63 @@ export class IgdbService {
     }
   }
 
+  /**
+   * Get games released in a specific month
+   * @param year - Year (e.g., 2024)
+   * @param month - Month (1-12)
+   * @param limit - Maximum number of results
+   * @param offset - Offset for pagination
+   */
+  async getGamesByReleaseMonth(
+    year: number,
+    month: number,
+    limit = 50,
+    offset = 0
+  ): Promise<IgdbGame[]> {
+    const token = await this.getAccessToken();
+
+    // Calculate start and end timestamps for the month
+    const startDate = new Date(Date.UTC(year, month - 1, 1));
+    const endDate = new Date(Date.UTC(year, month, 1));
+
+    const startTimestamp = Math.floor(startDate.getTime() / 1000);
+    const endTimestamp = Math.floor(endDate.getTime() / 1000);
+
+    try {
+      const response = await fetch('https://api.igdb.com/v4/games', {
+        method: 'POST',
+        headers: {
+          'Client-ID': this.clientId,
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'text/plain',
+        },
+        body: `
+          where first_release_date >= ${startTimestamp} & first_release_date < ${endTimestamp} & category = 0;
+          fields name, summary, first_release_date, category, cover.url, cover.image_id,
+                 screenshots.image_id,
+                 videos.video_id, videos.name,
+                 genres.name, platforms.name, platforms.abbreviation,
+                 involved_companies.company.name, involved_companies.company.logo.image_id, involved_companies.publisher, involved_companies.developer,
+                 release_dates.date, release_dates.region, release_dates.platform;
+          sort first_release_date asc;
+          limit ${limit};
+          offset ${offset};
+        `,
+      });
+
+      if (!response.ok) {
+        throw new Error(`IGDB API error: ${response.statusText}`);
+      }
+
+      const games = await response.json();
+      this.logger.log(`Found ${games.length} games for ${year}-${String(month).padStart(2, '0')}`);
+      return games;
+    } catch (error) {
+      this.logger.error(`Failed to get games for ${year}-${month}`, error);
+      throw error;
+    }
+  }
+
   async getGameById(igdbId: number): Promise<IgdbGame | null> {
     const token = await this.getAccessToken();
 

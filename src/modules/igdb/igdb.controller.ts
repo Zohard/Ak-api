@@ -56,6 +56,61 @@ export class IgdbController {
     }));
   }
 
+  @Get('releases/:year/:month')
+  @ApiOperation({ summary: 'Get games released in a specific month' })
+  @ApiQuery({ name: 'limit', description: 'Result limit', required: false })
+  @ApiQuery({ name: 'offset', description: 'Offset for pagination', required: false })
+  @ApiResponse({ status: 200, description: 'Games released in the specified month' })
+  async getByReleaseMonth(
+    @Param('year', ParseIntPipe) year: number,
+    @Param('month', ParseIntPipe) month: number,
+    @Query('limit') limit?: string,
+    @Query('offset') offset?: string,
+  ) {
+    if (month < 1 || month > 12) {
+      throw new BadRequestException('Month must be between 1 and 12');
+    }
+
+    const parsedLimit = limit ? parseInt(limit) : 50;
+    const parsedOffset = offset ? parseInt(offset) : 0;
+
+    const games = await this.igdbService.getGamesByReleaseMonth(
+      year,
+      month,
+      parsedLimit,
+      parsedOffset
+    );
+
+    // Transform IGDB format
+    return games.map(game => ({
+      id: game.id,
+      externalId: game.id,
+      title: game.name,
+      mediaType: 'game',
+      source: 'igdb',
+      image: game.cover?.image_id
+        ? `https://images.igdb.com/igdb/image/upload/t_cover_big/${game.cover.image_id}.jpg`
+        : null,
+      releaseDate: game.first_release_date
+        ? new Date(game.first_release_date * 1000).toISOString()
+        : null,
+      year: game.first_release_date
+        ? new Date(game.first_release_date * 1000).getFullYear()
+        : null,
+      summary: game.summary,
+      platforms: game.platforms?.map(p => p.name).join(', '),
+      genres: game.genres?.map(g => g.name).join(', '),
+      developers: game.involved_companies
+        ?.filter(c => c.developer)
+        ?.map(c => c.company.name)
+        .join(', '),
+      publishers: game.involved_companies
+        ?.filter(c => c.publisher)
+        ?.map(c => c.company.name)
+        .join(', '),
+    }));
+  }
+
   @Post('import/:id')
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Import a game from IGDB to local database' })
