@@ -1968,10 +1968,10 @@ export class ReviewsService {
     userId: number,
   ): Promise<void> {
     try {
-      // Get all moderators (users with groupId = 2 for moderators, or groupId = 1 for admins)
+      // Get all moderators (users with idGroup = 2 for moderators, or idGroup = 1 for admins)
       const moderators = await this.prisma.smfMember.findMany({
         where: {
-          groupId: { in: [1, 2] }, // 1 = admin, 2 = moderator
+          idGroup: { in: [1, 2] }, // 1 = admin, 2 = moderator
         },
         select: {
           idMember: true,
