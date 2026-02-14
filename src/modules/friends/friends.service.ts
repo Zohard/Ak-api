@@ -1040,7 +1040,7 @@ export class FriendsService {
       } catch (error) {
         // Gracefully handle if social feature not available yet
         // Other activities (ratings, reviews, lists) will still display
-        this.logger.debug('Social posts unavailable:', error.message);
+        // Silently continue - social posts are optional
       }
     }
 
