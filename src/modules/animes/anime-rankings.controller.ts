@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Post, ParseIntPipe, Query, UseGuards, Res, Req, HttpStatus } from '@nestjs/common';
+import { Controller, Get, Param, Post, ParseIntPipe, Query, UseGuards, Res, Req, HttpStatus, Options } from '@nestjs/common';
 import { AnimeRankingsService } from './services/anime-rankings.service';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { HttpService } from '@nestjs/axios';
@@ -40,6 +40,16 @@ export class AnimeRankingsController {
         @Query('week', ParseIntPipe) week: number,
     ) {
         return this.rankingsService.generateWeeklyRanking(year, season, week);
+    }
+
+    @Options('proxy-image')
+    async proxyImageOptions(@Res() res: Response) {
+        res.set({
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'GET, OPTIONS',
+            'Access-Control-Allow-Headers': 'Content-Type',
+        });
+        return res.sendStatus(HttpStatus.NO_CONTENT);
     }
 
     @Get('proxy-image')
@@ -91,6 +101,11 @@ export class AnimeRankingsController {
             if (error.response) {
                 console.error('Response status:', error.response.status, error.response.statusText);
             }
+            // Set CORS headers even on error
+            res.set({
+                'Access-Control-Allow-Origin': '*',
+                'Access-Control-Allow-Methods': 'GET, OPTIONS',
+            });
             return res.status(HttpStatus.BAD_GATEWAY).send('Failed to fetch image');
         }
     }
