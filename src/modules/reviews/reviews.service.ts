@@ -542,8 +542,8 @@ export class ReviewsService {
       }
     } catch { }
 
-    // Cache the individual review for 10 minutes
-    await this.cacheService.set(`review:${id}`, formattedReview, 600);
+    // Cache the individual review for 6 hours
+    await this.cacheService.set(`review:${id}`, formattedReview, 21600);
 
     return formattedReview;
   }
@@ -631,10 +631,10 @@ export class ReviewsService {
       }
     } catch { }
 
-    // Cache the review for 10 minutes (600 seconds) - same as findOne
+    // Cache the review for 6 hours (21600 seconds) - same as findOne
     // Only cache if it's published (not user-specific)
     if (review.statut === 0) {
-      await this.cacheService.set(cacheKey, formatted, 600);
+      await this.cacheService.set(cacheKey, formatted, 21600);
     }
 
     return formatted;
