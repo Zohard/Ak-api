@@ -1,7 +1,8 @@
-import { Controller, Get, Param, ParseIntPipe, Query, BadRequestException } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
+import { Controller, Get, Param, ParseIntPipe, Query, BadRequestException, Request } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery } from '@nestjs/swagger';
 import { JeuxVideoService } from './jeux-video.service';
 import { JeuVideoQueryDto } from './dto/jeu-video-query.dto';
+import { OptionalJwtAuthGuard } from '../../common/guards/optional-jwt-auth.guard';
 
 @ApiTags('Jeux Vidéo')
 @Controller('jeux-video')
@@ -29,21 +30,34 @@ export class JeuxVideoController {
 
   @Get('planning')
   @ApiOperation({ summary: 'Planning des sorties jeux vidéo par mois' })
+  @ApiQuery({ name: 'year', required: false, description: 'Année' })
+  @ApiQuery({ name: 'month', required: false, description: 'Mois (1-12)' })
+  @ApiQuery({ name: 'inCollection', required: false, description: 'Filtrer par ma collection (true/false)' })
+  @ApiQuery({ name: 'genreIds', required: false, description: 'IDs des genres (séparés par virgule)' })
+  @ApiQuery({ name: 'platformIds', required: false, description: 'IDs des plateformes (séparés par virgule)' })
   @ApiResponse({ status: 200, description: 'Liste des jeux sortant sur la période donnée' })
   async getPlanning(
-    @Query('year') year: string, // NestJS Query params are strings by default unless transformed
+    @Request() req,
+    @Query('year') year: string,
     @Query('month') month: string,
+    @Query('inCollection') inCollection?: string,
+    @Query('genreIds') genreIds?: string,
+    @Query('platformIds') platformIds?: string,
   ) {
-    if (!year || !month) {
-      // Default to current month if not provided? Or throw error?
-      // Let's mirror usual behavior or default to current.
-      const now = new Date();
-      return this.jeuxVideoService.getPlanning(
-        year ? parseInt(year) : now.getFullYear(),
-        month ? parseInt(month) : now.getMonth() + 1
-      );
-    }
-    return this.jeuxVideoService.getPlanning(parseInt(year), parseInt(month));
+    const now = new Date();
+    const parsedYear = year ? parseInt(year) : now.getFullYear();
+    const parsedMonth = month ? parseInt(month) : now.getMonth() + 1;
+
+    // Parse filters
+    const userId = inCollection === 'true' && req.user?.sub ? req.user.sub : undefined;
+    const parsedGenreIds = genreIds ? genreIds.split(',').map(id => parseInt(id)).filter(id => !isNaN(id)) : undefined;
+    const parsedPlatformIds = platformIds ? platformIds.split(',').map(id => parseInt(id)).filter(id => !isNaN(id)) : undefined;
+
+    return this.jeuxVideoService.getPlanning(parsedYear, parsedMonth, {
+      userId,
+      genreIds: parsedGenreIds,
+      platformIds: parsedPlatformIds,
+    });
   }
 
   @Get('bulk')
@@ -66,6 +80,13 @@ export class JeuxVideoController {
   @ApiResponse({ status: 200, description: 'Liste des plateformes' })
   async getPlatforms() {
     return this.jeuxVideoService.getPlatforms();
+  }
+
+  @Get('genres')
+  @ApiOperation({ summary: 'Liste des genres disponibles' })
+  @ApiResponse({ status: 200, description: 'Liste des genres' })
+  async getAllGenres() {
+    return this.jeuxVideoService.getAllGenres();
   }
 
   @Get(':id')

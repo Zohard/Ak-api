@@ -209,9 +209,25 @@ export class JeuxVideoService {
     return result;
   }
 
-  async getPlanning(year: number, month: number) {
-    // Cache key
-    const cacheKey = `planning_games:${year}_${month}`;
+  async getPlanning(
+    year: number,
+    month: number,
+    options?: {
+      userId?: number;
+      genreIds?: number[];
+      platformIds?: number[];
+    }
+  ) {
+    const { userId, genreIds, platformIds } = options || {};
+
+    // Cache key includes filters
+    const filterKey = [
+      userId ? `u${userId}` : '',
+      genreIds?.length ? `g${genreIds.join(',')}` : '',
+      platformIds?.length ? `p${platformIds.join(',')}` : ''
+    ].filter(Boolean).join('_');
+    const cacheKey = `planning_games:${year}_${month}${filterKey ? ':' + filterKey : ''}`;
+
     const cached = await this.cacheService.get(cacheKey);
     if (cached) {
       return cached;
@@ -222,16 +238,46 @@ export class JeuxVideoService {
     const startDate = new Date(year, month - 1, 1);
     const endDate = new Date(year, month, 0); // Last day of current month
 
+    // Build where clause with filters
+    const where: any = {
+      statut: 1, // Published
+      OR: [
+        { dateSortieWorldwide: { gte: startDate, lte: endDate } },
+        { dateSortieJapon: { gte: startDate, lte: endDate } },
+        { dateSortieUsa: { gte: startDate, lte: endDate } },
+        { dateSortieEurope: { gte: startDate, lte: endDate } },
+      ]
+    };
+
+    // Filter by user collection
+    if (userId) {
+      where.collection = {
+        some: {
+          userId,
+        }
+      };
+    }
+
+    // Filter by genres
+    if (genreIds && genreIds.length > 0) {
+      where.genres = {
+        some: {
+          idGenre: { in: genreIds }
+        }
+      };
+    }
+
+    // Filter by platforms
+    if (platformIds && platformIds.length > 0) {
+      where.platforms = {
+        some: {
+          idPlatform: { in: platformIds }
+        }
+      };
+    }
+
     const items = await this.prisma.akJeuxVideo.findMany({
-      where: {
-        statut: 1, // Published
-        OR: [
-          { dateSortieWorldwide: { gte: startDate, lte: endDate } },
-          { dateSortieJapon: { gte: startDate, lte: endDate } },
-          { dateSortieUsa: { gte: startDate, lte: endDate } },
-          { dateSortieEurope: { gte: startDate, lte: endDate } },
-        ]
-      },
+      where,
       select: {
         idJeu: true,
         titre: true,
@@ -247,8 +293,20 @@ export class JeuxVideoService {
           select: {
             platform: {
               select: {
+                idPlatform: true,
                 name: true,
                 shortName: true,
+              }
+            }
+          }
+        },
+        genres: {
+          select: {
+            genre: {
+              select: {
+                idGenre: true,
+                name: true,
+                slug: true,
               }
             }
           }
@@ -671,6 +729,30 @@ export class JeuxVideoService {
     await this.cacheService.set(cacheKey, platforms, 3600);
 
     return platforms;
+  }
+
+  async getAllGenres() {
+    // Try to get from cache
+    const cacheKey = 'jeux_video:genres';
+    const cached = await this.cacheService.get(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
+    // Fetch from database
+    const genres = await this.prisma.akGenre.findMany({
+      orderBy: { name: 'asc' },
+      select: {
+        idGenre: true,
+        name: true,
+        slug: true,
+      }
+    });
+
+    // Cache for 1 hour (3600 seconds)
+    await this.cacheService.set(cacheKey, genres, 3600);
+
+    return genres;
   }
 
   async autocomplete(query: string, exclude?: string, limit = 10) {
