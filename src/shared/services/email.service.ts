@@ -129,7 +129,7 @@ export class EmailService {
     reason: string,
     contentTitle: string,
   ): Promise<void> {
-    const reviewsUrl = `${this.configService.get('FRONTEND_URL')}/profile#critiques`;
+    const reviewsUrl = `${this.configService.get('FRONTEND_URL')}/reviews/my-reviews`;
 
     try {
       const { data, error } = await this.resend.emails.send({
