@@ -2,12 +2,14 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../shared/services/prisma.service';
 import { CacheService } from '../../../shared/services/cache.service';
+import { R2Service } from '../../media/r2.service';
 
 @Injectable()
 export class AnimeRankingsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly cacheService: CacheService,
+    private readonly r2Service: R2Service,
   ) { }
 
   async getTopAnimes(limit = 10, type = 'reviews-bayes') {
@@ -306,7 +308,11 @@ export class AnimeRankingsService {
       // Calculate trend icon/color purely on frontend based on 'trend' value
       anime: {
         ...r.anime,
-        image: r.anime.image ? (typeof r.anime.image === 'string' && /^https?:\/\//.test(r.anime.image) ? r.anime.image : `/api/media/serve/anime/${r.anime.image}`) : null
+        image: r.anime.image ? (
+          typeof r.anime.image === 'string' && /^https?:\/\//.test(r.anime.image)
+            ? r.anime.image // Already a full URL
+            : this.r2Service.getImageUrl(`images/animes/${r.anime.image}`) // Convert to R2 URL
+        ) : null
       }
     }));
 

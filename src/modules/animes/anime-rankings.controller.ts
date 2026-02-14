@@ -77,6 +77,7 @@ export class AnimeRankingsController {
             );
 
             const contentType = response.headers['content-type'] || 'image/jpeg';
+            console.log('Successfully proxied image:', imageUrl, 'Content-Type:', contentType);
 
             res.set({
                 'Content-Type': contentType,
@@ -86,7 +87,10 @@ export class AnimeRankingsController {
 
             return res.send(Buffer.from(response.data));
         } catch (error) {
-            console.error('Proxy image error:', error.message, 'URL:', url);
+            console.error('Proxy image error:', error.message, 'URL:', imageUrl, 'Original:', url);
+            if (error.response) {
+                console.error('Response status:', error.response.status, error.response.statusText);
+            }
             return res.status(HttpStatus.BAD_GATEWAY).send('Failed to fetch image');
         }
     }
