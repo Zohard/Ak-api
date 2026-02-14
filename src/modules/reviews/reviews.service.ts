@@ -664,6 +664,13 @@ export class ReviewsService {
     // Don't allow changing anime/manga IDs
     const { idAnime, idManga, ...updateData } = updateReviewDto;
 
+    // IMPORTANT: If review was rejected (status 2) and user is resubmitting (not admin),
+    // automatically set status to 3 (pending re-review) to require moderator approval
+    if (review.statut === 2 && !isAdmin) {
+      updateData.statut = 3; // Pending re-review - requires moderator approval
+      this.logger.log(`Review ${id} resubmitted after rejection - set to pending re-review (status 3)`);
+    }
+
     // Check if notation is being updated
     const notationChanged = updateData.notation !== undefined && updateData.notation !== review.notation;
 

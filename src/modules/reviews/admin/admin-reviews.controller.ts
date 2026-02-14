@@ -61,6 +61,17 @@ export class AdminReviewsController {
     return this.reviewsService.findAll(query);
   }
 
+  @Get('pending-reReview')
+  @ApiOperation({ summary: 'Get reviews pending re-review (resubmitted after rejection)' })
+  @ApiResponse({
+    status: 200,
+    description: 'Pending re-review reviews retrieved successfully',
+  })
+  getPendingReReview(@Query() query: ReviewQueryDto) {
+    query.statut = 3; // Status 3 = pending re-review (requires moderator approval)
+    return this.reviewsService.findAll(query);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get review by ID (Admin)' })
   @ApiResponse({ status: 200, description: 'Review retrieved successfully' })
