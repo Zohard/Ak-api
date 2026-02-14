@@ -3469,10 +3469,10 @@ export class ForumsService {
         }
       });
 
-      // Invalidate user-specific caches to reflect the read status change
+      // Invalidate only user-specific caches to reflect the read status change
+      // No need to invalidate global board cache since no content changed
       await Promise.all([
         this.cacheService.del(`forums:categories:user${userId}`),
-        this.cacheService.invalidateForumBoard(topic.idBoard),
         this.cacheService.invalidateUserForumBoard(topic.idBoard, userId)
       ]);
 
