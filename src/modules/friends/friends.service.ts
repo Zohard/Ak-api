@@ -994,6 +994,46 @@ export class FriendsService {
       })));
     }
 
+    // Fetch social posts
+    if (typeFilter === 'all' || typeFilter === 'post') {
+      const posts = await this.prisma.$queryRaw<Array<{
+        id_post: number;
+        user_id: number;
+        content: string;
+        image_url: string;
+        created_at: Date;
+        real_name: string;
+        avatar: string;
+        likes_count: number;
+        comments_count: number;
+      }>>`
+        SELECT
+          p.id_post, p.user_id, p.content, p.image_url, p.created_at,
+          m.real_name, m.avatar,
+          (SELECT COUNT(*) FROM ak_social_likes l WHERE l.post_id = p.id_post) as likes_count,
+          (SELECT COUNT(*) FROM ak_social_comments c WHERE c.post_id = p.id_post) as comments_count
+        FROM ak_social_posts p
+        JOIN smf_members m ON p.user_id = m.id_member
+        WHERE p.user_id IN (${Prisma.join(friendIds)})
+        ORDER BY p.created_at DESC
+        LIMIT ${limit + 50}
+      `;
+
+      activities.push(...posts.map(p => ({
+        id: `post-${p.id_post}`,
+        type: 'post',
+        userId: p.user_id,
+        userName: p.real_name,
+        userAvatar: p.avatar || '../img/noavatar.png',
+        createdAt: p.created_at,
+        content: p.content,
+        image: p.image_url,
+        likesCount: Number(p.likes_count),
+        commentsCount: Number(p.comments_count),
+        actionText: `a publié un message`
+      })));
+    }
+
     // Sort all activities by date
     activities.sort((a, b) => {
       const dateA = new Date(a.createdAt).getTime();

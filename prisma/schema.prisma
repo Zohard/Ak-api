@@ -84,6 +84,9 @@ model SmfMember {
   sentMessages     SmfPersonalMessage[] @relation("SentMessages")
   receivedMessages SmfPmRecipient[] @relation("ReceivedMessages")
   favorites        AkUserFavorite[]
+  socialPosts      AkSocialPost[]
+  socialLikes      AkSocialLike[]
+  socialComments   AkSocialComment[]
 
   // Forum relations
   messages         SmfMessage[] @relation("MessageAuthor")
@@ -1526,4 +1529,69 @@ model AkContactMessage {
   createdAt  DateTime @default(now()) @map("created_at")
 
   @@map("ak_contact_messages")
+}
+
+// Social Network Features
+model AkSocialPost {
+  idPost        Int       @id @default(autoincrement()) @map("id_post")
+  userId        Int       @map("user_id")
+  content       String    @db.Text
+  imageUrl      String?   @map("image_url") @db.VarChar(255)
+  linkUrl       String?   @map("link_url") @db.VarChar(500)
+  linkTitle     String?   @map("link_title") @db.VarChar(255)
+  linkImage     String?   @map("link_image") @db.VarChar(255)
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  
+  // Relations
+  user          SmfMember @relation(fields: [userId], references: [idMember], onDelete: Cascade)
+  likes         AkSocialLike[]
+  comments      AkSocialComment[]
+
+  @@index([userId])
+  @@index([createdAt])
+  @@map("ak_social_posts")
+}
+
+model AkSocialLike {
+  idLike        Int       @id @default(autoincrement()) @map("id_like")
+  userId        Int       @map("user_id")
+  
+  // Polymorphic targets (one must be set)
+  postId        Int?      @map("post_id")
+  activityType  String?   @map("activity_type") @db.VarChar(50) // 'rating', 'review', 'top_list', etc.
+  activityId    String?   @map("activity_id") @db.VarChar(100)  // External ID for non-post activities
+
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  // Relations
+  user          SmfMember @relation(fields: [userId], references: [idMember], onDelete: Cascade)
+  post          AkSocialPost? @relation(fields: [postId], references: [idPost], onDelete: Cascade)
+
+  @@unique([userId, postId, activityType, activityId])
+  @@index([postId])
+  @@index([activityType, activityId])
+  @@map("ak_social_likes")
+}
+
+model AkSocialComment {
+  idComment     Int       @id @default(autoincrement()) @map("id_comment")
+  userId        Int       @map("user_id")
+  content       String    @db.Text
+  
+  // Polymorphic targets
+  postId        Int?      @map("post_id")
+  activityType  String?   @map("activity_type") @db.VarChar(50)
+  activityId    String?   @map("activity_id") @db.VarChar(100)
+
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  // Relations
+  user          SmfMember @relation(fields: [userId], references: [idMember], onDelete: Cascade)
+  post          AkSocialPost? @relation(fields: [postId], references: [idPost], onDelete: Cascade)
+
+  @@index([postId])
+  @@index([activityType, activityId])
+  @@map("ak_social_comments")
 }
