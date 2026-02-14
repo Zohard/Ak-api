@@ -3441,10 +3441,10 @@ export class ForumsService {
 
   async markTopicAsRead(topicId: number, userId: number): Promise<{ success: boolean }> {
     try {
-      // Get the topic to find its last message ID
+      // Get the topic to find its last message ID and board ID
       const topic = await this.prisma.smfTopic.findUnique({
         where: { idTopic: topicId },
-        select: { idLastMsg: true }
+        select: { idLastMsg: true, idBoard: true }
       });
 
       if (!topic) {
@@ -3468,6 +3468,13 @@ export class ForumsService {
           idMsg: topic.idLastMsg
         }
       });
+
+      // Invalidate user-specific caches to reflect the read status change
+      await Promise.all([
+        this.cacheService.del(`forums:categories:user${userId}`),
+        this.cacheService.invalidateForumBoard(topic.idBoard),
+        this.cacheService.invalidateUserForumBoard(topic.idBoard, userId)
+      ]);
 
       return { success: true };
     } catch (error) {
