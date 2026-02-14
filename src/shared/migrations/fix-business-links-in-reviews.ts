@@ -12,14 +12,14 @@ export async function fixBusinessLinksInReviews(prisma: PrismaClient): Promise<v
     logger.log('Starting business links fix in reviews...');
 
     // Find all reviews with business links (both with and without IDs)
-    const reviews = await prisma.ak_critique.findMany({
+    const reviews = await prisma.akCritique.findMany({
       where: {
         critique: {
           contains: '/business/',
         },
       },
       select: {
-        id_critique: true,
+        idCritique: true,
         critique: true,
       },
     });
@@ -43,14 +43,14 @@ export async function fixBusinessLinksInReviews(prisma: PrismaClient): Promise<v
         continue;
       }
 
-      logger.log(`Review ${review.id_critique}: Found ${matches.length} potentially broken links`);
+      logger.log(`Review ${review.idCritique}: Found ${matches.length} potentially broken links`);
 
       for (const match of matches) {
         const slug = match[1];
 
         // Look up the business by denomination (slug-ified)
         // We need to find businesses where the slug matches
-        const businesses = await prisma.ak_business.findMany({
+        const businesses = await prisma.akBusiness.findMany({
           where: {
             denomination: {
               contains: slug.replace(/-/g, ' '),
@@ -58,7 +58,7 @@ export async function fixBusinessLinksInReviews(prisma: PrismaClient): Promise<v
             },
           },
           select: {
-            idbusiness: true,
+            idBusiness: true,
             denomination: true,
           },
           take: 5, // Get a few to find the best match
@@ -91,7 +91,7 @@ export async function fixBusinessLinksInReviews(prisma: PrismaClient): Promise<v
 
         // Replace the broken link with the fixed one
         const oldHref = `/business/${slug}`;
-        const newHref = `/business/${slug}-${bestMatch.idbusiness}`;
+        const newHref = `/business/${slug}-${bestMatch.idBusiness}`;
 
         content = content.replace(
           new RegExp(`href="${oldHref}"`, 'g'),
@@ -104,13 +104,13 @@ export async function fixBusinessLinksInReviews(prisma: PrismaClient): Promise<v
 
       if (modified) {
         // Update the review with fixed content
-        await prisma.ak_critique.update({
-          where: { id_critique: review.id_critique },
+        await prisma.akCritique.update({
+          where: { idCritique: review.idCritique },
           data: { critique: content },
         });
 
         fixedCount++;
-        logger.log(`  ✅ Updated review ${review.id_critique}`);
+        logger.log(`  ✅ Updated review ${review.idCritique}`);
       }
     }
 

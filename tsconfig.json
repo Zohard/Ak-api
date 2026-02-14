@@ -19,5 +19,13 @@
     "strictBindCallApply": false,
     "forceConsistentCasingInFileNames": false,
     "noFallthroughCasesInSwitch": false
-  }
+  },
+  "exclude": [
+    "node_modules",
+    "dist",
+    "check-entry.ts",
+    "check_unaccent.ts",
+    "enable_unaccent.ts",
+    "*.js"
+  ]
 }
