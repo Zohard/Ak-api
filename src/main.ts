@@ -16,6 +16,7 @@ import { DatabaseRetryInterceptor } from './common/interceptors/database-retry.i
 import { json } from 'express';
 import { PrismaService } from './shared/services/prisma.service';
 import { fixReviewReportsForeignKey } from './shared/migrations/fix-review-reports-fk';
+import { fixBusinessLinksInReviews } from './shared/migrations/fix-business-links-in-reviews';
 
 async function bootstrap() {
   // Fix BigInt serialization globally
@@ -140,6 +141,7 @@ async function bootstrap() {
   // Run database migrations
   const prisma = app.get(PrismaService);
   await fixReviewReportsForeignKey(prisma);
+  await fixBusinessLinksInReviews(prisma);
 
   const port = process.env.PORT || configService.get('PORT') || 3003;
   await app.listen(port, '0.0.0.0');
