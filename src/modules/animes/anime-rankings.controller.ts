@@ -63,9 +63,11 @@ export class AnimeRankingsController {
             return res.status(HttpStatus.BAD_REQUEST).send('URL parameter required');
         }
 
+        // Declare imageUrl outside try block so it's accessible in catch
+        let imageUrl = url;
+
         try {
             // Handle relative URLs (internal API images)
-            let imageUrl = url;
             if (url.startsWith('/api/')) {
                 // Build the full URL using the request's protocol and host
                 const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'https';
