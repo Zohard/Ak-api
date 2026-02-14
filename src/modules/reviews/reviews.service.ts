@@ -3,6 +3,7 @@ import {
   NotFoundException,
   ForbiddenException,
   BadRequestException,
+  Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../../shared/services/prisma.service';
 import { CacheService } from '../../shared/services/cache.service';
@@ -16,6 +17,8 @@ import { ModerateReviewDto } from './dto/moderate-review.dto';
 
 @Injectable()
 export class ReviewsService {
+  private readonly logger = new Logger(ReviewsService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly cacheService: CacheService,
@@ -715,6 +718,27 @@ export class ReviewsService {
           : false,
       },
     });
+
+    // Send notifications if review was resubmitted for re-review
+    if (review.statut === 2 && updatedReview.statut === 3 && !isAdmin) {
+      // Get content title for notification
+      const contentTitle = updatedReview.anime?.titre || updatedReview.manga?.titre || updatedReview.jeuxVideo?.titre || 'contenu';
+
+      // Notify user that their review is pending re-review
+      this.notificationsService.sendNotification({
+        userId: userId,
+        type: 'review_moderated',
+        title: 'Critique en attente de validation',
+        message: `Votre critique de "${contentTitle}" a été soumise pour re-validation. Un modérateur va l'examiner prochainement.`,
+        data: { reviewId: id, contentTitle },
+        priority: 'medium',
+      }).catch(err => this.logger.error(`Failed to send user notification: ${err.message}`));
+
+      // Notify moderators about pending re-review
+      this.notifyModeratorsOfPendingReview(id, contentTitle, userId).catch(err =>
+        this.logger.error(`Failed to notify moderators: ${err.message}`)
+      );
+    }
 
     // Update user's review count if status changed from/to published
     const statusChanged = updateData.statut !== undefined && updateData.statut !== review.statut;
@@ -1932,6 +1956,63 @@ export class ReviewsService {
           )
         WHERE id_jeu = ${jeuId}
       `;
+    }
+  }
+
+  /**
+   * Notify all moderators when a review is pending re-review (status 3)
+   */
+  private async notifyModeratorsOfPendingReview(
+    reviewId: number,
+    contentTitle: string,
+    userId: number,
+  ): Promise<void> {
+    try {
+      // Get all moderators (users with groupId = 2 for moderators, or groupId = 1 for admins)
+      const moderators = await this.prisma.smfMember.findMany({
+        where: {
+          groupId: { in: [1, 2] }, // 1 = admin, 2 = moderator
+        },
+        select: {
+          idMember: true,
+        },
+      });
+
+      if (moderators.length === 0) {
+        this.logger.warn('No moderators found to notify about pending re-review');
+        return;
+      }
+
+      // Get user info for the notification message
+      const user = await this.prisma.smfMember.findUnique({
+        where: { idMember: userId },
+        select: { memberName: true },
+      });
+
+      const userName = user?.memberName || 'Utilisateur';
+
+      // Send notification to all moderators
+      const notifications = moderators.map(mod =>
+        this.notificationsService.sendNotification({
+          userId: mod.idMember,
+          type: 'review_moderated',
+          title: 'Critique à re-valider',
+          message: `${userName} a resoumis sa critique de "${contentTitle}" après rejet. Validation requise.`,
+          data: {
+            reviewId,
+            contentTitle,
+            submittedBy: userId,
+            action: 'pending_re_review',
+          },
+          priority: 'medium',
+        })
+      );
+
+      await Promise.all(notifications);
+      this.logger.log(`Notified ${moderators.length} moderator(s) about review ${reviewId} pending re-review`);
+    } catch (error) {
+      this.logger.error(`Failed to notify moderators: ${error.message}`);
+      throw error;
     }
   }
 }
