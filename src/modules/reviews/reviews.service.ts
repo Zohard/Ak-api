@@ -475,6 +475,8 @@ export class ReviewsService {
             image: true,
             annee: true,
             niceUrl: true,
+            synopsis: true,
+            format: true,
           },
         },
         manga: {
@@ -484,6 +486,8 @@ export class ReviewsService {
             image: true,
             annee: true,
             niceUrl: true,
+            synopsis: true,
+            origine: true,
           },
         },
         jeuxVideo: {
@@ -493,6 +497,8 @@ export class ReviewsService {
             image: true,
             annee: true,
             niceUrl: true,
+            presentation: true,
+            plateforme: true,
           },
         },
       },
@@ -565,6 +571,8 @@ export class ReviewsService {
             image: true,
             annee: true,
             niceUrl: true,
+            synopsis: true,
+            format: true,
           },
         },
         manga: {
@@ -574,6 +582,8 @@ export class ReviewsService {
             image: true,
             annee: true,
             niceUrl: true,
+            synopsis: true,
+            origine: true,
           },
         },
         jeuxVideo: {
@@ -583,6 +593,8 @@ export class ReviewsService {
             image: true,
             annee: true,
             niceUrl: true,
+            presentation: true,
+            plateforme: true,
           },
         },
       },
