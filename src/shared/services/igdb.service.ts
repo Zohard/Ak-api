@@ -164,7 +164,7 @@ export class IgdbService {
           'Content-Type': 'text/plain',
         },
         body: `
-          where first_release_date >= ${startTimestamp} & first_release_date < ${endTimestamp} & category = (0,8,9,11);
+          where first_release_date >= ${startTimestamp} & first_release_date < ${endTimestamp};
           fields name, summary, first_release_date, category, cover.url, cover.image_id,
                  screenshots.image_id,
                  videos.video_id, videos.name,
