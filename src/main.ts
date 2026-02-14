@@ -14,6 +14,8 @@ import { setupSwagger } from './config/swagger.config';
 import { Logger } from 'nestjs-pino';
 import { DatabaseRetryInterceptor } from './common/interceptors/database-retry.interceptor';
 import { json } from 'express';
+import { PrismaService } from './shared/services/prisma.service';
+import { fixReviewReportsForeignKey } from './shared/migrations/fix-review-reports-fk';
 
 async function bootstrap() {
   // Fix BigInt serialization globally
@@ -134,6 +136,10 @@ async function bootstrap() {
 
   // Setup Swagger documentation
   setupSwagger(app);
+
+  // Run database migrations
+  const prisma = app.get(PrismaService);
+  await fixReviewReportsForeignKey(prisma);
 
   const port = process.env.PORT || configService.get('PORT') || 3003;
   await app.listen(port, '0.0.0.0');
