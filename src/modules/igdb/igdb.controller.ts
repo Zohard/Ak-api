@@ -60,68 +60,72 @@ export class IgdbController {
   @ApiOperation({ summary: 'Get games released in a specific month' })
   @ApiQuery({ name: 'limit', description: 'Result limit', required: false })
   @ApiQuery({ name: 'offset', description: 'Offset for pagination', required: false })
+  @ApiQuery({ name: 'day', description: 'Specific day in the month', required: false })
   @ApiResponse({ status: 200, description: 'Games released in the specified month' })
   async getByReleaseMonth(
-    @Param('year', ParseIntPipe) year: number,
-    @Param('month', ParseIntPipe) month: number,
-    @Query('limit') limit?: string,
-    @Query('offset') offset?: string,
-  ) {
-    if (month < 1 || month > 12) {
-      throw new BadRequestException('Month must be between 1 and 12');
-    }
-
-    // Warn if requesting future dates
-    const now = new Date();
-    const requestDate = new Date(year, month - 1, 1);
-    const isFuture = requestDate > now;
-
-    const parsedLimit = limit ? parseInt(limit) : 50;
-    const parsedOffset = offset ? parseInt(offset) : 0;
-
-    const games = await this.igdbService.getGamesByReleaseMonth(
-      year,
-      month,
-      parsedLimit,
-      parsedOffset
-    );
-
-    // Transform IGDB format
-    const transformedGames = games.map(game => ({
-      id: game.id,
-      externalId: game.id,
-      title: game.name,
-      mediaType: 'game',
-      source: 'igdb',
-      image: game.cover?.image_id
-        ? `https://images.igdb.com/igdb/image/upload/t_cover_big/${game.cover.image_id}.jpg`
-        : null,
-      releaseDate: game.first_release_date
-        ? new Date(game.first_release_date * 1000).toISOString()
-        : null,
-      year: game.first_release_date
-        ? new Date(game.first_release_date * 1000).getFullYear()
-        : null,
-      summary: game.summary,
-      platforms: game.platforms?.map(p => p.name).join(', '),
-      genres: game.genres?.map(g => g.name).join(', '),
-      developers: game.involved_companies
-        ?.filter(c => c.developer)
-        ?.map(c => c.company.name)
-        .join(', '),
-      publishers: game.involved_companies
-        ?.filter(c => c.publisher)
-        ?.map(c => c.company.name)
-        .join(', '),
-    }));
-
-    // Add helpful message if no results and requesting future date
-    if (transformedGames.length === 0 && isFuture) {
-      console.log(`No games found for ${year}-${month}. Note: IGDB may not have release data for future months yet.`);
-    }
-
-    return transformedGames;
+  @Param('year', ParseIntPipe) year: number,
+  @Param('month', ParseIntPipe) month: number,
+  @Query('limit') limit ?: string,
+  @Query('offset') offset ?: string,
+  @Query('day') day ?: string,
+) {
+  if (month < 1 || month > 12) {
+    throw new BadRequestException('Month must be between 1 and 12');
   }
+
+  // Warn if requesting future dates
+  const now = new Date();
+  const requestDate = new Date(year, month - 1, day ? parseInt(day) : 1);
+  const isFuture = requestDate > now;
+
+  const parsedLimit = limit ? parseInt(limit) : 50;
+  const parsedOffset = offset ? parseInt(offset) : 0;
+  const parsedDay = day ? parseInt(day) : undefined;
+
+  const games = await this.igdbService.getGamesByReleaseMonth(
+    year,
+    month,
+    parsedLimit,
+    parsedOffset,
+    parsedDay
+  );
+
+  // Transform IGDB format
+  const transformedGames = games.map(game => ({
+    id: game.id,
+    externalId: game.id,
+    title: game.name,
+    mediaType: 'game',
+    source: 'igdb',
+    image: game.cover?.image_id
+      ? `https://images.igdb.com/igdb/image/upload/t_cover_big/${game.cover.image_id}.jpg`
+      : null,
+    releaseDate: game.first_release_date
+      ? new Date(game.first_release_date * 1000).toISOString()
+      : null,
+    year: game.first_release_date
+      ? new Date(game.first_release_date * 1000).getFullYear()
+      : null,
+    summary: game.summary,
+    platforms: game.platforms?.map(p => p.name).join(', '),
+    genres: game.genres?.map(g => g.name).join(', '),
+    developers: game.involved_companies
+      ?.filter(c => c.developer)
+      ?.map(c => c.company.name)
+      .join(', '),
+    publishers: game.involved_companies
+      ?.filter(c => c.publisher)
+      ?.map(c => c.company.name)
+      .join(', '),
+  }));
+
+  // Add helpful message if no results and requesting future date
+  if (transformedGames.length === 0 && isFuture) {
+    console.log(`No games found for ${year}-${month}. Note: IGDB may not have release data for future months yet.`);
+  }
+
+  return transformedGames;
+}
 
   @Post('import/:id')
   @UseGuards(JwtAuthGuard)
@@ -129,7 +133,7 @@ export class IgdbController {
   @ApiResponse({ status: 201, description: 'Game imported successfully' })
   @ApiResponse({ status: 400, description: 'Invalid request' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  async import(@Param('id', ParseIntPipe) igdbId: number) {
+  async importGame(@Param('id', ParseIntPipe) igdbId: number) {
     const game = await this.igdbService.importGame(igdbId);
     return {
       id: game.idJeu,

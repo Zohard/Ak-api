@@ -39,6 +39,7 @@ interface IgdbGame {
     date?: number;
     region?: number;
     platform?: { id: number; name: string };
+    human?: string; // Added human readable date
   }>;
 }
 
@@ -134,26 +135,50 @@ export class IgdbService {
   }
 
   /**
-   * Get games released in a specific month
+   * Get games released in a specific month or day
    * @param year - Year (e.g., 2024)
    * @param month - Month (1-12)
    * @param limit - Maximum number of results
    * @param offset - Offset for pagination
+   * @param day - Optional Day (1-31)
    */
   async getGamesByReleaseMonth(
     year: number,
     month: number,
     limit = 50,
-    offset = 0
+    offset = 0,
+    day?: number
   ): Promise<IgdbGame[]> {
     const token = await this.getAccessToken();
 
-    // Calculate start and end timestamps for the month
-    const startDate = new Date(Date.UTC(year, month - 1, 1));
-    const endDate = new Date(Date.UTC(year, month, 1));
+    let startTimestamp: number;
+    let endTimestamp: number;
+    let whereClause: string;
 
-    const startTimestamp = Math.floor(startDate.getTime() / 1000);
-    const endTimestamp = Math.floor(endDate.getTime() / 1000);
+    if (day) {
+      // Specific day query
+      const startDate = new Date(Date.UTC(year, month - 1, day));
+      const endDate = new Date(Date.UTC(year, month - 1, day + 1));
+
+      // Subtract 1 second to get the end of the correct day
+      endDate.setSeconds(endDate.getSeconds() - 1);
+
+      startTimestamp = Math.floor(startDate.getTime() / 1000);
+      endTimestamp = Math.floor(endDate.getTime() / 1000);
+
+      // For specific dates, query release_dates.date
+      whereClause = `release_dates.date >= ${startTimestamp} & release_dates.date <= ${endTimestamp}`;
+    } else {
+      // Full month query
+      const startDate = new Date(Date.UTC(year, month - 1, 1));
+      const endDate = new Date(Date.UTC(year, month, 1));
+
+      startTimestamp = Math.floor(startDate.getTime() / 1000);
+      endTimestamp = Math.floor(endDate.getTime() / 1000);
+
+      // Keep existing behavior for months
+      whereClause = `first_release_date >= ${startTimestamp} & first_release_date < ${endTimestamp}`;
+    }
 
     try {
       const response = await fetch('https://api.igdb.com/v4/games', {
@@ -164,7 +189,7 @@ export class IgdbService {
           'Content-Type': 'text/plain',
         },
         body: `
-          where first_release_date >= ${startTimestamp} & first_release_date < ${endTimestamp};
+          where ${whereClause};
           fields name, summary, first_release_date, category, cover.url, cover.image_id,
                  screenshots.image_id,
                  videos.video_id, videos.name,
