@@ -273,6 +273,7 @@ export class AnimesService extends BaseContentService<
     if (search) {
       searchActive = true;
       const searchTerm = `%${search}%`;
+      console.log(`[Anime Search] Searching for: "${search}" with pattern: "${searchTerm}"`);
       try {
         const matchingIds = await this.prisma.$queryRaw<Array<{ id_anime: number }>>`
           SELECT id_anime FROM ak_animes
@@ -282,6 +283,7 @@ export class AnimesService extends BaseContentService<
           OR unaccent(COALESCE(titres_alternatifs, '')) ILIKE unaccent(${searchTerm})
         `;
         searchIds.push(...matchingIds.map(r => r.id_anime));
+        console.log(`[Anime Search] Found ${searchIds.length} matching IDs for "${search}"`);
       } catch (error) {
         // Fallback if unaccent extension is missing
         console.warn(`Search with unaccent failed, falling back to standard ILIKE: ${error.message}`);
@@ -370,6 +372,19 @@ export class AnimesService extends BaseContentService<
 
     // Intersect fallback: if search is active, intersect with whatever is already in where.idAnime
     if (searchActive) {
+      // If no search results found, return empty set immediately
+      if (searchIds.length === 0) {
+        return {
+          animes: [],
+          pagination: {
+            total: 0,
+            page: page || 1,
+            limit: limit || 20,
+            totalPages: 0,
+          },
+        };
+      }
+
       if (where.idAnime?.in) {
         where.idAnime.in = where.idAnime.in.filter(id => searchIds.includes(id));
       } else {
