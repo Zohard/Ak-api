@@ -7,6 +7,7 @@ import {
   IsOptional,
   MinLength,
   ValidateIf,
+  IsBoolean,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
@@ -96,4 +97,12 @@ export class CreateReviewDto {
   @Max(1)
   @Type(() => Number)
   acceptImages?: number;
+
+  @ApiPropertyOptional({
+    description: 'Indique si la critique contient des spoilers (auto-détecté si non spécifié)',
+    example: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  containsSpoilers?: boolean;
 }

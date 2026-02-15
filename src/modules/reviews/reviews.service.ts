@@ -30,6 +30,11 @@ export class ReviewsService {
   async create(createReviewDto: CreateReviewDto, userId: number) {
     const { idAnime, idManga, idJeu, ...reviewData } = createReviewDto;
 
+    // Auto-detect spoilers in HTML content if not explicitly set
+    if (reviewData.containsSpoilers === undefined && reviewData.critique) {
+      reviewData.containsSpoilers = this.detectSpoilersInContent(reviewData.critique);
+    }
+
     // Validate that exactly one content type is specified
     const contentCount = [idAnime, idManga, idJeu].filter(Boolean).length;
     if (contentCount === 0) {
@@ -667,6 +672,11 @@ export class ReviewsService {
     // Don't allow changing anime/manga IDs
     const { idAnime, idManga, ...updateData } = updateReviewDto;
 
+    // Auto-detect spoilers in HTML content if critique is being updated and containsSpoilers not explicitly set
+    if (updateData.critique && updateData.containsSpoilers === undefined) {
+      updateData.containsSpoilers = this.detectSpoilersInContent(updateData.critique);
+    }
+
     // IMPORTANT: If review was rejected (status 2) and user is resubmitting (not admin),
     // automatically set status to 3 (pending re-review) to require moderator approval
     if (review.statut === 2 && !isAdmin) {
@@ -1214,6 +1224,15 @@ export class ReviewsService {
     });
 
     return totals;
+  }
+
+  /**
+   * Detect if content contains spoiler elements (HTML spoiler spans)
+   */
+  private detectSpoilersInContent(content: string): boolean {
+    if (!content) return false;
+    // Check for HTML spoiler elements with class="spoiler"
+    return /<span[^>]*class="spoiler"[^>]*>/i.test(content);
   }
 
   async rateReview(reviewId: number, userId: number, ratingType: 'c' | 'a' | 'o' | 'y' | 'n' | 'yes' | 'no') {
