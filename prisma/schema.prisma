@@ -707,6 +707,7 @@ model AkCritique {
   popularite   Float?    @db.Real
   classementPopularite Int? @map("classement_popularite")
   variationPopularite String? @map("variation_popularite") @db.Text
+  containsSpoilers Boolean?  @default(false) @map("contains_spoilers")
 
   // Relations
   membre       SmfMember? @relation(fields: [idMembre], references: [idMember], onDelete: Cascade)
