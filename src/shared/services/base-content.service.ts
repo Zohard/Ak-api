@@ -102,27 +102,68 @@ export abstract class BaseContentService<T, CreateDto, UpdateDto, QueryDto> {
     query: string,
     exclude?: string,
     limit = 10,
-    statusFilter = 1,
+    userId?: number,
   ) {
     if (!query || query.length < 2) {
       return { data: [] };
     }
 
     const searchTerm = `%${query}%`;
-    const idCol = this.idField === 'idAnime' ? 'id_anime' : 'id_manga';
+    const idCol = this.idField === 'idAnime' ? 'id_anime' :
+                  this.idField === 'idManga' ? 'id_manga' : 'id_jeu';
     const table = this.tableName;
+    const statusFilter = 1; // Only show published items
 
-    // Build exclude clause
-    let excludeClause = '';
+    // Build exclude IDs array
+    let excludeIds: number[] = [];
+
+    // Add manual excludes
     if (exclude) {
-      const excludeIds = exclude
+      const manualExcludes = exclude
         .split(',')
         .map((id) => parseInt(id))
         .filter((id) => !isNaN(id));
+      excludeIds.push(...manualExcludes);
+    }
 
-      if (excludeIds.length > 0) {
-        excludeClause = `AND ${idCol} NOT IN (${excludeIds.join(',')})`;
+    // Add user collection excludes
+    if (userId) {
+      try {
+        const collectionTable = this.idField === 'idAnime' ? 'collection_animes' :
+                               this.idField === 'idManga' ? 'collection_mangas' : 'collection_jeux_video';
+        const collectionField = this.idField === 'idAnime' ? 'id_anime' :
+                               this.idField === 'idManga' ? 'id_manga' : 'id_jeu';
+
+        console.log('[Autocomplete] Filtering collection for userId:', userId);
+        console.log('[Autocomplete] Collection table:', collectionTable);
+        console.log('[Autocomplete] Collection field:', collectionField);
+
+        const userCollection: any[] = await this.prisma.$queryRawUnsafe(`
+          SELECT DISTINCT ${collectionField}
+          FROM ${collectionTable}
+          WHERE id_membre = ${userId}
+          AND ${collectionField} IS NOT NULL
+        `);
+
+        console.log('[Autocomplete] User collection items found:', userCollection.length);
+
+        const collectionIds = userCollection
+          .map(item => item[collectionField])
+          .filter(id => id != null);
+
+        console.log('[Autocomplete] Collection IDs to exclude:', collectionIds.slice(0, 10));
+
+        excludeIds.push(...collectionIds);
+      } catch (error) {
+        // Silently fail if collections query fails
+        console.error('[Autocomplete] Error fetching user collection:', error);
       }
+    }
+
+    // Build exclude clause
+    let excludeClause = '';
+    if (excludeIds.length > 0) {
+      excludeClause = `AND ${idCol} NOT IN (${excludeIds.join(',')})`;
     }
 
     // Use raw SQL with unaccent for accent-insensitive search

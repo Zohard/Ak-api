@@ -755,24 +755,52 @@ export class JeuxVideoService {
     return genres;
   }
 
-  async autocomplete(query: string, exclude?: string, limit = 10) {
+  async autocomplete(query: string, exclude?: string, limit = 10, userId?: number) {
     if (!query || query.length < 2) {
       return { data: [] };
     }
 
     const searchTerm = `%${query}%`;
 
-    // Build exclude clause
-    let excludeClause = '';
+    // Build exclude IDs array
+    let excludeIds: number[] = [];
+
+    // Add manual excludes
     if (exclude) {
-      const excludeIds = exclude
+      const manualExcludes = exclude
         .split(',')
         .map((id) => parseInt(id))
         .filter((id) => !isNaN(id));
+      excludeIds.push(...manualExcludes);
+    }
 
-      if (excludeIds.length > 0) {
-        excludeClause = `AND id_jeu NOT IN (${excludeIds.join(',')})`;
+    // Add user collection excludes
+    if (userId) {
+      try {
+        console.log('[JeuxVideo Autocomplete] Filtering collection for userId:', userId);
+        const userCollection: any[] = await this.prisma.$queryRawUnsafe(`
+          SELECT DISTINCT id_jeu
+          FROM collection_jeux_video
+          WHERE id_membre = ${userId}
+          AND id_jeu IS NOT NULL
+        `);
+
+        console.log('[JeuxVideo Autocomplete] User collection items found:', userCollection.length);
+
+        const collectionIds = userCollection
+          .map(item => item.id_jeu)
+          .filter(id => id != null);
+
+        excludeIds.push(...collectionIds);
+      } catch (error) {
+        console.error('[JeuxVideo Autocomplete] Error fetching user collection:', error);
       }
+    }
+
+    // Build exclude clause
+    let excludeClause = '';
+    if (excludeIds.length > 0) {
+      excludeClause = `AND id_jeu NOT IN (${excludeIds.join(',')})`;
     }
 
     // Use raw SQL with unaccent for accent-insensitive search

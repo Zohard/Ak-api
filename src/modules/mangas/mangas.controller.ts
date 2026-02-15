@@ -192,15 +192,47 @@ export class MangasController {
   }
 
   @Get('autocomplete')
+  @UseGuards(OptionalJwtAuthGuard)
   @ApiOperation({ summary: 'Recherche autocomplete pour mangas' })
+  @ApiQuery({
+    name: 'q',
+    required: true,
+    description: 'Terme de recherche',
+  })
+  @ApiQuery({
+    name: 'exclude',
+    required: false,
+    description: 'IDs à exclure (séparés par virgules)',
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    description: 'Nombre maximum de résultats',
+  })
+  @ApiQuery({
+    name: 'notInCollection',
+    required: false,
+    description: 'Exclure les mangas déjà dans la collection de l\'utilisateur',
+    type: Boolean,
+  })
   @ApiResponse({ status: 200, description: "Résultats de l'autocomplete" })
   async autocomplete(
     @Query('q') query: string,
     @Query('exclude') exclude?: string,
     @Query('limit') limit?: string,
+    @Query('notInCollection') notInCollection?: string,
+    @Request() req?: any,
   ) {
     const parsedLimit = limit ? parseInt(limit) : 10;
-    return this.mangasService.autocomplete(query, exclude, parsedLimit);
+    const userId = req?.user?.sub || req?.user?.id;
+    const shouldExcludeCollection = notInCollection === 'true' && userId;
+
+    return this.mangasService.autocomplete(
+      query,
+      exclude,
+      parsedLimit,
+      shouldExcludeCollection ? userId : undefined,
+    );
   }
 
   @Get('bulk')

@@ -14,11 +14,11 @@ export class AddToCollectionDto {
   @ApiProperty({
     description: 'Type de média',
     example: 'anime',
-    enum: ['anime', 'manga'],
+    enum: ['anime', 'manga', 'game'],
   })
   @IsString()
-  @IsIn(['anime', 'manga'])
-  mediaType: 'anime' | 'manga';
+  @IsIn(['anime', 'manga', 'game'])
+  mediaType: 'anime' | 'manga' | 'game';
 
   @ApiProperty({
     description: 'Type de collection',

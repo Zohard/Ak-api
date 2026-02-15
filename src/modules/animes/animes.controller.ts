@@ -174,6 +174,7 @@ export class AnimesController {
   }
 
   @Get('autocomplete')
+  @UseGuards(OptionalJwtAuthGuard)
   @ApiOperation({ summary: 'Recherche autocomplete pour animes' })
   @ApiQuery({
     name: 'q',
@@ -193,15 +194,32 @@ export class AnimesController {
     description: 'Nombre maximum de résultats',
     example: 10,
   })
+  @ApiQuery({
+    name: 'notInCollection',
+    required: false,
+    description: 'Exclure les animes déjà dans la collection de l\'utilisateur',
+    example: true,
+    type: Boolean,
+  })
   @ApiResponse({ status: 200, description: "Résultats de l'autocomplete" })
   @ApiResponse({ status: 400, description: 'Requête invalide' })
   async autocomplete(
     @Query('q') query: string,
     @Query('exclude') exclude?: string,
     @Query('limit') limit?: string,
+    @Query('notInCollection') notInCollection?: string,
+    @Request() req?: any,
   ) {
     const parsedLimit = limit ? parseInt(limit) : 10;
-    return this.animesService.autocomplete(query, exclude, parsedLimit);
+    const userId = req?.user?.sub || req?.user?.id;
+    const shouldExcludeCollection = notInCollection === 'true' && userId;
+
+    return this.animesService.autocomplete(
+      query,
+      exclude,
+      parsedLimit,
+      shouldExcludeCollection ? userId : undefined,
+    );
   }
 
   @Get('bulk')

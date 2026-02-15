@@ -345,6 +345,61 @@ export class CollectionsService {
             })
           );
         }
+      } else if (mediaType === 'game') {
+        // Verify game exists
+        const game = await this.prisma.executeWithRetry(() =>
+          this.prisma.akJeuxVideo.findUnique({ where: { idJeu: mediaId } })
+        );
+        if (!game) {
+          throw new NotFoundException('Game not found');
+        }
+
+        // Check if already in collection for this user+game (any type)
+        const existingAny = await this.prisma.executeWithRetry(() =>
+          this.prisma.collectionJeuxVideo.findFirst({
+            where: { idMembre: userId, idJeu: mediaId },
+          })
+        );
+        if (existingAny) {
+          await this.prisma.executeWithRetry(() =>
+            this.prisma.collectionJeuxVideo.updateMany({
+              where: { idMembre: userId, idJeu: mediaId },
+              data: {
+                type: collectionType,
+                evaluation: normalizedRating,
+                notes: notes || null,
+                dateModified: new Date(),
+              },
+            })
+          );
+          result = await this.prisma.executeWithRetry(() =>
+            this.prisma.collectionJeuxVideo.findFirst({
+              where: { idMembre: userId, idJeu: mediaId },
+              include: {
+                jeuxVideo: {
+                  select: { idJeu: true, titre: true, image: true, annee: true, moyennenotes: true },
+                },
+              },
+            })
+          );
+        } else {
+          result = await this.prisma.executeWithRetry(() =>
+            this.prisma.collectionJeuxVideo.create({
+              data: {
+                idMembre: userId,
+                idJeu: mediaId,
+                type: collectionType,
+                evaluation: normalizedRating,
+                notes: notes || null,
+              },
+              include: {
+                jeuxVideo: {
+                  select: { idJeu: true, titre: true, image: true, annee: true, moyennenotes: true },
+                },
+              },
+            })
+          );
+        }
       }
     } catch (err: any) {
       // Map known Prisma errors to proper HTTP errors; log for debugging
@@ -374,7 +429,7 @@ export class CollectionsService {
               },
             },
           });
-        } else {
+        } else if (mediaType === 'manga') {
           await this.prisma.collectionManga.updateMany({
             where: { idMembre: userId, idManga: mediaId },
             data: {
@@ -391,6 +446,24 @@ export class CollectionsService {
             include: {
               manga: {
                 select: { idManga: true, titre: true, image: true, annee: true, moyenneNotes: true, nbVol: true },
+              },
+            },
+          });
+        } else if (mediaType === 'game') {
+          await this.prisma.collectionJeuxVideo.updateMany({
+            where: { idMembre: userId, idJeu: mediaId },
+            data: {
+              type: collectionType,
+              evaluation: normalizedRating,
+              notes: notes || null,
+              dateModified: new Date(),
+            },
+          });
+          result = await this.prisma.collectionJeuxVideo.findFirst({
+            where: { idMembre: userId, idJeu: mediaId },
+            include: {
+              jeuxVideo: {
+                select: { idJeu: true, titre: true, image: true, annee: true, moyennenotes: true },
               },
             },
           });
@@ -971,12 +1044,12 @@ export class CollectionsService {
     });
   }
 
-  async checkBulkInCollection(userId: number, mediaType: 'anime' | 'manga', mediaIds: number[]) {
+  async checkBulkInCollection(userId: number, mediaType: 'anime' | 'manga' | 'game', mediaIds: number[]) {
     if (!mediaIds.length) {
       return {};
     }
 
-    this.logger.debug(`🔍 [checkBulkInCollection] userId: ${userId}, mediaType: ${mediaType}, ids: ${mediaIds.length}`);
+    this.logger.debug(`🔍 [checkBulkInCollection] userId: ${userId}, mediaType: ${mediaType}, ids: ${mediaIds.join(',')}`);
 
     // Direct DB query for efficiency
     // Return a map of { [mediaId]: { inCollection: true, type: number } }
@@ -1007,9 +1080,26 @@ export class CollectionsService {
         items.forEach(item => {
           result[item.idManga] = { inCollection: true, type: item.type };
         });
+      } else if (mediaType === 'game') {
+        this.logger.debug(`🔍 [checkBulkInCollection] Querying games for userId=${userId}, gameIds=${mediaIds.join(',')}`);
+
+        const items = await this.prisma.collectionJeuxVideo.findMany({
+          where: {
+            idMembre: userId,
+            idJeu: { in: mediaIds }
+          },
+          select: { idJeu: true, type: true }
+        });
+
+        this.logger.debug(`🔍 [checkBulkInCollection] Found ${items.length} games: ${JSON.stringify(items)}`);
+        items.forEach(item => {
+          result[item.idJeu] = { inCollection: true, type: item.type };
+        });
+        this.logger.debug(`🔍 [checkBulkInCollection] Final result for games: ${JSON.stringify(result)}`);
       }
     });
 
+    this.logger.debug(`🔍 [checkBulkInCollection] Returning result: ${JSON.stringify(result)}`);
     return result;
   }
 

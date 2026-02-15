@@ -101,7 +101,7 @@ export class CollectionsController {
   @Post('add')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Ajouter un anime/manga à une collection' })
+  @ApiOperation({ summary: 'Ajouter un anime/manga/jeu vidéo à une collection' })
   @ApiResponse({ status: 201, description: 'Ajouté à la collection avec succès' })
   @ApiResponse({ status: 404, description: 'Média non trouvé' })
   @ApiResponse({ status: 409, description: 'Déjà dans la collection' })
@@ -217,14 +217,17 @@ export class CollectionsController {
   @ApiOperation({ summary: 'Vérifier la présence de multiples médias dans les collections' })
   @ApiResponse({ status: 200, description: 'Statut de présence pour chaque média' })
   async checkBulkInCollection(
-    @Body() body: { mediaType: 'anime' | 'manga', mediaIds: number[] },
+    @Body() body: { mediaType: 'anime' | 'manga' | 'game', mediaIds: number[] },
     @Request() req,
   ) {
-    return this.collectionsService.checkBulkInCollection(
+    this.logger.debug(`[Controller] checkBulkInCollection - userId: ${req.user?.id}, mediaType: ${body.mediaType}, mediaIds: ${body.mediaIds?.length}`);
+    const result = await this.collectionsService.checkBulkInCollection(
       req.user.id,
       body.mediaType,
       body.mediaIds,
     );
+    this.logger.debug(`[Controller] checkBulkInCollection result: ${JSON.stringify(result)}`);
+    return result;
   }
 
   @Get('check-nocache/:mediaType/:mediaId')
