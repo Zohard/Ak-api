@@ -1124,12 +1124,13 @@ export class CollectionsService {
     currentUserId?: number,
     year?: number,
     sortBy?: string,
-    sortOrder: 'asc' | 'desc' = 'desc'
+    sortOrder: 'asc' | 'desc' = 'desc',
+    search?: string
   ) {
     const isOwnCollection = currentUserId === userId;
 
     // Create cache key for this specific request
-    const cacheKey = `collection_animes:${userId}:${type}:${page}:${limit}:${isOwnCollection ? 'own' : 'public'}:${year || 'all'}:${sortBy || 'def'}:${sortOrder}`;
+    const cacheKey = `collection_animes:${userId}:${type}:${page}:${limit}:${isOwnCollection ? 'own' : 'public'}:${year || 'all'}:${sortBy || 'def'}:${sortOrder}:${search || 'none'}`;
 
     // Try to get from cache first
     const cached = await this.cacheService.get(cacheKey);
@@ -1144,11 +1145,20 @@ export class CollectionsService {
       ...(isOwnCollection ? {} : { isPublic: true })
     };
 
-    // Add year filter on the anime relation
-    if (year) {
-      whereClause.anime = {
-        annee: year
-      };
+    // Add year and search filters on the anime relation
+    if (year || search) {
+      whereClause.anime = {};
+
+      if (year) {
+        whereClause.anime.annee = year;
+      }
+
+      if (search) {
+        whereClause.anime.OR = [
+          { titre: { contains: search, mode: 'insensitive' } },
+          { titreOrig: { contains: search, mode: 'insensitive' } }
+        ];
+      }
     }
 
     // Determine orderBy based on sortBy parameter
@@ -1376,12 +1386,13 @@ export class CollectionsService {
     currentUserId?: number,
     year?: number,
     sortBy?: string,
-    sortOrder: 'asc' | 'desc' = 'desc'
+    sortOrder: 'asc' | 'desc' = 'desc',
+    search?: string
   ) {
     const isOwnCollection = currentUserId === userId;
 
     // Create cache key for this specific request
-    const cacheKey = `collection_mangas:${userId}:${type}:${page}:${limit}:${isOwnCollection ? 'own' : 'public'}:${year || 'all'}:${sortBy || 'def'}:${sortOrder}`;
+    const cacheKey = `collection_mangas:${userId}:${type}:${page}:${limit}:${isOwnCollection ? 'own' : 'public'}:${year || 'all'}:${sortBy || 'def'}:${sortOrder}:${search || 'none'}`;
 
     // Try to get from cache first
     const cached = await this.cacheService.get(cacheKey);
@@ -1396,11 +1407,20 @@ export class CollectionsService {
       ...(isOwnCollection ? {} : { isPublic: true })
     };
 
-    // Add year filter on the manga relation (manga.annee is varchar)
-    if (year) {
-      whereClause.manga = {
-        annee: String(year)
-      };
+    // Add year and search filters on the manga relation
+    if (year || search) {
+      whereClause.manga = {};
+
+      if (year) {
+        whereClause.manga.annee = String(year);
+      }
+
+      if (search) {
+        whereClause.manga.OR = [
+          { titre: { contains: search, mode: 'insensitive' } },
+          { titreOrig: { contains: search, mode: 'insensitive' } }
+        ];
+      }
     }
 
     // Determine orderBy based on sortBy parameter

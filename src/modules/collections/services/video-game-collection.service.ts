@@ -257,10 +257,11 @@ export class VideoGameCollectionService {
         limit: number = 20,
         year?: number,
         sortBy?: string,
-        sortOrder: 'asc' | 'desc' = 'desc'
+        sortOrder: 'asc' | 'desc' = 'desc',
+        search?: string
     ) {
         // Cache key based on all query params
-        const cacheKey = `collection_jeuxvideo:${userId}:t${type ?? 'all'}:p${page}:l${limit}:y${year ?? 'all'}:s${sortBy ?? 'default'}:${sortOrder}`;
+        const cacheKey = `collection_jeuxvideo:${userId}:t${type ?? 'all'}:p${page}:l${limit}:y${year ?? 'all'}:s${sortBy ?? 'default'}:${sortOrder}:${search || 'none'}`;
         const cached = await this.cacheService.get(cacheKey);
         if (cached) {
             return cached;
@@ -271,10 +272,16 @@ export class VideoGameCollectionService {
             where.type = type;
         }
 
-        if (year) {
-            where.jeuxVideo = {
-                annee: year
-            };
+        if (year || search) {
+            where.jeuxVideo = {};
+
+            if (year) {
+                where.jeuxVideo.annee = year;
+            }
+
+            if (search) {
+                where.jeuxVideo.titre = { contains: search, mode: 'insensitive' };
+            }
         }
 
         // Determine orderBy

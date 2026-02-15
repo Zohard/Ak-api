@@ -522,6 +522,7 @@ export class CollectionsController {
   @ApiQuery({ name: 'page', required: false, type: Number, description: 'Page number' })
   @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Items per page' })
   @ApiQuery({ name: 'year', required: false, type: Number, description: 'Filter by anime year' })
+  @ApiQuery({ name: 'search', required: false, type: String, description: 'Search by title' })
   @ApiQuery({ name: 'sortBy', required: false, type: String, description: 'Sort by field (createdAt, rating, title, updatedAt, notes)' })
   @ApiQuery({ name: 'sortOrder', required: false, enum: ['asc', 'desc'], description: 'Sort order' })
   @ApiResponse({ status: 200, description: 'Collection animes retrieved successfully' })
@@ -532,13 +533,14 @@ export class CollectionsController {
     @Query('page') page: string = '1',
     @Query('limit') limit: string = '20',
     @Query('year', new ParseIntPipe({ optional: true })) year: number | undefined,
+    @Query('search') search: string | undefined,
     @Query('sortBy') sortBy: string | undefined,
     @Query('sortOrder') sortOrder: 'asc' | 'desc' | undefined,
     @Request() req,
   ) {
     const currentUserId = req.user?.id;
     // Note: getCollectionAnimes is still in CollectionsService as it returns ITEMS
-    return this.collectionsService.getCollectionAnimes(userId, type, parseInt(page), parseInt(limit), currentUserId, year, sortBy, sortOrder);
+    return this.collectionsService.getCollectionAnimes(userId, type, parseInt(page), parseInt(limit), currentUserId, year, sortBy, sortOrder, search);
   }
 
   @Post('user/:userId/type/:type/animes')
@@ -589,6 +591,7 @@ export class CollectionsController {
   @ApiQuery({ name: 'page', required: false, type: Number, description: 'Page number' })
   @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Items per page' })
   @ApiQuery({ name: 'year', required: false, type: Number, description: 'Filter by manga year' })
+  @ApiQuery({ name: 'search', required: false, type: String, description: 'Search by title' })
   @ApiQuery({ name: 'sortBy', required: false, type: String, description: 'Sort by field (createdAt, rating, title, updatedAt, notes)' })
   @ApiQuery({ name: 'sortOrder', required: false, enum: ['asc', 'desc'], description: 'Sort order' })
   @ApiResponse({ status: 200, description: 'Collection mangas retrieved successfully' })
@@ -599,12 +602,13 @@ export class CollectionsController {
     @Query('page') page: string = '1',
     @Query('limit') limit: string = '20',
     @Query('year', new ParseIntPipe({ optional: true })) year: number | undefined,
+    @Query('search') search: string | undefined,
     @Query('sortBy') sortBy: string | undefined,
     @Query('sortOrder') sortOrder: 'asc' | 'desc' | undefined,
     @Request() req,
   ) {
     const currentUserId = req.user?.id;
-    return this.collectionsService.getCollectionMangas(userId, type, parseInt(page), parseInt(limit), currentUserId, year, sortBy, sortOrder);
+    return this.collectionsService.getCollectionMangas(userId, type, parseInt(page), parseInt(limit), currentUserId, year, sortBy, sortOrder, search);
   }
 
   @Post('user/:userId/type/:type/mangas')
@@ -755,6 +759,7 @@ export class CollectionsController {
   @ApiQuery({ name: 'type', required: false, type: 'number', description: 'Collection type filter (1-5)' })
   @ApiQuery({ name: 'page', required: false, type: 'number', description: 'Page number (default: 1)' })
   @ApiQuery({ name: 'limit', required: false, type: 'number', description: 'Items per page (default: 20)' })
+  @ApiQuery({ name: 'search', required: false, type: String, description: 'Search by title' })
   @ApiResponse({ status: 200, description: 'Video game collection retrieved successfully' })
   getJeuxVideoCollection(
     @Param('userId', ParseIntPipe) userId: number,
@@ -762,12 +767,13 @@ export class CollectionsController {
     @Query('page', new ParseIntPipe({ optional: true })) page: number | undefined,
     @Query('limit', new ParseIntPipe({ optional: true })) limit: number | undefined,
     @Query('year', new ParseIntPipe({ optional: true })) year: number | undefined,
+    @Query('search') search: string | undefined,
     @Query('sortBy') sortBy: string | undefined,
     @Query('sortOrder') sortOrder: 'asc' | 'desc' | undefined,
     @Request() req,
   ) {
     const currentUserId = req.user?.id;
-    return this.videoGameCollectionService.getJeuxVideoCollection(userId, type, currentUserId, page, limit, year, sortBy, sortOrder);
+    return this.videoGameCollectionService.getJeuxVideoCollection(userId, type, currentUserId, page, limit, year, sortBy, sortOrder, search);
   }
 
   @Get('media/:mediaType/:mediaId/users')
