@@ -122,6 +122,32 @@ export class EmailService {
     }
   }
 
+  async sendContactReply(
+    name: string,
+    email: string,
+    originalMessage: string,
+    response: string,
+  ): Promise<void> {
+    try {
+      const { data, error } = await this.resend.emails.send({
+        from: this.fromEmail,
+        to: email,
+        subject: `Réponse à votre message - Anime-Kun`,
+        html: this.getContactReplyTemplate(name, originalMessage, response),
+      });
+
+      if (error) {
+        console.error('❌ Error sending contact reply:', error);
+        throw error;
+      }
+
+      console.log('✅ Contact reply sent to', email);
+    } catch (error) {
+      console.error('❌ Error sending contact reply:', error);
+      throw error;
+    }
+  }
+
   async sendReviewRejectionEmail(
     recipientEmail: string,
     recipientUsername: string,
@@ -959,6 +985,108 @@ export class EmailService {
 
           <div class="footer">
             <p>Ce message a été envoyé depuis le formulaire de contact d'Anime-Kun.</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+  }
+
+  private getContactReplyTemplate(
+    name: string,
+    originalMessage: string,
+    response: string,
+  ): string {
+    const escapedName = name.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const escapedOriginalMessage = originalMessage
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/\n/g, '<br>');
+    const escapedResponse = response
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/\n/g, '<br>');
+
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <title>Réponse à votre message - Anime-Kun</title>
+        <style>
+          body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+          }
+          .header {
+            background-color: #2563eb;
+            color: white;
+            padding: 20px;
+            text-align: center;
+            border-radius: 8px 8px 0 0;
+          }
+          .content {
+            background-color: #f8fafc;
+            padding: 30px;
+            border-radius: 0 0 8px 8px;
+          }
+          .response-box {
+            background-color: white;
+            border-left: 4px solid #10b981;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 4px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+          }
+          .original-message-box {
+            background-color: #f3f4f6;
+            border-left: 4px solid #6b7280;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+            font-size: 14px;
+          }
+          .footer {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #e5e7eb;
+            font-size: 14px;
+            color: #6b7280;
+          }
+          h3 {
+            color: #1f2937;
+            margin-top: 0;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1>🎌 Anime-Kun</h1>
+          <h2>Réponse à votre message</h2>
+        </div>
+        <div class="content">
+          <p>Bonjour ${escapedName},</p>
+          <p>Merci de nous avoir contactés. Voici notre réponse à votre message :</p>
+
+          <div class="response-box">
+            <h3>💬 Notre réponse :</h3>
+            <p style="margin: 10px 0 0 0; color: #1f2937;">${escapedResponse}</p>
+          </div>
+
+          <div class="original-message-box">
+            <h3 style="font-size: 14px; color: #6b7280;">📩 Votre message original :</h3>
+            <p style="margin: 10px 0 0 0; color: #4b5563;">${escapedOriginalMessage}</p>
+          </div>
+
+          <p>Si vous avez d'autres questions, n'hésitez pas à nous contacter à nouveau.</p>
+
+          <div class="footer">
+            <p><strong>Cordialement,</strong><br>L'équipe Anime-Kun</p>
+            <p>Pour nous contacter : <a href="https://www.anime-kun.net/contact">https://www.anime-kun.net/contact</a></p>
           </div>
         </div>
       </body>

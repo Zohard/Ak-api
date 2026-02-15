@@ -72,6 +72,39 @@ export class ContactService {
     return { success: true };
   }
 
+  async sendReply(id: number, response: string) {
+    // Get the contact message
+    const message = await this.prisma.akContactMessage.findUnique({
+      where: { idContact: id },
+    });
+
+    if (!message) {
+      throw new Error('Message not found');
+    }
+
+    // Send email reply to the user
+    try {
+      await this.emailService.sendContactReply(
+        message.name,
+        message.email,
+        message.message,
+        response,
+      );
+
+      // Mark as read
+      await this.prisma.akContactMessage.update({
+        where: { idContact: id },
+        data: { isRead: true },
+      });
+
+      this.logger.log(`Reply sent to ${message.email} for contact message ${id}`);
+      return { success: true, message: 'Reply sent successfully' };
+    } catch (error) {
+      this.logger.error(`Failed to send reply: ${error.message}`);
+      throw new Error('Failed to send reply email');
+    }
+  }
+
   async remove(id: number) {
     await this.prisma.akContactMessage.delete({
       where: { idContact: id },

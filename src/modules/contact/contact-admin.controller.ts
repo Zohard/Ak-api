@@ -1,10 +1,12 @@
 import {
   Controller,
   Get,
+  Post,
   Patch,
   Delete,
   Param,
   Query,
+  Body,
   UseGuards,
   ParseIntPipe,
 } from '@nestjs/common';
@@ -42,6 +44,15 @@ export class ContactAdminController {
   @ApiOperation({ summary: 'Mark a contact message as read' })
   markAsRead(@Param('id', ParseIntPipe) id: number) {
     return this.contactService.markAsRead(id);
+  }
+
+  @Post(':id/reply')
+  @ApiOperation({ summary: 'Send a reply to a contact message' })
+  reply(
+    @Param('id', ParseIntPipe) id: number,
+    @Body('response') response: string,
+  ) {
+    return this.contactService.sendReply(id, response);
   }
 
   @Delete(':id')
