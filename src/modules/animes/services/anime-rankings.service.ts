@@ -111,6 +111,90 @@ export class AnimeRankingsService {
     return result;
   }
 
+  async getWeeklyTop(limit = 20) {
+    // Get the most recent week with data (not necessarily current week)
+    // This ensures we show week 7 even when we're in week 8 but week 8 hasn't been generated yet
+    const mostRecentWeek = await this.prisma.animeWeeklyRanking.findFirst({
+      orderBy: [
+        { year: 'desc' },
+        { week: 'desc' },
+      ],
+      select: {
+        year: true,
+        week: true,
+      },
+    });
+
+    if (!mostRecentWeek) {
+      // No weekly rankings data available, return empty result
+      return {
+        weeklyTop: [],
+        week: null,
+        year: null,
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    const { year, week } = mostRecentWeek;
+
+    // Try cache first (15 minutes TTL for weekly rankings)
+    const cacheKey = `weekly-top:${year}:${week}:${limit}`;
+    const cached = await this.cacheService.get(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
+    // Fetch weekly rankings from database for the most recent week
+    const rankings = await this.prisma.animeWeeklyRanking.findMany({
+      where: {
+        year,
+        week,
+      },
+      orderBy: { rank: 'asc' },
+      take: limit,
+      include: {
+        anime: {
+          include: {
+            reviews: {
+              take: 2,
+              orderBy: { dateCritique: 'desc' },
+              include: {
+                membre: {
+                  select: { idMember: true, memberName: true },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    const result = {
+      weeklyTop: rankings.map(r => ({
+        ...this.formatAnime(r.anime),
+        weeklyRank: r.rank,
+        weeklyScore: r.score,
+        trend: r.trend,
+      })),
+      week,
+      year,
+      generatedAt: new Date().toISOString(),
+    };
+
+    // Cache for 23 hours (82800 seconds) - invalidated by weekly ranking calculation job
+    await this.cacheService.set(cacheKey, result, 82800);
+
+    return result;
+  }
+
+  private getWeekNumber(date: Date): number {
+    const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+    const dayNum = d.getUTCDay() || 7;
+    d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+    const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+    return Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+  }
+
   async getFlopAnimes(limit = 20, type = 'reviews-bayes') {
     // Try to get from cache first (1 hour TTL)
     const cached = await this.cacheService.getRankings('anime', 'flop', type, limit);

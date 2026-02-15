@@ -791,6 +791,10 @@ export class AnimesService extends BaseContentService<
     return this.animeRankingsService.getTopAnimes(limit, type);
   }
 
+  async getWeeklyTop(limit = 20) {
+    return this.animeRankingsService.getWeeklyTop(limit);
+  }
+
   async getFlopAnimes(limit = 20, type = 'reviews-bayes') {
     return this.animeRankingsService.getFlopAnimes(limit, type);
   }

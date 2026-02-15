@@ -87,6 +87,20 @@ export class AnimesController {
     return this.animesService.getTopAnimes(parsedLimit, rankingType);
   }
 
+  @Get('weekly-top')
+  @ApiOperation({ summary: 'Top 20 hebdomadaire des animes' })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    description: "Nombre d'animes à retourner",
+    example: 20,
+  })
+  @ApiResponse({ status: 200, description: 'Top 20 des animes de la semaine' })
+  async getWeeklyTop(@Query('limit') limit?: string) {
+    const parsedLimit = limit ? parseInt(limit) : 20;
+    return this.animesService.getWeeklyTop(parsedLimit);
+  }
+
   @Get('flop')
   @ApiOperation({ summary: 'Flop animes les moins bien notés' })
   @ApiQuery({
