@@ -113,7 +113,7 @@ export class BusinessService {
       const patternIdx = pi++;
       params.push(searchExact, searchStart, searchPattern);
 
-      conditions.push(`(denomination ILIKE $${patternIdx} OR autres_denominations ILIKE $${patternIdx})`);
+      conditions.push(`(denomination ILIKE $${startIdx} OR autres_denominations ILIKE $${startIdx})`);
 
       const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
@@ -388,10 +388,10 @@ export class BusinessService {
       SELECT id_business, denomination, type, origine, image, nice_url
       FROM ak_business
       WHERE statut = 1
-      AND (unaccent(denomination) ILIKE unaccent($1)
-           OR unaccent(COALESCE(autres_denominations, '')) ILIKE unaccent($1))
-      ORDER BY 
-        (CASE 
+      AND (unaccent(denomination) ILIKE unaccent($3)
+           OR unaccent(COALESCE(autres_denominations, '')) ILIKE unaccent($3))
+      ORDER BY
+        (CASE
           WHEN unaccent(denomination) ILIKE unaccent($2) THEN 0
           WHEN unaccent(denomination) ILIKE unaccent($3) THEN 1
           ELSE 2

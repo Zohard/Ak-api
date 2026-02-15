@@ -272,7 +272,7 @@ export class AnimesService extends BaseContentService<
 
     if (search) {
       searchActive = true;
-      const searchTerm = `%${search}%`;
+      const searchTerm = `${search}%`;
       console.log(`[Anime Search] Searching for: "${search}" with pattern: "${searchTerm}"`);
       try {
         const matchingIds = await this.prisma.$queryRaw<Array<{ id_anime: number }>>`
@@ -290,10 +290,10 @@ export class AnimesService extends BaseContentService<
         const matchingIds = await this.prisma.akAnime.findMany({
           where: {
             OR: [
-              { titre: { contains: search, mode: 'insensitive' } },
-              { titreOrig: { contains: search, mode: 'insensitive' } },
-              { titreFr: { contains: search, mode: 'insensitive' } },
-              { titresAlternatifs: { contains: search, mode: 'insensitive' } },
+              { titre: { startsWith: search, mode: 'insensitive' } },
+              { titreOrig: { startsWith: search, mode: 'insensitive' } },
+              { titreFr: { startsWith: search, mode: 'insensitive' } },
+              { titresAlternatifs: { startsWith: search, mode: 'insensitive' } },
             ]
           },
           select: { idAnime: true }

@@ -57,7 +57,7 @@ export class JeuxVideoService {
     // Search filter
     if (search) {
       searchActive = true;
-      const searchTerm = `%${search}%`;
+      const searchTerm = `${search}%`;
       try {
         const matchingIds = await this.prisma.$queryRaw<Array<{ id_jeu: number }>>`
           SELECT id_jeu FROM ak_jeux_video
@@ -69,7 +69,7 @@ export class JeuxVideoService {
         console.warn('Search with unaccent failed, falling back to standard ILIKE:', error);
         const matchingIds = await this.prisma.akJeuxVideo.findMany({
           where: {
-            titre: { contains: search, mode: 'insensitive' }
+            titre: { startsWith: search, mode: 'insensitive' }
           },
           select: { idJeu: true }
         });
@@ -760,7 +760,7 @@ export class JeuxVideoService {
       return { data: [] };
     }
 
-    const searchTerm = `%${query}%`;
+    const searchTerm = `${query}%`;
 
     // Build exclude IDs array
     let excludeIds: number[] = [];

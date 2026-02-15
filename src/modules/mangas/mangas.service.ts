@@ -251,15 +251,16 @@ export class MangasService extends BaseContentService<
 
     if (search) {
       searchActive = true;
-      const searchTerm = `%${search}%`;
+      const searchTermStart = `${search}%`;
+      const searchTermContains = `%${search}%`;
       try {
         const matchingIds = await this.prisma.$queryRaw<Array<{ id_manga: number }>>`
           SELECT id_manga FROM ak_mangas
-          WHERE unaccent(titre) ILIKE unaccent(${searchTerm})
-          OR unaccent(COALESCE(titre_orig, '')) ILIKE unaccent(${searchTerm})
-          OR unaccent(COALESCE(titre_fr, '')) ILIKE unaccent(${searchTerm})
-          OR unaccent(COALESCE(titres_alternatifs, '')) ILIKE unaccent(${searchTerm})
-          OR unaccent(COALESCE(synopsis, '')) ILIKE unaccent(${searchTerm})
+          WHERE unaccent(titre) ILIKE unaccent(${searchTermStart})
+          OR unaccent(COALESCE(titre_orig, '')) ILIKE unaccent(${searchTermStart})
+          OR unaccent(COALESCE(titre_fr, '')) ILIKE unaccent(${searchTermStart})
+          OR unaccent(COALESCE(titres_alternatifs, '')) ILIKE unaccent(${searchTermStart})
+          OR unaccent(COALESCE(synopsis, '')) ILIKE unaccent(${searchTermContains})
         `;
         searchIds.push(...matchingIds.map(r => r.id_manga));
       } catch (error) {
@@ -268,10 +269,10 @@ export class MangasService extends BaseContentService<
         const matchingIds = await this.prisma.akManga.findMany({
           where: {
             OR: [
-              { titre: { contains: search, mode: 'insensitive' } },
-              { titreOrig: { contains: search, mode: 'insensitive' } },
-              { titreFr: { contains: search, mode: 'insensitive' } },
-              { titresAlternatifs: { contains: search, mode: 'insensitive' } },
+              { titre: { startsWith: search, mode: 'insensitive' } },
+              { titreOrig: { startsWith: search, mode: 'insensitive' } },
+              { titreFr: { startsWith: search, mode: 'insensitive' } },
+              { titresAlternatifs: { startsWith: search, mode: 'insensitive' } },
               { synopsis: { contains: search, mode: 'insensitive' } },
             ]
           },
