@@ -1196,4 +1196,225 @@ export class SourcesExternesService {
       success: !!translatedText
     };
   }
+
+  /**
+   * Bulk create anime from season import with batching to avoid database overload
+   * Processes anime in batches of 10 with 500ms delay between batches
+   * @param animeList List of anime to create (only missing ones)
+   * @param user Current user
+   * @returns Results with created count, errors, and details
+   */
+  async bulkCreateAnime(animeList: any[], user: any): Promise<any> {
+    const BATCH_SIZE = 10;
+    const BATCH_DELAY_MS = 500; // 500ms delay between batches
+
+    // Filter only missing anime (not already in database) that have data to create from
+    const missingAnime = animeList.filter(anime => !anime.exists && (anime.scrapedData || anime.anilistData));
+
+    if (missingAnime.length === 0) {
+      return {
+        total: 0,
+        successCount: 0,
+        failedCount: 0,
+        createdAnimeIds: [],
+        results: [],
+        message: 'No missing anime to create'
+      };
+    }
+
+    console.log(`Starting bulk creation of ${missingAnime.length} anime in batches of ${BATCH_SIZE}`);
+
+    const results = [];
+    const createdAnimeIds = [];
+    let createdCount = 0;
+    let failedCount = 0;
+
+    // Helper function to delay between batches
+    const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+    // Process in batches
+    for (let i = 0; i < missingAnime.length; i += BATCH_SIZE) {
+      const batch = missingAnime.slice(i, i + BATCH_SIZE);
+      const batchNumber = Math.floor(i / BATCH_SIZE) + 1;
+      const totalBatches = Math.ceil(missingAnime.length / BATCH_SIZE);
+
+      console.log(`Processing batch ${batchNumber}/${totalBatches} (${batch.length} anime)`);
+
+      // Process batch in parallel
+      const batchPromises = batch.map(async (anime) => {
+        try {
+          // Prepare data from either scrapedData or anilistData
+          const data = anime.scrapedData || anime.anilistData || {};
+          const anilistId = anime.anilistData?.id || anime.anilistId || null;
+
+          // Extract title from anilistData if available
+          let titre = anime.titre;
+          let titreOrig = anime.titre;
+          let titresAlternatifs = '';
+
+          if (anime.anilistData?.title) {
+            titre = anime.anilistData.title.romaji || anime.titre;
+            titreOrig = anime.anilistData.title.native || anime.titre;
+
+            // Collect alternative titles
+            const altTitles = [];
+            if (anime.anilistData.title.english && anime.anilistData.title.english !== titre) {
+              altTitles.push(anime.anilistData.title.english);
+            }
+            if (anime.anilistData.synonyms?.length) {
+              altTitles.push(...anime.anilistData.synonyms);
+            }
+            titresAlternatifs = altTitles.join('\n');
+          }
+
+          // Extract date from anilistData startDate
+          let dateDiffusion = data.dateDiffusion || null;
+          let annee = data.annee || new Date().getFullYear().toString();
+          if (anime.anilistData?.startDate) {
+            const sd = anime.anilistData.startDate;
+            if (sd.year) {
+              const year = sd.year;
+              const month = sd.month ? String(sd.month).padStart(2, '0') : '01';
+              const day = sd.day ? String(sd.day).padStart(2, '0') : '01';
+              dateDiffusion = `${year}-${month}-${day}`;
+              annee = year.toString();
+            }
+          }
+
+          // Get format from anilistData
+          let format = data.format || 'Série TV';
+          if (anime.anilistData?.format) {
+            const formatMap: Record<string, string> = {
+              'TV': 'Série TV',
+              'TV_SHORT': 'Série TV',
+              'MOVIE': 'Film',
+              'SPECIAL': 'Spécial',
+              'OVA': 'OAV',
+              'ONA': 'ONA',
+              'MUSIC': 'Autre'
+            };
+            format = formatMap[anime.anilistData.format] || 'Série TV';
+          }
+
+          // Get image URL from anilistData
+          let imageUrl = data.imageUrl || '';
+          if (anime.anilistData?.coverImage) {
+            imageUrl = anime.anilistData.coverImage.extraLarge ||
+                       anime.anilistData.coverImage.large ||
+                       anime.anilistData.coverImage.medium || '';
+          }
+
+          // Get episode count from anilistData
+          let nbEpduree = data.nbEpisodes || data.nbEpduree || '';
+          if (anime.anilistData?.episodes) {
+            nbEpduree = anime.anilistData.episodes.toString();
+          }
+
+          // Get duration from anilistData
+          let episodeDuration = data.episodeDuration || null;
+          if (anime.anilistData?.duration) {
+            episodeDuration = anime.anilistData.duration;
+          }
+
+          // Prepare sources URL
+          const sourceUrls = [];
+          if (anilistId) {
+            sourceUrls.push(`https://anilist.co/anime/${anilistId}`);
+          }
+          if (anime.anilistData?.idMal) {
+            sourceUrls.push(`https://myanimelist.net/anime/${anime.anilistData.idMal}`);
+          }
+
+          // Build ressources object in expected format
+          let ressources: any = anime.scrapedData || {};
+
+          // If using anilistData, transform it to expected format
+          if (anime.anilistData && !anime.scrapedData) {
+            const al = anime.anilistData;
+
+            ressources = {
+              // Store original anilist data
+              anilist: al,
+
+              // Transform to expected format for createAnimeFromNautiljon
+              episode_count: al.episodes || 'NC',
+
+              // Extract year from startDate
+              airing_info: al.startDate?.year ? {
+                season: `${al.startDate.year}`
+              } : undefined,
+
+              // Studios array
+              studios: al.studios?.nodes?.filter((s: any) => s.isAnimationStudio).map((s: any) => s.name) || [],
+
+              // Official site from externalLinks
+              official_websites: al.externalLinks
+                ?.filter((link: any) => link.site === 'Official Site' && !link.url.includes('anilist.co'))
+                .map((link: any) => link.url) || [],
+
+              // Image URL
+              merged: {
+                image_url: al.coverImage?.extraLarge || al.coverImage?.large || al.coverImage?.medium
+              }
+            };
+          }
+
+          const createDto: CreateAnimeFromSourcesExternesDto = {
+            titre,
+            titreOrig,
+            titreFr: data.titreFr || '',
+            titresAlternatifs,
+            sources: sourceUrls.join('\n'),
+            ressources
+          };
+
+          const created = await this.createAnimeFromNautiljon(createDto, user);
+          createdCount++;
+
+          // Add to createdAnimeIds array for frontend
+          createdAnimeIds.push({
+            titre: anime.titre,
+            animeId: created.idAnime,
+            anilistId
+          });
+
+          return {
+            titre: anime.titre,
+            status: 'success',
+            animeId: created.idAnime,
+            message: 'Created successfully'
+          };
+        } catch (error) {
+          failedCount++;
+          console.error(`Failed to create anime "${anime.titre}": ${error.message}`);
+
+          return {
+            titre: anime.titre,
+            status: 'error',
+            error: error.message
+          };
+        }
+      });
+
+      // Wait for batch to complete
+      const batchResults = await Promise.all(batchPromises);
+      results.push(...batchResults);
+
+      // Add delay between batches (except for the last batch)
+      if (i + BATCH_SIZE < missingAnime.length) {
+        await delay(BATCH_DELAY_MS);
+      }
+    }
+
+    console.log(`Bulk creation completed: ${createdCount} created, ${failedCount} failed`);
+
+    return {
+      total: missingAnime.length,
+      successCount: createdCount,
+      failedCount: failedCount,
+      createdAnimeIds,
+      results,
+      message: `Successfully created ${createdCount} out of ${missingAnime.length} anime`
+    };
+  }
 }

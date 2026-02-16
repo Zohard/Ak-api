@@ -59,6 +59,33 @@ export class SourcesExternesController {
     return this.sourcesExternesService.createAnimeFromNautiljon(createDto, user);
   }
 
+  @Post('bulk-create-anime')
+  @ApiOperation({
+    summary: 'Bulk create missing anime from season import',
+    description: 'Create multiple anime entries in batches with "en attente" status to avoid database overload'
+  })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        animeList: {
+          type: 'array',
+          items: { type: 'object' }
+        }
+      }
+    }
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Anime bulk creation completed with results'
+  })
+  async bulkCreateAnime(
+    @Body() body: { animeList: any[] },
+    @CurrentUser() user: any,
+  ): Promise<any> {
+    return this.sourcesExternesService.bulkCreateAnime(body.animeList, user);
+  }
+
   @Get('anime/:id/resources')
   @ApiOperation({
     summary: 'Get staff and tags from anime resources',
