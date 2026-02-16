@@ -5,6 +5,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../../shared/services/prisma.service';
+import { CacheService } from '../../shared/services/cache.service';
 import { R2Service } from './r2.service';
 import { slugify } from '../../shared/utils/text.util';
 import {
@@ -22,6 +23,7 @@ export class MediaService {
   constructor(
     private prisma: PrismaService,
     private r2Service: R2Service,
+    private cacheService: CacheService,
   ) { }
   private readonly logger = new Logger(MediaService.name);
 
@@ -171,6 +173,9 @@ export class MediaService {
             throw new BadRequestException(`Screenshot upload not supported for type: ${type}`);
           }
 
+          // Invalidate cache so new screenshot shows immediately
+          await this.invalidateCacheForMedia(type, relatedId);
+
           return {
             id: screenshotId,
             filename: uploadResult.name,
@@ -208,6 +213,9 @@ export class MediaService {
         }
       } else {
         // For non-screenshot uploads (covers, avatars, etc.), just return the upload result
+        // Invalidate cache so new image shows immediately
+        await this.invalidateCacheForMedia(type, relatedId);
+
         return {
           filename: uploadResult.name,
           originalName: file.originalname,
@@ -417,6 +425,9 @@ export class MediaService {
             throw new BadRequestException(`Screenshot upload not supported for type: ${type}`);
           }
 
+          // Invalidate cache so new screenshot shows immediately
+          await this.invalidateCacheForMedia(type, relatedId);
+
           return {
             id: screenshotId,
             filename: uploadResult.name,
@@ -445,6 +456,9 @@ export class MediaService {
       }
 
       // No screenshot save - just return upload result
+      // Invalidate cache so new image shows immediately
+      await this.invalidateCacheForMedia(type, relatedId);
+
       return {
         filename: uploadResult.name,
         size: processedImage.length,
@@ -1053,6 +1067,40 @@ export class MediaService {
         siteName: 'X',
         type: 'article',
       };
+    }
+  }
+
+  /**
+   * Invalidate cache for anime/manga/game when media is uploaded
+   * This ensures users see the new image immediately
+   */
+  private async invalidateCacheForMedia(
+    type: 'anime' | 'manga' | 'avatar' | 'cover' | 'game' | 'business' | 'article',
+    relatedId?: number,
+  ): Promise<void> {
+    if (!relatedId) return;
+
+    try {
+      switch (type) {
+        case 'anime':
+          await this.cacheService.invalidateAnime(relatedId);
+          this.logger.debug(`Cache invalidated for anime ${relatedId} after media upload`);
+          break;
+        case 'manga':
+          await this.cacheService.invalidateManga(relatedId);
+          this.logger.debug(`Cache invalidated for manga ${relatedId} after media upload`);
+          break;
+        case 'game':
+          await this.cacheService.invalidateGame(relatedId);
+          this.logger.debug(`Cache invalidated for game ${relatedId} after media upload`);
+          break;
+        // No cache invalidation needed for avatars, covers, business, article
+        default:
+          break;
+      }
+    } catch (error) {
+      // Log but don't fail the upload if cache invalidation fails
+      this.logger.error(`Failed to invalidate cache for ${type} ${relatedId}:`, error);
     }
   }
 }

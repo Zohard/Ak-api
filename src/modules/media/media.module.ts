@@ -4,6 +4,7 @@ import { MediaController } from './media.controller';
 import { MediaService } from './media.service';
 import { R2Service } from './r2.service';
 import { PrismaService } from '../../shared/services/prisma.service';
+import { CacheService } from '../../shared/services/cache.service';
 
 @Module({
   imports: [
@@ -29,7 +30,7 @@ import { PrismaService } from '../../shared/services/prisma.service';
     }),
   ],
   controllers: [MediaController],
-  providers: [MediaService, R2Service, PrismaService],
+  providers: [MediaService, R2Service, PrismaService, CacheService],
   exports: [MediaService, R2Service],
 })
 export class MediaModule {}
