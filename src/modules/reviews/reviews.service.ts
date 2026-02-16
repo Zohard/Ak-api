@@ -675,8 +675,11 @@ export class ReviewsService {
     // SECURITY: Non-admin users cannot directly change review status
     // Remove statut from updateData for non-admin users - status changes are controlled by business logic
     if (!isAdmin && updateData.statut !== undefined) {
+      const attemptedStatus = updateData.statut;
       delete updateData.statut;
-      this.logger.warn(`Non-admin user ${userId} attempted to change review ${id} status - ignored`);
+      this.logger.warn(
+        `Non-admin user ${userId} attempted to change review ${id} status from ${review.statut} to ${attemptedStatus} - BLOCKED`,
+      );
     }
 
     // Auto-detect spoilers in HTML content if critique is being updated and containsSpoilers not explicitly set
@@ -684,11 +687,14 @@ export class ReviewsService {
       updateData.containsSpoilers = this.detectSpoilersInContent(updateData.critique);
     }
 
-    // IMPORTANT: If review was rejected (status 2) and user is resubmitting (not admin),
-    // automatically set status to 3 (pending re-review) to require moderator approval
-    if (review.statut === 2 && !isAdmin) {
-      updateData.statut = 3; // Pending re-review - requires moderator approval
-      this.logger.log(`Review ${id} resubmitted after rejection - set to pending re-review (status 3)`);
+    // IMPORTANT: If review was rejected (status 2) or pending re-review (status 3),
+    // users cannot publish it - only admins can change status
+    // If user tries to update content, keep it in pending re-review status
+    if (!isAdmin && (review.statut === 2 || review.statut === 3)) {
+      updateData.statut = 3; // Force pending re-review - requires moderator approval
+      this.logger.log(
+        `Review ${id} updated while in status ${review.statut} - kept in pending re-review (status 3)`,
+      );
     }
 
     // Check if notation is being updated
