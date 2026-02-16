@@ -11,11 +11,18 @@ export class AppService {
     private readonly prisma: PrismaService,
     private readonly cacheService: CacheService,
   ) {
-    this.imagekit = new ImageKit({
-      publicKey: 'public_pjoQrRTPxVOD7iy9kWQVSXWcXCU=',
-      privateKey: process.env.IMAGEKIT_PRIVATE_KEY || '',
-      urlEndpoint: 'https://ik.imagekit.io/akimages'
-    });
+    // Only initialize ImageKit if privateKey is configured
+    if (process.env.IMAGEKIT_PRIVATE_KEY) {
+      this.imagekit = new ImageKit({
+        publicKey: 'public_pjoQrRTPxVOD7iy9kWQVSXWcXCU=',
+        privateKey: process.env.IMAGEKIT_PRIVATE_KEY,
+        urlEndpoint: 'https://ik.imagekit.io/akimages'
+      });
+    } else {
+      console.warn('ImageKit credentials not configured - image upload disabled');
+      // @ts-ignore - allow null for optional feature
+      this.imagekit = null;
+    }
   }
 
   async getHealth() {
@@ -70,6 +77,10 @@ export class AppService {
   }
 
   async getImageKitAuth() {
+    if (!this.imagekit) {
+      throw new Error('ImageKit is not configured');
+    }
+
     try {
       const authenticationParameters = this.imagekit.getAuthenticationParameters();
       return authenticationParameters;
