@@ -17,6 +17,8 @@
     "cleanup-images": "ts-node -r tsconfig-paths/register scripts/cleanup-orphaned-images.ts",
     "cleanup-images:dry-run": "npm run cleanup-images -- --dry-run",
     "update-anime-popularity": "ts-node -r tsconfig-paths/register scripts/update-anime-popularity.ts",
+    "fix-alt-titles": "ts-node -r tsconfig-paths/register scripts/fix-alternative-titles-newlines.ts",
+    "fix-alt-titles:dry-run": "ts-node -r tsconfig-paths/register scripts/fix-alternative-titles-newlines-dry-run.ts",
     "start": "nest start",
     "start:dev": "nest start --watch",
     "start:prod:dev": "nest start",
