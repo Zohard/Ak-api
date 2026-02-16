@@ -3,6 +3,8 @@ import {
   NotFoundException,
   ForbiddenException,
   BadRequestException,
+  Inject,
+  forwardRef,
 } from '@nestjs/common';
 import { PrismaService } from '../../shared/services/prisma.service';
 import { CacheService } from '../../shared/services/cache.service';
@@ -22,6 +24,7 @@ import { AnimeTrailersService } from './services/anime-trailers.service';
 import { AnimeRankingsService } from './services/anime-rankings.service';
 import { AnimeExternalService } from './services/anime-external.service';
 import { AnimeCacheService } from './services/anime-cache.service';
+import { SeasonsService } from '../seasons/seasons.service';
 
 @Injectable()
 export class AnimesService extends BaseContentService<
@@ -42,6 +45,8 @@ export class AnimesService extends BaseContentService<
     private readonly animeRankingsService: AnimeRankingsService,
     private readonly animeExternalService: AnimeExternalService,
     private readonly animeCacheService: AnimeCacheService,
+    @Inject(forwardRef(() => SeasonsService))
+    private readonly seasonsService: SeasonsService,
   ) {
     super(prisma);
   }
@@ -767,6 +772,9 @@ export class AnimesService extends BaseContentService<
 
     // Invalidate caches after update
     await this.invalidateAnimeCache(id);
+
+    // Invalidate season caches containing this anime
+    await this.seasonsService.invalidateSeasonsContainingAnime(id);
 
     return this.formatAnime(updatedAnime);
   }

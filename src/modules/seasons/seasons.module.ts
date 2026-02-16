@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { SeasonsController } from './seasons.controller';
 import { AdminSeasonsController } from './admin.seasons.controller';
 import { SeasonsService } from './seasons.service';
@@ -7,7 +7,7 @@ import { CacheService } from '../../shared/services/cache.service';
 import { AnimesModule } from '../animes/animes.module';
 
 @Module({
-  imports: [AnimesModule],
+  imports: [forwardRef(() => AnimesModule)],
   controllers: [SeasonsController, AdminSeasonsController],
   providers: [SeasonsService, PrismaService, CacheService],
   exports: [SeasonsService],

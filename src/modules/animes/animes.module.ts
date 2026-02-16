@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { AnimesService } from './animes.service';
 import { AnimesController } from './animes.controller';
 import { PrismaService } from '../../shared/services/prisma.service';
@@ -21,9 +21,17 @@ import { EpisodesController, EpisodesScheduleController } from './episodes/episo
 import { AnimeRankingsController } from './anime-rankings.controller';
 
 import { HttpModule } from '@nestjs/axios';
+import { SeasonsModule } from '../seasons/seasons.module';
 
 @Module({
-  imports: [HttpModule, MediaModule, AniListModule, JikanModule, AdminLoggingModule],
+  imports: [
+    HttpModule,
+    MediaModule,
+    AniListModule,
+    JikanModule,
+    AdminLoggingModule,
+    forwardRef(() => SeasonsModule),
+  ],
   controllers: [AnimesController, EpisodesController, EpisodesScheduleController, AnimeRankingsController],
   providers: [
     AnimesService,

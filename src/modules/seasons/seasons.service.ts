@@ -412,4 +412,41 @@ export class SeasonsService {
 
     return { success: true, seasonId }
   }
+
+  /**
+   * Find all seasons that contain a specific anime ID
+   */
+  async findSeasonsByAnimeId(animeId: number): Promise<any[]> {
+    // This is a heavy operation if there are many seasons, but typically there are < 100
+    // We fetch all seasons and filter in memory because IDs are in JSON
+    const seasons = await this.findAll();
+    if (!Array.isArray(seasons)) return [];
+
+    return seasons.filter(season => {
+      const animeIds = this.normalizeJsonData(season.json_data);
+      return animeIds.includes(animeId);
+    });
+  }
+
+  /**
+   * Invalidate cache for all seasons containing a specific anime
+   */
+  async invalidateSeasonsContainingAnime(animeId: number): Promise<void> {
+    const seasons = await this.findSeasonsByAnimeId(animeId);
+
+    for (const season of seasons) {
+      const seasonId = season.id_saison;
+      this.logger.log(`Invalidating season cache for season ${seasonId} (contains updated anime ${animeId})`);
+
+      await this.cacheService.del(`season:${seasonId}`);
+      await this.cacheService.del(`season_animes:${seasonId}`);
+    }
+
+    // If any season was found, also invalidate global season lists just in case
+    if (seasons.length > 0) {
+      await this.cacheService.del('seasons:all');
+      await this.cacheService.del('seasons:current');
+      await this.cacheService.invalidateHomepageSeason();
+    }
+  }
 }
