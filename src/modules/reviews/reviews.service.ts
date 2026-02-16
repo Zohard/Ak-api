@@ -672,6 +672,13 @@ export class ReviewsService {
     // Don't allow changing anime/manga IDs
     const { idAnime, idManga, ...updateData } = updateReviewDto;
 
+    // SECURITY: Non-admin users cannot directly change review status
+    // Remove statut from updateData for non-admin users - status changes are controlled by business logic
+    if (!isAdmin && updateData.statut !== undefined) {
+      delete updateData.statut;
+      this.logger.warn(`Non-admin user ${userId} attempted to change review ${id} status - ignored`);
+    }
+
     // Auto-detect spoilers in HTML content if critique is being updated and containsSpoilers not explicitly set
     if (updateData.critique && updateData.containsSpoilers === undefined) {
       updateData.containsSpoilers = this.detectSpoilersInContent(updateData.critique);
