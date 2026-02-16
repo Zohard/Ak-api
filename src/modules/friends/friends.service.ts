@@ -1044,6 +1044,63 @@ export class FriendsService {
       }
     }
 
+    // Check which posts/activities the current user has liked
+    const postIds = activities
+      .filter(a => a.type === 'post' && a.id)
+      .map(a => parseInt(a.id.replace('post-', '')))
+      .filter(id => !isNaN(id));
+
+    const activityIdentifiers = activities
+      .filter(a => a.type !== 'post' && a.type && a.id)
+      .map(a => ({ activityType: a.type, activityId: a.id }));
+
+    let userLikes: any[] = [];
+    try {
+      // Only fetch likes if there are posts or activities to check
+      if (postIds.length > 0 || activityIdentifiers.length > 0) {
+        userLikes = await this.prisma.akSocialLike.findMany({
+          where: {
+            userId,
+            OR: [
+              ...(postIds.length > 0 ? [{ postId: { in: postIds } }] : []),
+              ...activityIdentifiers.map(({ activityType, activityId }) => ({
+                activityType,
+                activityId
+              }))
+            ]
+          },
+          select: {
+            postId: true,
+            activityType: true,
+            activityId: true
+          }
+        });
+      }
+    } catch (error) {
+      // If social likes table doesn't exist yet, continue without like status
+      userLikes = [];
+    }
+
+    // Create a Set for quick lookup
+    const likedPosts = new Set(userLikes.filter(l => l.postId).map(l => l.postId));
+    const likedActivities = new Set(
+      userLikes
+        .filter(l => l.activityType && l.activityId)
+        .map(l => `${l.activityType}-${l.activityId}`)
+    );
+
+    // Add isLiked status to activities
+    activities.forEach(activity => {
+      if (activity.type === 'post') {
+        const postId = parseInt(activity.id.replace('post-', ''));
+        activity.isLiked = likedPosts.has(postId);
+      } else if (activity.type && activity.id) {
+        activity.isLiked = likedActivities.has(`${activity.type}-${activity.id}`);
+      } else {
+        activity.isLiked = false;
+      }
+    });
+
     // Sort all activities by date
     activities.sort((a, b) => {
       const dateA = new Date(a.createdAt).getTime();

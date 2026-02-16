@@ -33,6 +33,102 @@ export class EpisodesService {
         return this.prisma.akAnimesEpisode.count({ where: { idAnime: animeId } });
     }
 
+    async updateEpisode(
+        animeId: number,
+        episodeId: number,
+        updateData: {
+            dateDiffusion?: string | null;
+            applyOffsetToNext?: boolean;
+            offsetDays?: number;
+        }
+    ) {
+        const episode = await this.prisma.akAnimesEpisode.findUnique({
+            where: { idEpisode: episodeId }
+        });
+
+        if (!episode) {
+            throw new NotFoundException(`Episode ${episodeId} not found`);
+        }
+
+        // Format date as YYYY-MM-DD for VARCHAR(10) column
+        let dateDiffusionStr: string | null = null;
+        if (updateData.dateDiffusion) {
+            const date = new Date(updateData.dateDiffusion);
+            if (!isNaN(date.getTime())) {
+                dateDiffusionStr = date.toISOString().split('T')[0];
+            }
+        }
+
+        // Update the current episode
+        const updated = await this.prisma.akAnimesEpisode.update({
+            where: { idEpisode: episodeId },
+            data: {
+                dateDiffusion: dateDiffusionStr
+            }
+        });
+
+        let affectedCount = 1;
+
+        // If applying offset to next episodes
+        if (updateData.applyOffsetToNext && updateData.offsetDays !== undefined && updateData.offsetDays !== 0) {
+            const offsetDays = updateData.offsetDays;
+
+            // Get all subsequent episodes
+            const nextEpisodes = await this.prisma.akAnimesEpisode.findMany({
+                where: {
+                    idAnime: animeId,
+                    numero: { gt: episode.numero },
+                    dateDiffusion: { not: null }
+                },
+                orderBy: { numero: 'asc' }
+            });
+
+            this.logger.log(`Applying offset of ${offsetDays} days to ${nextEpisodes.length} subsequent episodes`);
+
+            // Update each subsequent episode
+            for (const nextEp of nextEpisodes) {
+                if (nextEp.dateDiffusion) {
+                    try {
+                        // Parse the date (it's stored as VARCHAR in YYYY-MM-DD format)
+                        const currentDate = new Date(nextEp.dateDiffusion);
+
+                        if (!isNaN(currentDate.getTime())) {
+                            // Add the offset
+                            currentDate.setDate(currentDate.getDate() + offsetDays);
+
+                            // Format as YYYY-MM-DD
+                            const newDateStr = currentDate.toISOString().split('T')[0];
+
+                            await this.prisma.akAnimesEpisode.update({
+                                where: { idEpisode: nextEp.idEpisode },
+                                data: { dateDiffusion: newDateStr }
+                            });
+
+                            affectedCount++;
+                        }
+                    } catch (err) {
+                        this.logger.error(`Failed to update episode ${nextEp.numero}:`, err);
+                    }
+                }
+            }
+        }
+
+        // Invalidate schedule cache for the anime
+        await this.invalidateScheduleCaches();
+
+        return { ...updated, affectedCount };
+    }
+
+    private async invalidateScheduleCaches(): Promise<void> {
+        try {
+            this.logger.log('Clearing schedule caches after episode update');
+            await this.cacheService.delByPattern('episodes_schedule:*');
+            await this.cacheService.delByPattern('season_episodes_schedule:*');
+        } catch (error) {
+            this.logger.error('Failed to invalidate schedule caches:', error);
+        }
+    }
+
     private sanitizeString(str: any): string | null {
         if (str === null || str === undefined) return null;
         const strValue = typeof str === 'string' ? str : String(str);

@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Param, Query, ParseIntPipe, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Param, Query, Body, ParseIntPipe, UseGuards } from '@nestjs/common';
 import { EpisodesService } from './episodes.service';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { AdminGuard } from '../../../common/guards/admin.guard';
@@ -19,6 +19,20 @@ export class EpisodesController {
     async syncEpisodes(@Param('id', ParseIntPipe) id: number) {
         const result = await this.episodesService.fetchAndSyncEpisodes(id);
         return { success: true, count: result.length, episodes: result };
+    }
+
+    @Patch(':animeId/episodes/:episodeId')
+    @UseGuards(JwtAuthGuard, AdminGuard)
+    async updateEpisode(
+        @Param('animeId', ParseIntPipe) animeId: number,
+        @Param('episodeId', ParseIntPipe) episodeId: number,
+        @Body() updateData: {
+            dateDiffusion?: string | null;
+            applyOffsetToNext?: boolean;
+            offsetDays?: number;
+        }
+    ) {
+        return this.episodesService.updateEpisode(animeId, episodeId, updateData);
     }
 }
 

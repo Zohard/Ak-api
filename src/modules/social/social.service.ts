@@ -28,6 +28,7 @@ export class SocialService {
                     select: {
                         idMember: true,
                         memberName: true,
+                        realName: true,
                         avatar: true,
                     }
                 },
@@ -96,24 +97,31 @@ export class SocialService {
             throw new BadRequestException('Invalid comment target');
         }
 
-        return this.prisma.akSocialComment.create({
-            data: {
-                userId,
-                content,
-                postId: postId || null,
-                activityType: activityType || null,
-                activityId: activityId || null,
-            },
-            include: {
-                user: {
-                    select: {
-                        idMember: true,
-                        memberName: true,
-                        avatar: true,
+        try {
+            return await this.prisma.akSocialComment.create({
+                data: {
+                    userId,
+                    content,
+                    postId: postId || null,
+                    activityType: activityType || null,
+                    activityId: activityId || null,
+                },
+                include: {
+                    user: {
+                        select: {
+                            idMember: true,
+                            memberName: true,
+                            realName: true,
+                            avatar: true,
+                        }
                     }
                 }
-            }
-        });
+            });
+        } catch (error) {
+            console.error('Error creating comment:', error);
+            console.error('Data:', { userId, content, postId, activityType, activityId });
+            throw error;
+        }
     }
 
     async getComments(target: LikeTarget) {
@@ -133,6 +141,7 @@ export class SocialService {
                     select: {
                         idMember: true,
                         memberName: true,
+                        realName: true,
                         avatar: true,
                     }
                 }
