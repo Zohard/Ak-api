@@ -481,17 +481,32 @@ export class ArticlesService {
     // We need to encode the slug to match what's in the database
     const encodedSlug = encodeURIComponent(niceUrl).toLowerCase();
 
+    // Legacy URLs used {slug}-{id} format — extract trailing numeric ID if present
+    const trailingIdMatch = niceUrl.match(/-(\d+)$/);
+    const legacyPostId = trailingIdMatch ? BigInt(trailingIdMatch[1]) : null;
+    const slugWithoutId = trailingIdMatch ? niceUrl.slice(0, -trailingIdMatch[0].length) : null;
+
     // Build the post status filter based on admin access
     const postStatusFilter = isAdmin
       ? { in: ['publish', 'draft'] }  // Admins can see both published and draft
       : 'publish';                     // Non-admins only see published
 
+    const orConditions: any[] = [
+      { postName: niceUrl },           // Try exact match first
+      { postName: encodedSlug },       // Try encoded version
+    ];
+    // Fallback for legacy {slug}-{id} URLs: try by WordPress post ID
+    if (legacyPostId !== null) {
+      orConditions.push({ ID: legacyPostId });
+    }
+    // Also try slug without the trailing ID
+    if (slugWithoutId) {
+      orConditions.push({ postName: slugWithoutId });
+    }
+
     const post = await this.prisma.wpPost.findFirst({
       where: {
-        OR: [
-          { postName: niceUrl },           // Try exact match first
-          { postName: encodedSlug },       // Try encoded version
-        ],
+        OR: orConditions,
         postType: 'post',
         postStatus: postStatusFilter
       },
