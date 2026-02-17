@@ -4,6 +4,7 @@ import { R2Service } from '../../media/r2.service';
 import { MediaService } from '../../media/media.service';
 import { AdminLoggingService } from '../logging/admin-logging.service';
 import { AdminContentService } from './admin-content.service';
+import { CacheService } from '../../../shared/services/cache.service';
 import {
   AdminMangaListQueryDto,
   CreateAdminMangaDto,
@@ -18,6 +19,7 @@ export class AdminMangasService {
     private mediaService: MediaService,
     private adminLogging: AdminLoggingService,
     private adminContentService: AdminContentService,
+    private cacheService: CacheService,
   ) { }
 
   /**
