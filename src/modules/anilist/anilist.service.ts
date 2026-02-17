@@ -1082,6 +1082,7 @@ export class AniListService {
     };
 
     return {
+      anilistId: anilistManga.id,
       titre: anilistManga.title.romaji || anilistManga.title.english || anilistManga.title.native,
       titreOriginal: anilistManga.title.native,
       titreFrancais: anilistManga.title.english,

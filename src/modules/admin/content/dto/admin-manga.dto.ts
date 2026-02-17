@@ -43,6 +43,18 @@ export class CreateAdminMangaDto {
   @IsString()
   titresAlternatifs?: string;
 
+  @ApiPropertyOptional({ description: 'AniList manga ID' })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  anilistId?: number;
+
+  @ApiPropertyOptional({ description: 'Nombre total de chapitres' })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  nbChapitres?: number;
+
   @ApiPropertyOptional()
   @IsOptional()
   @IsInt()
