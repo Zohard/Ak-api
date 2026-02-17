@@ -1060,7 +1060,24 @@ export class ScrapeService {
         const text = $(el).text();
         return text.includes('Sortie le');
       }).first();
-      const releaseDate = releaseDateSpan.text().replace('Sortie le', '').trim();
+      let releaseDate = releaseDateSpan.text().replace('Sortie le', '').trim();
+
+      // Convert French date format (e.g., "15 janvier 2024") to ISO format (YYYY-MM-DD)
+      if (releaseDate && !/^\d{4}-\d{2}-\d{2}$/.test(releaseDate)) {
+        const frenchMonths: Record<string, string> = {
+          'janvier': '01', 'février': '02', 'mars': '03', 'avril': '04',
+          'mai': '05', 'juin': '06', 'juillet': '07', 'août': '08',
+          'septembre': '09', 'octobre': '10', 'novembre': '11', 'décembre': '12'
+        };
+        const match = releaseDate.match(/(\d{1,2})\s+(\w+)\s+(\d{4})/);
+        if (match) {
+          const [, day, monthFr, year] = match;
+          const month = frenchMonths[monthFr.toLowerCase()];
+          if (month) {
+            releaseDate = `${year}-${month}-${day.padStart(2, '0')}`;
+          }
+        }
+      }
 
       // Extract image URL
       const img = $element.find('img.main_img').first();
