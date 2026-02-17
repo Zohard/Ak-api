@@ -327,7 +327,6 @@ model AkManga {
   titreFr              String?   @map("titre_fr") @db.Text
   titresAlternatifs    String?   @map("titres_alternatifs") @db.Text
   licence              Int?      @default(0)
-  anilistId            Int?      @map("anilist_id")
   nbVolumes            String?   @map("nb_volumes") @db.VarChar(255)
   nbVol                Int?      @map("nb_vol")
   nbChapitres          Int?      @map("nb_chapitres")

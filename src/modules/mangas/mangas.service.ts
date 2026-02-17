@@ -137,7 +137,6 @@ export class MangasService extends BaseContentService<
           data = {
             ...anilistData,
             ...data,
-            anilistId,
             commentaire: JSON.stringify({
               ...(anilistData.commentaire ? JSON.parse(anilistData.commentaire) : {}),
               anilistId,
@@ -149,6 +148,8 @@ export class MangasService extends BaseContentService<
         console.warn(`Failed to fetch AniList manga for ID ${(createMangaDto as any).anilistId}:`, error.message);
       }
     }
+
+    delete (data as any).anilistId;
 
     // Upload external image to R2 if present
     if (data.image && data.image.startsWith('http')) {
