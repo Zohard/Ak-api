@@ -12,7 +12,7 @@ services:
       - "3003:3003"
     environment:
       - NODE_ENV=development
-      - DATABASE_URL=postgresql://anime_user:anime_password@host.docker.internal:5432/anime_kun
+      - DATABASE_URL=postgresql://anime_user:anime_password@postgres:5432/anime_kun
       - JWT_SECRET=anime-kun-jwt-secret-key-2024
       - JWT_EXPIRES_IN=15m
       - JWT_REFRESH_EXPIRES_IN=30d
@@ -20,16 +20,41 @@ services:
       - FRONTEND_URL=http://localhost:3000
       - FORUM_URL=http://localhost:8083
       - SESSION_SECRET=anime-kun-session-secret-key-2024
+      - RESEND_API_KEY=re_dummy_key_for_local_development
+      - MAILTRAP_HOST=smtp.resend.com
+      - MAILTRAP_USER=resend
+      - MAILTRAP_PASSWORD=re_dummy_password_for_local_development
+      - MAILTRAP_FROM=anime-kun@resend.dev
+      - MAILTRAP_TO=user@example.com
+      - JIKAN_API_URL=https://api.jikan.moe/v4
+      - JIKAN_API_KEY=re_dummy_key_for_local_development
+      - ENCRYPTION_KEY=re_dummy_key_for_local_development<bos>
+      - RESEND_API_KEY=re_dummy_key_for_local_development
+      - MAILTRAP_HOST=smtp.resend.com
+      - MAILTRAP_USER=resend
+      - MAILTRAP_PASSWORD=re_dummy_password_for_local_development
+      - MAILTRAP_FROM=anime-kun@[EMAIL_ADDRESS]
+      - MAILTRAP_TO=anime-kun@[EMAIL_ADDRESS]
+      - JIKAN_API_URL=https://api.jikan.moe/v4
+      - JIKAN_API_KEY=re_dummy_key_for_local_development
+      - ENCRYPTION_KEY=re_dummy_key_for_local_development
+      - JWT_SECRET=anime-kun-jwt-secret-key-2024
+      - JWT_EXPIRES_IN=15m
+      - JWT_REFRESH_EXPIRES_IN=30d
+      - SESSION_SECRET=anime-kun-session-secret-key-2024
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
     volumes:
       - ./src:/app/src:ro
       - ./prisma:/app/prisma:ro
       - ak9project_nestjs_uploads:/app/uploads
     depends_on:
       - postgres
+      - redis
     networks:
       - anime-kun-network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3003/api/health"]
+      test: [ "CMD", "curl", "-f", "http://localhost:3003/api/health" ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -45,7 +70,7 @@ services:
       POSTGRES_USER: anime_user
       POSTGRES_PASSWORD: anime_password
     ports:
-      - "5433:5432"  # Different port to avoid conflict with host PostgreSQL
+      - "5433:5432" # Different port to avoid conflict with host PostgreSQL
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./prisma/init.sql:/docker-entrypoint-initdb.d/init.sql:ro

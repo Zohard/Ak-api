@@ -1,3 +1,4 @@
+// Trigger rebuild - DTO changes not picked up
 import { Module } from '@nestjs/common';
 import { AdminController } from './admin.controller';
 import { AdminService } from './admin.service';
@@ -23,4 +24,4 @@ import { PrismaService } from '../../shared/services/prisma.service';
     ToolsModule,
   ],
 })
-export class AdminModule {}
+export class AdminModule { }
