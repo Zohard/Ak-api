@@ -76,13 +76,10 @@ export class CacheService implements OnModuleInit {
     }
 
     try {
-      this.logger.log(`🔍 Checking cache for key: ${key}`);
       const value = await this.redis.get(key);
       if (value) {
-        this.logger.log(`✅ Cache HIT for key: ${key}`);
         return JSON.parse(value) as T;
       } else {
-        this.logger.log(`❌ Cache MISS for key: ${key}`);
         return undefined;
       }
     } catch (error) {
@@ -99,10 +96,8 @@ export class CacheService implements OnModuleInit {
     }
 
     try {
-      this.logger.log(`💾 Attempting to cache key: ${key}, TTL: ${ttl}s`);
       const serialized = JSON.stringify(value);
       await this.redis.setex(key, ttl, serialized);
-      this.logger.log(`✅ Successfully cached key: ${key}`);
     } catch (error) {
       this.logger.error(`❌ Cache set error for key ${key}:`, error.message);
     }

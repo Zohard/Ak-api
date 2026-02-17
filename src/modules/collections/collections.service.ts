@@ -960,8 +960,6 @@ export class CollectionsService {
     // OPTIMIZATION: Cache collection check to avoid DB query on every page load
     const cacheKey = `user_collection_check:${userId}:${mediaType}:${mediaId}`;
 
-    this.logger.debug(`🔍 [isInCollection] Starting check for ${cacheKey}`);
-
     try {
       // Add timeout to cache get to prevent hanging
       const cached = await Promise.race([
@@ -971,19 +969,15 @@ export class CollectionsService {
 
       // Check for both null and undefined - cache.get() returns undefined when key doesn't exist
       if (cached !== null && cached !== undefined) {
-        this.logger.debug(`🔍 [isInCollection] Cache HIT for ${cacheKey}`, cached);
         return cached;
       }
     } catch (error) {
-      this.logger.error(`⚠️ [isInCollection] Cache get failed or timed out for ${cacheKey}:`, error.message);
+      this.logger.error(`[isInCollection] Cache get timed out for ${cacheKey}:`, error.message);
       // Continue to database query
     }
 
-    this.logger.debug(`🔍 [isInCollection] Cache MISS, querying database for ${cacheKey}`);
-
     // Fallback to database query
     return await this.prisma.executeWithRetry(async () => {
-      this.logger.debug(`🔍 [isInCollection] Cache MISS - Using RAW SQL - userId: ${userId}, mediaId: ${mediaId}, mediaType: ${mediaType}`);
       let collections: any[] = [];
 
       if (mediaType === 'anime') {
@@ -992,25 +986,21 @@ export class CollectionsService {
           FROM collection_animes
           WHERE id_membre = ${userId} AND id_anime = ${mediaId}
         `;
-        this.logger.debug(`🔍 [isInCollection] Anime RAW SQL - Found ${collections.length} rows: ${JSON.stringify(collections)}`);
       } else if (mediaType === 'manga') {
         collections = await this.prisma.$queryRaw<any[]>`
           SELECT type, evaluation, notes, chapters_read, NULL as id_collection
           FROM collection_mangas
           WHERE id_membre = ${userId} AND id_manga = ${mediaId}
         `;
-        this.logger.debug(`🔍 [isInCollection] Manga RAW SQL - Found ${collections.length} rows: ${JSON.stringify(collections)}`);
       } else if (mediaType === 'jeu-video') {
         collections = await this.prisma.$queryRaw<any[]>`
           SELECT id_collection, type, evaluation, notes, platform_played, started_date, finished_date
           FROM collection_jeuxvideo
           WHERE id_membre = ${userId} AND id_jeu = ${mediaId}
         `;
-        this.logger.debug(`🔍 [isInCollection] Game RAW SQL - Found ${collections.length} rows:`, JSON.stringify(collections));
       }
 
       const inCollection = collections.length > 0;
-      this.logger.debug(`🔍 [isInCollection] Final result - inCollection: ${inCollection}, count: ${collections.length}`);
 
       const result = {
         inCollection,
@@ -1038,7 +1028,6 @@ export class CollectionsService {
 
       // Cache for 5 minutes (balance between freshness and performance)
       await this.cacheService.set(cacheKey, result, 300);
-      this.logger.debug(`🔍 [isInCollection] Cached result for ${cacheKey}`);
 
       return result;
     });
@@ -1048,8 +1037,6 @@ export class CollectionsService {
     if (!mediaIds.length) {
       return {};
     }
-
-    this.logger.debug(`🔍 [checkBulkInCollection] userId: ${userId}, mediaType: ${mediaType}, ids: ${mediaIds.join(',')}`);
 
     // Direct DB query for efficiency
     // Return a map of { [mediaId]: { inCollection: true, type: number } }
@@ -1081,8 +1068,6 @@ export class CollectionsService {
           result[item.idManga] = { inCollection: true, type: item.type };
         });
       } else if (mediaType === 'game') {
-        this.logger.debug(`🔍 [checkBulkInCollection] Querying games for userId=${userId}, gameIds=${mediaIds.join(',')}`);
-
         const items = await this.prisma.collectionJeuxVideo.findMany({
           where: {
             idMembre: userId,
@@ -1091,15 +1076,12 @@ export class CollectionsService {
           select: { idJeu: true, type: true }
         });
 
-        this.logger.debug(`🔍 [checkBulkInCollection] Found ${items.length} games: ${JSON.stringify(items)}`);
         items.forEach(item => {
           result[item.idJeu] = { inCollection: true, type: item.type };
         });
-        this.logger.debug(`🔍 [checkBulkInCollection] Final result for games: ${JSON.stringify(result)}`);
       }
     });
 
-    this.logger.debug(`🔍 [checkBulkInCollection] Returning result: ${JSON.stringify(result)}`);
     return result;
   }
 

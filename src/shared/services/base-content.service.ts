@@ -134,10 +134,6 @@ export abstract class BaseContentService<T, CreateDto, UpdateDto, QueryDto> {
         const collectionField = this.idField === 'idAnime' ? 'id_anime' :
                                this.idField === 'idManga' ? 'id_manga' : 'id_jeu';
 
-        console.log('[Autocomplete] Filtering collection for userId:', userId);
-        console.log('[Autocomplete] Collection table:', collectionTable);
-        console.log('[Autocomplete] Collection field:', collectionField);
-
         const userCollection: any[] = await this.prisma.$queryRawUnsafe(`
           SELECT DISTINCT ${collectionField}
           FROM ${collectionTable}
@@ -145,18 +141,13 @@ export abstract class BaseContentService<T, CreateDto, UpdateDto, QueryDto> {
           AND ${collectionField} IS NOT NULL
         `);
 
-        console.log('[Autocomplete] User collection items found:', userCollection.length);
-
         const collectionIds = userCollection
           .map(item => item[collectionField])
           .filter(id => id != null);
 
-        console.log('[Autocomplete] Collection IDs to exclude:', collectionIds.slice(0, 10));
-
         excludeIds.push(...collectionIds);
       } catch (error) {
         // Silently fail if collections query fails
-        console.error('[Autocomplete] Error fetching user collection:', error);
       }
     }
 

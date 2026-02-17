@@ -777,7 +777,6 @@ export class JeuxVideoService {
     // Add user collection excludes
     if (userId) {
       try {
-        console.log('[JeuxVideo Autocomplete] Filtering collection for userId:', userId);
         const userCollection: any[] = await this.prisma.$queryRawUnsafe(`
           SELECT DISTINCT id_jeu
           FROM collection_jeux_video
@@ -785,15 +784,13 @@ export class JeuxVideoService {
           AND id_jeu IS NOT NULL
         `);
 
-        console.log('[JeuxVideo Autocomplete] User collection items found:', userCollection.length);
-
         const collectionIds = userCollection
           .map(item => item.id_jeu)
           .filter(id => id != null);
 
         excludeIds.push(...collectionIds);
       } catch (error) {
-        console.error('[JeuxVideo Autocomplete] Error fetching user collection:', error);
+        // Silently fail
       }
     }
 

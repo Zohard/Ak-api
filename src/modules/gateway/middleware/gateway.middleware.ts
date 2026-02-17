@@ -10,20 +10,12 @@ export class GatewayMiddleware implements NestMiddleware {
     const { method, originalUrl, ip } = req;
     const userAgent = req.get('user-agent') || '';
 
-    this.logger.log(`Gateway Request: ${method} ${originalUrl} from ${ip}`);
-
     res.on('finish', () => {
       const { statusCode } = res;
-      const contentLength = res.get('content-length') || '0';
-      const responseTime = Date.now() - startTime;
-
-      this.logger.log(
-        `Gateway Response: ${method} ${originalUrl} ${statusCode} ${contentLength}b - ${responseTime}ms`,
-      );
-
-      if (statusCode >= 400) {
+      if (statusCode >= 500) {
+        const responseTime = Date.now() - startTime;
         this.logger.warn(
-          `Gateway Error Response: ${statusCode} for ${method} ${originalUrl}`,
+          `${method} ${originalUrl} ${statusCode} - ${responseTime}ms from ${ip}`,
         );
       }
     });

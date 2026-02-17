@@ -52,11 +52,6 @@ export class JeuxVideoController {
     const userId = req?.user?.sub || req?.user?.id;
     const shouldExcludeCollection = notInCollection === 'true' && userId;
 
-    console.log('[JeuxVideo Autocomplete] notInCollection param:', notInCollection);
-    console.log('[JeuxVideo Autocomplete] User from request:', req?.user);
-    console.log('[JeuxVideo Autocomplete] userId extracted:', userId);
-    console.log('[JeuxVideo Autocomplete] shouldExcludeCollection:', shouldExcludeCollection);
-
     return this.jeuxVideoService.autocomplete(
       query,
       exclude,
