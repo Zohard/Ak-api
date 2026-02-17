@@ -41,6 +41,12 @@ export class AdminStaffAkService {
       whereConditions.push(`ur.id_user_role IS NULL`);
     }
 
+    if (query.groupId) {
+      whereConditions.push(`sm.id_group = $${paramIndex}`);
+      params.push(query.groupId);
+      paramIndex++;
+    }
+
     const whereClause =
       whereConditions.length > 0
         ? `WHERE ${whereConditions.join(' AND ')}`

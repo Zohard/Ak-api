@@ -808,6 +808,20 @@ export class AdminContentService {
     role?: string,
     username?: string,
   ) {
+    // Validate business ID
+    if (!businessId || businessId <= 0) {
+      throw new BadRequestException('ID entreprise invalide');
+    }
+
+    // Verify business exists
+    const businessExists = await this.prisma.$queryRawUnsafe(
+      `SELECT 1 FROM ak_business WHERE id_business = $1 LIMIT 1`,
+      businessId,
+    );
+    if ((businessExists as any[]).length === 0) {
+      throw new NotFoundException(`Entreprise avec l'ID ${businessId} introuvable`);
+    }
+
     const staffTable =
       type === 'anime' ? 'ak_business_to_animes' : 'ak_business_to_mangas';
     const idColumn = type === 'anime' ? 'id_anime' : 'id_manga';
@@ -820,7 +834,7 @@ export class AdminContentService {
       role || null,
     );
     if ((existing as any[]).length > 0) {
-      return { message: 'Staff member already attached with this role' };
+      throw new BadRequestException('Ce membre est déjà associé avec ce rôle');
     }
 
     await this.prisma.$queryRawUnsafe(

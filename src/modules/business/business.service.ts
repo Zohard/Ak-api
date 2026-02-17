@@ -428,12 +428,12 @@ export class BusinessService {
     const searchPattern = `%${term}%`;
 
     const businesses: any[] = await (this.prisma as any).$queryRawUnsafe(`
-      SELECT id_business, denomination, type, origine, site_officiel
+      SELECT id_business, denomination, autres_denominations, type, origine, site_officiel
       FROM ak_business
       WHERE statut = 1
       AND (denomination ILIKE $1 OR autres_denominations ILIKE $1)
-      ORDER BY 
-        (CASE 
+      ORDER BY
+        (CASE
           WHEN denomination ILIKE $2 THEN 0
           WHEN denomination ILIKE $3 THEN 1
           ELSE 2
@@ -446,9 +446,10 @@ export class BusinessService {
       data: businesses.map((business) => ({
         id: business.id_business,
         denomination: business.denomination,
+        autresDenominations: business.autres_denominations,
         type: business.type,
         origine: business.origine,
-        site_officiel: business.site_officiel,
+        siteOfficiel: business.site_officiel,
       })),
     };
   }

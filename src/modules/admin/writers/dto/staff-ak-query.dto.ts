@@ -43,6 +43,15 @@ export class StaffAkQueryDto {
   withoutRole?: boolean;
 
   @ApiProperty({
+    description: 'Filter by SMF group ID',
+    required: false,
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  groupId?: number;
+
+  @ApiProperty({
     description: 'Field to sort by',
     required: false,
     default: 'user_registered',

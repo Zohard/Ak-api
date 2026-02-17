@@ -61,6 +61,18 @@ export class AdminMangasController {
     return this.service.updateStatus(id, statut, username);
   }
 
+  @Patch(':id/image')
+  @ApiOperation({ summary: 'Mettre à jour uniquement l\'image du manga (admin)' })
+  @ApiResponse({ status: 200, description: 'Image mise à jour avec succès' })
+  updateImage(
+    @Request() req,
+    @Param('id', ParseIntPipe) id: number,
+    @Body('image') image: string,
+  ) {
+    const username = req.user?.pseudo || req.user?.member_name || 'admin';
+    return this.service.updateImage(id, image, username);
+  }
+
   @Delete(':id')
   @ApiOperation({ summary: 'Supprimer un manga (admin)' })
   remove(@Param('id', ParseIntPipe) id: number) { return this.service.remove(id); }

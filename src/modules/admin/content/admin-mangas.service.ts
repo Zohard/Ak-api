@@ -322,6 +322,26 @@ export class AdminMangasService {
     return updated;
   }
 
+  async updateImage(id: number, image: string, username?: string) {
+    const existing = await this.prisma.akManga.findUnique({ where: { idManga: id } });
+    if (!existing) throw new NotFoundException('Manga introuvable');
+
+    const updated = await this.prisma.akManga.update({
+      where: { idManga: id },
+      data: { image }
+    });
+
+    // Log the image update
+    if (username) {
+      await this.adminLogging.addLog(id, 'manga', username, `Modification image (${image})`);
+    }
+
+    // Invalidate cache
+    await this.cacheService.invalidateManga(id);
+
+    return { message: 'Image mise à jour avec succès', image };
+  }
+
   /**
    * Trigger notifications for all relationships when a manga is published.
    */

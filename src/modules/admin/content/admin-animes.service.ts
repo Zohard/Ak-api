@@ -332,6 +332,26 @@ export class AdminAnimesService {
     return updated;
   }
 
+  async updateImage(id: number, image: string, username?: string) {
+    const existing = await this.prisma.akAnime.findUnique({ where: { idAnime: id } });
+    if (!existing) throw new NotFoundException('Anime introuvable');
+
+    const updated = await this.prisma.akAnime.update({
+      where: { idAnime: id },
+      data: { image }
+    });
+
+    // Log the image update
+    if (username) {
+      await this.adminLogging.addLog(id, 'anime', username, `Modification image (${image})`);
+    }
+
+    // Invalidate cache
+    await this.cacheService.invalidateAnime(id);
+
+    return { message: 'Image mise à jour avec succès', image };
+  }
+
   /**
    * Trigger notifications for all relationships when an anime is published.
    */

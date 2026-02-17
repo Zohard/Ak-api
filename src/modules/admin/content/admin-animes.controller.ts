@@ -84,6 +84,18 @@ export class AdminAnimesController {
     return this.service.updateStatus(id, statut, username);
   }
 
+  @Patch(':id/image')
+  @ApiOperation({ summary: 'Mettre à jour uniquement l\'image de l\'anime (admin)' })
+  @ApiResponse({ status: 200, description: 'Image mise à jour avec succès' })
+  updateImage(
+    @Request() req,
+    @Param('id', ParseIntPipe) id: number,
+    @Body('image') image: string,
+  ) {
+    const username = req.user?.pseudo || req.user?.member_name || 'admin';
+    return this.service.updateImage(id, image, username);
+  }
+
   @Post(':id/staff')
   @ApiOperation({ summary: 'Créer le staff depuis les données d\'import' })
   @ApiResponse({ status: 200, description: 'Staff créé avec succès' })

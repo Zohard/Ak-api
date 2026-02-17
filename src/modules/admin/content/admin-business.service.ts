@@ -26,7 +26,15 @@ export class AdminBusinessService {
     const skip = (page - 1) * limit;
     const where: any = {};
 
-    if (statut !== undefined) where.statut = statut;
+    // When searching for businesses (e.g., in staff forms), default to showing only "affichée" (statut = 1)
+    // This ensures that staff searches don't show pending or blocked businesses
+    if (statut !== undefined) {
+      where.statut = statut;
+    } else if (search) {
+      // Default to statut = 1 when searching (for staff forms, etc.)
+      where.statut = 1;
+    }
+
     if (type) where.type = { contains: type, mode: 'insensitive' };
     if (search) where.denomination = { contains: search, mode: 'insensitive' };
 
@@ -37,7 +45,9 @@ export class AdminBusinessService {
     // When searching, order by "starts with" first, then alphabetical
     if (search) {
       const conditions: Prisma.Sql[] = [Prisma.sql`denomination ILIKE ${'%' + search + '%'}`];
-      if (statut !== undefined) conditions.push(Prisma.sql`statut = ${statut}`);
+      // Apply the same default: only show statut = 1 when searching unless explicitly specified otherwise
+      const searchStatut = statut !== undefined ? statut : 1;
+      conditions.push(Prisma.sql`statut = ${searchStatut}`);
       if (type) conditions.push(Prisma.sql`type ILIKE ${'%' + type + '%'}`);
 
       const whereClause = Prisma.sql`WHERE ${Prisma.join(conditions, ' AND ')}`;
@@ -53,7 +63,24 @@ export class AdminBusinessService {
         `,
         this.prisma.akBusiness.count({ where }),
       ]);
-      return { items, pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } };
+
+      // Transform raw SQL results to match Prisma field names
+      const transformedItems = items.map(item => ({
+        ...item,
+        idBusiness: item.id_business,
+        niceUrl: item.nice_url,
+        autresDenominations: item.autres_denominations,
+        siteOfficiel: item.site_officiel,
+        nbClics: item.nb_clics,
+        nbClicsDay: item.nb_clics_day,
+        nbClicsWeek: item.nb_clics_week,
+        nbClicsMonth: item.nb_clics_month,
+        dateAjout: item.date_ajout,
+        dateModification: item.date_modification,
+        latestCache: item.latest_cache
+      }));
+
+      return { items: transformedItems, pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } };
     }
 
     // Build dynamic orderBy
