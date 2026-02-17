@@ -602,15 +602,9 @@ export class AdminContentService {
         )
       `;
 
-      // Trigger notifications for related content
-      // Fire and forget - don't block the response
-      this.triggerRelatedContentNotifications(
-        { id, type },
-        { id: related_id, type: related_type },
-        relation_type,
-      ).catch((err) =>
-        console.error('Failed to trigger related content notifications:', err),
-      );
+      // NOTE: notifications are intentionally NOT triggered here.
+      // They fire only when a media's statut changes to published (see admin-animes/mangas.service updateStatus).
+      // Triggering on link creation would spam users when linking already-published items.
 
       // Invalidate caches
       await Promise.all([
