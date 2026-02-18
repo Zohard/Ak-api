@@ -79,9 +79,9 @@ export class NotificationsService {
   private initializeEmailTransporter() {
     try {
       this.transporter = nodemailer.createTransport({
-        host: this.configService.get('SMTP_HOST', 'localhost'),
-        port: this.configService.get('SMTP_PORT', 587),
-        secure: this.configService.get('SMTP_SECURE', false),
+        host: this.configService.get('SMTP_HOST') || 'smtp.gmail.com',
+        port: parseInt(this.configService.get('SMTP_PORT') || '465', 10),
+        secure: true,
         auth: {
           user: this.configService.get('SMTP_USER'),
           pass: this.configService.get('SMTP_PASS'),
@@ -687,7 +687,7 @@ export class NotificationsService {
       const template = this.getEmailTemplate(data);
 
       await this.transporter.sendMail({
-        from: this.configService.get('SMTP_FROM', 'noreply@anime-kun.com'),
+        from: this.configService.get('FROM_EMAIL') || `Anime-Kun <${this.configService.get('SMTP_USER')}>`,
         to: userData.email_address,
         subject: template.subject,
         html: template.html,

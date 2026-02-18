@@ -4,7 +4,7 @@ import {
   ExecutionContext,
   ForbiddenException,
 } from '@nestjs/common';
-import { hasModerationAccess } from '../../shared/constants/rbac.constants';
+import { hasAdminAccess } from '../../shared/constants/rbac.constants';
 
 /**
  * ModerationGuard checks if user has moderation rights (comments)
@@ -21,7 +21,7 @@ export class ModerationGuard implements CanActivate {
     }
 
     // Check if user has moderation access using RBAC system
-    const hasAccess = hasModerationAccess(user.groupId);
+    const hasAccess = hasAdminAccess(user.groupId);
 
     if (!hasAccess) {
       throw new ForbiddenException('Droits de modération requis (Administrateur, Modérateur Global, ou Modérateur uniquement)');
