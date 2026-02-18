@@ -35,7 +35,7 @@ export class CommentQueryDto {
   })
   @IsOptional()
   @IsString()
-  @IsIn(['all', 'approved', 'pending', 'rejected'])
+  @IsIn(['all', 'approved', 'pending', 'rejected', 'spam'])
   status?: string = 'approved';
 
   @ApiPropertyOptional({

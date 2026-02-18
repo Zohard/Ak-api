@@ -202,7 +202,7 @@ export class CommentsService {
       where.commentApproved = '1';
     } else if (status === 'pending') {
       where.commentApproved = '0';
-    } else if (status === 'spam') {
+    } else if (status === 'spam' || status === 'rejected') {
       where.commentApproved = 'spam';
     }
 
