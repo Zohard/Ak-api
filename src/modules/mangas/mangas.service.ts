@@ -2561,6 +2561,11 @@ export class MangasService extends BaseContentService<
       throw new NotFoundException(`Manga with ID ${mangaId} not found`);
     }
 
+    // Clean ISBN: strip dashes and spaces
+    const isbn = createVolumeDto.isbn
+      ? createVolumeDto.isbn.replace(/[-\s]/g, '').trim()
+      : undefined;
+
     let volumeNumber = createVolumeDto.volumeNumber;
 
     // If volume number is not provided, auto-increment
@@ -2590,14 +2595,14 @@ export class MangasService extends BaseContentService<
     }
 
     // Check if ISBN already exists
-    if (createVolumeDto.isbn) {
+    if (isbn) {
       const existingIsbn = await this.prisma.mangaVolume.findFirst({
-        where: { isbn: createVolumeDto.isbn },
+        where: { isbn },
       });
 
       if (existingIsbn) {
         throw new BadRequestException(
-          `ISBN ${createVolumeDto.isbn} already exists for another volume`,
+          `ISBN ${isbn} already exists for another volume`,
         );
       }
     }
@@ -2606,7 +2611,7 @@ export class MangasService extends BaseContentService<
       data: {
         idManga: mangaId,
         volumeNumber: volumeNumber,
-        isbn: createVolumeDto.isbn,
+        isbn: isbn || undefined,
         coverImage: createVolumeDto.coverImage,
         title: createVolumeDto.title,
         releaseDate: createVolumeDto.releaseDate
@@ -2627,26 +2632,33 @@ export class MangasService extends BaseContentService<
     // Check if volume exists
     await this.getVolume(volumeId);
 
+    // Clean ISBN: strip dashes and spaces
+    const isbn = updateVolumeDto.isbn
+      ? updateVolumeDto.isbn.replace(/[-\s]/g, '').trim()
+      : undefined;
+
     // If updating ISBN, check it doesn't exist
-    if (updateVolumeDto.isbn) {
+    if (isbn) {
       const existingIsbn = await this.prisma.mangaVolume.findFirst({
         where: {
-          isbn: updateVolumeDto.isbn,
+          isbn,
           idVolume: { not: volumeId },
         },
       });
 
       if (existingIsbn) {
         throw new BadRequestException(
-          `ISBN ${updateVolumeDto.isbn} already exists for another volume`,
+          `ISBN ${isbn} already exists for another volume`,
         );
       }
     }
 
+    const { isbn: _rawIsbn, ...otherFields } = updateVolumeDto;
     const updatedVolume = await this.prisma.mangaVolume.update({
       where: { idVolume: volumeId },
       data: {
-        ...updateVolumeDto,
+        ...otherFields,
+        isbn: isbn || undefined,
         releaseDate: updateVolumeDto.releaseDate
           ? new Date(updateVolumeDto.releaseDate)
           : undefined,
