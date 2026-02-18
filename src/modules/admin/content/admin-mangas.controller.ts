@@ -39,6 +39,116 @@ export class AdminMangasController {
     return this.service.getMangasWithoutScreenshots(search, sortBy);
   }
 
+  @Get('volumes/missing-covers')
+  @ApiOperation({
+    summary: 'Get volumes without covers',
+    description: 'List volumes that are missing cover images (for bulk operations)'
+  })
+  @ApiQuery({ name: 'mangaId', required: false, description: 'Filter by manga ID' })
+  @ApiResponse({ status: 200, description: 'List of volumes without covers' })
+  async getVolumesWithoutCovers(@Query('mangaId') mangaId?: string) {
+    return this.mangaVolumesService.getVolumesWithoutCovers(
+      mangaId ? parseInt(mangaId, 10) : undefined
+    );
+  }
+
+  @Get('nautiljon/search')
+  @ApiOperation({
+    summary: 'Search volume on Nautiljon directly',
+    description: 'Search Nautiljon for a specific manga volume. Useful for debugging or when Google Books fails.'
+  })
+  @ApiQuery({ name: 'title', required: true, description: 'Manga title (e.g., "Bleach", "Death Note")' })
+  @ApiQuery({ name: 'volume', required: true, description: 'Volume number' })
+  @ApiResponse({
+    status: 200,
+    description: 'Volume info from Nautiljon',
+    schema: {
+      type: 'object',
+      properties: {
+        found: { type: 'boolean' },
+        volumeNumber: { type: 'number' },
+        title: { type: 'string' },
+        isbn: { type: 'string' },
+        releaseDate: { type: 'string' },
+        coverUrl: { type: 'string' },
+        description: { type: 'string' },
+        publisher: { type: 'string' },
+        source: { type: 'string', enum: ['nautiljon'] },
+        sourceUrl: { type: 'string' },
+      }
+    }
+  })
+  async searchNautiljon(
+    @Query('title') title: string,
+    @Query('volume') volume: string,
+  ) {
+    const volumeNumber = parseInt(volume, 10);
+    if (isNaN(volumeNumber) || volumeNumber < 1) {
+      return { found: false, message: 'Invalid volume number' };
+    }
+
+    const result = await this.nautiljonService.searchVolume(title, volumeNumber);
+
+    if (!result) {
+      return {
+        found: false,
+        message: `No volume found for "${title}" Tome ${volumeNumber} on Nautiljon`,
+      };
+    }
+
+    return {
+      found: !!(result.isbn || result.releaseDate || result.coverUrl),
+      ...result,
+    };
+  }
+
+  @Get('volume-info/:isbn')
+  @ApiOperation({
+    summary: 'Get volume info by ISBN',
+    description: 'Fetch volume details (title, cover, release date, description) from Google Books API using ISBN'
+  })
+  @ApiParam({ name: 'isbn', description: 'ISBN-10 or ISBN-13 (with or without dashes)' })
+  @ApiResponse({
+    status: 200,
+    description: 'Volume info from Google Books',
+    schema: {
+      type: 'object',
+      properties: {
+        found: { type: 'boolean' },
+        title: { type: 'string' },
+        subtitle: { type: 'string' },
+        authors: { type: 'array', items: { type: 'string' } },
+        publisher: { type: 'string' },
+        publishedDate: { type: 'string' },
+        description: { type: 'string' },
+        isbn13: { type: 'string' },
+        isbn10: { type: 'string' },
+        pageCount: { type: 'number' },
+        imageUrl: { type: 'string' },
+      }
+    }
+  })
+  @ApiResponse({ status: 404, description: 'Volume not found' })
+  async getVolumeInfoByIsbn(@Param('isbn') isbn: string): Promise<any> {
+    // Clean ISBN (remove dashes and spaces)
+    const cleanIsbn = isbn.replace(/[-\s]/g, '');
+
+    const result = await this.googleBooksService.getByISBN(cleanIsbn);
+
+    if (!result) {
+      return {
+        found: false,
+        message: `No volume found for ISBN: ${isbn}`
+      };
+    }
+
+    return {
+      found: true,
+      ...result
+    };
+  }
+
+  // NOTE: @Get(':id') must come AFTER all static GET routes to avoid catching them
   @Get(':id')
   @ApiOperation({ summary: 'Obtenir un manga (admin)' })
   getOne(@Param('id', ParseIntPipe) id: number) { return this.service.getOne(id); }
@@ -107,52 +217,6 @@ export class AdminMangasController {
     @Body() importData: { imageUrl: string; mangaTitle: string },
   ): Promise<any> {
     return this.service.importMangaImage(importData.imageUrl, importData.mangaTitle);
-  }
-
-  @Get('volume-info/:isbn')
-  @ApiOperation({
-    summary: 'Get volume info by ISBN',
-    description: 'Fetch volume details (title, cover, release date, description) from Google Books API using ISBN'
-  })
-  @ApiParam({ name: 'isbn', description: 'ISBN-10 or ISBN-13 (with or without dashes)' })
-  @ApiResponse({
-    status: 200,
-    description: 'Volume info from Google Books',
-    schema: {
-      type: 'object',
-      properties: {
-        found: { type: 'boolean' },
-        title: { type: 'string' },
-        subtitle: { type: 'string' },
-        authors: { type: 'array', items: { type: 'string' } },
-        publisher: { type: 'string' },
-        publishedDate: { type: 'string' },
-        description: { type: 'string' },
-        isbn13: { type: 'string' },
-        isbn10: { type: 'string' },
-        pageCount: { type: 'number' },
-        imageUrl: { type: 'string' },
-      }
-    }
-  })
-  @ApiResponse({ status: 404, description: 'Volume not found' })
-  async getVolumeInfoByIsbn(@Param('isbn') isbn: string): Promise<any> {
-    // Clean ISBN (remove dashes and spaces)
-    const cleanIsbn = isbn.replace(/[-\s]/g, '');
-
-    const result = await this.googleBooksService.getByISBN(cleanIsbn);
-
-    if (!result) {
-      return {
-        found: false,
-        message: `No volume found for ISBN: ${isbn}`
-      };
-    }
-
-    return {
-      found: true,
-      ...result
-    };
   }
 
   // ========== VOLUME SYNC ENDPOINTS ==========
@@ -403,69 +467,6 @@ export class AdminMangasController {
       mangaTitle: manga.titre,
       volumeNumber,
       titleVariants,
-      ...result,
-    };
-  }
-
-  @Get('volumes/missing-covers')
-  @ApiOperation({
-    summary: 'Get volumes without covers',
-    description: 'List volumes that are missing cover images (for bulk operations)'
-  })
-  @ApiQuery({ name: 'mangaId', required: false, description: 'Filter by manga ID' })
-  @ApiResponse({ status: 200, description: 'List of volumes without covers' })
-  async getVolumesWithoutCovers(@Query('mangaId') mangaId?: string) {
-    return this.mangaVolumesService.getVolumesWithoutCovers(
-      mangaId ? parseInt(mangaId, 10) : undefined
-    );
-  }
-
-  @Get('nautiljon/search')
-  @ApiOperation({
-    summary: 'Search volume on Nautiljon directly',
-    description: 'Search Nautiljon for a specific manga volume. Useful for debugging or when Google Books fails.'
-  })
-  @ApiQuery({ name: 'title', required: true, description: 'Manga title (e.g., "Bleach", "Death Note")' })
-  @ApiQuery({ name: 'volume', required: true, description: 'Volume number' })
-  @ApiResponse({
-    status: 200,
-    description: 'Volume info from Nautiljon',
-    schema: {
-      type: 'object',
-      properties: {
-        found: { type: 'boolean' },
-        volumeNumber: { type: 'number' },
-        title: { type: 'string' },
-        isbn: { type: 'string' },
-        releaseDate: { type: 'string' },
-        coverUrl: { type: 'string' },
-        description: { type: 'string' },
-        publisher: { type: 'string' },
-        source: { type: 'string', enum: ['nautiljon'] },
-        sourceUrl: { type: 'string' },
-      }
-    }
-  })
-  async searchNautiljon(
-    @Query('title') title: string,
-    @Query('volume') volume: string,
-  ) {
-    const volumeNumber = parseInt(volume, 10);
-    if (isNaN(volumeNumber) || volumeNumber < 1) {
-      return { found: false, message: 'Invalid volume number' };
-    }
-
-    const result = await this.nautiljonService.searchVolume(title, volumeNumber);
-
-    if (!result) {
-      return {
-        found: false,
-        message: `No volume found for "${title}" Tome ${volumeNumber} on Nautiljon`,
-      };
-    }
-
-    return {
-      found: !!(result.isbn || result.releaseDate || result.coverUrl),
       ...result,
     };
   }

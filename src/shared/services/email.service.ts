@@ -1,44 +1,44 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Resend } from 'resend';
+import * as nodemailer from 'nodemailer';
 import { parseBBCode } from '../utils/bbcode.util';
 
 @Injectable()
 export class EmailService {
-  private resend: Resend;
+  private transporter: nodemailer.Transporter;
   private fromEmail: string;
 
   constructor(private readonly configService: ConfigService) {
-    const apiKey = this.configService.get<string>('RESEND_API_KEY');
-    this.fromEmail = this.configService.get<string>('FROM_EMAIL') || 'Anime-Kun <noreply@anime-kun.xyz>';
+    const smtpUser = this.configService.get<string>('SMTP_USER');
+    const smtpPass = this.configService.get<string>('SMTP_PASS');
+    this.fromEmail = this.configService.get<string>('FROM_EMAIL') || `Anime-Kun <${smtpUser}>`;
 
-    if (!apiKey) {
-      console.error('❌ RESEND_API_KEY is not configured');
-      throw new Error('RESEND_API_KEY is required');
+    if (!smtpUser || !smtpPass) {
+      console.error('❌ SMTP_USER and SMTP_PASS are required');
+      throw new Error('SMTP_USER and SMTP_PASS are required');
     }
 
-    this.resend = new Resend(apiKey);
-
-
+    this.transporter = nodemailer.createTransport({
+      host: this.configService.get<string>('SMTP_HOST') || 'smtp.gmail.com',
+      port: parseInt(this.configService.get<string>('SMTP_PORT') || '465', 10),
+      secure: true,
+      auth: {
+        user: smtpUser,
+        pass: smtpPass,
+      },
+    });
   }
 
   async sendEmailVerification(email: string, username: string, verificationToken: string): Promise<void> {
     const verificationUrl = `${this.configService.get('FRONTEND_URL')}/verify-email?token=${verificationToken}`;
 
     try {
-      const { data, error } = await this.resend.emails.send({
+      await this.transporter.sendMail({
         from: this.fromEmail,
         to: email,
         subject: 'Confirmez votre adresse email - Anime-Kun',
         html: this.getEmailVerificationTemplate(username, verificationUrl),
       });
-
-      if (error) {
-        console.error('❌ Error sending verification email to', email, ':', error);
-        throw error;
-      }
-
-
     } catch (error) {
       console.error('❌ Error sending verification email to', email, ':', error);
       throw error;
@@ -49,19 +49,12 @@ export class EmailService {
     const resetUrl = `${this.configService.get('FRONTEND_URL')}/reset-password?token=${resetToken}`;
 
     try {
-      const { data, error } = await this.resend.emails.send({
+      await this.transporter.sendMail({
         from: this.fromEmail,
         to: email,
         subject: 'Réinitialisation de votre mot de passe - Anime-Kun',
         html: this.getForgotPasswordTemplate(resetUrl),
       });
-
-      if (error) {
-        console.error('❌ Error sending password reset email to', email, ':', error);
-        throw error;
-      }
-
-
     } catch (error) {
       console.error('❌ Error sending password reset email to', email, ':', error);
       throw error;
@@ -80,20 +73,12 @@ export class EmailService {
     try {
       const parsedMessage = parseBBCode(messagePreview);
 
-      const { data, error } = await this.resend.emails.send({
+      await this.transporter.sendMail({
         from: this.fromEmail,
         to: recipientEmail,
         subject: `Nouveau message privé de ${senderName} - Anime-Kun`,
         html: this.getPrivateMessageTemplate(recipientUsername, senderName, subject, parsedMessage, messagesUrl),
       });
-
-      if (error) {
-        console.error('❌ Error sending PM notification email to', recipientEmail, ':', error);
-        // Don't throw - we don't want to fail the PM send if email fails
-        return;
-      }
-
-
     } catch (error) {
       console.error('❌ Error sending PM notification email to', recipientEmail, ':', error);
       // Don't throw - we don't want to fail the PM send if email fails
@@ -104,18 +89,13 @@ export class EmailService {
     const contactEmail = this.configService.get<string>('CONTACT_EMAIL') || 'contact@anime-kun.fr';
 
     try {
-      const { data, error } = await this.resend.emails.send({
+      await this.transporter.sendMail({
         from: this.fromEmail,
         to: contactEmail,
         replyTo: email,
         subject: `Nouveau message de contact de ${name} - Anime-Kun`,
         html: this.getContactEmailTemplate(name, email, message),
       });
-
-      if (error) {
-        console.error('❌ Error sending contact email:', error);
-        throw error;
-      }
     } catch (error) {
       console.error('❌ Error sending contact email:', error);
       throw error;
@@ -129,17 +109,12 @@ export class EmailService {
     response: string,
   ): Promise<void> {
     try {
-      const { data, error } = await this.resend.emails.send({
+      await this.transporter.sendMail({
         from: this.fromEmail,
         to: email,
         subject: `Réponse à votre message - Anime-Kun`,
         html: this.getContactReplyTemplate(name, originalMessage, response),
       });
-
-      if (error) {
-        console.error('❌ Error sending contact reply:', error);
-        throw error;
-      }
 
       console.log('✅ Contact reply sent to', email);
     } catch (error) {
@@ -158,20 +133,12 @@ export class EmailService {
     const reviewsUrl = `${this.configService.get('FRONTEND_URL')}/reviews/my-reviews`;
 
     try {
-      const { data, error } = await this.resend.emails.send({
+      await this.transporter.sendMail({
         from: this.fromEmail,
         to: recipientEmail,
         subject: `Votre critique a été rejetée - Anime-Kun`,
         html: this.getReviewRejectionTemplate(recipientUsername, reviewTitle, reason, contentTitle, reviewsUrl),
       });
-
-      if (error) {
-        console.error('❌ Error sending review rejection email to', recipientEmail, ':', error);
-        // Don't throw - we don't want to fail the moderation if email fails
-        return;
-      }
-
-
     } catch (error) {
       console.error('❌ Error sending review rejection email to', recipientEmail, ':', error);
       // Don't throw - we don't want to fail the moderation if email fails
@@ -495,17 +462,12 @@ export class EmailService {
     const profileUrl = `${this.configService.get('FRONTEND_URL')}/profile`;
 
     try {
-      const { data, error } = await this.resend.emails.send({
+      await this.transporter.sendMail({
         from: this.fromEmail,
         to: recipientEmail,
         subject: 'Import MAL terminé - Anime-Kun',
         html: this.getImportSummaryTemplate(username, summary, profileUrl),
       });
-
-      if (error) {
-        console.error('Error sending import summary email to', recipientEmail, ':', error);
-        throw error;
-      }
     } catch (error) {
       console.error('Error sending import summary email to', recipientEmail, ':', error);
       throw error;
@@ -520,17 +482,12 @@ export class EmailService {
     const profileUrl = `${this.configService.get('FRONTEND_URL')}/profile/import`;
 
     try {
-      const { data, error } = await this.resend.emails.send({
+      await this.transporter.sendMail({
         from: this.fromEmail,
         to: recipientEmail,
         subject: 'Erreur lors de l\'import MAL - Anime-Kun',
         html: this.getImportFailureTemplate(username, errorMessage, profileUrl),
       });
-
-      if (error) {
-        console.error('Error sending import failure email to', recipientEmail, ':', error);
-        throw error;
-      }
     } catch (error) {
       console.error('Error sending import failure email to', recipientEmail, ':', error);
       throw error;
