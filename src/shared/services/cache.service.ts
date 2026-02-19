@@ -538,8 +538,8 @@ export class CacheService implements OnModuleInit {
     return this.get(`articles_list:${key}`);
   }
 
-  async setArticlesList(key: string, articles: any, ttl = 600): Promise<void> {
-    await this.set(`articles_list:${key}`, articles, ttl); // 10 minutes for articles lists
+  async setArticlesList(key: string, articles: any, ttl = 21600): Promise<void> {
+    await this.set(`articles_list:${key}`, articles, ttl); // 6 hours for articles lists
   }
 
   async getArticle(id: number): Promise<any> {
@@ -572,7 +572,7 @@ export class CacheService implements OnModuleInit {
       this.del(`article:${id}`),
       this.del('featured_articles'),
       this.del('homepage:articles'),
-      // Article lists will expire via TTL (10 min)
+      this.delByPattern('articles_list:*'),
     ]);
     this.logger.debug(`Invalidated article cache for ID: ${id}`);
   }

@@ -2,9 +2,17 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../shared/services/prisma.service';
 import { LogClientErrorDto, GetClientErrorsQueryDto } from './dto/client-error.dto';
 
+// In-memory cache for activities (5 minutes)
+let activitiesCache: { data: any; timestamp: number; key: string } | null = null;
+const ACTIVITIES_CACHE_TTL = 5 * 60 * 1000;
+
 @Injectable()
 export class AdminLoggingService {
   constructor(private prisma: PrismaService) {}
+
+  invalidateActivitiesCache() {
+    activitiesCache = null;
+  }
 
   /**
    * Add a log entry for anime, manga, business, or video game modification
@@ -147,6 +155,11 @@ export class AdminLoggingService {
    * Optimized: Single query with JOINs instead of N+1 queries
    */
   async getFormattedActivities(limit = 20, offset = 0): Promise<{ items: any[]; hasMore: boolean; total: number }> {
+    const cacheKey = `${limit}:${offset}`;
+    if (activitiesCache && activitiesCache.key === cacheKey && Date.now() - activitiesCache.timestamp < ACTIVITIES_CACHE_TTL) {
+      return activitiesCache.data;
+    }
+
     try {
       // Get total count for pagination
       const countResult = await this.prisma.$queryRaw<any[]>`
@@ -244,11 +257,13 @@ export class AdminLoggingService {
         };
       });
 
-      return {
+      const result = {
         items: formattedLogs,
         hasMore: offset + logs.length < total,
         total,
       };
+      activitiesCache = { data: result, timestamp: Date.now(), key: cacheKey };
+      return result;
     } catch (error) {
       console.error('Failed to get formatted activities:', error);
       return { items: [], hasMore: false, total: 0 };
