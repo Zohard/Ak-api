@@ -68,6 +68,16 @@ export class EmailService {
     }
   }
 
+  async sendRawEmail(to: string, subject: string, html: string, text?: string): Promise<void> {
+    await this.ensureTransporter().sendMail({
+      from: this.fromEmail,
+      to,
+      subject,
+      html,
+      text,
+    });
+  }
+
   async sendPrivateMessageNotification(
     recipientEmail: string,
     recipientUsername: string,

@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../shared/services/prisma.service';
+import { EmailService } from '../../shared/services/email.service';
 import * as nodemailer from 'nodemailer';
 import { ConfigService } from '@nestjs/config';
 import { EpisodesService } from '../animes/episodes/episodes.service';
@@ -73,6 +74,7 @@ export class NotificationsService {
     private configService: ConfigService,
     private episodesService: EpisodesService,
     private mangaVolumesService: MangaVolumesService,
+    private emailService: EmailService,
   ) {
     this.initializeEmailTransporter();
   }
@@ -670,16 +672,11 @@ export class NotificationsService {
   }
 
   private async sendEmail(data: NotificationData): Promise<void> {
-    if (!this.transporter) {
-      this.logger.warn('Email transporter not available, skipping email');
-      return;
-    }
-
     try {
       // Get user email
       const user = await this.prisma.$queryRaw`
         SELECT email_address, member_name
-        FROM smf_members 
+        FROM smf_members
         WHERE id_member = ${data.userId}
       `;
 
@@ -691,13 +688,12 @@ export class NotificationsService {
       const userData = (user as any[])[0];
       const template = this.getEmailTemplate(data);
 
-      await this.transporter.sendMail({
-        from: this.configService.get('FROM_EMAIL') || `Anime-Kun <${this.configService.get('SMTP_USER')}>`,
-        to: userData.email_address,
-        subject: template.subject,
-        html: template.html,
-        text: template.text,
-      });
+      await this.emailService.sendRawEmail(
+        userData.email_address,
+        template.subject,
+        template.html,
+        template.text,
+      );
 
       this.logger.log(
         `Email sent successfully to ${userData.email_address} for notification type: ${data.type}`,
