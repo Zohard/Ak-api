@@ -102,26 +102,34 @@ export class NotificationsService {
 
   // Send notification
   async sendNotification(data: NotificationData): Promise<boolean> {
+    console.log(`[NotificationsService] sendNotification called: type=${data.type}, userId=${data.userId}`);
     try {
       // Check user preferences
       const preferences = await this.getUserPreferences(data.userId);
+      console.log(`[NotificationsService] User preferences loaded for ${data.userId}`);
+
       if (!this.shouldSendNotification(data.type, preferences)) {
         this.logger.debug(
           `Notification blocked by user preferences: ${data.type} for user ${data.userId}`,
         );
+        console.log(`[NotificationsService] Notification blocked by preferences`);
         return false;
       }
 
       // Store notification in database
       await this.storeNotification(data);
+      console.log(`[NotificationsService] Notification stored in DB`);
 
       // Send email if user has email notifications enabled for this type
       const shouldSendEmail = this.shouldSendEmail(data.type, preferences);
+      console.log(`[NotificationsService] Should send email? ${shouldSendEmail}`);
+
       if (shouldSendEmail) {
         // Run email sending in background to avoid blocking the response
-        this.sendEmail(data).catch(err =>
-          this.logger.error(`Background email sending failed: ${err.message}`)
-        );
+        this.sendEmail(data).catch(err => {
+          this.logger.error(`Background email sending failed: ${err.message}`);
+          console.error(`[NotificationsService] Background email sending failed:`, err);
+        });
       }
 
       this.logger.log(
@@ -130,6 +138,7 @@ export class NotificationsService {
       return true;
     } catch (error) {
       this.logger.error(`Failed to send notification: ${error.message}`);
+      console.error(`[NotificationsService] Failed to send notification:`, error);
       return false;
     }
   }
@@ -672,36 +681,45 @@ export class NotificationsService {
   }
 
   private async sendEmail(data: NotificationData): Promise<void> {
+    console.log(`[NotificationsService] sendEmail called for user ${data.userId}, type=${data.type}`);
     try {
-      // Get user email
-      const user = await this.prisma.$queryRaw`
-        SELECT email_address, member_name
-        FROM smf_members
-        WHERE id_member = ${data.userId}
-      `;
+      // Get user email using Prisma Client for better type safety
+      const user = await this.prisma.smfMember.findUnique({
+        where: { idMember: data.userId },
+        select: {
+          emailAddress: true,
+          memberName: true,
+        },
+      });
 
-      if (!user || (user as any[]).length === 0) {
-        this.logger.warn(`User ${data.userId} not found, cannot send email`);
+      if (!user || !user.emailAddress) {
+        this.logger.warn(`User ${data.userId} not found or has no email, cannot send email`);
+        console.warn(`[NotificationsService] User ${data.userId} not found or no email`);
         return;
       }
 
-      const userData = (user as any[])[0];
+      console.log(`[NotificationsService] Sending email to ${user.emailAddress}`);
+
       const template = this.getEmailTemplate(data);
+      console.log(`[NotificationsService] Template generated. Subject: ${template.subject}`);
 
       await this.emailService.sendRawEmail(
-        userData.email_address,
+        user.emailAddress,
         template.subject,
         template.html,
         template.text,
       );
 
       this.logger.log(
-        `Email sent successfully to ${userData.email_address} for notification type: ${data.type}`,
+        `Email sent successfully to ${user.emailAddress} for notification type: ${data.type}`,
       );
+      console.log(`[NotificationsService] Email sent successfully via EmailService`);
     } catch (error) {
       this.logger.error(`Failed to send email: ${error.message}`);
+      console.error(`[NotificationsService] Failed to send email:`, error);
     }
   }
+
 
   private getEmailTemplate(data: NotificationData): EmailTemplate {
     const baseUrl = this.configService.get('APP_URL', 'http://localhost:3003');
@@ -922,6 +940,7 @@ export class NotificationsService {
         };
 
       case 'warning':
+        console.log(`[NotificationsService] Generating warning email template for user ${data.userId}`);
         return {
           subject: `⚠️ Avertissement - ${data.title}`,
           html: `

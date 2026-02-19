@@ -288,17 +288,20 @@ export class AdminUsersService {
   }
 
   async warnUser(id: number, message: string, adminId: number) {
+    console.log(`[AdminUsersService] warnUser called for user ${id} by admin ${adminId}`);
     // Fetch current warning value
     const result = await this.prisma.$queryRaw<{ warning: number }[]>`
       SELECT warning FROM smf_members WHERE id_member = ${id}
     `;
 
     if (!result || result.length === 0) {
+      console.log(`[AdminUsersService] User ${id} not found`);
       throw new NotFoundException(`User with ID ${id} not found`);
     }
 
     const currentWarning = Number(result[0].warning) || 0;
     const newWarning = Math.min(currentWarning + 33, 100);
+    console.log(`[AdminUsersService] Warning level calculated: ${currentWarning} -> ${newWarning}`);
 
     // Update warning level
     await this.prisma.$executeRaw`
@@ -306,7 +309,8 @@ export class AdminUsersService {
     `;
 
     // Send notification to user
-    await this.notificationsService.sendNotification({
+    console.log(`[AdminUsersService] Sending notification to user ${id}`);
+    const notifResult = await this.notificationsService.sendNotification({
       userId: id,
       type: 'warning',
       title: 'Avertissement',
@@ -314,6 +318,7 @@ export class AdminUsersService {
       data: { warningLevel: newWarning },
       priority: 'high',
     });
+    console.log(`[AdminUsersService] Notification result: ${notifResult}`);
 
     // Log admin action
     await this.logUserAction(
@@ -602,29 +607,16 @@ export class AdminUsersService {
   private async logUserAction(actionLog: UserActionLogDto, adminId: number) {
     // Simple audit logging without request context
     try {
-      const metadataJson = actionLog.metadata
-        ? JSON.stringify(actionLog.metadata)
-        : null;
-
-      await this.prisma.$executeRawUnsafe(
-        `
-        INSERT INTO admin_audit_log (
-          admin_id,
-          action,
-          target_type,
-          target_id,
-          reason,
-          metadata,
-          created_at
-        ) VALUES ($1, $2, $3, $4, $5, $6::jsonb, NOW())
-      `,
-        adminId,
-        actionLog.action,
-        'user',
-        actionLog.target_user_id,
-        actionLog.reason || null,
-        metadataJson,
-      );
+      await this.prisma.adminAuditLog.create({
+        data: {
+          adminId,
+          action: actionLog.action,
+          targetType: 'user',
+          targetId: actionLog.target_user_id,
+          reason: actionLog.reason || null,
+          metadata: actionLog.metadata || undefined,
+        },
+      });
     } catch (error) {
       console.error('Failed to log user action:', error);
     }
