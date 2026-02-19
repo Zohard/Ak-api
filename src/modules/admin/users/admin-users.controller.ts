@@ -211,6 +211,32 @@ export class AdminUsersController {
     return this.adminUsersService.banUser(id, reason, req.user.id);
   }
 
+  @Post(':id/warn')
+  @AuditLog(AuditActions.USER_UPDATE, AuditTargets.USER)
+  @ApiOperation({ summary: 'Issue a warning to a user' })
+  @ApiParam({ name: 'id', description: 'User ID' })
+  @ApiResponse({ status: 200, description: 'Warning issued successfully' })
+  @ApiResponse({ status: 404, description: 'User not found' })
+  @HttpCode(HttpStatus.OK)
+  async warnUser(
+    @Param('id', ParseIntPipe) id: number,
+    @Body('message') message: string,
+    @Request() req: any,
+  ) {
+    return this.adminUsersService.warnUser(id, message, req.user.id);
+  }
+
+  @Post(':id/unlock')
+  @AuditLog(AuditActions.USER_UNBAN, AuditTargets.USER)
+  @ApiOperation({ summary: 'Unlock a user account and reset warnings' })
+  @ApiParam({ name: 'id', description: 'User ID' })
+  @ApiResponse({ status: 200, description: 'User unlocked successfully' })
+  @ApiResponse({ status: 404, description: 'User not found' })
+  @HttpCode(HttpStatus.OK)
+  async unlockUser(@Param('id', ParseIntPipe) id: number, @Request() req: any) {
+    return this.adminUsersService.unlockUser(id, req.user.id);
+  }
+
   @Post(':id/unban')
   @AuditLog(AuditActions.USER_UNBAN, AuditTargets.USER)
   @ApiOperation({ summary: 'Unban a user' })

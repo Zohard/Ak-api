@@ -4,13 +4,17 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '../../../shared/services/prisma.service';
+import { NotificationsService } from '../../notifications/notifications.service';
 import { UserAdminQueryDto } from './dto/user-admin-query.dto';
 import { UpdateUserAdminDto } from './dto/update-user-admin.dto';
 import { UserActionLogDto } from './dto/user-action-log.dto';
 
 @Injectable()
 export class AdminUsersService {
-  constructor(private prisma: PrismaService) { }
+  constructor(
+    private prisma: PrismaService,
+    private notificationsService: NotificationsService,
+  ) { }
 
   async findAll(query: UserAdminQueryDto) {
     const {
@@ -283,6 +287,54 @@ export class AdminUsersService {
     return this.findOne(id);
   }
 
+  async warnUser(id: number, message: string, adminId: number) {
+    // Fetch current warning value
+    const result = await this.prisma.$queryRaw<{ warning: number }[]>`
+      SELECT warning FROM smf_members WHERE id_member = ${id}
+    `;
+
+    if (!result || result.length === 0) {
+      throw new NotFoundException(`User with ID ${id} not found`);
+    }
+
+    const currentWarning = Number(result[0].warning) || 0;
+    const newWarning = Math.min(currentWarning + 33, 100);
+
+    // Update warning level
+    await this.prisma.$executeRaw`
+      UPDATE smf_members SET warning = ${newWarning} WHERE id_member = ${id}
+    `;
+
+    // Send notification to user
+    await this.notificationsService.sendNotification({
+      userId: id,
+      type: 'warning',
+      title: 'Avertissement',
+      message,
+      data: { warningLevel: newWarning },
+      priority: 'high',
+    });
+
+    // Log admin action
+    await this.logUserAction(
+      {
+        action: 'warning',
+        target_user_id: id,
+        reason: message,
+        metadata: { warning_level: newWarning },
+      },
+      adminId,
+    );
+
+    // Auto-ban on 3rd warning
+    const banned = newWarning >= 100;
+    if (banned) {
+      await this.banUser(id, 'Compte bloqué après 3 avertissements', adminId);
+    }
+
+    return { message: 'Warning issued', warning: newWarning, banned };
+  }
+
   async banUser(id: number, reason: string, adminId: number) {
     await this.prisma.$executeRaw`
       UPDATE smf_members 
@@ -302,6 +354,28 @@ export class AdminUsersService {
     );
 
     return { message: 'User banned successfully' };
+  }
+
+  async unlockUser(id: number, adminId: number) {
+    // Reset warning to 0 and reactivate account
+    await this.prisma.$executeRaw`
+      UPDATE smf_members
+      SET warning = 0, is_activated = 1
+      WHERE id_member = ${id}
+    `;
+
+    // Log the unlock action
+    await this.logUserAction(
+      {
+        action: 'unlock',
+        target_user_id: id,
+        reason: 'Compte débloqué et avertissements réinitialisés par un administrateur',
+        metadata: { unlocked_by: adminId },
+      },
+      adminId,
+    );
+
+    return { message: 'User unlocked successfully', warning: 0 };
   }
 
   async unbanUser(id: number, adminId: number) {

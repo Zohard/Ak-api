@@ -55,7 +55,8 @@ export interface NotificationData {
   | 'related_content_added'
   | 'related_content_added'
   | 'episode_release'
-  | 'volume_release';
+  | 'volume_release'
+  | 'warning';
   title: string;
   message: string;
   data?: any;
@@ -487,6 +488,8 @@ export class NotificationsService {
       case 'volume_release':
         // Reuse new season anime preference (or new review?) - Let's reuse new season anime for now as "New Content"
         return preferences.webNewSeasonAnime;
+      case 'warning':
+        return true; // Always show warnings
       default:
         return true;
     }
@@ -523,6 +526,8 @@ export class NotificationsService {
         return preferences.emailNewSeasonAnime;
       case 'volume_release':
         return preferences.emailNewSeasonAnime;
+      case 'warning':
+        return true; // Always email warnings
       default:
         return false;
     }
@@ -918,6 +923,28 @@ export class NotificationsService {
             <a href="${baseUrl}/events/${data.data?.eventSlug || data.data?.eventId}" style="background-color: #28a745; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Voir ${data.data?.resultsVisible ? 'les résultats' : 'l\'événement'}</a>
           `,
           text: `Les votes sont terminés pour ${data.title}. ${data.message}`,
+        };
+
+      case 'warning':
+        return {
+          subject: `⚠️ Avertissement - ${data.title}`,
+          html: `
+            <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden;">
+              <div style="background-color: #dc2626; padding: 20px; text-align: center;">
+                <h1 style="color: white; margin: 0; font-size: 24px;">⚠️ Avertissement</h1>
+              </div>
+              <div style="padding: 30px; line-height: 1.6; color: #374151;">
+                <h2 style="margin-top: 0;">Vous avez reçu un avertissement</h2>
+                <p>${data.message}</p>
+                ${data.data?.warningLevel ? `<p><strong>Niveau d'avertissement :</strong> ${data.data.warningLevel}%</p>` : ''}
+                ${data.data?.warningLevel >= 100 ? '<p style="color: #dc2626; font-weight: bold;">Votre compte a été bloqué suite à 3 avertissements.</p>' : ''}
+                <div style="background-color: #fef2f2; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #dc2626;">
+                  <p style="margin: 0; color: #991b1b;">Merci de respecter les règles de la communauté.</p>
+                </div>
+              </div>
+            </div>
+          `,
+          text: `Avertissement: ${data.message}`,
         };
 
       case 'related_content_added':
