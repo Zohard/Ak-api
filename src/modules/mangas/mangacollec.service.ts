@@ -25,14 +25,70 @@ interface MangaCollecVolume {
 export class MangaCollecService {
   private readonly logger = new Logger(MangaCollecService.name);
   private readonly BASE_URL = 'https://api.mangacollec.com';
-  private readonly CLIENT_ID = '9b0ab8e2-08bd-4e2e-9516-2266e1e68632';
-  private readonly CLIENT_SECRET = 'glDsUcgazNsIgJVq2geGW9gKPJbWMTzCXEnoPlKu';
+  private readonly SITE_URL = 'https://www.mangacollec.com';
 
   private token: MangaCollecToken | null = null;
+  private clientCredentials: { clientId: string; clientSecret: string } | null = null;
   private lastRequestTime = 0;
   private readonly MIN_REQUEST_DELAY = 1500;
   private readonly CACHE_TTL = 10 * 60 * 1000; // 10 minutes
   private responseCache = new Map<string, { data: any; timestamp: number }>();
+
+  /**
+   * Extract client_id and client_secret from MangaCollec's JS bundle.
+   * These are public OAuth app credentials embedded in their frontend.
+   * Cached for the lifetime of the service instance.
+   */
+  private async getClientCredentials(): Promise<{ clientId: string; clientSecret: string }> {
+    if (this.clientCredentials) {
+      return this.clientCredentials;
+    }
+
+    // Allow env override
+    if (process.env.MANGACOLLEC_CLIENT_ID && process.env.MANGACOLLEC_CLIENT_SECRET) {
+      this.clientCredentials = {
+        clientId: process.env.MANGACOLLEC_CLIENT_ID,
+        clientSecret: process.env.MANGACOLLEC_CLIENT_SECRET,
+      };
+      return this.clientCredentials;
+    }
+
+    this.logger.debug('Extracting client credentials from MangaCollec JS bundle...');
+
+    try {
+      // Fetch the main page to find the JS bundle URL
+      const pageRes = await fetch(this.SITE_URL);
+      const html = await pageRes.text();
+
+      const scriptMatch = html.match(/src="(\/static\/js\/client\.[^"]+\.js)"/);
+      if (!scriptMatch) {
+        throw new Error('Could not find client JS bundle URL');
+      }
+
+      // Fetch the JS bundle
+      const jsRes = await fetch(`${this.SITE_URL}${scriptMatch[1]}`);
+      const js = await jsRes.text();
+
+      // Extract clientId and clientSecret
+      const idMatch = js.match(/clientId="([a-f0-9]{64})"/);
+      const secretMatch = js.match(/clientSecret="([a-f0-9]{64})"/);
+
+      if (!idMatch || !secretMatch) {
+        throw new Error('Could not extract clientId/clientSecret from JS bundle');
+      }
+
+      this.clientCredentials = {
+        clientId: idMatch[1],
+        clientSecret: secretMatch[1],
+      };
+
+      this.logger.log('Extracted MangaCollec client credentials from JS bundle');
+      return this.clientCredentials;
+    } catch (error: any) {
+      this.logger.error(`Failed to extract credentials: ${error.message}`);
+      throw new Error('Cannot obtain MangaCollec client credentials');
+    }
+  }
 
   private async authenticate(): Promise<string> {
     if (this.token && Date.now() < this.token.expires_at) {
@@ -46,14 +102,16 @@ export class MangaCollecService {
       throw new Error('MANGACOLLEC_EMAIL and MANGACOLLEC_PASSWORD must be set');
     }
 
+    const { clientId, clientSecret } = await this.getClientCredentials();
+
     this.logger.debug('Authenticating with MangaCollec API...');
 
     const res = await fetch(`${this.BASE_URL}/oauth/token`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        client_id: this.CLIENT_ID,
-        client_secret: this.CLIENT_SECRET,
+        client_id: clientId,
+        client_secret: clientSecret,
         grant_type: 'password',
         username: email,
         password: password,
@@ -61,13 +119,40 @@ export class MangaCollecService {
     });
 
     if (!res.ok) {
+      // If auth fails, credentials may have rotated — clear cache and retry once
+      if (this.clientCredentials && !process.env.MANGACOLLEC_CLIENT_ID) {
+        this.logger.warn('Auth failed, retrying with fresh credentials...');
+        this.clientCredentials = null;
+        const fresh = await this.getClientCredentials();
+        const retryRes = await fetch(`${this.BASE_URL}/oauth/token`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            client_id: fresh.clientId,
+            client_secret: fresh.clientSecret,
+            grant_type: 'password',
+            username: email,
+            password: password,
+          }),
+        });
+        if (!retryRes.ok) {
+          throw new Error(`MangaCollec auth failed after retry: HTTP ${retryRes.status}`);
+        }
+        const retryData = await retryRes.json();
+        this.token = {
+          access_token: retryData.access_token,
+          expires_at: Date.now() + (retryData.expires_in - 60) * 1000,
+        };
+        this.logger.log('MangaCollec authentication successful (after credential refresh)');
+        return this.token.access_token;
+      }
       throw new Error(`MangaCollec auth failed: HTTP ${res.status}`);
     }
 
     const data = await res.json();
     this.token = {
       access_token: data.access_token,
-      expires_at: Date.now() + (data.expires_in - 60) * 1000, // refresh 60s before expiry
+      expires_at: Date.now() + (data.expires_in - 60) * 1000,
     };
 
     this.logger.log('MangaCollec authentication successful');
