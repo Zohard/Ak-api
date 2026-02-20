@@ -6,21 +6,28 @@ import { parseBBCode } from '../utils/bbcode.util';
 @Injectable()
 export class EmailService {
   private transporter: nodemailer.Transporter | null = null;
+  private resendApiKey: string | null = null;
   private fromEmail: string;
 
   constructor(private readonly configService: ConfigService) {
+    this.resendApiKey = this.configService.get<string>('RESEND_API_KEY') || null;
     const smtpUser = this.configService.get<string>('SMTP_USER');
     const smtpPass = this.configService.get<string>('SMTP_PASS');
     this.fromEmail = this.configService.get<string>('FROM_EMAIL') || `Anime-Kun <${smtpUser}>`;
 
+    if (this.resendApiKey) {
+      console.log(`📧 EmailService: using Resend HTTP API, from=${this.fromEmail}`);
+      return;
+    }
+
     if (!smtpUser || !smtpPass) {
-      console.warn('⚠️ SMTP_USER/SMTP_PASS not configured - email sending disabled');
+      console.warn('⚠️ No RESEND_API_KEY or SMTP credentials configured - email sending disabled');
       return;
     }
 
     const smtpHost = this.configService.get<string>('SMTP_HOST') || 'smtp.gmail.com';
     const smtpPort = parseInt(this.configService.get<string>('SMTP_PORT') || '465', 10);
-    console.log(`📧 EmailService: host=${smtpHost} port=${smtpPort} user=${smtpUser} from=${this.fromEmail}`);
+    console.log(`📧 EmailService: SMTP host=${smtpHost} port=${smtpPort} user=${smtpUser} from=${this.fromEmail}`);
 
     this.transporter = nodemailer.createTransport({
       host: smtpHost,
@@ -33,19 +40,57 @@ export class EmailService {
     });
   }
 
-  private ensureTransporter() {
-    if (!this.transporter) {
-      throw new Error('Email service not configured (SMTP_USER/SMTP_PASS missing)');
+  private ensureCanSend() {
+    if (!this.resendApiKey && !this.transporter) {
+      throw new Error('Email service not configured (no RESEND_API_KEY or SMTP credentials)');
     }
-    return this.transporter;
+  }
+
+  private async sendViaResend(to: string, subject: string, html: string, text?: string): Promise<void> {
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${this.resendApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        from: this.fromEmail,
+        to,
+        subject,
+        html,
+        text,
+      }),
+    });
+
+    if (!res.ok) {
+      const body = await res.text();
+      throw new Error(`Resend API error ${res.status}: ${body}`);
+    }
+
+    const data = await res.json();
+    console.log(`✅ Resend email sent to=${to} subject="${subject}" id=${data.id}`);
+  }
+
+  /**
+   * Internal send method that routes to Resend HTTP API or SMTP transporter
+   */
+  private async sendMail(options: { to: string; subject: string; html: string; text?: string; replyTo?: string }): Promise<void> {
+    this.ensureCanSend();
+    if (this.resendApiKey) {
+      await this.sendViaResend(options.to, options.subject, options.html, options.text);
+    } else {
+      await this.transporter!.sendMail({
+        from: this.fromEmail,
+        ...options,
+      });
+    }
   }
 
   async sendEmailVerification(email: string, username: string, verificationToken: string): Promise<void> {
     const verificationUrl = `${this.configService.get('FRONTEND_URL')}/verify-email?token=${verificationToken}`;
 
     try {
-      await this.ensureTransporter().sendMail({
-        from: this.fromEmail,
+      await this.sendMail({
         to: email,
         subject: 'Confirmez votre adresse email - Anime-Kun',
         html: this.getEmailVerificationTemplate(username, verificationUrl),
@@ -60,8 +105,7 @@ export class EmailService {
     const resetUrl = `${this.configService.get('FRONTEND_URL')}/reset-password?token=${resetToken}`;
 
     try {
-      await this.ensureTransporter().sendMail({
-        from: this.fromEmail,
+      await this.sendMail({
         to: email,
         subject: 'Réinitialisation de votre mot de passe - Anime-Kun',
         html: this.getForgotPasswordTemplate(resetUrl),
@@ -74,14 +118,7 @@ export class EmailService {
 
   async sendRawEmail(to: string, subject: string, html: string, text?: string): Promise<void> {
     try {
-      const result = await this.ensureTransporter().sendMail({
-        from: this.fromEmail,
-        to,
-        subject,
-        html,
-        text,
-      });
-      console.log(`✅ sendRawEmail OK to=${to} subject="${subject}" messageId=${result.messageId}`);
+      await this.sendMail({ to, subject, html, text });
     } catch (error) {
       console.error(`❌ sendRawEmail FAILED to=${to} subject="${subject}":`, error.message);
       throw error;
@@ -100,8 +137,7 @@ export class EmailService {
     try {
       const parsedMessage = parseBBCode(messagePreview);
 
-      await this.ensureTransporter().sendMail({
-        from: this.fromEmail,
+      await this.sendMail({
         to: recipientEmail,
         subject: `Nouveau message privé de ${senderName} - Anime-Kun`,
         html: this.getPrivateMessageTemplate(recipientUsername, senderName, subject, parsedMessage, messagesUrl),
@@ -116,8 +152,7 @@ export class EmailService {
     const contactEmail = this.configService.get<string>('CONTACT_EMAIL') || 'contact@anime-kun.fr';
 
     try {
-      await this.ensureTransporter().sendMail({
-        from: this.fromEmail,
+      await this.sendMail({
         to: contactEmail,
         replyTo: email,
         subject: `Nouveau message de contact de ${name} - Anime-Kun`,
@@ -136,8 +171,7 @@ export class EmailService {
     response: string,
   ): Promise<void> {
     try {
-      await this.ensureTransporter().sendMail({
-        from: this.fromEmail,
+      await this.sendMail({
         to: email,
         subject: `Réponse à votre message - Anime-Kun`,
         html: this.getContactReplyTemplate(name, originalMessage, response),
@@ -160,8 +194,7 @@ export class EmailService {
     const reviewsUrl = `${this.configService.get('FRONTEND_URL')}/reviews/my-reviews`;
 
     try {
-      await this.ensureTransporter().sendMail({
-        from: this.fromEmail,
+      await this.sendMail({
         to: recipientEmail,
         subject: `Votre critique a été rejetée - Anime-Kun`,
         html: this.getReviewRejectionTemplate(recipientUsername, reviewTitle, reason, contentTitle, reviewsUrl),
@@ -489,8 +522,7 @@ export class EmailService {
     const profileUrl = `${this.configService.get('FRONTEND_URL')}/profile`;
 
     try {
-      await this.ensureTransporter().sendMail({
-        from: this.fromEmail,
+      await this.sendMail({
         to: recipientEmail,
         subject: 'Import MAL terminé - Anime-Kun',
         html: this.getImportSummaryTemplate(username, summary, profileUrl),
@@ -509,8 +541,7 @@ export class EmailService {
     const profileUrl = `${this.configService.get('FRONTEND_URL')}/profile/import`;
 
     try {
-      await this.ensureTransporter().sendMail({
-        from: this.fromEmail,
+      await this.sendMail({
         to: recipientEmail,
         subject: 'Erreur lors de l\'import MAL - Anime-Kun',
         html: this.getImportFailureTemplate(username, errorMessage, profileUrl),
