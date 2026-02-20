@@ -73,9 +73,16 @@ export class ScrapeService {
 
         const res = await fetch(url, {
           headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-            'Accept-Language': 'fr-FR,fr;q=0.9',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+            'Accept-Language': 'fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7',
+            'Referer': 'https://booknode.com/',
+            'Upgrade-Insecure-Requests': '1',
+            'Sec-Fetch-Dest': 'document',
+            'Sec-Fetch-Mode': 'navigate',
+            'Sec-Fetch-Site': 'same-origin',
+            'Sec-Fetch-User': '?1',
+            'Cache-Control': 'max-age=0',
           },
           signal: controller.signal
         });
@@ -90,6 +97,16 @@ export class ScrapeService {
             await new Promise(resolve => setTimeout(resolve, delay));
             continue;
           }
+
+          if (res.status === 403 || res.status === 503) {
+            try {
+              const body = await res.text();
+              this.logger.error(`Fetch failed ${res.status} for ${url}. Body preview: ${body.substring(0, 1000)}`);
+            } catch (e) {
+              console.error('Failed to read error body', e);
+            }
+          }
+
           if (res.status >= 500 && attempt < 3) {
             // Server error, retry with exponential backoff
             const delay = 2000 * Math.pow(2, attempt - 1); // 2s, 4s, 8s
@@ -1390,6 +1407,101 @@ export class ScrapeService {
 
   async scrapeManga(q: string) {
     return this.scrapeNautiljonManga(q);
+  }
+
+  /**
+   * Scrape manga releases from mangacollec.com/planning for a specific year and month
+   * Extracts window.DATA_STORE JSON from the page, then resolves:
+   *   volume.edition_id → editions.data[edition_id].series_id → series.data[series_id].title
+   * @param year The year (e.g. 2026)
+   * @param month The month (1-12)
+   * @returns Array of manga releases with title, volume number, release date, image, ISBN
+   */
+  async scrapeMangaCollecPlanning(year: number, month: number) {
+    const monthStr = month.toString().padStart(2, '0');
+    const planningKey = `${year}-${monthStr}`;
+    const url = `https://www.mangacollec.com/planning`;
+
+    const $ = await this.fetchHtml(url);
+    const html = $.html();
+
+    // Extract window.DATA_STORE JSON from the page
+    // The JSON is huge so we find the start marker and extract up to the closing ";</script>"
+    const marker = 'window.DATA_STORE = ';
+    const startIdx = html.indexOf(marker);
+    if (startIdx === -1) {
+      throw new BadRequestException('Could not find DATA_STORE in MangaCollec page');
+    }
+    const jsonStart = startIdx + marker.length;
+    // Find the </script> tag after the DATA_STORE, then look back for the ";"
+    const scriptEnd = html.indexOf('</script>', jsonStart);
+    if (scriptEnd === -1) {
+      throw new BadRequestException('Could not find end of DATA_STORE in MangaCollec page');
+    }
+    // The JSON ends with "};" — trim whitespace between ";" and "</script>"
+    const segment = html.substring(jsonStart, scriptEnd).trimEnd();
+    // Remove trailing semicolon
+    const jsonStr = segment.endsWith(';') ? segment.slice(0, -1) : segment;
+
+    let dataStore: any;
+    try {
+      dataStore = JSON.parse(jsonStr);
+    } catch (e) {
+      throw new BadRequestException('Failed to parse DATA_STORE JSON from MangaCollec');
+    }
+
+    const volumes = dataStore.volumes?.data || {};
+    const editions = dataStore.editions?.data || {};
+    const series = dataStore.series?.data || {};
+    const publishers = dataStore.publishers?.data || {};
+    const planningData = dataStore.planning?.[planningKey];
+
+    if (!planningData || !planningData.volumes || !Array.isArray(planningData.volumes)) {
+      return [];
+    }
+
+    const results: Array<{
+      titre: string;
+      number: number | null;
+      releaseDate: string;
+      imageUrl: string;
+      isbn: string;
+      seriesTitle: string;
+      publisher: string;
+      mangacollecVolumeId: string;
+    }> = [];
+
+    for (const volumeId of planningData.volumes) {
+      const volume = volumes[volumeId];
+      if (!volume) continue;
+
+      const edition = editions[volume.edition_id];
+      const serie = edition ? series[edition.series_id] : null;
+      const publisher = edition ? publishers[edition.publisher_id] : null;
+
+      const seriesTitle = serie?.title || '';
+      const volumeTitle = volume.title || '';
+      // Build display title: "Series Title - Tome X" or just volume title
+      const displayTitle = seriesTitle
+        ? (volume.number ? `${seriesTitle} - Tome ${volume.number}` : seriesTitle)
+        : volumeTitle || 'Unknown';
+
+      results.push({
+        titre: displayTitle,
+        number: volume.number ?? null,
+        releaseDate: volume.release_date || '',
+        imageUrl: volume.image_url || '',
+        isbn: volume.isbn || '',
+        seriesTitle,
+        publisher: publisher?.title || '',
+        mangacollecVolumeId: volumeId,
+      });
+    }
+
+    // Sort by release date
+    results.sort((a, b) => a.releaseDate.localeCompare(b.releaseDate));
+
+    return results;
   }
 
   private async scrapeNautiljonManga(q: string) {

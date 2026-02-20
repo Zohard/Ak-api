@@ -1,4 +1,4 @@
-import { Controller, Get, Query } from '@nestjs/common';
+import { Controller, Get, Query, ParseIntPipe } from '@nestjs/common';
 import { ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { ScrapeService } from './scrape.service';
 
@@ -20,5 +20,16 @@ export class ScrapeController {
   @ApiQuery({ name: 'q', description: 'Manga name or direct URL', required: true })
   async scrapeManga(@Query('q') q: string) {
     return this.scrapeService.scrapeManga(q);
+  }
+
+  @Get('manga-planning')
+  @ApiOperation({ summary: 'Scrape manga release planning from MangaCollec' })
+  @ApiQuery({ name: 'year', description: 'Year (e.g. 2026)', required: true })
+  @ApiQuery({ name: 'month', description: 'Month (1-12)', required: true })
+  async scrapeMangaPlanning(
+    @Query('year', ParseIntPipe) year: number,
+    @Query('month', ParseIntPipe) month: number,
+  ) {
+    return this.scrapeService.scrapeMangaCollecPlanning(year, month);
   }
 }

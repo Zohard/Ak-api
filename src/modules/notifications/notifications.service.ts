@@ -1,7 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../shared/services/prisma.service';
 import { EmailService } from '../../shared/services/email.service';
-import * as nodemailer from 'nodemailer';
 import { ConfigService } from '@nestjs/config';
 import { EpisodesService } from '../animes/episodes/episodes.service';
 import { MangaVolumesService } from '../mangas/manga-volumes.service';
@@ -67,7 +66,6 @@ export interface NotificationData {
 @Injectable()
 export class NotificationsService {
   private readonly logger = new Logger(NotificationsService.name);
-  private transporter: nodemailer.Transporter;
 
   constructor(
     private prisma: PrismaService,
@@ -75,30 +73,7 @@ export class NotificationsService {
     private episodesService: EpisodesService,
     private mangaVolumesService: MangaVolumesService,
     private emailService: EmailService,
-  ) {
-    this.initializeEmailTransporter();
-  }
-
-  private initializeEmailTransporter() {
-    try {
-      this.transporter = nodemailer.createTransport({
-        host: this.configService.get('SMTP_HOST') || 'smtp.gmail.com',
-        port: parseInt(this.configService.get('SMTP_PORT') || '465', 10),
-        secure: true,
-        auth: {
-          user: this.configService.get('SMTP_USER'),
-          pass: this.configService.get('SMTP_PASS'),
-        },
-      });
-
-      this.logger.log('Email transporter initialized successfully');
-    } catch (error) {
-      this.logger.error(
-        'Failed to initialize email transporter:',
-        error.message,
-      );
-    }
-  }
+  ) { }
 
   // Send notification
   async sendNotification(data: NotificationData): Promise<boolean> {

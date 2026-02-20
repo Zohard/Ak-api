@@ -135,6 +135,28 @@ export class NotificationsController {
   }
 
   // Admin endpoints
+  @Get('test-email')
+  @UseGuards(AdminGuard)
+  @ApiOperation({ summary: 'Test email sending (Admin only)' })
+  async testEmail(@CurrentUser() user: any) {
+    try {
+      const emailService = this.notificationsService['emailService'];
+      await emailService.sendRawEmail(
+        'animekun621@gmail.com',
+        'Test email from Anime-Kun',
+        '<h1>Test</h1><p>If you see this, email works in production!</p>',
+      );
+      return { success: true, message: 'Email sent successfully' };
+    } catch (error) {
+      return {
+        success: false,
+        error: error.message,
+        code: error.code,
+        command: error.command,
+      };
+    }
+  }
+
   @Post('send')
   @UseGuards(AdminGuard)
   @ApiOperation({ summary: 'Send notification to user (Admin only)' })

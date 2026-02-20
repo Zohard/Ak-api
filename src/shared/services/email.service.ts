@@ -18,9 +18,13 @@ export class EmailService {
       return;
     }
 
+    const smtpHost = this.configService.get<string>('SMTP_HOST') || 'smtp.gmail.com';
+    const smtpPort = parseInt(this.configService.get<string>('SMTP_PORT') || '465', 10);
+    console.log(`📧 EmailService: host=${smtpHost} port=${smtpPort} user=${smtpUser} from=${this.fromEmail}`);
+
     this.transporter = nodemailer.createTransport({
-      host: this.configService.get<string>('SMTP_HOST') || 'smtp.gmail.com',
-      port: parseInt(this.configService.get<string>('SMTP_PORT') || '465', 10),
+      host: smtpHost,
+      port: smtpPort,
       secure: true,
       auth: {
         user: smtpUser,
@@ -69,13 +73,19 @@ export class EmailService {
   }
 
   async sendRawEmail(to: string, subject: string, html: string, text?: string): Promise<void> {
-    await this.ensureTransporter().sendMail({
-      from: this.fromEmail,
-      to,
-      subject,
-      html,
-      text,
-    });
+    try {
+      const result = await this.ensureTransporter().sendMail({
+        from: this.fromEmail,
+        to,
+        subject,
+        html,
+        text,
+      });
+      console.log(`✅ sendRawEmail OK to=${to} subject="${subject}" messageId=${result.messageId}`);
+    } catch (error) {
+      console.error(`❌ sendRawEmail FAILED to=${to} subject="${subject}":`, error.message);
+      throw error;
+    }
   }
 
   async sendPrivateMessageNotification(
