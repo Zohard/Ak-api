@@ -1241,6 +1241,7 @@ export class MangasService extends BaseContentService<
     releaseDate: string;
     imageUrl: string;
     booknodeUrl: string;
+    [key: string]: any;
   }>) {
     const comparisons = await Promise.all(
       booknodeMangas.map(async (booknodeManga) => {
@@ -1348,12 +1349,8 @@ export class MangasService extends BaseContentService<
         }
 
         return {
-          titre: booknodeManga.titre,
-          baseTitre, // Include base title for debugging
-          auteur: booknodeManga.auteur,
-          releaseDate: booknodeManga.releaseDate,
-          imageUrl: booknodeManga.imageUrl,
-          booknodeUrl: booknodeManga.booknodeUrl,
+          ...booknodeManga,
+          baseTitre,
           exists: !!existing,
           existingMangaId: existing?.idManga || null,
           volumeExists,
@@ -1365,7 +1362,6 @@ export class MangasService extends BaseContentService<
     return {
       comparisons,
       total: comparisons.length,
-      source: 'Booknode',
     };
   }
 

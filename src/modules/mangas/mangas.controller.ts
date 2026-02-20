@@ -331,6 +331,32 @@ export class MangasController {
     return this.mangasService.compareBooknodeMangasWithDatabase(booknodeMangas);
   }
 
+  @Get('mangacollec/month/:year/:month')
+  @ApiOperation({ summary: 'Récupérer les parutions manga depuis mangacollec.com par mois avec comparaison à la base de données' })
+  @ApiParam({ name: 'year', description: 'Année', example: 2026 })
+  @ApiParam({ name: 'month', description: 'Mois (1-12)', example: 2 })
+  @ApiResponse({ status: 200, description: 'Mangas trouvés sur mangacollec.com avec statut d\'existence dans la base' })
+  async getMangasByMangaCollec(
+    @Param('year', ParseIntPipe) year: number,
+    @Param('month', ParseIntPipe) month: number,
+  ) {
+    const mangaCollecMangas = await this.scrapeService.scrapeMangaCollecPlanning(year, month);
+
+    // Transform to the same format as booknode for comparison
+    const formatted = mangaCollecMangas.map(m => ({
+      titre: m.titre,
+      auteur: '',
+      releaseDate: m.releaseDate,
+      imageUrl: m.imageUrl,
+      booknodeUrl: '',
+      isbn: m.isbn,
+      seriesTitle: m.seriesTitle,
+      publisher: m.publisher,
+    }));
+
+    return this.mangasService.compareBooknodeMangasWithDatabase(formatted);
+  }
+
   @Get('booknode/details')
   @ApiOperation({ summary: 'Récupérer les détails d\'un manga depuis booknode.com' })
   @ApiQuery({ name: 'url', required: true, description: 'URL booknode du manga' })
