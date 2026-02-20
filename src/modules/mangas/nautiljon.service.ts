@@ -209,11 +209,15 @@ export class NautiljonService {
    */
   async getVolumeInfo(mangaTitle: string, volumeNumber: number): Promise<NautiljonVolumeInfo | null> {
     try {
-      // First, get the manga's volumes listing page
-      const mangaSlug = this.formatUrlSlug(mangaTitle);
+      // Find the correct manga base URL (tries direct slug, then search)
+      const mangaBaseUrl = await this.getMangaVolumesPageUrl(mangaTitle);
+      if (!mangaBaseUrl) {
+        this.logger.debug(`Could not find manga "${mangaTitle}" on Nautiljon`);
+        return null;
+      }
 
       // Try to access the volumes listing
-      const volumesListUrl = `${this.BASE_URL}/mangas/${mangaSlug}/volumes.html`;
+      const volumesListUrl = `${mangaBaseUrl}/volumes.html`;
       this.logger.debug(`Fetching volumes list: ${volumesListUrl}`);
 
       let volumeUrl: string | null = null;
@@ -240,10 +244,8 @@ export class NautiljonService {
 
       // If we didn't find the volume URL, try alternative patterns
       if (!volumeUrl) {
-        // Try common volume page patterns
         const patterns = [
-          `${this.BASE_URL}/mangas/${mangaSlug}/volume-${volumeNumber}.html`,
-          `${this.BASE_URL}/mangas/${mangaSlug}+vol.+${volumeNumber}/volume-${volumeNumber}.html`,
+          `${mangaBaseUrl}/volume-${volumeNumber}.html`,
         ];
 
         for (const pattern of patterns) {
@@ -485,9 +487,14 @@ export class NautiljonService {
    */
   async scrapeVolumeList(mangaTitle: string): Promise<NautiljonVolumeInfo[]> {
     try {
-      const mangaSlug = this.formatUrlSlug(mangaTitle);
-      const url = `${this.BASE_URL}/mangas/${mangaSlug}/volumes.html`;
+      // Find the correct manga base URL (tries direct slug, then search)
+      const mangaBaseUrl = await this.getMangaVolumesPageUrl(mangaTitle);
+      if (!mangaBaseUrl) {
+        this.logger.warn(`Could not find manga "${mangaTitle}" on Nautiljon for volume list`);
+        return [];
+      }
 
+      const url = `${mangaBaseUrl}/volumes.html`;
       this.logger.debug(`Scraping volumes list: ${url}`);
 
       // We might need to handle 404 if the volumes page doesn't exist (e.g. one-shot)
