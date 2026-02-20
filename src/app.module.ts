@@ -45,6 +45,7 @@ import { CronModule } from './modules/cron/cron.module';
 import { SystemSettingsModule } from './modules/system-settings/system-settings.module';
 import { ContactModule } from './modules/contact/contact.module';
 import { SocialModule } from './modules/social/social.module';
+import { GamesModule } from './modules/games/games.module';
 import { PrismaService } from './shared/services/prisma.service';
 import { CacheService } from './shared/services/cache.service';
 import { ActivityTrackerService } from './shared/services/activity-tracker.service';
@@ -176,6 +177,7 @@ import redisConfig from './config/redis.config';
     SystemSettingsModule,
     ContactModule,
     SocialModule,
+    GamesModule,
   ],
   controllers: [AppController],
   providers: [
