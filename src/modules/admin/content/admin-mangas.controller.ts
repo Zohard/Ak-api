@@ -8,6 +8,7 @@ import { AdminMangaListQueryDto, CreateAdminMangaDto, UpdateAdminMangaDto } from
 import { GoogleBooksService } from '../../mangas/google-books.service';
 import { MangaVolumesService } from '../../mangas/manga-volumes.service';
 import { NautiljonService } from '../../mangas/nautiljon.service';
+import { MangaCollecService } from '../../mangas/mangacollec.service';
 import { MangasService } from '../../mangas/mangas.service';
 import { MediaService } from '../../media/media.service';
 
@@ -22,6 +23,7 @@ export class AdminMangasController {
     private readonly googleBooksService: GoogleBooksService,
     private readonly mangaVolumesService: MangaVolumesService,
     private readonly nautiljonService: NautiljonService,
+    private readonly mangaCollecService: MangaCollecService,
     private readonly mediaService: MediaService,
   ) { }
 
@@ -87,12 +89,18 @@ export class AdminMangasController {
       return { found: false, message: 'Invalid volume number' };
     }
 
-    const result = await this.nautiljonService.searchVolume(title, volumeNumber);
+    // Try MangaCollec first (Nautiljon is blocked by Cloudflare)
+    let result = await this.mangaCollecService.searchVolume(title, volumeNumber);
+
+    // Fallback to Nautiljon if MangaCollec fails
+    if (!result || !(result.isbn || result.releaseDate || result.coverUrl)) {
+      result = await this.nautiljonService.searchVolume(title, volumeNumber);
+    }
 
     if (!result) {
       return {
         found: false,
-        message: `No volume found for "${title}" Tome ${volumeNumber} on Nautiljon`,
+        message: `No volume found for "${title}" Tome ${volumeNumber}`,
       };
     }
 

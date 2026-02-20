@@ -10,7 +10,7 @@ export interface NautiljonVolumeInfo {
   description?: string;
   publisher?: string;
   pageCount?: number;
-  source: 'nautiljon';
+  source: string;
   sourceUrl?: string;
 }
 

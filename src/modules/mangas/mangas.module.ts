@@ -4,6 +4,7 @@ import { MangasService } from './mangas.service';
 import { GoogleBooksService } from './google-books.service';
 import { MangaVolumesService } from './manga-volumes.service';
 import { NautiljonService } from './nautiljon.service';
+import { MangaCollecService } from './mangacollec.service';
 import { MangasController } from './mangas.controller';
 import { PrismaService } from '../../shared/services/prisma.service';
 import { CacheService } from '../../shared/services/cache.service';
@@ -26,7 +27,7 @@ import { JikanModule } from '../jikan/jikan.module';
     JikanModule,
   ],
   controllers: [MangasController],
-  providers: [MangasService, GoogleBooksService, MangaVolumesService, NautiljonService, PrismaService, CacheService],
-  exports: [MangasService, MangaVolumesService, NautiljonService],
+  providers: [MangasService, GoogleBooksService, MangaVolumesService, NautiljonService, MangaCollecService, PrismaService, CacheService],
+  exports: [MangasService, MangaVolumesService, NautiljonService, MangaCollecService],
 })
 export class MangasModule {}

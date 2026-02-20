@@ -5,6 +5,7 @@ import { R2Service } from '../media/r2.service';
 import { MediaService } from '../media/media.service';
 import { GoogleBooksService } from './google-books.service';
 import { NautiljonService } from './nautiljon.service';
+import { MangaCollecService } from './mangacollec.service';
 import { JikanService, JikanManga } from '../jikan/jikan.service';
 import { AniListService } from '../anilist/anilist.service';
 import { slugify } from '../../shared/utils/text.util';
@@ -17,7 +18,7 @@ export interface VolumeInfo {
   coverUrl?: string;
   description?: string;
   publisher?: string;
-  source?: 'google_books' | 'nautiljon' | 'jikan' | 'manual';
+  source?: 'google_books' | 'nautiljon' | 'mangacollec' | 'jikan' | 'manual';
 }
 
 export interface VolumeSyncResult {
@@ -46,6 +47,7 @@ export class MangaVolumesService {
     private readonly mediaService: MediaService,
     private readonly googleBooksService: GoogleBooksService,
     private readonly nautiljonService: NautiljonService,
+    private readonly mangaCollecService: MangaCollecService,
     private readonly jikanService: JikanService,
     private readonly anilistService: AniListService,
   ) { }
@@ -148,21 +150,43 @@ export class MangaVolumesService {
       }
     }
 
-    // ===== STRATEGY 2: Nautiljon (French database) =====
-    this.logger.debug(`[Nautiljon] Google Books failed, trying Nautiljon for ${mangaTitle} Tome ${volumeNumber}`);
+    // ===== STRATEGY 2: MangaCollec (French database, JSON API) =====
+    this.logger.debug(`[MangaCollec] Google Books failed, trying MangaCollec for ${mangaTitle} Tome ${volumeNumber}`);
 
-    for (const title of uniqueTitles.slice(0, 2)) { // Limit Nautiljon queries
+    for (const title of uniqueTitles.slice(0, 2)) {
+      try {
+        const mcResult = await this.mangaCollecService.searchVolume(title, volumeNumber);
+        if (mcResult && (mcResult.isbn || mcResult.releaseDate || mcResult.coverUrl)) {
+          this.logger.debug(`[MangaCollec] Found volume info for "${title}": ISBN ${mcResult.isbn || 'N/A'}, Date ${mcResult.releaseDate || 'N/A'}`);
+          return {
+            volumeNumber: mcResult.volumeNumber,
+            title: `Volume ${mcResult.volumeNumber || volumeNumber}`,
+            isbn: mcResult.isbn,
+            releaseDate: mcResult.releaseDate,
+            coverUrl: mcResult.coverUrl,
+            publisher: mcResult.publisher,
+            source: 'mangacollec',
+          };
+        }
+      } catch (error) {
+        this.logger.warn(`[MangaCollec] Search failed for "${title}": ${error.message}`);
+      }
+    }
+
+    // ===== STRATEGY 3: Nautiljon (French database, scraping fallback) =====
+    this.logger.debug(`[Nautiljon] MangaCollec failed, trying Nautiljon for ${mangaTitle} Tome ${volumeNumber}`);
+
+    for (const title of uniqueTitles.slice(0, 2)) {
       try {
         const nautiljonResult = await this.nautiljonService.searchVolume(title, volumeNumber);
         if (nautiljonResult && (nautiljonResult.isbn || nautiljonResult.releaseDate || nautiljonResult.coverUrl)) {
           this.logger.debug(`[Nautiljon] Found volume info for "${title}": ISBN ${nautiljonResult.isbn || 'N/A'}, Date ${nautiljonResult.releaseDate || 'N/A'}`);
           return {
             volumeNumber: nautiljonResult.volumeNumber,
-            title: `Volume ${nautiljonResult.volumeNumber || volumeNumber}`, // Simple title without copyright content
+            title: `Volume ${nautiljonResult.volumeNumber || volumeNumber}`,
             isbn: nautiljonResult.isbn,
             releaseDate: nautiljonResult.releaseDate,
             coverUrl: nautiljonResult.coverUrl,
-            // Note: description intentionally omitted due to copyright concerns
             publisher: nautiljonResult.publisher,
             source: 'nautiljon',
           };
@@ -234,7 +258,33 @@ export class MangaVolumesService {
       }
     }
 
-    // ===== Nautiljon candidate =====
+    // ===== MangaCollec candidate =====
+    for (const title of uniqueTitles.slice(0, 1)) {
+      try {
+        const mcResult = await this.mangaCollecService.searchVolume(title, volumeNumber);
+        if (mcResult && (mcResult.isbn || mcResult.releaseDate || mcResult.coverUrl)) {
+          sources.push('mangacollec');
+          const isDuplicate = allCandidates.some(
+            existing => existing.isbn && existing.isbn === mcResult.isbn
+          );
+          if (!isDuplicate) {
+            allCandidates.push({
+              volumeNumber: mcResult.volumeNumber,
+              title: `Volume ${mcResult.volumeNumber || volumeNumber}`,
+              isbn: mcResult.isbn,
+              releaseDate: mcResult.releaseDate,
+              coverUrl: mcResult.coverUrl,
+              publisher: mcResult.publisher,
+              source: 'mangacollec',
+            });
+          }
+        }
+      } catch (error) {
+        this.logger.warn(`[MangaCollec] Candidates search failed for "${title}": ${error.message}`);
+      }
+    }
+
+    // ===== Nautiljon candidate (fallback) =====
     for (const title of uniqueTitles.slice(0, 1)) {
       try {
         const nautiljonResult = await this.nautiljonService.searchVolume(title, volumeNumber);
@@ -246,11 +296,10 @@ export class MangaVolumesService {
           if (!isDuplicate) {
             allCandidates.push({
               volumeNumber: nautiljonResult.volumeNumber,
-              title: `Volume ${nautiljonResult.volumeNumber || volumeNumber}`, // Simple title without copyright content
+              title: `Volume ${nautiljonResult.volumeNumber || volumeNumber}`,
               isbn: nautiljonResult.isbn,
               releaseDate: nautiljonResult.releaseDate,
               coverUrl: nautiljonResult.coverUrl,
-              // Note: description intentionally omitted due to copyright concerns
               publisher: nautiljonResult.publisher,
               source: 'nautiljon',
             });
@@ -475,10 +524,36 @@ export class MangaVolumesService {
 
         const uniqueTitles = [...new Set(titlesToTry)] as string[];
 
-        // Start bulk scrape
+        // Start bulk scrape — try MangaCollec first, then Nautiljon
         for (const title of uniqueTitles) {
           if (!title) continue;
-          this.logger.debug(`Attempting bulk scrape for "${title}"...`);
+
+          // Try MangaCollec first
+          this.logger.debug(`Attempting MangaCollec bulk fetch for "${title}"...`);
+          try {
+            const mcResults = await this.mangaCollecService.getSeriesVolumes(title);
+            if (mcResults && mcResults.length > 0) {
+              if (options.filterDate) {
+                const filterMonth = options.filterDate.getMonth();
+                const filterYear = options.filterDate.getFullYear();
+                bulkVolumes = mcResults.filter(v => {
+                  if (!v.releaseDate) return false;
+                  const d = new Date(v.releaseDate);
+                  return d.getMonth() === filterMonth && d.getFullYear() === filterYear;
+                });
+                this.logger.log(`MangaCollec found ${mcResults.length} total, filtered to ${bulkVolumes.length}`);
+              } else {
+                bulkVolumes = mcResults;
+                this.logger.log(`MangaCollec bulk fetch successful for "${title}": found ${mcResults.length} volumes`);
+              }
+              break;
+            }
+          } catch (e) {
+            this.logger.warn(`MangaCollec bulk fetch failed for "${title}": ${e.message}`);
+          }
+
+          // Fallback to Nautiljon scraping
+          this.logger.debug(`Attempting Nautiljon bulk scrape for "${title}"...`);
           const results = await this.nautiljonService.scrapeVolumeList(title);
 
           if (results && results.length > 0) {
