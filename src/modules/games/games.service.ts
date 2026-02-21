@@ -13,7 +13,7 @@ export class GamesService {
      * Gets today's game ID/number based on a reference date.
      */
     getGameNumber(): number {
-        const epoch = new Date('2024-01-01').getTime();
+        const epoch = new Date('2026-02-20').getTime();
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         return Math.floor((today.getTime() - epoch) / (24 * 60 * 60 * 1000));
