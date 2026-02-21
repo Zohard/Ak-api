@@ -6,6 +6,7 @@ import { AdminModerationService } from './moderation/admin-moderation.service';
 
 // Simple in-memory cache for dashboard stats
 let dashboardCache: { data: any; timestamp: number } | null = null;
+let dashboardPromise: Promise<any> | null = null;
 const CACHE_TTL_MS = 60000; // 1 minute
 
 // Separate cache for chart data (longer TTL since historical data changes slowly)
@@ -27,33 +28,46 @@ export class AdminService {
       return dashboardCache.data;
     }
 
-    // Run ALL queries in parallel for faster response
-    const [
-      userStats,
-      contentStats,
-      moderationStats,
-      recentActivity,
-      systemHealth,
-    ] = await Promise.all([
-      this.adminUsersService.getUserStats(),
-      this.adminContentService.getContentStats(),
-      this.adminModerationService.getModerationStats(),
-      this.getRecentActivityFast(),
-      this.getSystemHealthFast(),
-    ]);
+    // Dedup concurrent requests (cache stampede protection)
+    if (dashboardPromise) {
+      return dashboardPromise;
+    }
 
-    const result = {
-      users: userStats,
-      content: contentStats,
-      moderation: moderationStats,
-      recent_activity: recentActivity,
-      system_health: systemHealth,
-    };
+    dashboardPromise = (async () => {
+      try {
+        // Run ALL queries in parallel for faster response
+        const [
+          userStats,
+          contentStats,
+          moderationStats,
+          recentActivity,
+          systemHealth,
+        ] = await Promise.all([
+          this.adminUsersService.getUserStats(),
+          this.adminContentService.getContentStats(),
+          this.adminModerationService.getModerationStats(),
+          this.getRecentActivityFast(),
+          this.getSystemHealthFast(),
+        ]);
 
-    // Update cache
-    dashboardCache = { data: result, timestamp: Date.now() };
+        const result = {
+          users: userStats,
+          content: contentStats,
+          moderation: moderationStats,
+          recent_activity: recentActivity,
+          system_health: systemHealth,
+        };
 
-    return result;
+        // Update cache
+        dashboardCache = { data: result, timestamp: Date.now() };
+
+        return result;
+      } finally {
+        dashboardPromise = null;
+      }
+    })();
+
+    return dashboardPromise;
   }
 
   async getChartData(refresh = false) {

@@ -325,6 +325,53 @@ export class CronService {
     }
   }
   /**
+   * Update manga volume counts
+   * Updates `nb_vol` in `ak_mangas` based on MAX(volume_number) in `manga_volumes`
+   * Only updates when the stored count is lower than the actual max to avoid overwriting manual edits
+   */
+  async updateMangaVolumeCount() {
+    this.logger.log('Starting manga volume count update...');
+
+    try {
+      const updateResult = await this.prisma.$executeRaw`
+        WITH volume_counts AS (
+          SELECT
+            id_manga,
+            MAX(volume_number) AS max_volume
+          FROM manga_volumes
+          GROUP BY id_manga
+        )
+        UPDATE ak_mangas m
+        SET nb_vol = vc.max_volume
+        FROM volume_counts vc
+        WHERE m.id_manga = vc.id_manga
+        AND (m.nb_vol IS NULL OR vc.max_volume > m.nb_vol)
+      `;
+
+      this.logger.log(`Updated nb_vol for ${updateResult} mangas`);
+
+      if (updateResult > 0) {
+        await this.cacheService.delByPattern('manga:*');
+      }
+
+      return {
+        success: true,
+        message: `Updated volume count for ${updateResult} mangas`,
+        stats: {
+          updatedCount: updateResult,
+          errorCount: 0,
+        },
+      };
+    } catch (error) {
+      this.logger.error(
+        `Fatal error in manga volume count update: ${error.message}`,
+        error.stack,
+      );
+      throw error;
+    }
+  }
+
+  /**
    * Update anime episode counts
    * Updates `nb_ep` in `ak_animes` based on count in `ak_animes_episodes`
    */

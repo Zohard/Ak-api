@@ -437,6 +437,36 @@ export class JobsCronController {
         }
     }
 
+    @Post('general/manga-volume-count')
+    @UseGuards(OptionalJwtAuthGuard, CronAuthGuard)
+    @ApiHeader({
+        name: 'x-cron-api-key',
+        description: 'API Key for external cron jobs',
+        required: false,
+    })
+    @ApiOperation({ summary: 'Update manga nb_vol from actual volume records (only if higher)' })
+    @ApiResponse({ status: 200, description: 'Manga volume count updated' })
+    async triggerMangaVolumeCount() {
+        try {
+            const result = await this.cronService.updateMangaVolumeCount();
+            return {
+                success: true,
+                job: 'manga-volume-count',
+                message: result.message,
+                stats: result.stats,
+                timestamp: new Date().toISOString(),
+            };
+        } catch (error) {
+            this.logger.error(`Manga volume count job failed: ${error.message}`, error.stack);
+            return {
+                success: false,
+                job: 'manga-volume-count',
+                message: `Job failed: ${error.message}`,
+                timestamp: new Date().toISOString(),
+            };
+        }
+    }
+
     @Post('rankings/weekly')
     @UseGuards(OptionalJwtAuthGuard, CronAuthGuard)
     @ApiHeader({

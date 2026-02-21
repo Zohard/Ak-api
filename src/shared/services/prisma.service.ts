@@ -73,7 +73,7 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
           // Railway hobby plan has limited connections (~20 total)
           // Use 5 connections - enough for ~30 concurrent users with fast queries
           if (!params.has('connection_limit')) {
-            params.set('connection_limit', '3');
+            params.set('connection_limit', '5');
           }
           // Shorter timeouts for Railway's fast network
           params.set('pool_timeout', '10');
