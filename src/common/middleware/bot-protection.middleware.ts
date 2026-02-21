@@ -107,6 +107,13 @@ export class BotProtectionMiddleware implements NestMiddleware {
     const ua = req.headers['user-agent'] || '';
     const ip = this.getClientIp(req);
 
+    // 0. Always allow internal/localhost requests (Nuxt SSR proxy, health checks)
+    const rawIp = req.ip || req.socket?.remoteAddress || '';
+    if (rawIp === '127.0.0.1' || rawIp === '::1' || rawIp === '::ffff:127.0.0.1') {
+      next();
+      return;
+    }
+
     // 1. Block empty user-agents (almost always bots)
     if (!ua || ua.trim() === '') {
       res.status(403).json({ statusCode: 403, message: 'Forbidden' });

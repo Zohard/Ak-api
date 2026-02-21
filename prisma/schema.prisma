@@ -88,6 +88,7 @@ model SmfMember {
   socialLikes      AkSocialLike[]
   socialComments   AkSocialComment[]
   gameScores       AkGuessGameScore[] @relation("UserGameScores")
+  gameScoresJeux   AkGuessGameScoreJeux[] @relation("UserGameScoresJeux")
 
   // Forum relations
   messages         SmfMessage[] @relation("MessageAuthor")
@@ -1616,4 +1617,22 @@ model AkGuessGameScore {
   @@index([userId])
   @@index([gameNumber])
   @@map("ak_guess_game_scores")
+}
+
+model AkGuessGameScoreJeux {
+  id          Int      @id @default(autoincrement())
+  userId      Int      @map("user_id")
+  gameNumber  Int      @map("game_number")
+  attempts    Int
+  isWon       Boolean  @default(false) @map("is_won")
+  guesses     Json     @db.JsonB
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  user        SmfMember @relation("UserGameScoresJeux", fields: [userId], references: [idMember], onDelete: Cascade)
+
+  @@unique([userId, gameNumber])
+  @@index([userId])
+  @@index([gameNumber])
+  @@map("ak_guess_game_scores_jeux")
 }

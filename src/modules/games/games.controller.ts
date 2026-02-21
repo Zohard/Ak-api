@@ -52,12 +52,40 @@ export class GamesController {
         @Body('animeId') animeId: number,
         @Req() req: any,
     ) {
-        // If user is authenticated, passport-jwt will put 'user' on req even if guard didn't block
-        // (Assuming JwtAuthGuard is globally applied or used elsewhere to populate req.user,
-        // but here it's safer to just check if repo.user exists if we want it optional).
-        // For simple implementation, let's just use useGuards if we want it strictly for logged in users
-        // but we want both. So we check if user is in request.
         const userId = req.user?.id;
         return this.gamesService.compareGuess(animeId, userId);
+    }
+
+    // ─── Jeux-Vidéo Guess Game ───────────────────────────────────────────────
+
+    @Get('jeux/daily')
+    @ApiOperation({ summary: "Get today's jeux-vidéo game metadata" })
+    async getDailyMetadataJeux() {
+        const gameNumber = this.gamesService.getGameNumber();
+        return { gameNumber, title: `Ani-Kun Guess Jeux #${gameNumber}` };
+    }
+
+    @Get('jeux/state')
+    @UseGuards(JwtAuthGuard)
+    @ApiOperation({ summary: "Get user's daily jeux game state" })
+    async getGameStateJeux(@CurrentUser() user: CurrentUserData) {
+        return this.gamesService.getFullGameStateJeux(user.id);
+    }
+
+    @Get('jeux/hint')
+    @ApiOperation({ summary: 'Get a hint for the daily jeu' })
+    async getHintJeux(@Query('attempts') attempts: number) {
+        return this.gamesService.getHintJeux(attempts);
+    }
+
+    @Post('jeux/guess')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({ summary: 'Submit a jeu-vidéo guess' })
+    async submitGuessJeux(
+        @Body('jeuId') jeuId: number,
+        @Req() req: any,
+    ) {
+        const userId = req.user?.id;
+        return this.gamesService.compareGuessJeux(jeuId, userId);
     }
 }

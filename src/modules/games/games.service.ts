@@ -270,4 +270,190 @@ export class GamesService {
             return char; // Keep spaces, dashes, etc.
         }).join(' ');
     }
+
+    // ════════════════════════════════════════════════════════
+    //  JEUX-VIDÉO GUESS GAME
+    // ════════════════════════════════════════════════════════
+
+    /**
+     * Fetches the daily target video game (platform/year/genres/editeur/studio).
+     */
+    async getDailyTargetJeux() {
+        const gameNumber = this.getGameNumber();
+
+        const candidates = await this.prisma.akJeuxVideo.findMany({
+            where: {
+                statut: 1,
+                annee: { gt: 0 },
+                editeur: { not: null },
+            },
+            select: { idJeu: true },
+            orderBy: { idJeu: 'asc' },
+        });
+
+        if (candidates.length === 0) {
+            throw new NotFoundException('Aucun jeu candidat trouvé pour le jeu');
+        }
+
+        const index = gameNumber % candidates.length;
+        const targetId = candidates[index].idJeu;
+
+        return this.getJeuForGuess(targetId);
+    }
+
+    /**
+     * Fetches a video game with all fields needed for comparison.
+     */
+    private async getJeuForGuess(id: number) {
+        const item = await this.prisma.akJeuxVideo.findUnique({
+            where: { idJeu: id, statut: 1 },
+            select: {
+                idJeu: true,
+                titre: true,
+                image: true,
+                niceUrl: true,
+                annee: true,
+                editeur: true,
+                developpeur: true,
+                platforms: {
+                    select: {
+                        platform: { select: { name: true, shortName: true } }
+                    },
+                    orderBy: { isPrimary: 'desc' },
+                },
+                genres: {
+                    select: {
+                        genre: { select: { nameFr: true, name: true } }
+                    }
+                },
+            },
+        });
+
+        if (!item) throw new NotFoundException('Jeu vidéo introuvable');
+        return item;
+    }
+
+    /**
+     * Compares a guessed video game against the daily target.
+     */
+    async compareGuessJeux(jeuId: number, userId?: number) {
+        const target = await this.getDailyTargetJeux();
+        const guess = await this.getJeuForGuess(jeuId);
+
+        const guessPlatforms = (guess.platforms || []).map(p => p.platform?.shortName || p.platform?.name).filter(Boolean);
+        const targetPlatforms = (target.platforms || []).map(p => p.platform?.shortName || p.platform?.name).filter(Boolean);
+
+        const guessGenres = (guess.genres || []).map(g => g.genre?.nameFr || g.genre?.name).filter(Boolean);
+        const targetGenres = (target.genres || []).map(g => g.genre?.nameFr || g.genre?.name).filter(Boolean);
+
+        const result = {
+            jeu: {
+                id: guess.idJeu,
+                titre: guess.titre,
+                image: guess.image,
+                niceUrl: guess.niceUrl ?? null,
+            },
+            comparison: {
+                platform: this.compareStringArrays(guessPlatforms, targetPlatforms),
+                year: this.compareYear(guess.annee, target.annee),
+                genres: this.compareStringArrays(guessGenres, targetGenres),
+                editeur: this.compareValue(guess.editeur, target.editeur),
+                developpeur: this.compareValue(guess.developpeur, target.developpeur),
+            },
+            isCorrect: guess.idJeu === target.idJeu,
+        };
+
+        if (userId) {
+            const gameNumber = this.getGameNumber();
+            const existing = await this.getUserScoreJeux(userId, gameNumber);
+            const guesses = existing ? [...(existing.guesses as any[]), result] : [result];
+            await this.saveScoreJeux(userId, gameNumber, guesses, result.isCorrect);
+            const streak = await this.getUserStreakJeux(userId);
+            return { ...result, streak };
+        }
+
+        return result;
+    }
+
+    async saveScoreJeux(userId: number, gameNumber: number, guesses: any[], isWon: boolean) {
+        return this.prisma.akGuessGameScoreJeux.upsert({
+            where: { userId_gameNumber: { userId, gameNumber } },
+            update: { attempts: guesses.length, isWon, guesses },
+            create: { userId, gameNumber, attempts: guesses.length, isWon, guesses },
+        });
+    }
+
+    async getUserScoreJeux(userId: number, gameNumber: number) {
+        return this.prisma.akGuessGameScoreJeux.findUnique({
+            where: { userId_gameNumber: { userId, gameNumber } },
+        });
+    }
+
+    async getUserStreakJeux(userId: number): Promise<number> {
+        const scores = await this.prisma.akGuessGameScoreJeux.findMany({
+            where: { userId },
+            orderBy: { gameNumber: 'desc' },
+            select: { gameNumber: true, isWon: true, attempts: true },
+        });
+
+        if (scores.length === 0) return 0;
+
+        const currentGame = this.getGameNumber();
+        let streak = 0;
+        let expectedGame = currentGame;
+
+        for (const score of scores) {
+            if (score.gameNumber > currentGame) continue;
+            if (score.gameNumber === currentGame && !score.isWon && score.attempts < 10) {
+                expectedGame = currentGame - 1;
+                continue;
+            }
+            if (score.gameNumber !== expectedGame) break;
+            if (!score.isWon) { streak = 0; break; }
+            streak++;
+            expectedGame--;
+        }
+
+        return streak;
+    }
+
+    async getFullGameStateJeux(userId: number) {
+        const gameNumber = this.getGameNumber();
+        const [score, streak] = await Promise.all([
+            this.getUserScoreJeux(userId, gameNumber),
+            this.getUserStreakJeux(userId),
+        ]);
+        return { ...score, streak };
+    }
+
+    async getHintJeux(attempts: number) {
+        const target = await this.getDailyTargetJeux();
+        const hints: any = {};
+
+        if (attempts >= 3) {
+            hints.firstLetter = target.titre?.charAt(0) || '';
+        }
+        if (attempts >= 5) {
+            hints.platforms = (target.platforms || []).map(p => p.platform?.shortName || p.platform?.name).filter(Boolean);
+        }
+        if (attempts >= 8) {
+            hints.maskedTitle = this.generateMaskedTitle(target.titre, true);
+        }
+        if (attempts >= 10) {
+            hints.answer = target.titre;
+        }
+
+        return hints;
+    }
+
+    private compareStringArrays(guess: string[], target: string[]) {
+        const common = guess.filter(v => target.includes(v));
+        if (common.length === target.length && guess.length === target.length) {
+            return { status: 'correct', common };
+        }
+        if (common.length > 0) {
+            return { status: 'partial', common };
+        }
+        return { status: 'incorrect', common: [] };
+    }
 }
