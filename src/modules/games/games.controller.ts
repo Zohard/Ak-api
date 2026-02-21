@@ -12,6 +12,7 @@ import {
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { GamesService } from './games.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { OptionalJwtAuthGuard } from '../../common/guards/optional-jwt-auth.guard';
 import { CurrentUser, CurrentUserData } from '../auth/decorators/current-user.decorator';
 
 @ApiTags('Games')
@@ -38,10 +39,13 @@ export class GamesController {
     }
 
     @Get('anime/hint')
+    @UseGuards(OptionalJwtAuthGuard)
     @ApiOperation({ summary: 'Get a hint for the daily anime' })
     @ApiResponse({ status: 200, description: 'Hint retrieved successfully' })
-    async getHint(@Query('attempts') attempts: number) {
-        return this.gamesService.getHint(attempts);
+    async getHint(@Query('attempts') attempts: number, @Req() req: any) {
+        const userId = req.user?.id;
+        const safeAttempts = await this.gamesService.resolveAttempts(attempts, userId, 'anime');
+        return this.gamesService.getHint(safeAttempts);
     }
 
     @Post('anime/guess')
@@ -73,9 +77,12 @@ export class GamesController {
     }
 
     @Get('jeux/hint')
+    @UseGuards(OptionalJwtAuthGuard)
     @ApiOperation({ summary: 'Get a hint for the daily jeu' })
-    async getHintJeux(@Query('attempts') attempts: number) {
-        return this.gamesService.getHintJeux(attempts);
+    async getHintJeux(@Query('attempts') attempts: number, @Req() req: any) {
+        const userId = req.user?.id;
+        const safeAttempts = await this.gamesService.resolveAttempts(attempts, userId, 'jeux');
+        return this.gamesService.getHintJeux(safeAttempts);
     }
 
     @Post('jeux/guess')

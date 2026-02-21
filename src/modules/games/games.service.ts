@@ -192,6 +192,22 @@ export class GamesService {
     }
 
     /**
+     * Resolves the number of attempts to use for hint generation.
+     * - Authenticated users: use their actual DB attempt count (tamper-proof).
+     * - Anonymous users: use client-provided value, capped at 9 (answer never leaked).
+     */
+    async resolveAttempts(clientAttempts: number, userId: number | undefined, game: 'anime' | 'jeux'): Promise<number> {
+        if (userId) {
+            const gameNumber = this.getGameNumber();
+            const score = game === 'anime'
+                ? await this.getUserScore(userId, gameNumber)
+                : await this.getUserScoreJeux(userId, gameNumber);
+            return score?.attempts ?? 0;
+        }
+        return Math.min(Number(clientAttempts) || 0, 9);
+    }
+
+    /**
      * Returns today's game score enriched with the user's current streak.
      */
     async getFullGameState(userId: number) {
