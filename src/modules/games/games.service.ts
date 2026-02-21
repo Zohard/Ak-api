@@ -225,12 +225,20 @@ export class GamesService {
             hints.firstLetter = target.titre?.charAt(0) || '';
         }
 
-        if (attempts >= 5) {
+        if (attempts >= 4) {
+            hints.maskedTitle = this.generateMaskedTitle(target.titre, 1);
+        }
+
+        if (attempts >= 6) {
             hints.tags = (target.tags || []).map(t => t.tag_name).filter(Boolean);
         }
 
         if (attempts >= 8) {
-            hints.maskedTitle = this.generateMaskedTitle(target.titre, true);
+            hints.maskedTitle = this.generateMaskedTitle(target.titre, 2);
+        }
+
+        if (attempts >= 9) {
+            hints.maskedTitle = this.generateMaskedTitle(target.titre, 3);
         }
 
         if (attempts >= 10) {
@@ -240,34 +248,34 @@ export class GamesService {
         return hints;
     }
 
-    private generateMaskedTitle(title: string, revealRandomLetter: boolean): string {
+    private generateMaskedTitle(title: string, revealCount: number): string {
         if (!title) return '';
 
         const chars = title.split('');
-        const firstLetter = chars[0];
 
-        // Define indices that can be revealed (alphanumeric, not space, not the first letter)
-        const revealableIndices = [];
+        // Collect indices that can be revealed (alphanumeric, not the first letter)
+        const revealableIndices: number[] = [];
         for (let i = 1; i < chars.length; i++) {
             if (/[a-zA-Z0-9]/.test(chars[i])) {
                 revealableIndices.push(i);
             }
         }
 
-        let randomRevealIndex = -1;
-        if (revealRandomLetter && revealableIndices.length > 0) {
-            // Use date-based seed for stability if possible, but for a "hint" random is often fine.
-            // However, to keep it consistent for the user during the same day, we could seed it.
-            const seed = this.getGameNumber() + title.length;
-            const pseudoRandom = (Math.sin(seed) + 1) / 2;
-            randomRevealIndex = revealableIndices[Math.floor(pseudoRandom * revealableIndices.length)];
-        }
+        // Pick indices deterministically using a seeded shuffle so hints are
+        // consistent for the same game number across users and page reloads.
+        const seed = this.getGameNumber() + title.length;
+        const shuffled = [...revealableIndices].sort((a, b) => {
+            const ra = (Math.sin(seed * a + 1) + 1) / 2;
+            const rb = (Math.sin(seed * b + 1) + 1) / 2;
+            return ra - rb;
+        });
+        const revealedSet = new Set(shuffled.slice(0, revealCount));
 
         return chars.map((char, index) => {
             if (index === 0) return char;
-            if (index === randomRevealIndex) return char;
+            if (revealedSet.has(index)) return char;
             if (/[a-zA-Z0-9]/.test(char)) return '_';
-            return char; // Keep spaces, dashes, etc.
+            return char;
         }).join(' ');
     }
 
@@ -433,11 +441,17 @@ export class GamesService {
         if (attempts >= 3) {
             hints.firstLetter = target.titre?.charAt(0) || '';
         }
-        if (attempts >= 5) {
+        if (attempts >= 4) {
+            hints.maskedTitle = this.generateMaskedTitle(target.titre, 1);
+        }
+        if (attempts >= 6) {
             hints.platforms = (target.platforms || []).map(p => p.platform?.shortName || p.platform?.name).filter(Boolean);
         }
         if (attempts >= 8) {
-            hints.maskedTitle = this.generateMaskedTitle(target.titre, true);
+            hints.maskedTitle = this.generateMaskedTitle(target.titre, 2);
+        }
+        if (attempts >= 9) {
+            hints.maskedTitle = this.generateMaskedTitle(target.titre, 3);
         }
         if (attempts >= 10) {
             hints.answer = target.titre;
