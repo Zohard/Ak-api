@@ -51,6 +51,24 @@ export class GamesService {
     /**
      * Compares a guessed anime with the daily target and optionally saves progress.
      */
+    /**
+     * Returns true if two animes share the same franchise group (ak_fiche_to_fiche)
+     * AND have the same format — e.g. two films from the same series.
+     */
+    private async areRelatedAnimes(guessId: number, targetId: number, guessFormat: string | null, targetFormat: string | null): Promise<boolean> {
+        if (!guessFormat || !targetFormat || guessFormat !== targetFormat) return false;
+
+        const rows = await this.prisma.akFicheToFiche.findMany({
+            where: { idAnime: { in: [guessId, targetId] } },
+            select: { idFicheDepart: true, idAnime: true },
+        });
+
+        const guessGroups = new Set(rows.filter(r => r.idAnime === guessId).map(r => r.idFicheDepart));
+        const targetGroups = rows.filter(r => r.idAnime === targetId).map(r => r.idFicheDepart);
+
+        return targetGroups.some(g => guessGroups.has(g));
+    }
+
     async compareGuess(animeId: number, userId?: number) {
         const target = await this.getDailyTarget();
         const guess = await this.animesService.findOne(animeId);
@@ -58,6 +76,9 @@ export class GamesService {
         if (!guess) {
             throw new NotFoundException('Anime deviné introuvable');
         }
+
+        const isCorrect = guess.id === target.id ||
+            await this.areRelatedAnimes(guess.id, target.id, guess.format, target.format);
 
         const result = {
             anime: {
@@ -73,7 +94,7 @@ export class GamesService {
                 episodes: this.compareEpisodes(guess.nbEp, target.nbEp),
                 tags: this.compareTags(guess.tags, target.tags),
             },
-            isCorrect: guess.id === target.id,
+            isCorrect,
         };
 
         // If user is logged in, sync with database and return streak
