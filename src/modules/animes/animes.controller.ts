@@ -222,6 +222,7 @@ export class AnimesController {
     @Query('exclude') exclude?: string,
     @Query('limit') limit?: string,
     @Query('notInCollection') notInCollection?: string,
+    @Query('formatExclude') formatExclude?: string,
     @Request() req?: any,
   ) {
     const parsedLimit = limit ? parseInt(limit) : 10;
@@ -233,6 +234,7 @@ export class AnimesController {
       exclude,
       parsedLimit,
       shouldExcludeCollection ? userId : undefined,
+      formatExclude,
     );
   }
 

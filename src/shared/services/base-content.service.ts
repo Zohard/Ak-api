@@ -103,6 +103,7 @@ export abstract class BaseContentService<T, CreateDto, UpdateDto, QueryDto> {
     exclude?: string,
     limit = 10,
     userId?: number,
+    formatExclude?: string,
   ) {
     if (!query || query.length < 2) {
       return { data: [] };
@@ -157,6 +158,13 @@ export abstract class BaseContentService<T, CreateDto, UpdateDto, QueryDto> {
       excludeClause = `AND ${idCol} NOT IN (${excludeIds.join(',')})`;
     }
 
+    // Build format exclusion clause
+    let formatExcludeClause = '';
+    if (formatExclude) {
+      const formats = formatExclude.split(',').map(f => `'${f.trim().replace(/'/g, "''")}'`).join(',');
+      formatExcludeClause = `AND (format IS NULL OR format NOT IN (${formats}))`;
+    }
+
     // Use raw SQL with unaccent for accent-insensitive search
     const items: any[] = await this.prisma.$queryRawUnsafe(`
       SELECT *
@@ -165,6 +173,7 @@ export abstract class BaseContentService<T, CreateDto, UpdateDto, QueryDto> {
       AND (unaccent(titre) ILIKE unaccent($1)
            OR unaccent(COALESCE(titre_orig, '')) ILIKE unaccent($1))
       ${excludeClause}
+      ${formatExcludeClause}
       ORDER BY titre ASC
       LIMIT ${limit * 3}
     `, searchTerm);
