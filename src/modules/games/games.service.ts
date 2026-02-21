@@ -64,6 +64,7 @@ export class GamesService {
                 id: guess.id,
                 titre: guess.titre,
                 image: guess.image,
+                niceUrl: (guess as any).niceUrl ?? null,
             },
             comparison: {
                 year: this.compareYear(guess.annee, target.annee),
@@ -75,13 +76,16 @@ export class GamesService {
             isCorrect: guess.id === target.id,
         };
 
-        // If user is logged in, sync with database
+        // If user is logged in, sync with database and return streak
         if (userId) {
             const gameNumber = this.getGameNumber();
             const existing = await this.getUserScore(userId, gameNumber);
 
             const guesses = existing ? [...(existing.guesses as any[]), result] : [result];
             await this.saveScore(userId, gameNumber, guesses, result.isCorrect);
+
+            const streak = await this.getUserStreak(userId);
+            return { ...result, streak };
         }
 
         return result;
@@ -119,6 +123,63 @@ export class GamesService {
                 userId_gameNumber: { userId, gameNumber },
             },
         });
+    }
+
+    /**
+     * Calculates the user's current win streak.
+     * A game is "lost" when attempts >= 10 and isWon is false — streak resets to 0.
+     * An ongoing game (attempts < 10, not yet won) is excluded from the streak count.
+     */
+    async getUserStreak(userId: number): Promise<number> {
+        const scores = await this.prisma.akGuessGameScore.findMany({
+            where: { userId },
+            orderBy: { gameNumber: 'desc' },
+            select: { gameNumber: true, isWon: true, attempts: true },
+        });
+
+        if (scores.length === 0) return 0;
+
+        const currentGame = this.getGameNumber();
+        let streak = 0;
+        // Start expecting the current game; if it's still ongoing we'll skip to yesterday
+        let expectedGame = currentGame;
+
+        for (const score of scores) {
+            // Ignore future game numbers (shouldn't happen, but be safe)
+            if (score.gameNumber > currentGame) continue;
+
+            // If today's game is still in progress, don't count it yet
+            if (score.gameNumber === currentGame && !score.isWon && score.attempts < 10) {
+                expectedGame = currentGame - 1;
+                continue;
+            }
+
+            // Gap in days — streak is broken
+            if (score.gameNumber !== expectedGame) break;
+
+            // Lost this game → streak resets to 0 and stops
+            if (!score.isWon) {
+                streak = 0;
+                break;
+            }
+
+            streak++;
+            expectedGame--;
+        }
+
+        return streak;
+    }
+
+    /**
+     * Returns today's game score enriched with the user's current streak.
+     */
+    async getFullGameState(userId: number) {
+        const gameNumber = this.getGameNumber();
+        const [score, streak] = await Promise.all([
+            this.getUserScore(userId, gameNumber),
+            this.getUserStreak(userId),
+        ]);
+        return { ...score, streak };
     }
 
     private compareYear(guess: number, target: number) {

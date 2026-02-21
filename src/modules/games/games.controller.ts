@@ -32,10 +32,9 @@ export class GamesController {
 
     @Get('anime/state')
     @UseGuards(JwtAuthGuard)
-    @ApiOperation({ summary: "Get user's daily game state" })
+    @ApiOperation({ summary: "Get user's daily game state including current streak" })
     async getGameState(@CurrentUser() user: CurrentUserData) {
-        const gameNumber = this.gamesService.getGameNumber();
-        return this.gamesService.getUserScore(user.id, gameNumber);
+        return this.gamesService.getFullGameState(user.id);
     }
 
     @Get('anime/hint')

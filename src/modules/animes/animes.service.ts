@@ -18,6 +18,7 @@ import { R2Service } from '../media/r2.service';
 import { AniListService } from '../anilist/anilist.service';
 import { Prisma } from '@prisma/client';
 import { hasAdminAccess } from '../../shared/constants/rbac.constants';
+import { decodeHTMLEntities } from '../../shared/utils/text.util';
 import { AnimeRelationsService } from './services/anime-relations.service';
 import { AnimeStaffService } from './services/anime-staff.service';
 import { AnimeTrailersService } from './services/anime-trailers.service';
@@ -955,7 +956,7 @@ export class AnimesService extends BaseContentService<
   }
 
   private formatAnime(anime: any, season?: any, tags?: any[]) {
-    const { idAnime, dateAjout, image, lienForum, businessRelations, studio: dbStudio, dateDiffusion, ...otherFields } = anime;
+    const { idAnime, dateAjout, image, lienForum, businessRelations, studio: dbStudio, dateDiffusion, titre, ...otherFields } = anime;
 
     // Find studio ID and name from business relations
     let idStudio = null;
@@ -987,6 +988,7 @@ export class AnimesService extends BaseContentService<
 
     return {
       id: idAnime,
+      titre: decodeHTMLEntities(titre) as string,
       addedDate: dateAjout?.toISOString(),
       image: image ? (typeof image === 'string' && /^https?:\/\//.test(image) ? image : `/api/media/serve/anime/${image}`) : null,
       lienforum: lienForum || null,
