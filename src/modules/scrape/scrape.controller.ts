@@ -32,4 +32,15 @@ export class ScrapeController {
   ) {
     return this.scrapeService.scrapeMangaCollecPlanning(year, month);
   }
+
+  @Get('booknode-planning')
+  @ApiOperation({ summary: 'Scrape manga release planning from Booknode' })
+  @ApiQuery({ name: 'year', description: 'Year (e.g. 2026)', required: true })
+  @ApiQuery({ name: 'month', description: 'Month (1-12)', required: true })
+  async scrapeBooknodePlanning(
+    @Query('year', ParseIntPipe) year: number,
+    @Query('month', ParseIntPipe) month: number,
+  ) {
+    return this.scrapeService.scrapeBooknodeManga(year, month);
+  }
 }
