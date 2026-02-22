@@ -1355,12 +1355,18 @@ export class MangasService extends BaseContentService<
         let volumeNumber: number | null = null;
 
         if (existing) {
-          // Extract volume number from title
-          // Support formats: "Tome 12", "Vol. 12", " #12", or just " 12" at the end
-          const volumeMatch = booknodeManga.titre.match(/(?:Tome|Volume|Vol\.?|T\.?)\s+(\d+)|(?:\s+#?(\d+))$/i);
-          if (volumeMatch) {
-            volumeNumber = parseInt(volumeMatch[1] || volumeMatch[2], 10);
+          // Prefer direct number field (MangaCollec), fallback to regex extraction from title
+          if (booknodeManga.number != null) {
+            volumeNumber = booknodeManga.number;
+          } else {
+            // Support formats: "Tome 12", "Vol. 12", " #12", or just " 12" at the end
+            const volumeMatch = booknodeManga.titre.match(/(?:Tome|Volume|Vol\.?|T\.?)\s+(\d+)|(?:\s+#?(\d+))$/i);
+            if (volumeMatch) {
+              volumeNumber = parseInt(volumeMatch[1] || volumeMatch[2], 10);
+            }
+          }
 
+          if (volumeNumber != null) {
             // Check if volume exists in database
             const volume = await this.prisma.mangaVolume.findFirst({
               where: {
