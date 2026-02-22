@@ -162,4 +162,45 @@ export class GamesController {
         const userId = req.user?.id;
         return this.gamesService.compareGuessScreenshot(animeId, userId, gameNumber);
     }
+
+    // ─── Manga Guess Game ────────────────────────────────────────────────────
+
+    @Get('manga/daily')
+    @ApiOperation({ summary: "Get today's manga game metadata" })
+    async getDailyMetadataManga(@Query('gameNumber') rawGn?: string) {
+        const gameNumber = this.parseGameNumber(rawGn) ?? this.gamesService.getGameNumber();
+        return { gameNumber, title: `Ani-Kun Guess Manga #${gameNumber}` };
+    }
+
+    @Get('manga/state')
+    @UseGuards(JwtAuthGuard)
+    @ApiOperation({ summary: "Get user's daily manga game state" })
+    async getGameStateManga(@CurrentUser() user: CurrentUserData, @Query('gameNumber') rawGn?: string) {
+        const gameNumber = this.parseGameNumber(rawGn);
+        return this.gamesService.getFullGameStateManga(user.id, gameNumber);
+    }
+
+    @Get('manga/hint')
+    @UseGuards(OptionalJwtAuthGuard)
+    @ApiOperation({ summary: 'Get a hint for the daily manga' })
+    async getHintManga(@Query('attempts') attempts: number, @Query('gameNumber') rawGn: string, @Req() req: any) {
+        const gameNumber = this.parseGameNumber(rawGn);
+        const userId = req.user?.id;
+        const safeAttempts = await this.gamesService.resolveAttempts(attempts, userId, 'manga', gameNumber);
+        return this.gamesService.getHintManga(safeAttempts, gameNumber);
+    }
+
+    @Post('manga/guess')
+    @HttpCode(HttpStatus.OK)
+    @UseGuards(OptionalJwtAuthGuard)
+    @ApiOperation({ summary: 'Submit a manga guess' })
+    async submitGuessManga(
+        @Body('mangaId') mangaId: number,
+        @Body('gameNumber') rawGn: any,
+        @Req() req: any,
+    ) {
+        const gameNumber = this.parseGameNumber(rawGn);
+        const userId = req.user?.id;
+        return this.gamesService.compareGuessManga(mangaId, userId, gameNumber);
+    }
 }

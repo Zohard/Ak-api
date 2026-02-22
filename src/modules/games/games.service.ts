@@ -206,12 +206,13 @@ export class GamesService {
      * - Authenticated users: use their actual DB attempt count (tamper-proof).
      * - Anonymous users: use client-provided value, capped at 9 (answer never leaked).
      */
-    async resolveAttempts(clientAttempts: number, userId: number | undefined, game: 'anime' | 'jeux' | 'screenshot', forGameNumber?: number): Promise<number> {
+    async resolveAttempts(clientAttempts: number, userId: number | undefined, game: 'anime' | 'jeux' | 'screenshot' | 'manga', forGameNumber?: number): Promise<number> {
         if (userId) {
             const gn = forGameNumber ?? this.getGameNumber();
             let score: any;
             if (game === 'anime') score = await this.getUserScore(userId, gn);
             else if (game === 'jeux') score = await this.getUserScoreJeux(userId, gn);
+            else if (game === 'manga') score = await this.getUserScoreManga(userId, gn);
             else score = await this.getUserScoreScreenshot(userId, gn);
             return score?.attempts ?? 0;
         }
@@ -744,6 +745,154 @@ export class GamesService {
             hints.format = anime.format ?? null;
             hints.studio = anime.studio ?? null;
         }
+
+        return hints;
+    }
+
+    // ════════════════════════════════════════════════════════
+    //  MANGA GUESS GAME
+    // ════════════════════════════════════════════════════════
+
+    async getDailyTargetManga(forGameNumber?: number) {
+        const gameNumber = forGameNumber ?? this.getGameNumber();
+
+        const candidates = await this.prisma.akManga.findMany({
+            where: {
+                statut: 1,
+                classementPopularite: { gt: 0, lte: 2000 },
+            },
+            select: { idManga: true },
+            orderBy: { idManga: 'asc' },
+        });
+
+        if (candidates.length === 0) throw new NotFoundException('Aucun manga candidat trouvé pour le jeu');
+
+        const index = gameNumber % candidates.length;
+        const targetId = candidates[index].idManga;
+
+        return this.prisma.akManga.findUnique({
+            where: { idManga: targetId },
+            select: { idManga: true, titre: true, annee: true, origine: true, editeur: true, nbVol: true, tags: true, image: true, niceUrl: true },
+        });
+    }
+
+    private parseMangaTags(tags: string | null): string[] {
+        if (!tags) return [];
+        return tags.split(/[,\n]/).map(t => t.trim()).filter(Boolean);
+    }
+
+    async compareGuessManga(mangaId: number, userId?: number, forGameNumber?: number) {
+        const gn = forGameNumber ?? this.getGameNumber();
+        const target = await this.getDailyTargetManga(gn);
+        const guess = await this.prisma.akManga.findUnique({
+            where: { idManga: mangaId, statut: 1 },
+            select: { idManga: true, titre: true, annee: true, origine: true, editeur: true, nbVol: true, tags: true, image: true, niceUrl: true },
+        });
+
+        if (!guess) throw new NotFoundException('Manga deviné introuvable');
+
+        const isCorrect = guess.idManga === target.idManga;
+        const guessTagsArr = this.parseMangaTags(guess.tags);
+        const targetTagsArr = this.parseMangaTags(target.tags);
+
+        const result = {
+            manga: {
+                id: guess.idManga,
+                titre: guess.titre,
+                image: guess.image,
+                niceUrl: guess.niceUrl ?? null,
+            },
+            comparison: {
+                year: this.compareYear(Number(guess.annee), Number(target.annee)),
+                format: this.compareValue(guess.origine, target.origine),
+                editeur: this.compareValue(guess.editeur, target.editeur),
+                volumes: this.compareEpisodes(guess.nbVol ?? 0, target.nbVol ?? 0),
+                tags: { status: this.compareMangaTagsStatus(guessTagsArr, targetTagsArr), common: guessTagsArr.filter(t => targetTagsArr.includes(t)) },
+            },
+            isCorrect,
+        };
+
+        if (userId) {
+            const existing = await this.getUserScoreManga(userId, gn);
+            const guesses = existing ? [...(existing.guesses as any[]), result] : [result];
+            await this.saveScoreManga(userId, gn, guesses, result.isCorrect);
+            const streak = await this.getUserStreakManga(userId);
+            return { ...result, streak };
+        }
+
+        return result;
+    }
+
+    private compareMangaTagsStatus(guessTags: string[], targetTags: string[]): 'correct' | 'partial' | 'incorrect' {
+        const common = guessTags.filter(t => targetTags.includes(t));
+        if (common.length === targetTags.length && guessTags.length === targetTags.length) return 'correct';
+        if (common.length > 0) return 'partial';
+        return 'incorrect';
+    }
+
+    async saveScoreManga(userId: number, gameNumber: number, guesses: any[], isWon: boolean) {
+        return this.prisma.akGuessGameScoreManga.upsert({
+            where: { userId_gameNumber: { userId, gameNumber } },
+            update: { attempts: guesses.length, isWon, guesses },
+            create: { userId, gameNumber, attempts: guesses.length, isWon, guesses },
+        });
+    }
+
+    async getUserScoreManga(userId: number, gameNumber: number) {
+        return this.prisma.akGuessGameScoreManga.findUnique({
+            where: { userId_gameNumber: { userId, gameNumber } },
+        });
+    }
+
+    async getUserStreakManga(userId: number): Promise<number> {
+        const scores = await this.prisma.akGuessGameScoreManga.findMany({
+            where: { userId },
+            orderBy: { gameNumber: 'desc' },
+            select: { gameNumber: true, isWon: true, attempts: true },
+        });
+
+        if (scores.length === 0) return 0;
+
+        const currentGame = this.getGameNumber();
+        let streak = 0;
+        let expectedGame = currentGame;
+
+        for (const score of scores) {
+            if (score.gameNumber > currentGame) continue;
+            if (score.gameNumber === currentGame && !score.isWon && score.attempts < 10) {
+                expectedGame = currentGame - 1;
+                continue;
+            }
+            if (score.gameNumber !== expectedGame) break;
+            if (!score.isWon) { streak = 0; break; }
+            streak++;
+            expectedGame--;
+        }
+
+        return streak;
+    }
+
+    async getFullGameStateManga(userId: number, forGameNumber?: number) {
+        const gn = forGameNumber ?? this.getGameNumber();
+        const [score, streak] = await Promise.all([
+            this.getUserScoreManga(userId, gn),
+            this.getUserStreakManga(userId),
+        ]);
+        return { ...score, streak };
+    }
+
+    async getHintManga(attempts: number, forGameNumber?: number) {
+        const target = await this.getDailyTargetManga(forGameNumber);
+        const hints: any = {};
+
+        if (attempts >= 3) hints.maskedTitle = this.generateMaskedTitle(target.titre, 0, forGameNumber);
+        if (attempts >= 4) hints.maskedTitle = this.generateMaskedTitle(target.titre, 1, forGameNumber, { excludeFirstLetter: true });
+        if (attempts >= 5) hints.maskedTitle = this.generateMaskedTitle(target.titre, 2, forGameNumber, { excludeFirstLetter: true });
+        if (attempts >= 6) hints.tags = this.parseMangaTags(target.tags);
+        if (attempts >= 7) hints.maskedTitle = this.generateMaskedTitle(target.titre, 2, forGameNumber, { excludeFirstLetter: true, alwaysRevealFirstLetter: true });
+        if (attempts >= 8) hints.maskedTitle = this.generateMaskedTitle(target.titre, 3, forGameNumber, { excludeFirstLetter: true, alwaysRevealFirstLetter: true });
+        if (attempts >= 9) hints.maskedTitle = this.generateMaskedTitle(target.titre, 4, forGameNumber, { excludeFirstLetter: true, alwaysRevealFirstLetter: true });
+        if (attempts >= 10) hints.answer = target.titre;
 
         return hints;
     }
