@@ -2,6 +2,10 @@ import { Injectable, BadRequestException, NotFoundException, Logger } from '@nes
 import { load } from 'cheerio';
 import { PrismaService } from '../../shared/services/prisma.service';
 import { AniListService } from '../anilist/anilist.service';
+import { exec } from 'child_process';
+import { promisify } from 'util';
+
+const execAsync = promisify(exec);
 
 type ScrapeSource = 'mal' | 'nautiljon' | 'anilist' | 'auto';
 
@@ -73,21 +77,21 @@ export class ScrapeService {
 
         const res = await fetch(url, {
           headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36',
             'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
             'Accept-Language': 'fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7',
             'Accept-Encoding': 'gzip, deflate, br',
             'Referer': 'https://www.google.com/',
+            'DNT': '1',
             'Upgrade-Insecure-Requests': '1',
-            'Sec-Ch-Ua': '"Google Chrome";v="131", "Chromium";v="131", "Not_A Brand";v="24"',
+            'Sec-Ch-Ua': '"Not(A:Brand";v="99", "Google Chrome";v="133", "Chromium";v="133"',
             'Sec-Ch-Ua-Mobile': '?0',
             'Sec-Ch-Ua-Platform': '"Windows"',
             'Sec-Fetch-Dest': 'document',
             'Sec-Fetch-Mode': 'navigate',
-            'Sec-Fetch-Site': 'none',
+            'Sec-Fetch-Site': 'cross-site',
             'Sec-Fetch-User': '?1',
             'Connection': 'keep-alive',
-            'Cache-Control': 'max-age=0',
           },
           signal: controller.signal
         });
@@ -98,17 +102,17 @@ export class ScrapeService {
           if (res.status === 429 && attempt < 3) {
             // Exponential backoff for rate limiting: 3s, 6s, 9s
             const delay = 3000 * attempt;
-
+            this.logger.warn(`Rate limited (429) for ${url}. Attempt ${attempt}/3. Waiting ${delay}ms...`);
             await new Promise(resolve => setTimeout(resolve, delay));
             continue;
           }
 
-          if (res.status === 403 || res.status === 503) {
-            try {
-              const body = await res.text();
-              this.logger.error(`Fetch failed ${res.status} for ${url}. Body preview: ${body.substring(0, 1000)}`);
-            } catch (e) {
-              console.error('Failed to read error body', e);
+          if (res.status === 403 || res.status === 503 || res.status === 401) {
+            const body = await res.text().catch(() => 'Could not read body');
+            this.logger.error(`Fetch failed ${res.status} for ${url}. This site likely has strong anti-bot protection. Body preview: ${body.substring(0, 500)}`);
+
+            if (res.status === 403 && url.includes('booknode.com')) {
+              throw new BadRequestException(`Booknode est actuellement inaccessible (Protection Anti-Bot). Veuillez essayer MangaCollec.`);
             }
           }
 
@@ -151,7 +155,52 @@ export class ScrapeService {
 
     const errorMsg = lastError?.message || 'Failed to fetch after retries';
     console.error(`Scraping failed for ${url}: ${errorMsg}`);
+
+    // If fetch failed and it's Booknode, try the curl bypass
+    if (url.includes('booknode.com')) {
+      try {
+        this.logger.warn(`Standard fetch failed for ${url}, attempting curl bypass...`);
+        return await this.fetchHtmlWithCurl(url);
+      } catch (curlError) {
+        this.logger.error(`Curl bypass also failed for ${url}: ${curlError.message}`);
+      }
+    }
+
     throw lastError || new BadRequestException(errorMsg);
+  }
+
+  /**
+   * Bypass using Python curl_cffi — impersonates a real Chrome TLS fingerprint.
+   * Required for Cloudflare-protected sites (e.g. Booknode) where Node.js fetch
+   * and standard curl are blocked via JA3/JA4 TLS fingerprinting.
+   * Prerequisite: pip3 install curl-cffi
+   */
+  private async fetchHtmlWithCurl(url: string) {
+    // Check cache again just in case
+    const cached = this.requestCache.get(url);
+    if (cached && Date.now() - cached.timestamp < this.CACHE_TTL) {
+      return load(cached.data);
+    }
+
+    try {
+      const scriptPath = require('path').join(__dirname, 'fetch_with_curl_cffi.py');
+      // Pass URL as argument — avoids shell escaping issues
+      const command = `python3 ${scriptPath} "${url.replace(/"/g, '\\"')}"`;
+
+      const { stdout, stderr } = await execAsync(command, { maxBuffer: 10 * 1024 * 1024 });
+
+      if (!stdout || stdout.length < 500) {
+        throw new Error(`curl_cffi returned empty or too short response. Stderr: ${stderr}`);
+      }
+
+      // Cache the result
+      this.requestCache.set(url, { data: stdout, timestamp: Date.now() });
+
+      return load(stdout);
+    } catch (error) {
+      this.logger.error(`fetchHtmlWithCurl (curl_cffi) failed for ${url}: ${error.message}`);
+      throw error;
+    }
   }
 
   /**
