@@ -95,4 +95,52 @@ export class GamesController {
         const userId = req.user?.id;
         return this.gamesService.compareGuessJeux(jeuId, userId);
     }
+
+    // ─── Screenshot Guess Game ───────────────────────────────────────────────
+
+    @Get('screenshot/daily')
+    @ApiOperation({ summary: "Get today's screenshot game metadata" })
+    async getDailyMetadataScreenshot() {
+        const gameNumber = this.gamesService.getGameNumber();
+        const { screenshot } = await this.gamesService.getDailyTargetScreenshot();
+
+        const cropX = Math.round(((Math.sin(gameNumber * 3.7) + 1) / 2) * 60 + 20);
+        const cropY = Math.round(((Math.sin(gameNumber * 2.3) + 1) / 2) * 60 + 20);
+
+        return {
+            gameNumber,
+            title: `Screenshot du jour #${gameNumber}`,
+            screenshotUrl: screenshot.urlScreen,
+            cropX,
+            cropY,
+        };
+    }
+
+    @Get('screenshot/state')
+    @UseGuards(JwtAuthGuard)
+    @ApiOperation({ summary: "Get user's daily screenshot game state" })
+    async getGameStateScreenshot(@CurrentUser() user: CurrentUserData) {
+        return this.gamesService.getFullGameStateScreenshot(user.id);
+    }
+
+    @Get('screenshot/hint')
+    @UseGuards(OptionalJwtAuthGuard)
+    @ApiOperation({ summary: 'Get a hint for the daily screenshot game' })
+    async getHintScreenshot(@Query('attempts') attempts: number, @Req() req: any) {
+        const userId = req.user?.id;
+        const safeAttempts = await this.gamesService.resolveAttempts(attempts, userId, 'screenshot');
+        return this.gamesService.getHintScreenshot(safeAttempts);
+    }
+
+    @Post('screenshot/guess')
+    @HttpCode(HttpStatus.OK)
+    @UseGuards(OptionalJwtAuthGuard)
+    @ApiOperation({ summary: 'Submit an anime guess for the screenshot game' })
+    async submitGuessScreenshot(
+        @Body('animeId') animeId: number,
+        @Req() req: any,
+    ) {
+        const userId = req.user?.id;
+        return this.gamesService.compareGuessScreenshot(animeId, userId);
+    }
 }
