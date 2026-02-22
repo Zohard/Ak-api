@@ -23,8 +23,8 @@ export class GamesService {
      * Selects a target anime for the day based on the game number.
      * Filters for published animes with a popularity rank to ensure it's guessable.
      */
-    async getDailyTarget() {
-        const gameNumber = this.getGameNumber();
+    async getDailyTarget(forGameNumber?: number) {
+        const gameNumber = forGameNumber ?? this.getGameNumber();
 
         // Get a stable list of candidate animes (published and relatively popular)
         const candidates = await this.prisma.akAnime.findMany({
@@ -69,8 +69,9 @@ export class GamesService {
         return targetGroups.some(g => guessGroups.has(g));
     }
 
-    async compareGuess(animeId: number, userId?: number) {
-        const target = await this.getDailyTarget();
+    async compareGuess(animeId: number, userId?: number, forGameNumber?: number) {
+        const gn = forGameNumber ?? this.getGameNumber();
+        const target = await this.getDailyTarget(gn);
         const guess = await this.animesService.findOne(animeId);
 
         if (!guess) {
@@ -80,6 +81,8 @@ export class GamesService {
         const isCorrect = guess.id === target.id ||
             await this.areRelatedAnimes(guess.id, target.id, guess.format, target.format);
 
+        const isRelated = isCorrect && guess.id !== target.id;
+
         const result = {
             anime: {
                 id: guess.id,
@@ -87,6 +90,14 @@ export class GamesService {
                 image: guess.image,
                 niceUrl: (guess as any).niceUrl ?? null,
             },
+            ...(isRelated && {
+                correctAnime: {
+                    id: target.id,
+                    titre: target.titre,
+                    image: target.image,
+                    niceUrl: (target as any).niceUrl ?? null,
+                },
+            }),
             comparison: {
                 year: this.compareYear(guess.annee, target.annee),
                 format: this.compareValue(guess.format, target.format),
@@ -99,11 +110,10 @@ export class GamesService {
 
         // If user is logged in, sync with database and return streak
         if (userId) {
-            const gameNumber = this.getGameNumber();
-            const existing = await this.getUserScore(userId, gameNumber);
+            const existing = await this.getUserScore(userId, gn);
 
             const guesses = existing ? [...(existing.guesses as any[]), result] : [result];
-            await this.saveScore(userId, gameNumber, guesses, result.isCorrect);
+            await this.saveScore(userId, gn, guesses, result.isCorrect);
 
             const streak = await this.getUserStreak(userId);
             return { ...result, streak };
@@ -196,13 +206,13 @@ export class GamesService {
      * - Authenticated users: use their actual DB attempt count (tamper-proof).
      * - Anonymous users: use client-provided value, capped at 9 (answer never leaked).
      */
-    async resolveAttempts(clientAttempts: number, userId: number | undefined, game: 'anime' | 'jeux' | 'screenshot'): Promise<number> {
+    async resolveAttempts(clientAttempts: number, userId: number | undefined, game: 'anime' | 'jeux' | 'screenshot', forGameNumber?: number): Promise<number> {
         if (userId) {
-            const gameNumber = this.getGameNumber();
+            const gn = forGameNumber ?? this.getGameNumber();
             let score: any;
-            if (game === 'anime') score = await this.getUserScore(userId, gameNumber);
-            else if (game === 'jeux') score = await this.getUserScoreJeux(userId, gameNumber);
-            else score = await this.getUserScoreScreenshot(userId, gameNumber);
+            if (game === 'anime') score = await this.getUserScore(userId, gn);
+            else if (game === 'jeux') score = await this.getUserScoreJeux(userId, gn);
+            else score = await this.getUserScoreScreenshot(userId, gn);
             return score?.attempts ?? 0;
         }
         return Math.min(Number(clientAttempts) || 0, 9);
@@ -211,10 +221,10 @@ export class GamesService {
     /**
      * Returns today's game score enriched with the user's current streak.
      */
-    async getFullGameState(userId: number) {
-        const gameNumber = this.getGameNumber();
+    async getFullGameState(userId: number, forGameNumber?: number) {
+        const gn = forGameNumber ?? this.getGameNumber();
         const [score, streak] = await Promise.all([
-            this.getUserScore(userId, gameNumber),
+            this.getUserScore(userId, gn),
             this.getUserStreak(userId),
         ]);
         return { ...score, streak };
@@ -255,28 +265,36 @@ export class GamesService {
     /**
      * Returns hints based on the number of attempts.
      */
-    async getHint(attempts: number) {
-        const target = await this.getDailyTarget();
+    async getHint(attempts: number, forGameNumber?: number) {
+        const target = await this.getDailyTarget(forGameNumber);
         const hints: any = {};
 
         if (attempts >= 3) {
-            hints.firstLetter = target.titre?.charAt(0) || '';
+            hints.maskedTitle = this.generateMaskedTitle(target.titre, 0, forGameNumber);
         }
 
         if (attempts >= 4) {
-            hints.maskedTitle = this.generateMaskedTitle(target.titre, 1);
+            hints.maskedTitle = this.generateMaskedTitle(target.titre, 1, forGameNumber, { excludeFirstLetter: true });
+        }
+
+        if (attempts >= 5) {
+            hints.maskedTitle = this.generateMaskedTitle(target.titre, 2, forGameNumber, { excludeFirstLetter: true });
         }
 
         if (attempts >= 6) {
             hints.tags = (target.tags || []).map(t => t.tag_name).filter(Boolean);
         }
 
+        if (attempts >= 7) {
+            hints.maskedTitle = this.generateMaskedTitle(target.titre, 2, forGameNumber, { excludeFirstLetter: true, alwaysRevealFirstLetter: true });
+        }
+
         if (attempts >= 8) {
-            hints.maskedTitle = this.generateMaskedTitle(target.titre, 2);
+            hints.maskedTitle = this.generateMaskedTitle(target.titre, 3, forGameNumber, { excludeFirstLetter: true, alwaysRevealFirstLetter: true });
         }
 
         if (attempts >= 9) {
-            hints.maskedTitle = this.generateMaskedTitle(target.titre, 3);
+            hints.maskedTitle = this.generateMaskedTitle(target.titre, 4, forGameNumber, { excludeFirstLetter: true, alwaysRevealFirstLetter: true });
         }
 
         if (attempts >= 10) {
@@ -286,22 +304,32 @@ export class GamesService {
         return hints;
     }
 
-    private generateMaskedTitle(title: string, revealCount: number): string {
+    private generateMaskedTitle(
+        title: string,
+        revealCount: number,
+        forGameNumber?: number,
+        options?: { excludeFirstLetter?: boolean; alwaysRevealFirstLetter?: boolean },
+    ): string {
         if (!title) return '';
 
         const chars = title.split('');
+        const excludeFirstLetter = options?.excludeFirstLetter ?? false;
+        const alwaysRevealFirstLetter = options?.alwaysRevealFirstLetter ?? false;
 
-        // Collect indices that can be revealed (alphanumeric, not the first letter)
+        const firstAlphaIndex = chars.findIndex(c => /[a-zA-Z0-9]/.test(c));
+
+        // Collect indices that can be revealed (all alphanumeric characters)
         const revealableIndices: number[] = [];
-        for (let i = 1; i < chars.length; i++) {
+        for (let i = 0; i < chars.length; i++) {
             if (/[a-zA-Z0-9]/.test(chars[i])) {
+                if (excludeFirstLetter && i === firstAlphaIndex) continue;
                 revealableIndices.push(i);
             }
         }
 
         // Pick indices deterministically using a seeded shuffle so hints are
         // consistent for the same game number across users and page reloads.
-        const seed = this.getGameNumber() + title.length;
+        const seed = (forGameNumber ?? this.getGameNumber()) + title.length;
         const shuffled = [...revealableIndices].sort((a, b) => {
             const ra = (Math.sin(seed * a + 1) + 1) / 2;
             const rb = (Math.sin(seed * b + 1) + 1) / 2;
@@ -309,8 +337,11 @@ export class GamesService {
         });
         const revealedSet = new Set(shuffled.slice(0, revealCount));
 
+        if (alwaysRevealFirstLetter && firstAlphaIndex !== -1) {
+            revealedSet.add(firstAlphaIndex);
+        }
+
         return chars.map((char, index) => {
-            if (index === 0) return char;
             if (revealedSet.has(index)) return char;
             if (/[a-zA-Z0-9]/.test(char)) return '_';
             return char;
@@ -324,8 +355,8 @@ export class GamesService {
     /**
      * Fetches the daily target video game (platform/year/genres/editeur/studio).
      */
-    async getDailyTargetJeux() {
-        const gameNumber = this.getGameNumber();
+    async getDailyTargetJeux(forGameNumber?: number) {
+        const gameNumber = forGameNumber ?? this.getGameNumber();
 
         const candidates = await this.prisma.akJeuxVideo.findMany({
             where: {
@@ -382,8 +413,9 @@ export class GamesService {
     /**
      * Compares a guessed video game against the daily target.
      */
-    async compareGuessJeux(jeuId: number, userId?: number) {
-        const target = await this.getDailyTargetJeux();
+    async compareGuessJeux(jeuId: number, userId?: number, forGameNumber?: number) {
+        const gn = forGameNumber ?? this.getGameNumber();
+        const target = await this.getDailyTargetJeux(gn);
         const guess = await this.getJeuForGuess(jeuId);
 
         const guessPlatforms = (guess.platforms || []).map(p => p.platform?.shortName || p.platform?.name).filter(Boolean);
@@ -410,10 +442,9 @@ export class GamesService {
         };
 
         if (userId) {
-            const gameNumber = this.getGameNumber();
-            const existing = await this.getUserScoreJeux(userId, gameNumber);
+            const existing = await this.getUserScoreJeux(userId, gn);
             const guesses = existing ? [...(existing.guesses as any[]), result] : [result];
-            await this.saveScoreJeux(userId, gameNumber, guesses, result.isCorrect);
+            await this.saveScoreJeux(userId, gn, guesses, result.isCorrect);
             const streak = await this.getUserStreakJeux(userId);
             return { ...result, streak };
         }
@@ -463,33 +494,33 @@ export class GamesService {
         return streak;
     }
 
-    async getFullGameStateJeux(userId: number) {
-        const gameNumber = this.getGameNumber();
+    async getFullGameStateJeux(userId: number, forGameNumber?: number) {
+        const gn = forGameNumber ?? this.getGameNumber();
         const [score, streak] = await Promise.all([
-            this.getUserScoreJeux(userId, gameNumber),
+            this.getUserScoreJeux(userId, gn),
             this.getUserStreakJeux(userId),
         ]);
         return { ...score, streak };
     }
 
-    async getHintJeux(attempts: number) {
-        const target = await this.getDailyTargetJeux();
+    async getHintJeux(attempts: number, forGameNumber?: number) {
+        const target = await this.getDailyTargetJeux(forGameNumber);
         const hints: any = {};
 
         if (attempts >= 3) {
             hints.firstLetter = target.titre?.charAt(0) || '';
         }
         if (attempts >= 4) {
-            hints.maskedTitle = this.generateMaskedTitle(target.titre, 1);
+            hints.maskedTitle = this.generateMaskedTitle(target.titre, 1, forGameNumber);
         }
         if (attempts >= 6) {
             hints.platforms = (target.platforms || []).map(p => p.platform?.shortName || p.platform?.name).filter(Boolean);
         }
         if (attempts >= 8) {
-            hints.maskedTitle = this.generateMaskedTitle(target.titre, 2);
+            hints.maskedTitle = this.generateMaskedTitle(target.titre, 2, forGameNumber);
         }
         if (attempts >= 9) {
-            hints.maskedTitle = this.generateMaskedTitle(target.titre, 3);
+            hints.maskedTitle = this.generateMaskedTitle(target.titre, 3, forGameNumber);
         }
         if (attempts >= 10) {
             hints.answer = target.titre;
@@ -517,37 +548,44 @@ export class GamesService {
      * Fetches today's screenshot target — a random anime screenshot (type=1),
      * deterministically selected from popular published animes.
      */
-    async getDailyTargetScreenshot() {
-        const gameNumber = this.getGameNumber();
+    async getDailyTargetScreenshot(forGameNumber?: number) {
+        const gameNumber = forGameNumber ?? this.getGameNumber();
 
-        // Find screenshots linked to published popular animes
-        const candidates = await this.prisma.akScreenshot.findMany({
+        // Step 1: Get distinct anime IDs that have at least one type=1 screenshot,
+        // filtered to popular published animes only.
+        // We query from the screenshot table to get the intersection, then sort by
+        // idTitre for a stable deterministic list.
+        const popularAnimeIds = await this.prisma.akAnime.findMany({
+            where: {
+                statut: 1,
+                classementPopularite: { gt: 0, lte: 2000 },
+            },
+            select: { idAnime: true },
+            orderBy: { idAnime: 'asc' },
+        }).then(rows => rows.map(r => r.idAnime));
+
+        // Distinct anime IDs that actually have screenshots
+        const animeIdsWithScreenshots = await this.prisma.akScreenshot.findMany({
             where: {
                 type: 1,
-                idTitre: {
-                    in: await this.prisma.akAnime.findMany({
-                        where: {
-                            statut: 1,
-                            classementPopularite: { gt: 0, lte: 2000 },
-                        },
-                        select: { idAnime: true },
-                        orderBy: { idAnime: 'asc' },
-                    }).then(rows => rows.map(r => r.idAnime)),
-                },
+                idTitre: { in: popularAnimeIds, gt: 0 },
+                urlScreen: { not: null },
             },
-            select: { idScreen: true, urlScreen: true, idTitre: true },
-            orderBy: { idScreen: 'asc' },
-        });
+            select: { idTitre: true },
+            distinct: ['idTitre'],
+            orderBy: { idTitre: 'asc' },
+        }).then(rows => rows.map(r => r.idTitre));
 
-        if (candidates.length === 0) {
+        if (animeIdsWithScreenshots.length === 0) {
             throw new NotFoundException('Aucun screenshot candidat trouvé pour le jeu');
         }
 
-        const index = gameNumber % candidates.length;
-        const target = candidates[index];
+        // Step 2: Pick anime deterministically by gameNumber
+        const animeIndex = gameNumber % animeIdsWithScreenshots.length;
+        const targetAnimeId = animeIdsWithScreenshots[animeIndex];
 
         const anime = await this.prisma.akAnime.findUnique({
-            where: { idAnime: target.idTitre },
+            where: { idAnime: targetAnimeId },
             select: {
                 idAnime: true,
                 titre: true,
@@ -561,17 +599,31 @@ export class GamesService {
 
         if (!anime) throw new NotFoundException('Anime cible introuvable');
 
+        // Step 3: Get all type=1 screenshots for that specific anime
+        const screenshots = await this.prisma.akScreenshot.findMany({
+            where: { type: 1, idTitre: targetAnimeId, urlScreen: { not: null } },
+            select: { idScreen: true, urlScreen: true },
+            orderBy: { idScreen: 'asc' },
+        });
+
+        if (screenshots.length === 0) throw new NotFoundException('Aucun screenshot pour cet anime');
+
+        // Step 4: Pick screenshot deterministically (cycle through them across days)
+        const screenshotIndex = Math.floor(gameNumber / animeIdsWithScreenshots.length) % screenshots.length;
+        const targetScreenshot = screenshots[screenshotIndex];
+
         return {
             anime,
-            screenshot: { idScreen: target.idScreen, urlScreen: target.urlScreen },
+            screenshot: { idScreen: targetScreenshot.idScreen, urlScreen: targetScreenshot.urlScreen! },
         };
     }
 
     /**
      * Compares a guessed anime against the daily screenshot target.
      */
-    async compareGuessScreenshot(animeId: number, userId?: number) {
-        const { anime: target, screenshot } = await this.getDailyTargetScreenshot();
+    async compareGuessScreenshot(animeId: number, userId?: number, forGameNumber?: number) {
+        const gn = forGameNumber ?? this.getGameNumber();
+        const { anime: target, screenshot } = await this.getDailyTargetScreenshot(gn);
         const guess = await this.prisma.akAnime.findUnique({
             where: { idAnime: animeId, statut: 1 },
             select: { idAnime: true, titre: true, image: true, niceUrl: true, format: true },
@@ -592,14 +644,21 @@ export class GamesService {
             isCorrect,
         };
 
+        const buildRevealedAnime = () => ({
+            id: target.idAnime,
+            titre: target.titre,
+            image: target.image,
+            niceUrl: target.niceUrl ?? null,
+        });
+
         if (userId) {
-            const gameNumber = this.getGameNumber();
-            const existing = await this.getUserScoreScreenshot(userId, gameNumber);
+            const existing = await this.getUserScoreScreenshot(userId, gn);
             const guesses = existing ? [...(existing.guesses as any[]), result] : [result];
-            await this.saveScoreScreenshot(userId, gameNumber, guesses, result.isCorrect);
+            await this.saveScoreScreenshot(userId, gn, guesses, result.isCorrect);
             const streak = await this.getUserStreakScreenshot(userId);
             const gameOver = guesses.length >= 6;
-            return { ...result, streak, gameOver };
+            const revealedAnime = (gameOver && !result.isCorrect) ? buildRevealedAnime() : undefined;
+            return { ...result, streak, gameOver, ...(revealedAnime && { revealedAnime }) };
         }
 
         return result;
@@ -647,12 +706,23 @@ export class GamesService {
         return streak;
     }
 
-    async getFullGameStateScreenshot(userId: number) {
-        const gameNumber = this.getGameNumber();
+    async getFullGameStateScreenshot(userId: number, forGameNumber?: number) {
+        const gn = forGameNumber ?? this.getGameNumber();
         const [score, streak] = await Promise.all([
-            this.getUserScoreScreenshot(userId, gameNumber),
+            this.getUserScoreScreenshot(userId, gn),
             this.getUserStreakScreenshot(userId),
         ]);
+        const gameFailed = score && !score.isWon && score.attempts >= 6;
+        if (gameFailed) {
+            const { anime: target } = await this.getDailyTargetScreenshot(gn);
+            const revealedAnime = {
+                id: target.idAnime,
+                titre: target.titre,
+                image: target.image,
+                niceUrl: target.niceUrl ?? null,
+            };
+            return { ...score, streak, revealedAnime };
+        }
         return { ...score, streak };
     }
 
@@ -661,8 +731,8 @@ export class GamesService {
      * attempts >= 4 → year
      * attempts >= 5 → year + format + studio
      */
-    async getHintScreenshot(attempts: number) {
-        const { anime } = await this.getDailyTargetScreenshot();
+    async getHintScreenshot(attempts: number, forGameNumber?: number) {
+        const { anime } = await this.getDailyTargetScreenshot(forGameNumber);
         const hints: any = {};
 
         if (attempts >= 4) {

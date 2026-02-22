@@ -181,9 +181,15 @@ export class ScrapeService {
     }
 
     try {
-      const scriptPath = require('path').join(__dirname, 'fetch_with_curl_cffi.py');
+      const path = require('path');
+      // __dirname = dist/src/modules/scrape in compiled build; fall back to src/ for dev
+      const distPath = path.join(__dirname, 'fetch_with_curl_cffi.py');
+      const srcPath = path.join(process.cwd(), 'src', 'modules', 'scrape', 'fetch_with_curl_cffi.py');
+      const fs = require('fs');
+      const scriptPath = fs.existsSync(distPath) ? distPath : srcPath;
       // Pass URL as argument — avoids shell escaping issues
       const command = `python3 ${scriptPath} "${url.replace(/"/g, '\\"')}"`;
+      this.logger.debug(`curl_cffi: using script at ${scriptPath}`);
 
       const { stdout, stderr } = await execAsync(command, { maxBuffer: 10 * 1024 * 1024 });
 
@@ -1682,3 +1688,4 @@ export class ScrapeService {
     };
   }
 }
+
