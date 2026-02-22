@@ -109,11 +109,9 @@ export class ScrapeService {
 
           if (res.status === 403 || res.status === 503 || res.status === 401) {
             const body = await res.text().catch(() => 'Could not read body');
-            this.logger.error(`Fetch failed ${res.status} for ${url}. This site likely has strong anti-bot protection. Body preview: ${body.substring(0, 500)}`);
-
-            if (res.status === 403 && url.includes('booknode.com')) {
-              throw new BadRequestException(`Booknode est actuellement inaccessible (Protection Anti-Bot). Veuillez essayer MangaCollec.`);
-            }
+            this.logger.error(`Fetch failed ${res.status} for ${url}. Body preview: ${body.substring(0, 200)}`);
+            // For Booknode 403, break out of the retry loop and fall through to curl_cffi bypass
+            if (res.status === 403 && url.includes('booknode.com')) break;
           }
 
           if (res.status >= 500 && attempt < 3) {
