@@ -1478,45 +1478,50 @@ export class ScrapeService {
   async scrapeMangaCollecPlanning(year: number, month: number) {
     const monthStr = month.toString().padStart(2, '0');
     const planningKey = `${year}-${monthStr}`;
-    const url = `https://www.mangacollec.com/planning`;
 
-    const $ = await this.fetchHtml(url);
-    const html = $.html();
-
-    // Extract window.DATA_STORE JSON from the page
-    // The JSON is huge so we find the start marker and extract up to the closing ";</script>"
-    const marker = 'window.DATA_STORE = ';
-    const startIdx = html.indexOf(marker);
-    if (startIdx === -1) {
-      throw new BadRequestException('Could not find DATA_STORE in MangaCollec page');
-    }
-    const jsonStart = startIdx + marker.length;
-    // Find the </script> tag after the DATA_STORE, then look back for the ";"
-    const scriptEnd = html.indexOf('</script>', jsonStart);
-    if (scriptEnd === -1) {
-      throw new BadRequestException('Could not find end of DATA_STORE in MangaCollec page');
-    }
-    // The JSON ends with "};" — trim whitespace between ";" and "</script>"
-    const segment = html.substring(jsonStart, scriptEnd).trimEnd();
-    // Remove trailing semicolon
-    const jsonStr = segment.endsWith(';') ? segment.slice(0, -1) : segment;
-
-    let dataStore: any;
+    // Step 1: Fetch the planning page to extract the guest bearer token.
+    // Use a direct lightweight fetch (not fetchHtml) to avoid the 3-retry timeout overhead.
+    let bearerToken: string;
     try {
-      dataStore = JSON.parse(jsonStr);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000);
+      const pageRes = await fetch('https://www.mangacollec.com/planning', {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+          'Accept': 'text/html',
+        },
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+      const pageHtml = await pageRes.text();
+      const tokenMatch = pageHtml.match(/"access_token":"([^"]+)"/);
+      if (!tokenMatch) throw new Error('access_token not found in page');
+      bearerToken = tokenMatch[1];
     } catch (e) {
-      throw new BadRequestException('Failed to parse DATA_STORE JSON from MangaCollec');
+      throw new BadRequestException(`Could not retrieve MangaCollec bearer token: ${e.message}`);
     }
 
-    const volumes = dataStore.volumes?.data || {};
-    const editions = dataStore.editions?.data || {};
-    const series = dataStore.series?.data || {};
-    const publishers = dataStore.publishers?.data || {};
-    const planningData = dataStore.planning?.[planningKey];
-
-    if (!planningData || !planningData.volumes || !Array.isArray(planningData.volumes)) {
-      return [];
+    // Step 2: Call the JSON API directly — works for any month (current or future)
+    let apiData: any;
+    try {
+      const res = await fetch(`https://api.mangacollec.com/v2/planning?month=${planningKey}`, {
+        headers: {
+          'Authorization': `Bearer ${bearerToken}`,
+          'Accept': 'application/json',
+          'Origin': 'https://www.mangacollec.com',
+          'Referer': 'https://www.mangacollec.com/planning',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+        },
+      });
+      if (!res.ok) throw new Error(`API returned ${res.status}`);
+      apiData = await res.json();
+    } catch (e) {
+      throw new BadRequestException(`Failed to fetch MangaCollec planning API: ${e.message}`);
     }
+
+    // Build lookup maps from the flat arrays
+    const editionsMap = new Map((apiData.editions || []).map((e: any) => [e.id, e]));
+    const seriesMap = new Map((apiData.series || []).map((s: any) => [s.id, s]));
 
     const results: Array<{
       titre: string;
@@ -1529,20 +1534,14 @@ export class ScrapeService {
       mangacollecVolumeId: string;
     }> = [];
 
-    for (const volumeId of planningData.volumes) {
-      const volume = volumes[volumeId];
-      if (!volume) continue;
+    for (const volume of (apiData.volumes || [])) {
+      const edition = editionsMap.get(volume.edition_id) as any;
+      const serie = edition ? seriesMap.get(edition.series_id) as any : null;
 
-      const edition = editions[volume.edition_id];
-      const serie = edition ? series[edition.series_id] : null;
-      const publisher = edition ? publishers[edition.publisher_id] : null;
-
-      const seriesTitle = serie?.title || '';
-      const volumeTitle = volume.title || '';
-      // Build display title: "Series Title - Tome X" or just volume title
+      const seriesTitle = serie?.title || volume.title || '';
       const displayTitle = seriesTitle
         ? (volume.number ? `${seriesTitle} - Tome ${volume.number}` : seriesTitle)
-        : volumeTitle || 'Unknown';
+        : 'Unknown';
 
       results.push({
         titre: displayTitle,
@@ -1551,8 +1550,8 @@ export class ScrapeService {
         imageUrl: volume.image_url || '',
         isbn: volume.isbn || '',
         seriesTitle,
-        publisher: publisher?.title || '',
-        mangacollecVolumeId: volumeId,
+        publisher: '',
+        mangacollecVolumeId: volume.id,
       });
     }
 
