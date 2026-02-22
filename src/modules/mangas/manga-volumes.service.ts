@@ -1,4 +1,5 @@
-import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../shared/services/prisma.service';
 import { CacheService } from '../../shared/services/cache.service';
 import { R2Service } from '../media/r2.service';
@@ -466,13 +467,21 @@ export class MangaVolumesService {
       }
 
       // Create new volume
-      await this.prisma.mangaVolume.create({
-        data: {
-          idManga: mangaId,
-          volumeNumber,
-          ...volumeData,
-        },
-      });
+      try {
+        await this.prisma.mangaVolume.create({
+          data: {
+            idManga: mangaId,
+            volumeNumber,
+            ...volumeData,
+          },
+        });
+      } catch (err) {
+        if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+          const fields = (err.meta?.target as string[])?.join(', ') ?? 'isbn';
+          throw new ConflictException(`Un volume avec ce ${fields} existe déjà.`);
+        }
+        throw err;
+      }
 
       return {
         volumeNumber,
