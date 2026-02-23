@@ -251,9 +251,9 @@ export class JeuxVideoService {
 
     // Filter by user collection
     if (userId) {
-      where.collection = {
+      where.collections = {
         some: {
-          userId,
+          idMembre: userId,
         }
       };
     }

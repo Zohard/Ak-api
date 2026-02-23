@@ -61,6 +61,7 @@ export class JeuxVideoController {
   }
 
   @Get('planning')
+  @UseGuards(OptionalJwtAuthGuard)
   @ApiOperation({ summary: 'Planning des sorties jeux vidéo par mois' })
   @ApiQuery({ name: 'year', required: false, description: 'Année' })
   @ApiQuery({ name: 'month', required: false, description: 'Mois (1-12)' })
