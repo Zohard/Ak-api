@@ -560,6 +560,12 @@ export class GamesService {
             where: {
                 statut: 1,
                 classementPopularite: { gt: 0, lte: 2000 },
+                // Exclude formats that are filtered out in the autocomplete search,
+                // so the answer is always guessable by the player.
+                OR: [
+                    { format: null },
+                    { format: { notIn: ['OAV', 'Special', 'Clip'] } },
+                ],
             },
             select: { idAnime: true },
             orderBy: { idAnime: 'asc' },
