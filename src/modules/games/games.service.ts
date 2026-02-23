@@ -753,6 +753,20 @@ export class GamesService {
     //  MANGA GUESS GAME
     // ════════════════════════════════════════════════════════
 
+    private readonly MANGA_SELECT = {
+        idManga: true, titre: true, annee: true, origine: true, nbVol: true, tags: true, image: true, niceUrl: true,
+        businessRelations: {
+            where: { type: 'Editeur' },
+            orderBy: { idRelation: 'asc' as const },
+            take: 1,
+            select: { business: { select: { denomination: true } } },
+        },
+    } as const;
+
+    private extractMangaEditeur(manga: { businessRelations: { business: { denomination: string | null } | null }[] }): string | null {
+        return manga.businessRelations[0]?.business?.denomination ?? null;
+    }
+
     async getDailyTargetManga(forGameNumber?: number) {
         const gameNumber = forGameNumber ?? this.getGameNumber();
 
@@ -772,7 +786,7 @@ export class GamesService {
 
         return this.prisma.akManga.findUnique({
             where: { idManga: targetId },
-            select: { idManga: true, titre: true, annee: true, origine: true, editeur: true, nbVol: true, tags: true, image: true, niceUrl: true },
+            select: this.MANGA_SELECT,
         });
     }
 
@@ -784,9 +798,11 @@ export class GamesService {
     async compareGuessManga(mangaId: number, userId?: number, forGameNumber?: number) {
         const gn = forGameNumber ?? this.getGameNumber();
         const target = await this.getDailyTargetManga(gn);
-        const guess = await this.prisma.akManga.findUnique({
+        if (!target) throw new NotFoundException('Manga cible introuvable');
+
+        const guess = await this.prisma.akManga.findFirst({
             where: { idManga: mangaId, statut: 1 },
-            select: { idManga: true, titre: true, annee: true, origine: true, editeur: true, nbVol: true, tags: true, image: true, niceUrl: true },
+            select: this.MANGA_SELECT,
         });
 
         if (!guess) throw new NotFoundException('Manga deviné introuvable');
@@ -794,6 +810,8 @@ export class GamesService {
         const isCorrect = guess.idManga === target.idManga;
         const guessTagsArr = this.parseMangaTags(guess.tags);
         const targetTagsArr = this.parseMangaTags(target.tags);
+        const guessEditeur = this.extractMangaEditeur(guess);
+        const targetEditeur = this.extractMangaEditeur(target);
 
         const result = {
             manga: {
@@ -805,7 +823,7 @@ export class GamesService {
             comparison: {
                 year: this.compareYear(Number(guess.annee), Number(target.annee)),
                 format: this.compareValue(guess.origine, target.origine),
-                editeur: this.compareValue(guess.editeur, target.editeur),
+                editeur: this.compareValue(guessEditeur, targetEditeur),
                 volumes: this.compareEpisodes(guess.nbVol ?? 0, target.nbVol ?? 0),
                 tags: { status: this.compareMangaTagsStatus(guessTagsArr, targetTagsArr), common: guessTagsArr.filter(t => targetTagsArr.includes(t)) },
             },
@@ -883,6 +901,7 @@ export class GamesService {
 
     async getHintManga(attempts: number, forGameNumber?: number) {
         const target = await this.getDailyTargetManga(forGameNumber);
+        if (!target) throw new NotFoundException('Manga cible introuvable');
         const hints: any = {};
 
         if (attempts >= 3) hints.maskedTitle = this.generateMaskedTitle(target.titre, 0, forGameNumber);
