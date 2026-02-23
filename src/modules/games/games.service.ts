@@ -754,7 +754,7 @@ export class GamesService {
     // ════════════════════════════════════════════════════════
 
     private readonly MANGA_SELECT = {
-        idManga: true, titre: true, annee: true, origine: true, nbVol: true, tags: true, image: true, niceUrl: true,
+        idManga: true, titre: true, annee: true, statutVol: true, nbVol: true, tags: true, image: true, niceUrl: true,
         businessRelations: {
             where: { type: 'Editeur' },
             orderBy: { idRelation: 'asc' as const },
@@ -822,7 +822,7 @@ export class GamesService {
             },
             comparison: {
                 year: this.compareYear(Number(guess.annee), Number(target.annee)),
-                format: this.compareValue(guess.origine, target.origine),
+                format: this.compareValue(guess.statutVol, target.statutVol),
                 editeur: this.compareValue(guessEditeur, targetEditeur),
                 volumes: this.compareEpisodes(guess.nbVol ?? 0, target.nbVol ?? 0),
                 tags: { status: this.compareMangaTagsStatus(guessTagsArr, targetTagsArr), common: guessTagsArr.filter(t => targetTagsArr.includes(t)) },
