@@ -58,7 +58,7 @@ export class AnimeQueryDto {
   @IsOptional()
   @Type(() => Number)
   @IsNumber()
-  @Min(1900)
+  @Min(0)
   annee?: number;
 
   @ApiPropertyOptional({
@@ -68,7 +68,7 @@ export class AnimeQueryDto {
   @IsOptional()
   @Type(() => Number)
   @IsNumber()
-  @Min(1900)
+  @Min(0)
   year?: number;
 
   @ApiPropertyOptional({
