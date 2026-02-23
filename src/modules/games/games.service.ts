@@ -754,7 +754,7 @@ export class GamesService {
     // ════════════════════════════════════════════════════════
 
     private readonly MANGA_SELECT = {
-        idManga: true, titre: true, annee: true, statutVol: true, nbVol: true, tags: true, image: true, niceUrl: true,
+        idManga: true, titre: true, annee: true, statutVol: true, nbVol: true, image: true, niceUrl: true,
         businessRelations: {
             where: { type: 'Editeur' },
             orderBy: { idRelation: 'asc' as const },
@@ -790,9 +790,15 @@ export class GamesService {
         });
     }
 
-    private parseMangaTags(tags: string | null): string[] {
-        if (!tags) return [];
-        return tags.split(/[,\n]/).map(t => t.trim()).filter(Boolean);
+    private async getMangaTagNames(mangaId: number): Promise<string[]> {
+        const rows = await this.prisma.$queryRaw<{ tag_name: string }[]>`
+            SELECT t.tag_name
+            FROM ak_tags t
+            INNER JOIN ak_tag2fiche tf ON t.id_tag = tf.id_tag
+            WHERE tf.id_fiche = ${mangaId} AND tf.type = 'manga'
+            ORDER BY t.categorie, t.tag_name
+        `;
+        return rows.map(r => r.tag_name);
     }
 
     async compareGuessManga(mangaId: number, userId?: number, forGameNumber?: number) {
@@ -808,8 +814,10 @@ export class GamesService {
         if (!guess) throw new NotFoundException('Manga deviné introuvable');
 
         const isCorrect = guess.idManga === target.idManga;
-        const guessTagsArr = this.parseMangaTags(guess.tags);
-        const targetTagsArr = this.parseMangaTags(target.tags);
+        const [guessTagsArr, targetTagsArr] = await Promise.all([
+            this.getMangaTagNames(guess.idManga),
+            this.getMangaTagNames(target.idManga),
+        ]);
         const guessEditeur = this.extractMangaEditeur(guess);
         const targetEditeur = this.extractMangaEditeur(target);
 
@@ -907,7 +915,7 @@ export class GamesService {
         if (attempts >= 3) hints.maskedTitle = this.generateMaskedTitle(target.titre, 0, forGameNumber);
         if (attempts >= 4) hints.maskedTitle = this.generateMaskedTitle(target.titre, 1, forGameNumber, { excludeFirstLetter: true });
         if (attempts >= 5) hints.maskedTitle = this.generateMaskedTitle(target.titre, 2, forGameNumber, { excludeFirstLetter: true });
-        if (attempts >= 6) hints.tags = this.parseMangaTags(target.tags);
+        if (attempts >= 6) hints.tags = await this.getMangaTagNames(target.idManga);
         if (attempts >= 7) hints.maskedTitle = this.generateMaskedTitle(target.titre, 2, forGameNumber, { excludeFirstLetter: true, alwaysRevealFirstLetter: true });
         if (attempts >= 8) hints.maskedTitle = this.generateMaskedTitle(target.titre, 3, forGameNumber, { excludeFirstLetter: true, alwaysRevealFirstLetter: true });
         if (attempts >= 9) hints.maskedTitle = this.generateMaskedTitle(target.titre, 4, forGameNumber, { excludeFirstLetter: true, alwaysRevealFirstLetter: true });
