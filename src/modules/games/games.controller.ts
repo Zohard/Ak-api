@@ -37,7 +37,7 @@ export class GamesController {
         const gameNumber = this.parseGameNumber(rawGn) ?? this.gamesService.getGameNumber();
         return {
             gameNumber,
-            title: `Guess the Anime #${gameNumber}`,
+            title: `AK Games Anime #${gameNumber}`,
         };
     }
 
@@ -57,7 +57,7 @@ export class GamesController {
         const gameNumber = this.parseGameNumber(rawGn);
         const userId = req.user?.id;
         const safeAttempts = await this.gamesService.resolveAttempts(attempts, userId, 'anime', gameNumber);
-        return this.gamesService.getHint(safeAttempts, gameNumber);
+        return this.gamesService.getHint(safeAttempts, gameNumber, userId);
     }
 
     @Post('anime/guess')
@@ -81,7 +81,7 @@ export class GamesController {
     @ApiOperation({ summary: "Get today's jeux-vidéo game metadata" })
     async getDailyMetadataJeux(@Query('gameNumber') rawGn?: string) {
         const gameNumber = this.parseGameNumber(rawGn) ?? this.gamesService.getGameNumber();
-        return { gameNumber, title: `Ani-Kun Guess Jeux #${gameNumber}` };
+        return { gameNumber, title: `AK Games Jeux #${gameNumber}` };
     }
 
     @Get('jeux/state')
@@ -126,7 +126,7 @@ export class GamesController {
 
         return {
             gameNumber,
-            title: `Screenshot du jour #${gameNumber}`,
+            title: `AK Games Screenshot #${gameNumber}`,
             screenshotUrl: screenshot.urlScreen,
         };
     }
@@ -169,7 +169,7 @@ export class GamesController {
     @ApiOperation({ summary: "Get today's manga game metadata" })
     async getDailyMetadataManga(@Query('gameNumber') rawGn?: string) {
         const gameNumber = this.parseGameNumber(rawGn) ?? this.gamesService.getGameNumber();
-        return { gameNumber, title: `Ani-Kun Guess Manga #${gameNumber}` };
+        return { gameNumber, title: `AK Games Manga #${gameNumber}` };
     }
 
     @Get('manga/state')

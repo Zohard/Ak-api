@@ -1603,17 +1603,18 @@ model AkSocialComment {
 
 // Anime Guessing Game Scores
 model AkGuessGameScore {
-  id          Int      @id @default(autoincrement())
-  userId      Int      @map("user_id")
-  gameNumber  Int      @map("game_number")
-  attempts    Int
-  isWon       Boolean  @default(false) @map("is_won")
-  guesses     Json     @db.JsonB
-  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  id            Int      @id @default(autoincrement())
+  userId        Int      @map("user_id")
+  gameNumber    Int      @map("game_number")
+  targetAnimeId Int?     @map("target_anime_id")
+  attempts      Int
+  isWon         Boolean  @default(false) @map("is_won")
+  guesses       Json     @db.JsonB
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt     DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
   // Relations
-  user        SmfMember @relation("UserGameScores", fields: [userId], references: [idMember], onDelete: Cascade)
+  user          SmfMember @relation("UserGameScores", fields: [userId], references: [idMember], onDelete: Cascade)
 
   @@unique([userId, gameNumber])
   @@index([userId])

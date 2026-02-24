@@ -20,20 +20,31 @@ export class GamesService {
     }
 
     /**
+     * Deterministic seeded pseudo-random number in [0, 1) for a given integer seed.
+     * Uses a multiply-xorshift hash for much better distribution than simple modulo.
+     */
+    private seededRandom(seed: number): number {
+        let s = (seed + 0x6D2B79F5) | 0;
+        s = Math.imul(s ^ (s >>> 15), s | 1);
+        s ^= s + Math.imul(s ^ (s >>> 7), s | 61);
+        return ((s ^ (s >>> 14)) >>> 0) / 0x100000000;
+    }
+
+    /**
      * Selects a target anime for the day based on the game number.
-     * Filters for published animes with a popularity rank to ensure it's guessable.
+     * Uses all published animes with a popularity rank (no cap) for a larger pool,
+     * and a seeded PRNG for better distribution across the pool.
      */
     async getDailyTarget(forGameNumber?: number) {
         const gameNumber = forGameNumber ?? this.getGameNumber();
 
-        // Get a stable list of candidate animes (published and relatively popular)
         const candidates = await this.prisma.akAnime.findMany({
             where: {
                 statut: 1,
-                classementPopularite: { gt: 0, lte: 2000 }, // Top 2000 animes
+                classementPopularite: { gt: 0 }, // All ranked published animes
                 OR: [
                     { format: null },
-                    { format: { notIn: ['OAV', 'Special', 'Clip'] } },
+                    { format: { notIn: ['OAV', 'Spécial', 'Clip'] } },
                 ],
             },
             select: { idAnime: true },
@@ -44,12 +55,17 @@ export class GamesService {
             throw new NotFoundException('Aucun anime candidat trouvé pour le jeu');
         }
 
-        // Pick one based on the game number
-        const index = gameNumber % candidates.length;
+        const index = Math.floor(this.seededRandom(gameNumber) * candidates.length);
         const targetId = candidates[index].idAnime;
 
-        // Fetch full details
         return this.animesService.findOne(targetId);
+    }
+
+    /**
+     * Fetches full anime details by ID, used when resolving a stored target.
+     */
+    async getDailyTargetById(animeId: number) {
+        return this.animesService.findOne(animeId);
     }
 
     /**
@@ -75,7 +91,21 @@ export class GamesService {
 
     async compareGuess(animeId: number, userId?: number, forGameNumber?: number) {
         const gn = forGameNumber ?? this.getGameNumber();
-        const target = await this.getDailyTarget(gn);
+
+        // For logged-in users, reuse the stored target so pool changes don't affect ongoing/past games
+        let target: Awaited<ReturnType<typeof this.getDailyTarget>>;
+        let existing: Awaited<ReturnType<typeof this.getUserScore>> | null = null;
+
+        if (userId) {
+            existing = await this.getUserScore(userId, gn);
+        }
+
+        if (existing?.targetAnimeId) {
+            target = await this.getDailyTargetById(existing.targetAnimeId);
+        } else {
+            target = await this.getDailyTarget(gn);
+        }
+
         const guess = await this.animesService.findOne(animeId);
 
         if (!guess) {
@@ -114,10 +144,9 @@ export class GamesService {
 
         // If user is logged in, sync with database and return streak
         if (userId) {
-            const existing = await this.getUserScore(userId, gn);
-
             const guesses = existing ? [...(existing.guesses as any[]), result] : [result];
-            await this.saveScore(userId, gn, guesses, result.isCorrect);
+            // Pass targetAnimeId on first create; upsert will ignore it on subsequent updates
+            await this.saveScore(userId, gn, guesses, result.isCorrect, existing ? undefined : target.id);
 
             const streak = await this.getUserStreak(userId);
             return { ...result, streak };
@@ -128,8 +157,9 @@ export class GamesService {
 
     /**
      * Saves or updates a user's game score for a specific game.
+     * targetAnimeId is stored on first create so old games are unaffected by pool changes.
      */
-    async saveScore(userId: number, gameNumber: number, guesses: any[], isWon: boolean) {
+    async saveScore(userId: number, gameNumber: number, guesses: any[], isWon: boolean, targetAnimeId?: number) {
         return this.prisma.akGuessGameScore.upsert({
             where: {
                 userId_gameNumber: { userId, gameNumber },
@@ -142,6 +172,7 @@ export class GamesService {
             create: {
                 userId,
                 gameNumber,
+                targetAnimeId: targetAnimeId ?? null,
                 attempts: guesses.length,
                 isWon,
                 guesses,
@@ -269,9 +300,20 @@ export class GamesService {
 
     /**
      * Returns hints based on the number of attempts.
+     * For logged-in users, uses their stored targetAnimeId so hints stay consistent
+     * even if the pool changes.
      */
-    async getHint(attempts: number, forGameNumber?: number) {
-        const target = await this.getDailyTarget(forGameNumber);
+    async getHint(attempts: number, forGameNumber?: number, userId?: number) {
+        let target: Awaited<ReturnType<typeof this.getDailyTarget>>;
+        if (userId) {
+            const gn = forGameNumber ?? this.getGameNumber();
+            const score = await this.getUserScore(userId, gn);
+            target = score?.targetAnimeId
+                ? await this.getDailyTargetById(score.targetAnimeId)
+                : await this.getDailyTarget(forGameNumber);
+        } else {
+            target = await this.getDailyTarget(forGameNumber);
+        }
         const hints: any = {};
 
         if (attempts >= 3) {
@@ -568,7 +610,7 @@ export class GamesService {
                 // so the answer is always guessable by the player.
                 OR: [
                     { format: null },
-                    { format: { notIn: ['OAV', 'Special', 'Clip'] } },
+                    { format: { notIn: ['OAV', 'Spécial', 'Clip'] } },
                 ],
             },
             select: { idAnime: true },
