@@ -454,7 +454,10 @@ export class GamesService {
         });
 
         if (!item) throw new NotFoundException('Jeu vidéo introuvable');
-        return item;
+        return {
+            ...item,
+            image: item.image ? `/api/media/serve/game/${item.image}` : null,
+        };
     }
 
     /**
@@ -877,7 +880,7 @@ export class GamesService {
             manga: {
                 id: guess.idManga,
                 titre: guess.titre,
-                image: guess.image,
+                image: guess.image ? `/api/media/serve/manga/${guess.image}` : null,
                 niceUrl: guess.niceUrl ?? null,
             },
             comparison: {
