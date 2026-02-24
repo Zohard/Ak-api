@@ -31,6 +31,10 @@ export class GamesService {
             where: {
                 statut: 1,
                 classementPopularite: { gt: 0, lte: 2000 }, // Top 2000 animes
+                OR: [
+                    { format: null },
+                    { format: { notIn: ['OAV', 'Special', 'Clip'] } },
+                ],
             },
             select: { idAnime: true },
             orderBy: { idAnime: 'asc' },
@@ -930,3 +934,4 @@ export class GamesService {
         return hints;
     }
 }
+
