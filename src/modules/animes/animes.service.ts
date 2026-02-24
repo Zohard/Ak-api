@@ -512,7 +512,7 @@ export class AnimesService extends BaseContentService<
   async findOne(id: number, includeReviews = false, includeEpisodes = false, includeTrailers = false, user?: any) {
     // Try to get from cache first (v3 includes collection score)
     const cacheKey = `${id}_${includeReviews}_${includeEpisodes}_${includeTrailers}_v3`;
-    const cached = await this.cacheService.getAnime(parseInt(cacheKey.replace(/[^0-9]/g, '')));
+    const cached = await this.cacheService.getAnime(id);
     if (cached && cached.includeReviews === includeReviews && cached.includeEpisodes === includeEpisodes && cached.includeTrailers === includeTrailers) {
       return cached.data;
     }

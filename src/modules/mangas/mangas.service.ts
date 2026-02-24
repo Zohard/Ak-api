@@ -467,7 +467,7 @@ export class MangasService extends BaseContentService<
   async findOne(id: number, includeReviews = false, user?: any) {
     // Try to get from cache first (v1 includes collection score)
     const cacheKey = `${id}_${includeReviews}_v1`;
-    const cached = await this.cacheService.getManga(parseInt(cacheKey.replace(/[^0-9]/g, '')));
+    const cached = await this.cacheService.getManga(id);
     if (cached && cached.includeReviews === includeReviews) {
       return cached.data;
     }
