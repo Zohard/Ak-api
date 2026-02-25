@@ -149,7 +149,7 @@ export class ReviewReportsService {
         status,
         idModerator: userId,
         dateTreated: new Date(),
-        moderatorNote,
+        moderatorNote: sanitizeForPostgres(moderatorNote) as string | undefined,
       },
     });
 
