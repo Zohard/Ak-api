@@ -153,7 +153,7 @@ export class AuthService {
     return {
       accessToken,
       refreshToken,
-      user: this.sanitizeUser(user),
+      user: await this.sanitizeUser(user),
     };
   }
 
@@ -234,7 +234,7 @@ export class AuthService {
     return {
       message: 'Registration successful. Please check your email to verify your account.',
       emailSent: true,
-      user: this.sanitizeUser(user),
+      user: await this.sanitizeUser(user),
     };
   }
 
@@ -354,7 +354,7 @@ export class AuthService {
     return {
       accessToken,
       refreshToken,
-      user: this.sanitizeUser(user),
+      user: await this.sanitizeUser(user),
     };
   }
 
@@ -420,7 +420,7 @@ export class AuthService {
       message: 'Email verified successfully',
       accessToken,
       refreshToken,
-      user: this.sanitizeUser(verificationRecord.user),
+      user: await this.sanitizeUser(verificationRecord.user),
     };
   }
 
@@ -529,7 +529,7 @@ export class AuthService {
     return {
       accessToken: newAccessToken,
       refreshToken: newRefreshToken,
-      user: this.sanitizeUser(tokenRecord.user),
+      user: await this.sanitizeUser(tokenRecord.user),
     };
   }
 
@@ -709,7 +709,8 @@ export class AuthService {
     }
   }
 
-  private sanitizeUser(user: SmfMember) {
+  private async sanitizeUser(user: SmfMember) {
+    const permissions = await this.getUserPermissionStrings(user.idMember);
     return {
       id: user.idMember,
       username: user.memberName,
@@ -723,6 +724,36 @@ export class AuthService {
       role: getRoleName(user.idGroup),
       isAdmin:
         hasAdminAccess(user.idGroup) || user.idMember === 1,
+      permissions,
     };
+  }
+
+  private async getUserPermissionStrings(userId: number): Promise<string[]> {
+    const userRoles = await this.prisma.akUserRole.findMany({
+      where: {
+        idMember: userId,
+        isActive: true,
+        OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+      },
+      include: {
+        role: {
+          include: {
+            rolePermissions: {
+              include: { permission: true },
+            },
+          },
+        },
+      },
+    });
+
+    const permSet = new Set<string>();
+    userRoles.forEach((userRole) => {
+      userRole.role.rolePermissions.forEach((rp) => {
+        if (rp.permission.isActive) {
+          permSet.add(`${rp.permission.resource}:${rp.permission.action}`);
+        }
+      });
+    });
+    return Array.from(permSet);
   }
 }
