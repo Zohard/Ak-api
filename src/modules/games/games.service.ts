@@ -836,13 +836,34 @@ export class GamesService {
 
         if (candidates.length === 0) throw new NotFoundException('Aucun manga candidat trouvé pour le jeu');
 
-        const index = gameNumber % candidates.length;
+        const index = Math.floor(this.seededRandom(gameNumber) * candidates.length);
         const targetId = candidates[index].idManga;
 
         return this.prisma.akManga.findUnique({
             where: { idManga: targetId },
             select: this.MANGA_SELECT,
         });
+    }
+
+    async getDailyTargetMangaById(mangaId: number) {
+        return this.prisma.akManga.findUnique({
+            where: { idManga: mangaId },
+            select: this.MANGA_SELECT,
+        });
+    }
+
+    private async areRelatedMangas(guessId: number, targetId: number, guessFormat: string | null, targetFormat: string | null): Promise<boolean> {
+        if (!guessFormat || !targetFormat || guessFormat !== targetFormat) return false;
+
+        const rows = await this.prisma.akFicheToFiche.findMany({
+            where: { idManga: { in: [guessId, targetId] } },
+            select: { idFicheDepart: true, idManga: true },
+        });
+
+        const guessGroups = new Set(rows.filter(r => r.idManga === guessId).map(r => r.idFicheDepart));
+        const targetGroups = rows.filter(r => r.idManga === targetId).map(r => r.idFicheDepart);
+
+        return targetGroups.some(g => guessGroups.has(g));
     }
 
     private async getMangaTagNames(mangaId: number): Promise<string[]> {
@@ -858,7 +879,20 @@ export class GamesService {
 
     async compareGuessManga(mangaId: number, userId?: number, forGameNumber?: number) {
         const gn = forGameNumber ?? this.getGameNumber();
-        const target = await this.getDailyTargetManga(gn);
+
+        let target: Awaited<ReturnType<typeof this.getDailyTargetManga>>;
+        let existing: Awaited<ReturnType<typeof this.getUserScoreManga>> | null = null;
+
+        if (userId) {
+            existing = await this.getUserScoreManga(userId, gn);
+        }
+
+        if (existing?.targetMangaId) {
+            target = await this.getDailyTargetMangaById(existing.targetMangaId);
+        } else {
+            target = await this.getDailyTargetManga(gn);
+        }
+
         if (!target) throw new NotFoundException('Manga cible introuvable');
 
         const guess = await this.prisma.akManga.findFirst({
@@ -868,7 +902,11 @@ export class GamesService {
 
         if (!guess) throw new NotFoundException('Manga deviné introuvable');
 
-        const isCorrect = guess.idManga === target.idManga;
+        const isCorrect = guess.idManga === target.idManga ||
+            await this.areRelatedMangas(guess.idManga, target.idManga, guess.statutVol, target.statutVol);
+
+        const isRelated = isCorrect && guess.idManga !== target.idManga;
+
         const [guessTagsArr, targetTagsArr] = await Promise.all([
             this.getMangaTagNames(guess.idManga),
             this.getMangaTagNames(target.idManga),
@@ -883,6 +921,14 @@ export class GamesService {
                 image: guess.image ? `/api/media/serve/manga/${guess.image}` : null,
                 niceUrl: guess.niceUrl ?? null,
             },
+            ...(isRelated && {
+                correctManga: {
+                    id: target.idManga,
+                    titre: target.titre,
+                    image: target.image ? `/api/media/serve/manga/${target.image}` : null,
+                    niceUrl: target.niceUrl ?? null,
+                },
+            }),
             comparison: {
                 year: this.compareYear(Number(guess.annee), Number(target.annee)),
                 format: this.compareValue(guess.statutVol, target.statutVol),
@@ -894,9 +940,8 @@ export class GamesService {
         };
 
         if (userId) {
-            const existing = await this.getUserScoreManga(userId, gn);
             const guesses = existing ? [...(existing.guesses as any[]), result] : [result];
-            await this.saveScoreManga(userId, gn, guesses, result.isCorrect);
+            await this.saveScoreManga(userId, gn, guesses, result.isCorrect, existing ? undefined : target.idManga);
             const streak = await this.getUserStreakManga(userId);
             return { ...result, streak };
         }
@@ -911,11 +956,11 @@ export class GamesService {
         return 'incorrect';
     }
 
-    async saveScoreManga(userId: number, gameNumber: number, guesses: any[], isWon: boolean) {
+    async saveScoreManga(userId: number, gameNumber: number, guesses: any[], isWon: boolean, targetMangaId?: number) {
         return this.prisma.akGuessGameScoreManga.upsert({
             where: { userId_gameNumber: { userId, gameNumber } },
             update: { attempts: guesses.length, isWon, guesses },
-            create: { userId, gameNumber, attempts: guesses.length, isWon, guesses },
+            create: { userId, gameNumber, targetMangaId: targetMangaId ?? null, attempts: guesses.length, isWon, guesses },
         });
     }
 
@@ -962,8 +1007,18 @@ export class GamesService {
         return { ...score, streak };
     }
 
-    async getHintManga(attempts: number, forGameNumber?: number) {
-        const target = await this.getDailyTargetManga(forGameNumber);
+    async getHintManga(attempts: number, forGameNumber?: number, userId?: number) {
+        let target: Awaited<ReturnType<typeof this.getDailyTargetManga>>;
+        if (userId) {
+            const gn = forGameNumber ?? this.getGameNumber();
+            const score = await this.getUserScoreManga(userId, gn);
+            target = score?.targetMangaId
+                ? await this.getDailyTargetMangaById(score.targetMangaId)
+                : await this.getDailyTargetManga(forGameNumber);
+        } else {
+            target = await this.getDailyTargetManga(forGameNumber);
+        }
+
         if (!target) throw new NotFoundException('Manga cible introuvable');
         const hints: any = {};
 

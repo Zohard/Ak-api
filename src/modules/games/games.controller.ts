@@ -187,7 +187,7 @@ export class GamesController {
         const gameNumber = this.parseGameNumber(rawGn);
         const userId = req.user?.id;
         const safeAttempts = await this.gamesService.resolveAttempts(attempts, userId, 'manga', gameNumber);
-        return this.gamesService.getHintManga(safeAttempts, gameNumber);
+        return this.gamesService.getHintManga(safeAttempts, gameNumber, userId);
     }
 
     @Post('manga/guess')

@@ -1659,14 +1659,15 @@ model AkGuessGameScoreScreenshot {
 }
 
 model AkGuessGameScoreManga {
-  id          Int      @id @default(autoincrement())
-  userId      Int      @map("user_id")
-  gameNumber  Int      @map("game_number")
-  attempts    Int      @default(0)
-  isWon       Boolean  @default(false) @map("is_won")
-  guesses     Json     @default("[]") @db.JsonB
-  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  id            Int      @id @default(autoincrement())
+  userId        Int      @map("user_id")
+  gameNumber    Int      @map("game_number")
+  targetMangaId Int?     @map("target_manga_id")
+  attempts      Int      @default(0)
+  isWon         Boolean  @default(false) @map("is_won")
+  guesses       Json     @default("[]") @db.JsonB
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt     DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
   user        SmfMember @relation("UserGameScoresManga", fields: [userId], references: [idMember], onDelete: Cascade)
 

@@ -412,12 +412,13 @@ export class AdminModerationService {
 
   async getModerationStats() {
     const stats = await this.prisma.$queryRaw`
-      SELECT 
+      SELECT
         (SELECT COUNT(*) FROM ak_critique WHERE statut = 1) as pending_reviews,
         (SELECT COUNT(*) FROM ak_critique WHERE statut = 0) as approved_reviews,
         (SELECT COUNT(*) FROM ak_critique WHERE statut = 2) as rejected_reviews,
         (SELECT COUNT(*) FROM smf_log_reported WHERE closed = 0) as pending_reports,
-        (SELECT COUNT(*) FROM smf_log_reported WHERE closed = 1) as resolved_reports
+        (SELECT COUNT(*) FROM smf_log_reported WHERE closed = 1) as resolved_reports,
+        (SELECT COUNT(*) FROM ak_review_reports WHERE status = 0) as pending_review_reports
     `;
 
     const result = (stats as any[])[0];
@@ -429,6 +430,7 @@ export class AdminModerationService {
       rejected_reviews: Number(result.rejected_reviews),
       pending_reports: Number(result.pending_reports),
       resolved_reports: Number(result.resolved_reports),
+      pending_review_reports: Number(result.pending_review_reports),
     };
   }
 
