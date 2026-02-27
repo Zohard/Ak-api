@@ -84,9 +84,18 @@ export class GamesService {
         });
 
         const guessGroups = new Set(rows.filter(r => r.idAnime === guessId).map(r => r.idFicheDepart));
-        const targetGroups = rows.filter(r => r.idAnime === targetId).map(r => r.idFicheDepart);
+        const sharedGroups = rows.filter(r => r.idAnime === targetId && guessGroups.has(r.idFicheDepart)).map(r => r.idFicheDepart);
 
-        return targetGroups.some(g => guessGroups.has(g));
+        if (sharedGroups.length === 0) return false;
+
+        // Exclude groups that contain a video game link — those connections are too loose
+        const gameLinksInGroups = await this.prisma.akFicheToFiche.findMany({
+            where: { idFicheDepart: { in: sharedGroups }, idJeu: { gt: 0 } },
+            select: { idFicheDepart: true },
+        });
+        const groupsWithGame = new Set(gameLinksInGroups.map(r => r.idFicheDepart));
+
+        return sharedGroups.some(g => !groupsWithGame.has(g));
     }
 
     async compareGuess(animeId: number, userId?: number, forGameNumber?: number) {
@@ -861,9 +870,18 @@ export class GamesService {
         });
 
         const guessGroups = new Set(rows.filter(r => r.idManga === guessId).map(r => r.idFicheDepart));
-        const targetGroups = rows.filter(r => r.idManga === targetId).map(r => r.idFicheDepart);
+        const sharedGroups = rows.filter(r => r.idManga === targetId && guessGroups.has(r.idFicheDepart)).map(r => r.idFicheDepart);
 
-        return targetGroups.some(g => guessGroups.has(g));
+        if (sharedGroups.length === 0) return false;
+
+        // Exclude groups that contain a video game link — those connections are too loose
+        const gameLinksInGroups = await this.prisma.akFicheToFiche.findMany({
+            where: { idFicheDepart: { in: sharedGroups }, idJeu: { gt: 0 } },
+            select: { idFicheDepart: true },
+        });
+        const groupsWithGame = new Set(gameLinksInGroups.map(r => r.idFicheDepart));
+
+        return sharedGroups.some(g => !groupsWithGame.has(g));
     }
 
     private async getMangaTagNames(mangaId: number): Promise<string[]> {
