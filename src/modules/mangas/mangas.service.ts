@@ -2536,10 +2536,17 @@ export class MangasService extends BaseContentService<
    * Get all volumes for a manga
    */
   async getMangaVolumes(mangaId: number) {
-    return this.prisma.mangaVolume.findMany({
+    const cacheKey = `manga_volumes:${mangaId}`;
+    const cached = await this.cacheService.get<any[]>(cacheKey);
+    if (cached) return cached;
+
+    const volumes = await this.prisma.mangaVolume.findMany({
       where: { idManga: mangaId },
       orderBy: { volumeNumber: 'asc' },
     });
+
+    await this.cacheService.set(cacheKey, volumes, 21600); // 6 hours
+    return volumes;
   }
 
   /**
@@ -2647,6 +2654,7 @@ export class MangasService extends BaseContentService<
     });
 
     await this.cacheService.invalidateMangaPlanning();
+    await this.cacheService.del(`manga_volumes:${mangaId}`);
     return volume;
   }
 
@@ -2655,7 +2663,7 @@ export class MangasService extends BaseContentService<
    */
   async updateVolume(volumeId: number, updateVolumeDto: any) {
     // Check if volume exists
-    await this.getVolume(volumeId);
+    const existingVolume = await this.getVolume(volumeId);
 
     // Clean ISBN: strip dashes and spaces
     const isbn = updateVolumeDto.isbn
@@ -2691,6 +2699,7 @@ export class MangasService extends BaseContentService<
     });
 
     await this.cacheService.invalidateMangaPlanning();
+    await this.cacheService.del(`manga_volumes:${existingVolume.idManga}`);
     return updatedVolume;
   }
 
@@ -2699,13 +2708,14 @@ export class MangasService extends BaseContentService<
    */
   async deleteVolume(volumeId: number) {
     // Check if volume exists
-    await this.getVolume(volumeId);
+    const existingVolume = await this.getVolume(volumeId);
 
     await this.prisma.mangaVolume.delete({
       where: { idVolume: volumeId },
     });
 
     await this.cacheService.invalidateMangaPlanning();
+    await this.cacheService.del(`manga_volumes:${existingVolume.idManga}`);
 
     return { message: 'Volume deleted successfully' };
   }
