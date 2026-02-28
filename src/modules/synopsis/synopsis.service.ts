@@ -262,186 +262,173 @@ export class SynopsisService {
     };
   }
 
-  async findAllSynopses(page: number = 1, limit: number = 20, validation?: number, search?: string) {
+  async findAllSynopses(page: number = 1, limit: number = 20, validation?: number, search?: string, type?: number) {
     const skip = (page - 1) * limit;
 
     let synopsesRaw: any[];
     let countRaw: any[];
 
-    // Build WHERE clause conditions
-    const conditions: string[] = [];
-    const countConditions: string[] = [];
-
     if (search && search.trim()) {
       const searchTerm = `%${search.trim()}%`;
 
       if (validation !== undefined) {
-        synopsesRaw = await this.prisma.$queryRaw<any[]>`
-        SELECT
-          s.id_synopsis,
-          s.synopsis,
-          s.type,
-          s.id_fiche,
-          s.validation,
-          s.date,
-          s.id_membre,
-          m.member_name,
-          CASE
-            WHEN s.type = 1 THEN a.titre
-            WHEN s.type = 2 THEN ma.titre
-            ELSE 'Contenu introuvable'
-          END as content_title,
-          CASE
-            WHEN s.type = 1 THEN a.nice_url
-            WHEN s.type = 2 THEN ma.nice_url
-            ELSE NULL
-          END as content_nice_url
-        FROM ak_synopsis s
-        LEFT JOIN smf_members m ON s.id_membre = m.id_member
-        LEFT JOIN ak_animes a ON s.type = 1 AND s.id_fiche = a.id_anime
-        LEFT JOIN ak_mangas ma ON s.type = 2 AND s.id_fiche = ma.id_manga
-        WHERE (
-          (s.type = 1 AND a.titre ILIKE ${searchTerm})
-          OR (s.type = 2 AND ma.titre ILIKE ${searchTerm})
-        )
-        AND s.validation = ${validation}
-        ORDER BY s.date DESC
-        LIMIT ${limit} OFFSET ${skip}
-      `;
-
-        countRaw = await this.prisma.$queryRaw<any[]>`
-        SELECT COUNT(*) as count
-        FROM ak_synopsis s
-        LEFT JOIN ak_animes a ON s.type = 1 AND s.id_fiche = a.id_anime
-        LEFT JOIN ak_mangas ma ON s.type = 2 AND s.id_fiche = ma.id_manga
-        WHERE (
-          (s.type = 1 AND a.titre ILIKE ${searchTerm})
-          OR (s.type = 2 AND ma.titre ILIKE ${searchTerm})
-        )
-        AND s.validation = ${validation}
-      `;
+        if (type !== undefined) {
+          synopsesRaw = await this.prisma.$queryRaw<any[]>`
+            SELECT s.id_synopsis, s.synopsis, s.type, s.id_fiche, s.validation, s.date, s.id_membre,
+              m.member_name,
+              CASE WHEN s.type = 1 THEN a.titre WHEN s.type = 2 THEN ma.titre ELSE 'Contenu introuvable' END as content_title,
+              CASE WHEN s.type = 1 THEN a.nice_url WHEN s.type = 2 THEN ma.nice_url ELSE NULL END as content_nice_url
+            FROM ak_synopsis s
+            LEFT JOIN smf_members m ON s.id_membre = m.id_member
+            LEFT JOIN ak_animes a ON s.type = 1 AND s.id_fiche = a.id_anime
+            LEFT JOIN ak_mangas ma ON s.type = 2 AND s.id_fiche = ma.id_manga
+            WHERE ((s.type = 1 AND a.titre ILIKE ${searchTerm}) OR (s.type = 2 AND ma.titre ILIKE ${searchTerm}))
+              AND s.validation = ${validation} AND s.type = ${type}
+            ORDER BY s.date DESC LIMIT ${limit} OFFSET ${skip}`;
+          countRaw = await this.prisma.$queryRaw<any[]>`
+            SELECT COUNT(*) as count FROM ak_synopsis s
+            LEFT JOIN ak_animes a ON s.type = 1 AND s.id_fiche = a.id_anime
+            LEFT JOIN ak_mangas ma ON s.type = 2 AND s.id_fiche = ma.id_manga
+            WHERE ((s.type = 1 AND a.titre ILIKE ${searchTerm}) OR (s.type = 2 AND ma.titre ILIKE ${searchTerm}))
+              AND s.validation = ${validation} AND s.type = ${type}`;
+        } else {
+          synopsesRaw = await this.prisma.$queryRaw<any[]>`
+            SELECT s.id_synopsis, s.synopsis, s.type, s.id_fiche, s.validation, s.date, s.id_membre,
+              m.member_name,
+              CASE WHEN s.type = 1 THEN a.titre WHEN s.type = 2 THEN ma.titre ELSE 'Contenu introuvable' END as content_title,
+              CASE WHEN s.type = 1 THEN a.nice_url WHEN s.type = 2 THEN ma.nice_url ELSE NULL END as content_nice_url
+            FROM ak_synopsis s
+            LEFT JOIN smf_members m ON s.id_membre = m.id_member
+            LEFT JOIN ak_animes a ON s.type = 1 AND s.id_fiche = a.id_anime
+            LEFT JOIN ak_mangas ma ON s.type = 2 AND s.id_fiche = ma.id_manga
+            WHERE ((s.type = 1 AND a.titre ILIKE ${searchTerm}) OR (s.type = 2 AND ma.titre ILIKE ${searchTerm}))
+              AND s.validation = ${validation}
+            ORDER BY s.date DESC LIMIT ${limit} OFFSET ${skip}`;
+          countRaw = await this.prisma.$queryRaw<any[]>`
+            SELECT COUNT(*) as count FROM ak_synopsis s
+            LEFT JOIN ak_animes a ON s.type = 1 AND s.id_fiche = a.id_anime
+            LEFT JOIN ak_mangas ma ON s.type = 2 AND s.id_fiche = ma.id_manga
+            WHERE ((s.type = 1 AND a.titre ILIKE ${searchTerm}) OR (s.type = 2 AND ma.titre ILIKE ${searchTerm}))
+              AND s.validation = ${validation}`;
+        }
       } else {
-        synopsesRaw = await this.prisma.$queryRaw<any[]>`
-        SELECT
-          s.id_synopsis,
-          s.synopsis,
-          s.type,
-          s.id_fiche,
-          s.validation,
-          s.date,
-          s.id_membre,
-          m.member_name,
-          CASE
-            WHEN s.type = 1 THEN a.titre
-            WHEN s.type = 2 THEN ma.titre
-            ELSE 'Contenu introuvable'
-          END as content_title,
-          CASE
-            WHEN s.type = 1 THEN a.nice_url
-            WHEN s.type = 2 THEN ma.nice_url
-            ELSE NULL
-          END as content_nice_url
-        FROM ak_synopsis s
-        LEFT JOIN smf_members m ON s.id_membre = m.id_member
-        LEFT JOIN ak_animes a ON s.type = 1 AND s.id_fiche = a.id_anime
-        LEFT JOIN ak_mangas ma ON s.type = 2 AND s.id_fiche = ma.id_manga
-        WHERE (
-          (s.type = 1 AND a.titre ILIKE ${searchTerm})
-          OR (s.type = 2 AND ma.titre ILIKE ${searchTerm})
-        )
-        ORDER BY s.date DESC
-        LIMIT ${limit} OFFSET ${skip}
-      `;
-
-        countRaw = await this.prisma.$queryRaw<any[]>`
-        SELECT COUNT(*) as count
-        FROM ak_synopsis s
-        LEFT JOIN ak_animes a ON s.type = 1 AND s.id_fiche = a.id_anime
-        LEFT JOIN ak_mangas ma ON s.type = 2 AND s.id_fiche = ma.id_manga
-        WHERE (
-          (s.type = 1 AND a.titre ILIKE ${searchTerm})
-          OR (s.type = 2 AND ma.titre ILIKE ${searchTerm})
-        )
-      `;
+        if (type !== undefined) {
+          synopsesRaw = await this.prisma.$queryRaw<any[]>`
+            SELECT s.id_synopsis, s.synopsis, s.type, s.id_fiche, s.validation, s.date, s.id_membre,
+              m.member_name,
+              CASE WHEN s.type = 1 THEN a.titre WHEN s.type = 2 THEN ma.titre ELSE 'Contenu introuvable' END as content_title,
+              CASE WHEN s.type = 1 THEN a.nice_url WHEN s.type = 2 THEN ma.nice_url ELSE NULL END as content_nice_url
+            FROM ak_synopsis s
+            LEFT JOIN smf_members m ON s.id_membre = m.id_member
+            LEFT JOIN ak_animes a ON s.type = 1 AND s.id_fiche = a.id_anime
+            LEFT JOIN ak_mangas ma ON s.type = 2 AND s.id_fiche = ma.id_manga
+            WHERE ((s.type = 1 AND a.titre ILIKE ${searchTerm}) OR (s.type = 2 AND ma.titre ILIKE ${searchTerm}))
+              AND s.type = ${type}
+            ORDER BY s.date DESC LIMIT ${limit} OFFSET ${skip}`;
+          countRaw = await this.prisma.$queryRaw<any[]>`
+            SELECT COUNT(*) as count FROM ak_synopsis s
+            LEFT JOIN ak_animes a ON s.type = 1 AND s.id_fiche = a.id_anime
+            LEFT JOIN ak_mangas ma ON s.type = 2 AND s.id_fiche = ma.id_manga
+            WHERE ((s.type = 1 AND a.titre ILIKE ${searchTerm}) OR (s.type = 2 AND ma.titre ILIKE ${searchTerm}))
+              AND s.type = ${type}`;
+        } else {
+          synopsesRaw = await this.prisma.$queryRaw<any[]>`
+            SELECT s.id_synopsis, s.synopsis, s.type, s.id_fiche, s.validation, s.date, s.id_membre,
+              m.member_name,
+              CASE WHEN s.type = 1 THEN a.titre WHEN s.type = 2 THEN ma.titre ELSE 'Contenu introuvable' END as content_title,
+              CASE WHEN s.type = 1 THEN a.nice_url WHEN s.type = 2 THEN ma.nice_url ELSE NULL END as content_nice_url
+            FROM ak_synopsis s
+            LEFT JOIN smf_members m ON s.id_membre = m.id_member
+            LEFT JOIN ak_animes a ON s.type = 1 AND s.id_fiche = a.id_anime
+            LEFT JOIN ak_mangas ma ON s.type = 2 AND s.id_fiche = ma.id_manga
+            WHERE (s.type = 1 AND a.titre ILIKE ${searchTerm}) OR (s.type = 2 AND ma.titre ILIKE ${searchTerm})
+            ORDER BY s.date DESC LIMIT ${limit} OFFSET ${skip}`;
+          countRaw = await this.prisma.$queryRaw<any[]>`
+            SELECT COUNT(*) as count FROM ak_synopsis s
+            LEFT JOIN ak_animes a ON s.type = 1 AND s.id_fiche = a.id_anime
+            LEFT JOIN ak_mangas ma ON s.type = 2 AND s.id_fiche = ma.id_manga
+            WHERE (s.type = 1 AND a.titre ILIKE ${searchTerm}) OR (s.type = 2 AND ma.titre ILIKE ${searchTerm})`;
+        }
       }
     } else {
-      // Non-search queries - also use raw SQL for consistency and performance
       if (validation !== undefined) {
-        synopsesRaw = await this.prisma.$queryRaw<any[]>`
-        SELECT
-          s.id_synopsis,
-          s.synopsis,
-          s.type,
-          s.id_fiche,
-          s.validation,
-          s.date,
-          s.id_membre,
-          m.member_name,
-          CASE
-            WHEN s.type = 1 THEN a.titre
-            WHEN s.type = 2 THEN ma.titre
-            ELSE 'Contenu introuvable'
-          END as content_title,
-          CASE
-            WHEN s.type = 1 THEN a.nice_url
-            WHEN s.type = 2 THEN ma.nice_url
-            ELSE NULL
-          END as content_nice_url
-        FROM ak_synopsis s
-        LEFT JOIN smf_members m ON s.id_membre = m.id_member
-        LEFT JOIN ak_animes a ON s.type = 1 AND s.id_fiche = a.id_anime
-        LEFT JOIN ak_mangas ma ON s.type = 2 AND s.id_fiche = ma.id_manga
-        WHERE s.validation = ${validation}
-          AND (a.id_anime IS NOT NULL OR ma.id_manga IS NOT NULL)
-        ORDER BY s.date DESC
-        LIMIT ${limit} OFFSET ${skip}
-      `;
-
-        countRaw = await this.prisma.$queryRaw<any[]>`
-        SELECT COUNT(*) as count
-        FROM ak_synopsis s
-        LEFT JOIN ak_animes a ON s.type = 1 AND s.id_fiche = a.id_anime
-        LEFT JOIN ak_mangas ma ON s.type = 2 AND s.id_fiche = ma.id_manga
-        WHERE s.validation = ${validation}
-          AND (a.id_anime IS NOT NULL OR ma.id_manga IS NOT NULL)
-      `;
+        if (type !== undefined) {
+          synopsesRaw = await this.prisma.$queryRaw<any[]>`
+            SELECT s.id_synopsis, s.synopsis, s.type, s.id_fiche, s.validation, s.date, s.id_membre,
+              m.member_name,
+              CASE WHEN s.type = 1 THEN a.titre WHEN s.type = 2 THEN ma.titre ELSE 'Contenu introuvable' END as content_title,
+              CASE WHEN s.type = 1 THEN a.nice_url WHEN s.type = 2 THEN ma.nice_url ELSE NULL END as content_nice_url
+            FROM ak_synopsis s
+            LEFT JOIN smf_members m ON s.id_membre = m.id_member
+            LEFT JOIN ak_animes a ON s.type = 1 AND s.id_fiche = a.id_anime
+            LEFT JOIN ak_mangas ma ON s.type = 2 AND s.id_fiche = ma.id_manga
+            WHERE s.validation = ${validation} AND s.type = ${type}
+              AND (a.id_anime IS NOT NULL OR ma.id_manga IS NOT NULL)
+            ORDER BY s.date DESC LIMIT ${limit} OFFSET ${skip}`;
+          countRaw = await this.prisma.$queryRaw<any[]>`
+            SELECT COUNT(*) as count FROM ak_synopsis s
+            LEFT JOIN ak_animes a ON s.type = 1 AND s.id_fiche = a.id_anime
+            LEFT JOIN ak_mangas ma ON s.type = 2 AND s.id_fiche = ma.id_manga
+            WHERE s.validation = ${validation} AND s.type = ${type}
+              AND (a.id_anime IS NOT NULL OR ma.id_manga IS NOT NULL)`;
+        } else {
+          synopsesRaw = await this.prisma.$queryRaw<any[]>`
+            SELECT s.id_synopsis, s.synopsis, s.type, s.id_fiche, s.validation, s.date, s.id_membre,
+              m.member_name,
+              CASE WHEN s.type = 1 THEN a.titre WHEN s.type = 2 THEN ma.titre ELSE 'Contenu introuvable' END as content_title,
+              CASE WHEN s.type = 1 THEN a.nice_url WHEN s.type = 2 THEN ma.nice_url ELSE NULL END as content_nice_url
+            FROM ak_synopsis s
+            LEFT JOIN smf_members m ON s.id_membre = m.id_member
+            LEFT JOIN ak_animes a ON s.type = 1 AND s.id_fiche = a.id_anime
+            LEFT JOIN ak_mangas ma ON s.type = 2 AND s.id_fiche = ma.id_manga
+            WHERE s.validation = ${validation}
+              AND (a.id_anime IS NOT NULL OR ma.id_manga IS NOT NULL)
+            ORDER BY s.date DESC LIMIT ${limit} OFFSET ${skip}`;
+          countRaw = await this.prisma.$queryRaw<any[]>`
+            SELECT COUNT(*) as count FROM ak_synopsis s
+            LEFT JOIN ak_animes a ON s.type = 1 AND s.id_fiche = a.id_anime
+            LEFT JOIN ak_mangas ma ON s.type = 2 AND s.id_fiche = ma.id_manga
+            WHERE s.validation = ${validation}
+              AND (a.id_anime IS NOT NULL OR ma.id_manga IS NOT NULL)`;
+        }
       } else {
-        synopsesRaw = await this.prisma.$queryRaw<any[]>`
-        SELECT
-          s.id_synopsis,
-          s.synopsis,
-          s.type,
-          s.id_fiche,
-          s.validation,
-          s.date,
-          s.id_membre,
-          m.member_name,
-          CASE
-            WHEN s.type = 1 THEN a.titre
-            WHEN s.type = 2 THEN ma.titre
-            ELSE 'Contenu introuvable'
-          END as content_title,
-          CASE
-            WHEN s.type = 1 THEN a.nice_url
-            WHEN s.type = 2 THEN ma.nice_url
-            ELSE NULL
-          END as content_nice_url
-        FROM ak_synopsis s
-        LEFT JOIN smf_members m ON s.id_membre = m.id_member
-        LEFT JOIN ak_animes a ON s.type = 1 AND s.id_fiche = a.id_anime
-        LEFT JOIN ak_mangas ma ON s.type = 2 AND s.id_fiche = ma.id_manga
-        WHERE (a.id_anime IS NOT NULL OR ma.id_manga IS NOT NULL)
-        ORDER BY s.date DESC
-        LIMIT ${limit} OFFSET ${skip}
-      `;
-
-        countRaw = await this.prisma.$queryRaw<any[]>`
-        SELECT COUNT(*) as count
-        FROM ak_synopsis s
-        LEFT JOIN ak_animes a ON s.type = 1 AND s.id_fiche = a.id_anime
-        LEFT JOIN ak_mangas ma ON s.type = 2 AND s.id_fiche = ma.id_manga
-        WHERE (a.id_anime IS NOT NULL OR ma.id_manga IS NOT NULL)
-      `;
+        if (type !== undefined) {
+          synopsesRaw = await this.prisma.$queryRaw<any[]>`
+            SELECT s.id_synopsis, s.synopsis, s.type, s.id_fiche, s.validation, s.date, s.id_membre,
+              m.member_name,
+              CASE WHEN s.type = 1 THEN a.titre WHEN s.type = 2 THEN ma.titre ELSE 'Contenu introuvable' END as content_title,
+              CASE WHEN s.type = 1 THEN a.nice_url WHEN s.type = 2 THEN ma.nice_url ELSE NULL END as content_nice_url
+            FROM ak_synopsis s
+            LEFT JOIN smf_members m ON s.id_membre = m.id_member
+            LEFT JOIN ak_animes a ON s.type = 1 AND s.id_fiche = a.id_anime
+            LEFT JOIN ak_mangas ma ON s.type = 2 AND s.id_fiche = ma.id_manga
+            WHERE s.type = ${type}
+              AND (a.id_anime IS NOT NULL OR ma.id_manga IS NOT NULL)
+            ORDER BY s.date DESC LIMIT ${limit} OFFSET ${skip}`;
+          countRaw = await this.prisma.$queryRaw<any[]>`
+            SELECT COUNT(*) as count FROM ak_synopsis s
+            LEFT JOIN ak_animes a ON s.type = 1 AND s.id_fiche = a.id_anime
+            LEFT JOIN ak_mangas ma ON s.type = 2 AND s.id_fiche = ma.id_manga
+            WHERE s.type = ${type}
+              AND (a.id_anime IS NOT NULL OR ma.id_manga IS NOT NULL)`;
+        } else {
+          synopsesRaw = await this.prisma.$queryRaw<any[]>`
+            SELECT s.id_synopsis, s.synopsis, s.type, s.id_fiche, s.validation, s.date, s.id_membre,
+              m.member_name,
+              CASE WHEN s.type = 1 THEN a.titre WHEN s.type = 2 THEN ma.titre ELSE 'Contenu introuvable' END as content_title,
+              CASE WHEN s.type = 1 THEN a.nice_url WHEN s.type = 2 THEN ma.nice_url ELSE NULL END as content_nice_url
+            FROM ak_synopsis s
+            LEFT JOIN smf_members m ON s.id_membre = m.id_member
+            LEFT JOIN ak_animes a ON s.type = 1 AND s.id_fiche = a.id_anime
+            LEFT JOIN ak_mangas ma ON s.type = 2 AND s.id_fiche = ma.id_manga
+            WHERE (a.id_anime IS NOT NULL OR ma.id_manga IS NOT NULL)
+            ORDER BY s.date DESC LIMIT ${limit} OFFSET ${skip}`;
+          countRaw = await this.prisma.$queryRaw<any[]>`
+            SELECT COUNT(*) as count FROM ak_synopsis s
+            LEFT JOIN ak_animes a ON s.type = 1 AND s.id_fiche = a.id_anime
+            LEFT JOIN ak_mangas ma ON s.type = 2 AND s.id_fiche = ma.id_manga
+            WHERE (a.id_anime IS NOT NULL OR ma.id_manga IS NOT NULL)`;
+        }
       }
     }
 
@@ -684,6 +671,100 @@ export class SynopsisService {
       success: true,
       message: 'Synopsis resoumis avec succès. Il sera réexaminé par notre équipe.',
     };
+  }
+
+  async findOrphanSynopses(page: number = 1, limit: number = 50, type?: number) {
+    const skip = (page - 1) * limit;
+
+    const [orphans, total] = await Promise.all([
+      type !== undefined
+        ? this.prisma.$queryRaw<any[]>`
+            SELECT
+              s.id_synopsis,
+              s.synopsis,
+              s.type,
+              s.id_fiche,
+              s.validation,
+              s.date,
+              s.id_membre,
+              m.member_name
+            FROM ak_synopsis s
+            LEFT JOIN smf_members m ON s.id_membre = m.id_member
+            WHERE (s.id_fiche = 0 OR s.id_fiche IS NULL) AND s.type = ${type}
+            ORDER BY s.id_synopsis ASC
+            LIMIT ${limit} OFFSET ${skip}
+          `
+        : this.prisma.$queryRaw<any[]>`
+            SELECT
+              s.id_synopsis,
+              s.synopsis,
+              s.type,
+              s.id_fiche,
+              s.validation,
+              s.date,
+              s.id_membre,
+              m.member_name
+            FROM ak_synopsis s
+            LEFT JOIN smf_members m ON s.id_membre = m.id_member
+            WHERE s.id_fiche = 0 OR s.id_fiche IS NULL
+            ORDER BY s.id_synopsis ASC
+            LIMIT ${limit} OFFSET ${skip}
+          `,
+      type !== undefined
+        ? this.prisma.$queryRaw<any[]>`
+            SELECT COUNT(*) as count FROM ak_synopsis
+            WHERE (id_fiche = 0 OR id_fiche IS NULL) AND type = ${type}
+          `
+        : this.prisma.$queryRaw<any[]>`
+            SELECT COUNT(*) as count FROM ak_synopsis WHERE id_fiche = 0 OR id_fiche IS NULL
+          `,
+    ]);
+
+    return {
+      success: true,
+      synopses: orphans.map(s => ({
+        id_synopsis: s.id_synopsis,
+        synopsis: s.synopsis,
+        type: s.type,
+        id_fiche: s.id_fiche,
+        validation: s.validation,
+        date: s.date,
+        author_name: s.member_name || 'Utilisateur introuvable',
+        content_title: 'Orphelin',
+      })),
+      pagination: {
+        total: Number(total[0]?.count || 0),
+        page,
+        limit,
+        totalPages: Math.ceil(Number(total[0]?.count || 0) / limit),
+      },
+    };
+  }
+
+  async reassignSynopsis(synopsisId: number, idFiche: number, type: number) {
+    const synopsis = await this.prisma.akSynopsis.findUnique({
+      where: { idSynopsis: synopsisId },
+    });
+
+    if (!synopsis) {
+      throw new NotFoundException('Synopsis introuvable');
+    }
+
+    // Validate that target anime/manga exists
+    if (type === 1) {
+      const anime = await this.prisma.akAnime.findUnique({ where: { idAnime: idFiche } });
+      if (!anime) throw new NotFoundException('Anime introuvable');
+    } else if (type === 2) {
+      const manga = await this.prisma.akManga.findUnique({ where: { idManga: idFiche } });
+      if (!manga) throw new NotFoundException('Manga introuvable');
+    }
+
+    await this.prisma.akSynopsis.update({
+      where: { idSynopsis: synopsisId },
+      data: { idFiche: idFiche, type },
+    });
+
+    return { success: true, message: 'Synopsis réassigné avec succès' };
   }
 
   async bulkDelete(ids: number[]): Promise<{ deletedCount: number }> {

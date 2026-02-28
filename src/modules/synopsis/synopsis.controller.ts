@@ -159,11 +159,13 @@ export class SynopsisController {
     @Query('limit') limitStr?: string,
     @Query('validation') validationStr?: string,
     @Query('search') search?: string,
+    @Query('type') typeStr?: string,
   ) {
     const page = pageStr ? parseInt(pageStr) : 1;
     const limit = limitStr ? parseInt(limitStr) : 20;
     const validation = validationStr !== undefined ? parseInt(validationStr) : undefined;
-    return this.synopsisService.findAllSynopses(page, limit, validation, search);
+    const type = typeStr !== undefined ? parseInt(typeStr) : undefined;
+    return this.synopsisService.findAllSynopses(page, limit, validation, search, type);
   }
 
   @Get('pending/count')
@@ -299,6 +301,35 @@ export class SynopsisController {
   })
   async resetToPending(@Param('id', ParseIntPipe) id: number, @Request() req) {
     return this.synopsisService.resetToPending(id, req.user.id);
+  }
+
+  @Get('orphans')
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Lister les synopsis orphelins (id_fiche=0) - Admin seulement' })
+  @ApiResponse({ status: 200, description: 'Liste des synopsis non rattachés à un anime/manga' })
+  async getOrphanSynopses(
+    @Query('page') pageStr?: string,
+    @Query('limit') limitStr?: string,
+    @Query('type') typeStr?: string,
+  ) {
+    const page = pageStr ? parseInt(pageStr) : 1;
+    const limit = limitStr ? parseInt(limitStr) : 50;
+    const type = typeStr !== undefined ? parseInt(typeStr) : undefined;
+    return this.synopsisService.findOrphanSynopses(page, limit, type);
+  }
+
+  @Patch(':id/reassign')
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Réassigner un synopsis orphelin à un anime/manga - Admin seulement' })
+  @ApiParam({ name: 'id', description: 'ID du synopsis', type: 'number' })
+  @ApiResponse({ status: 200, description: 'Synopsis réassigné avec succès' })
+  async reassignSynopsis(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: { id_fiche: number; type: number },
+  ) {
+    return this.synopsisService.reassignSynopsis(id, body.id_fiche, body.type);
   }
 
   @Post('bulk-delete')
