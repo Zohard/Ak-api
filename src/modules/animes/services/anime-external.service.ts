@@ -140,6 +140,13 @@ export class AnimeExternalService {
         await this.cacheService.set(cacheKey, seasonalAnime, 3600);
       }
 
+      // Filter out hentai regardless of cache state
+      seasonalAnime = seasonalAnime.filter((a: any) => {
+        if (a.isAdult) return false;
+        if (Array.isArray(a.genres) && a.genres.some((g: string) => g.toLowerCase() === 'hentai')) return false;
+        return true;
+      });
+
       // Check existence for each anime individually (uses per-anime cache with AniList ID)
       const comparisons: any[] = [];
 

@@ -48,6 +48,7 @@ export class AdminAnimesService {
       statut,
       sortBy = 'dateAjout',
       sortOrder = 'desc',
+      noNbEpisode,
     } = query;
     const skip = (page - 1) * limit;
 
@@ -63,6 +64,9 @@ export class AdminAnimesService {
     if (annee) where.annee = annee;
     if (ficheComplete !== undefined) where.ficheComplete = ficheComplete;
     if (statut !== undefined) where.statut = statut;
+    if (noNbEpisode) {
+      where.AND = [{ OR: [{ nbEp: null }, { nbEp: 0 }] }];
+    }
 
     // Build order by - only add status sort if not filtering by specific status
     const orderBy: any[] = [];

@@ -56,7 +56,7 @@ export class AdminMangasService {
   }
 
   async list(query: AdminMangaListQueryDto) {
-    const { page = 1, limit = 20, search, annee, ficheComplete, statut, sortBy = 'dateAjout', sortOrder = 'desc' } = query;
+    const { page = 1, limit = 20, search, annee, ficheComplete, statut, sortBy = 'dateAjout', sortOrder = 'desc', noNbVolume } = query;
     const skip = (page - 1) * limit;
     const where: any = {};
     if (search) {
@@ -70,6 +70,9 @@ export class AdminMangasService {
     if (annee) where.annee = annee;
     if (ficheComplete !== undefined) where.ficheComplete = ficheComplete;
     if (statut !== undefined) where.statut = statut;
+    if (noNbVolume) {
+      where.AND = [{ OR: [{ nbVolumes: null }, { nbVolumes: '' }] }];
+    }
 
     // Build orderBy based on sortBy and sortOrder
     const orderBy: any = {};

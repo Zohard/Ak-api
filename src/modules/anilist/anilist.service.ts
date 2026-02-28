@@ -116,6 +116,7 @@ export interface AniListManga {
   externalLinks: Array<{ id: number; type: string; site: string; url: string }>;
   averageScore?: number;
   meanScore?: number;
+  isAdult?: boolean;
   siteUrl: string;
 }
 
@@ -561,14 +562,21 @@ export class AniListService {
       }
     }
 
-    return allAnime.slice(0, limit);
+    // Filter out hentai (isAdult flag or "Hentai" genre) as a safety net
+    const filtered = allAnime.filter((a: any) => {
+      if (a.isAdult) return false;
+      if (Array.isArray(a.genres) && a.genres.some((g: string) => g.toLowerCase() === 'hentai')) return false;
+      return true;
+    });
+
+    return filtered.slice(0, limit);
   }
 
   private async getAnimesPage(season: string, year: number, page: number, perPage: number): Promise<AniListAnime[]> {
     const graphqlQuery = `
       query ($season: MediaSeason, $year: Int, $page: Int, $perPage: Int) {
         Page(page: $page, perPage: $perPage) {
-          media(season: $season, seasonYear: $year, type: ANIME, sort: [POPULARITY_DESC]) {
+          media(season: $season, seasonYear: $year, type: ANIME, isAdult: false, sort: [POPULARITY_DESC]) {
             id
             title {
               romaji
@@ -651,6 +659,7 @@ export class AniListService {
             }
             averageScore
             meanScore
+            isAdult
             siteUrl
           }
         }

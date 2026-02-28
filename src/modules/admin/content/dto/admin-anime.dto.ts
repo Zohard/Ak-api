@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsInt, IsNotEmpty, IsOptional, IsString, Min, Max, IsIn } from 'class-validator';
-import { Type } from 'class-transformer';
+import { IsBoolean, IsInt, IsNotEmpty, IsOptional, IsString, Min, Max, IsIn } from 'class-validator';
+import { Transform, Type } from 'class-transformer';
 
 export class CreateAdminAnimeDto {
   @ApiProperty({ description: 'Titre de l\'anime' })
@@ -336,4 +336,10 @@ export class AdminAnimeListQueryDto {
   @IsOptional()
   @IsString()
   sortOrder?: 'asc' | 'desc' = 'desc';
+
+  @ApiPropertyOptional({ description: 'Filtrer les animes sans nb d\'épisodes (nbEp null ou 0)' })
+  @IsOptional()
+  @Transform(({ value }) => value === 'true' || value === true)
+  @IsBoolean()
+  noNbEpisode?: boolean;
 }
