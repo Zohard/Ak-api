@@ -30,9 +30,11 @@ export class HomePageService {
       recentAnimes: 'recent_animes',
       recentMangas: 'recent_mangas',
       recentGames: 'recent_games',
+      onThisDayReviews: 'on_this_day_reviews',
     };
 
-    // 1. Try to get all parts from cache in parallel
+    const cachedOnThisDayReviews = arguments[0] ? null : null; // Temp fix, actually I'll just destructure properly.
+    // Let's redefine the variables from the promise array properly
     const [
       rawCachedReviews,
       rawCachedArticles,
@@ -42,6 +44,7 @@ export class HomePageService {
       cachedRecentAnimes,
       cachedRecentMangas,
       cachedRecentGames,
+      rawCachedOnThisDayReviews,
     ] = await Promise.all([
       this.cache.get<any>(`homepage:${keys.reviews}`),
       this.cache.get<any>(`homepage:${keys.articles}`),
@@ -51,11 +54,13 @@ export class HomePageService {
       this.cache.get<any>(`homepage:${keys.recentAnimes}`),
       this.cache.get<any>(`homepage:${keys.recentMangas}`),
       this.cache.get<any>(`homepage:${keys.recentGames}`),
+      this.cache.get<any>(`homepage:${keys.onThisDayReviews}`),
     ]);
 
     // Discard cached empty arrays for reviews/articles (treat as cache miss)
     const cachedReviews = (Array.isArray(rawCachedReviews) && rawCachedReviews.length === 0) ? null : rawCachedReviews;
     const cachedArticles = (Array.isArray(rawCachedArticles) && rawCachedArticles.length === 0) ? null : rawCachedArticles;
+    const cachedOnThisDayReviewsClean = (Array.isArray(rawCachedOnThisDayReviews?.reviews) && rawCachedOnThisDayReviews.reviews.length === 0) ? null : rawCachedOnThisDayReviews;
 
     if (rawCachedReviews && !cachedReviews) {
       this.logger.warn('⚠️ Discarded cached empty [] for homepage:reviews — treating as MISS');
@@ -173,6 +178,11 @@ export class HomePageService {
       });
     }
 
+    if (!cachedOnThisDayReviewsClean) {
+      this.logger.log('MISS: On This Day Reviews');
+      promises.onThisDayReviews = this.reviewsService.getOnThisDayReviews(4);
+    }
+
     // 3. Resolve all missing data
     // We can't use Promise.allSettled on an object directly, so we map the values
     const keysToFetch = Object.keys(promises);
@@ -230,6 +240,7 @@ export class HomePageService {
             if (key === 'recentAnimes') promises.recentAnimesResult = dataToCache;
             if (key === 'recentMangas') promises.recentMangasResult = dataToCache;
             if (key === 'recentGames') promises.recentGamesResult = dataToCache;
+            if (key === 'onThisDayReviews') promises.onThisDayReviewsResult = dataToCache;
 
           } catch (e) {
             this.logger.error(`Failed to fetch ${key}`, e);
@@ -256,6 +267,8 @@ export class HomePageService {
     const recentAnimes = promises.recentAnimesResult || cachedRecentAnimes || [];
     const recentMangas = promises.recentMangasResult || cachedRecentMangas || [];
     const recentGames = promises.recentGamesResult || cachedRecentGames || [];
+    const onThisDayReviewsRaw = promises.onThisDayReviewsResult || cachedOnThisDayReviewsClean || { reviews: [] };
+    const onThisDayReviews = Array.isArray(onThisDayReviewsRaw?.reviews) ? onThisDayReviewsRaw.reviews : [];
 
     // Safety check: Ensure date fields are strings (if they came from cache as dates or strings)
     // This prevents "reload failure" if cache restoration creates objects that serialization doesn't like
@@ -270,6 +283,13 @@ export class HomePageService {
       articles.forEach((a: any) => {
         if (a.date) a.date = toISOString(a.date);
         if (a.postDate) a.postDate = toISOString(a.postDate);
+      });
+    }
+
+    if (Array.isArray(onThisDayReviews)) {
+      onThisDayReviews.forEach((r: any) => {
+        if (r.dateCritique) r.dateCritique = toISOString(r.dateCritique);
+        if (r.reviewDate) r.reviewDate = toISOString(r.reviewDate);
       });
     }
 
@@ -314,6 +334,7 @@ export class HomePageService {
           addedDate: toISOString(g.dateAjout),
         })),
       },
+      onThisDayReviews,
       generatedAt: new Date().toISOString(),
     };
   }

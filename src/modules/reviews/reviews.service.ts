@@ -451,6 +451,65 @@ export class ReviewsService {
     return result;
   }
 
+  async getOnThisDayReviews(limit = 5) {
+    const now = new Date();
+    const currentMonth = now.getMonth() + 1; // JS months are 0-indexed, SQL is 1-indexed
+    const currentDay = now.getDate();
+    const currentYear = now.getFullYear();
+
+    // Cache key for today's retro reviews
+    const cacheKey = `reviews:on-this-day:${currentDay}-${currentMonth}`;
+    const cached = await this.cacheService.get(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
+    try {
+      // Use raw query for MySQL EXTRACT/MONTH/DAY functions
+      const rawReviews: any[] = await this.prisma.$queryRawUnsafe(`
+        SELECT c.*, 
+               m.idMember, m.memberName, m.avatar,
+               a.idAnime as a_idAnime, a.titre as a_titre, a.image as a_image,
+               b.idManga as b_idManga, b.titre as b_titre, b.image as b_image,
+               j.idJeu as j_idJeu, j.titre as j_titre, j.image as j_image
+        FROM ak_critiques c
+        LEFT JOIN smf_members m ON c.idMembre = m.idMember
+        LEFT JOIN ak_animes a ON c.idAnime = a.idAnime
+        LEFT JOIN ak_mangas b ON c.idManga = b.idManga
+        LEFT JOIN ak_jeux_video j ON c.idJeu = j.idJeu
+        WHERE c.statut = 0 
+          AND MONTH(c.dateCritique) = ${currentMonth} 
+          AND DAY(c.dateCritique) = ${currentDay} 
+          AND YEAR(c.dateCritique) < ${currentYear}
+        ORDER BY c.popularite DESC, c.notation DESC, c.dateCritique DESC
+        LIMIT ${limit}
+      `);
+
+      // Map raw data to the structure formatReview expects
+      const formattedReviews = rawReviews.map(raw => {
+        // Construct standard object
+        const review = {
+          ...raw,
+          membre: raw.idMember ? { idMember: raw.idMember, memberName: raw.memberName, avatar: raw.avatar } : null,
+          anime: raw.a_idAnime ? { idAnime: raw.a_idAnime, titre: raw.a_titre, image: raw.a_image } : null,
+          manga: raw.b_idManga ? { idManga: raw.b_idManga, titre: raw.b_titre, image: raw.b_image } : null,
+          jeuxVideo: raw.j_idJeu ? { idJeu: raw.j_idJeu, titre: raw.j_titre, image: raw.j_image } : null,
+        };
+        return this.formatReview(review);
+      });
+
+      // Cache for 6 hours
+      if (formattedReviews.length > 0) {
+        await this.cacheService.set(cacheKey, { reviews: formattedReviews }, 21600);
+      }
+
+      return { reviews: formattedReviews };
+    } catch (error) {
+      this.logger.error(`Failed to fetch On This Day reviews: ${error.message}`);
+      return { reviews: [] };
+    }
+  }
+
   async findOne(id: number, requestingUserId?: number) {
     // Try to get from cache first (only for public/published reviews)
     const cached = await this.cacheService.get(`review:${id}`);

@@ -57,6 +57,15 @@ export class ReviewsController {
     return this.reviewsService.getTopReviews(limit, type);
   }
 
+  @Get('on-this-day')
+  @ApiOperation({ summary: 'Critiques postées le même jour lors des années précédentes' })
+  @ApiResponse({ status: 200, description: 'Liste des critiques rétro' })
+  async getOnThisDayReviews(
+    @Query('limit', new ParseIntPipe({ optional: true })) limit = 5,
+  ) {
+    return this.reviewsService.getOnThisDayReviews(limit);
+  }
+
   @Get('user/:userId')
   @ApiOperation({ summary: "Critiques d'un utilisateur" })
   @ApiParam({
