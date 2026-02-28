@@ -1350,33 +1350,31 @@ export class MangasService extends BaseContentService<
           }
         }
 
-        // Check for volume existence if manga exists
-        let volumeExists = false;
+        // Extract volume number regardless of DB existence
+        // Prefer direct number field (MangaCollec), fallback to regex extraction from title
         let volumeNumber: number | null = null;
+        if (booknodeManga.number != null) {
+          volumeNumber = booknodeManga.number;
+        } else if (booknodeManga.volumeNumber != null) {
+          volumeNumber = booknodeManga.volumeNumber;
+        } else {
+          // Support formats: "Tome 12", "Vol. 12", " #12", or just " 12" at the end
+          const volumeMatch = booknodeManga.titre.match(/(?:Tome|Volume|Vol\.?|T\.?)\s+(\d+)|(?:\s+#?(\d+))$/i);
+          if (volumeMatch) {
+            volumeNumber = parseInt(volumeMatch[1] || volumeMatch[2], 10);
+          }
+        }
 
-        if (existing) {
-          // Prefer direct number field (MangaCollec), fallback to regex extraction from title
-          if (booknodeManga.number != null) {
-            volumeNumber = booknodeManga.number;
-          } else {
-            // Support formats: "Tome 12", "Vol. 12", " #12", or just " 12" at the end
-            const volumeMatch = booknodeManga.titre.match(/(?:Tome|Volume|Vol\.?|T\.?)\s+(\d+)|(?:\s+#?(\d+))$/i);
-            if (volumeMatch) {
-              volumeNumber = parseInt(volumeMatch[1] || volumeMatch[2], 10);
+        // Check if volume already exists in DB (only relevant when manga exists)
+        let volumeExists = false;
+        if (existing && volumeNumber != null) {
+          const volume = await this.prisma.mangaVolume.findFirst({
+            where: {
+              idManga: existing.idManga,
+              volumeNumber: volumeNumber
             }
-          }
-
-          if (volumeNumber != null) {
-            // Check if volume exists in database
-            const volume = await this.prisma.mangaVolume.findFirst({
-              where: {
-                idManga: existing.idManga,
-                volumeNumber: volumeNumber
-              }
-            });
-
-            volumeExists = !!volume;
-          }
+          });
+          volumeExists = !!volume;
         }
 
         return {

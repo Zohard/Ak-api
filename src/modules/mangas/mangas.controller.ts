@@ -347,11 +347,14 @@ export class MangasController {
       titre: m.titre,
       auteur: '',
       releaseDate: m.releaseDate,
-      imageUrl: m.imageUrl,
+      imageUrl: m.imageUrl
+        ? (m.imageUrl.startsWith('http') ? m.imageUrl : `https://api.mangacollec.com${m.imageUrl}`)
+        : '',
       booknodeUrl: '',
       isbn: m.isbn,
       seriesTitle: m.seriesTitle,
       publisher: m.publisher,
+      volumeNumber: m.number ?? null,
     }));
 
     return this.mangasService.compareBooknodeMangasWithDatabase(formatted);
