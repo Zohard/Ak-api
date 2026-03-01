@@ -82,7 +82,7 @@ export class JeuxVideoController {
     const parsedMonth = month ? parseInt(month) : now.getMonth() + 1;
 
     // Parse filters
-    const userId = inCollection === 'true' && req.user?.sub ? req.user.sub : undefined;
+    const userId = inCollection === 'true' && req.user?.id ? req.user.id : undefined;
     const parsedGenreIds = genreIds ? genreIds.split(',').map(id => parseInt(id)).filter(id => !isNaN(id)) : undefined;
     const parsedPlatformIds = platformIds ? platformIds.split(',').map(id => parseInt(id)).filter(id => !isNaN(id)) : undefined;
 
