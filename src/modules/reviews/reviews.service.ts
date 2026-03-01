@@ -453,9 +453,12 @@ export class ReviewsService {
 
   async getOnThisDayReviews(limit = 5) {
     const now = new Date();
-    const currentMonth = now.getMonth() + 1; // JS months are 0-indexed, SQL is 1-indexed
-    const currentDay = now.getDate();
-    const currentYear = now.getFullYear();
+    // Use Paris timezone to match how dates are displayed on the site
+    const parisFormatter = new Intl.DateTimeFormat('fr-FR', { timeZone: 'Europe/Paris', day: 'numeric', month: 'numeric', year: 'numeric' });
+    const parisParts = parisFormatter.formatToParts(now);
+    const currentDay = parseInt(parisParts.find(p => p.type === 'day')!.value);
+    const currentMonth = parseInt(parisParts.find(p => p.type === 'month')!.value);
+    const currentYear = parseInt(parisParts.find(p => p.type === 'year')!.value);
 
     // Cache key for today's retro reviews
     const cacheKey = `reviews:on-this-day:${currentDay}-${currentMonth}`;
@@ -492,9 +495,9 @@ export class ReviewsService {
         LEFT JOIN ak_mangas b ON c.id_manga = b.id_manga
         LEFT JOIN ak_jeux_video j ON c.id_jeu = j.id_jeu
         WHERE c.statut = 0
-          AND EXTRACT(MONTH FROM c.date_critique) = ${currentMonth}
-          AND EXTRACT(DAY FROM c.date_critique) = ${currentDay}
-          AND EXTRACT(YEAR FROM c.date_critique) < ${currentYear}
+          AND EXTRACT(MONTH FROM (c.date_critique AT TIME ZONE 'UTC' AT TIME ZONE 'Europe/Paris')) = ${currentMonth}
+          AND EXTRACT(DAY FROM (c.date_critique AT TIME ZONE 'UTC' AT TIME ZONE 'Europe/Paris')) = ${currentDay}
+          AND EXTRACT(YEAR FROM (c.date_critique AT TIME ZONE 'UTC' AT TIME ZONE 'Europe/Paris')) < ${currentYear}
         ORDER BY c.popularite DESC, c.notation DESC, c.date_critique DESC
         LIMIT ${limit}
       `);
