@@ -465,31 +465,58 @@ export class ReviewsService {
     }
 
     try {
-      // Use raw query for MySQL EXTRACT/MONTH/DAY functions
       const rawReviews: any[] = await this.prisma.$queryRawUnsafe(`
-        SELECT c.*, 
-               m.idMember, m.memberName, m.avatar,
-               a.idAnime as a_idAnime, a.titre as a_titre, a.image as a_image,
-               b.idManga as b_idManga, b.titre as b_titre, b.image as b_image,
-               j.idJeu as j_idJeu, j.titre as j_titre, j.image as j_image
-        FROM ak_critiques c
-        LEFT JOIN smf_members m ON c.idMembre = m.idMember
-        LEFT JOIN ak_animes a ON c.idAnime = a.idAnime
-        LEFT JOIN ak_mangas b ON c.idManga = b.idManga
-        LEFT JOIN ak_jeux_video j ON c.idJeu = j.idJeu
-        WHERE c.statut = 0 
-          AND MONTH(c.dateCritique) = ${currentMonth} 
-          AND DAY(c.dateCritique) = ${currentDay} 
-          AND YEAR(c.dateCritique) < ${currentYear}
-        ORDER BY c.popularite DESC, c.notation DESC, c.dateCritique DESC
+        SELECT c.id_critique as "idCritique",
+               c.nice_url as "niceUrl",
+               c.titre,
+               c.critique,
+               c.notation,
+               c.date_critique as "dateCritique",
+               c.statut,
+               c.questions,
+               c.accept_images as "acceptImages",
+               c.contains_spoilers as "containsSpoilers",
+               c.id_membre as "idMembre",
+               c.id_anime as "idAnime",
+               c.id_manga as "idManga",
+               c.id_jeu as "idJeu",
+               c.nb_clics as "nbClics",
+               c.popularite,
+               m.id_member as "idMember", m.member_name as "memberName", m.avatar,
+               a.id_anime as "a_idAnime", a.titre as "a_titre", a.image as "a_image",
+               b.id_manga as "b_idManga", b.titre as "b_titre", b.image as "b_image",
+               j.id_jeu as "j_idJeu", j.titre as "j_titre", j.image as "j_image"
+        FROM ak_critique c
+        LEFT JOIN smf_members m ON c.id_membre = m.id_member
+        LEFT JOIN ak_animes a ON c.id_anime = a.id_anime
+        LEFT JOIN ak_mangas b ON c.id_manga = b.id_manga
+        LEFT JOIN ak_jeux_video j ON c.id_jeu = j.id_jeu
+        WHERE c.statut = 0
+          AND EXTRACT(MONTH FROM c.date_critique) = ${currentMonth}
+          AND EXTRACT(DAY FROM c.date_critique) = ${currentDay}
+          AND EXTRACT(YEAR FROM c.date_critique) < ${currentYear}
+        ORDER BY c.popularite DESC, c.notation DESC, c.date_critique DESC
         LIMIT ${limit}
       `);
 
-      // Map raw data to the structure formatReview expects
       const formattedReviews = rawReviews.map(raw => {
-        // Construct standard object
         const review = {
-          ...raw,
+          idCritique: raw.idCritique,
+          niceUrl: raw.niceUrl,
+          titre: raw.titre,
+          critique: raw.critique,
+          notation: raw.notation,
+          dateCritique: raw.dateCritique,
+          statut: raw.statut,
+          questions: raw.questions,
+          acceptImages: raw.acceptImages,
+          containsSpoilers: raw.containsSpoilers,
+          idMembre: raw.idMembre,
+          idAnime: raw.idAnime,
+          idManga: raw.idManga,
+          idJeu: raw.idJeu,
+          nbClics: raw.nbClics,
+          popularite: raw.popularite,
           membre: raw.idMember ? { idMember: raw.idMember, memberName: raw.memberName, avatar: raw.avatar } : null,
           anime: raw.a_idAnime ? { idAnime: raw.a_idAnime, titre: raw.a_titre, image: raw.a_image } : null,
           manga: raw.b_idManga ? { idManga: raw.b_idManga, titre: raw.b_titre, image: raw.b_image } : null,
