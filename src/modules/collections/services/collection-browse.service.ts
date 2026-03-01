@@ -433,10 +433,11 @@ export class CollectionBrowseService {
         page: number = 1,
         limit: number = 20,
         currentUserId?: number,
-        friendsOnly: boolean = false
+        friendsOnly: boolean = false,
+        statusType?: number
     ) {
         // OPTIMIZATION: Cache users with media to reduce DB load
-        const cacheKey = `media_collections_users:${mediaType}:${mediaId}:${page}:${limit}:${friendsOnly ? 'friends' : 'all'}${currentUserId ? `:user${currentUserId}` : ''}`;
+        const cacheKey = `media_collections_users:${mediaType}:${mediaId}:${page}:${limit}:${friendsOnly ? 'friends' : 'all'}${currentUserId ? `:user${currentUserId}` : ''}${statusType ? `:status${statusType}` : ''}`;
         const cached = await this.cacheService.get(cacheKey);
         if (cached) {
             return cached;
@@ -487,6 +488,9 @@ export class CollectionBrowseService {
                 idMembre: { gt: 0 },
                 user: { idMember: { gt: 0 } }, // Filter by user existence check
             };
+            if (statusType) {
+                where.type = statusType;
+            }
 
             // Query for main data
             const queryWhere = { ...where };
@@ -547,6 +551,9 @@ export class CollectionBrowseService {
                 idMembre: { gt: 0 },
                 user: { idMember: { gt: 0 } }, // Filter by user existence check
             };
+            if (statusType) {
+                where.type = statusType;
+            }
 
             // Query for main data
             const queryWhere = { ...where };
@@ -608,6 +615,9 @@ export class CollectionBrowseService {
                 idMembre: { gt: 0 },
                 user: { idMember: { gt: 0 } },
             };
+            if (statusType) {
+                where.type = statusType;
+            }
 
             const queryWhere = { ...where };
             if (friendsOnly && friendIds.length > 0) {

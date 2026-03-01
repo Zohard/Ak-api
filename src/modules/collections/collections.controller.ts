@@ -783,6 +783,7 @@ export class CollectionsController {
   @ApiQuery({ name: 'page', required: false, type: 'number', description: 'Page number (default: 1)' })
   @ApiQuery({ name: 'limit', required: false, type: 'number', description: 'Items per page (default: 20)' })
   @ApiQuery({ name: 'friendsOnly', required: false, type: 'boolean', description: 'Show only friends (default: false)' })
+  @ApiQuery({ name: 'statusType', required: false, type: 'number', description: 'Filter by collection status type (1=Terminé, 2=En cours, 3=Wishlist, 4=Abandonné, 5=En pause)' })
   @ApiResponse({ status: 200, description: 'Users with collections retrieved successfully' })
   getUsersWithMedia(
     @Param('mediaType') mediaType: 'anime' | 'manga' | 'game' | 'jeu-video',
@@ -790,10 +791,11 @@ export class CollectionsController {
     @Query('page', new ParseIntPipe({ optional: true })) page: number = 1,
     @Query('limit', new ParseIntPipe({ optional: true })) limit: number = 20,
     @Query('friendsOnly') friendsOnly: string = 'false',
-    @Request() req,
+    @Query('statusType', new ParseIntPipe({ optional: true })) statusType?: number,
+    @Request() req?,
   ) {
     const currentUserId = req.user?.id;
     const friendsOnlyBool = friendsOnly === 'true';
-    return this.collectionBrowseService.getUsersWithMedia(mediaType, mediaId, page, limit, currentUserId, friendsOnlyBool);
+    return this.collectionBrowseService.getUsersWithMedia(mediaType, mediaId, page, limit, currentUserId, friendsOnlyBool, statusType);
   }
 }
