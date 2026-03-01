@@ -517,6 +517,7 @@ export class EmailService {
       notFound: number;
       total: number;
       failedItems?: Array<{ title: string; reason?: string }>;
+      resultUrl?: string;
     }
   ): Promise<void> {
     const profileUrl = `${this.configService.get('FRONTEND_URL')}/profile`;
@@ -560,6 +561,7 @@ export class EmailService {
       notFound: number;
       total: number;
       failedItems?: Array<{ title: string; reason?: string }>;
+      resultUrl?: string;
     },
     profileUrl: string
   ): string {
@@ -708,7 +710,8 @@ export class EmailService {
           ` : ''}
 
           <div style="text-align: center;">
-            <a href="${profileUrl}" class="button">Voir ma collection</a>
+            ${summary.resultUrl ? `<a href="${summary.resultUrl}" class="button" style="background-color: #10b981; margin-right: 10px;">Voir le résultat complet</a>` : ''}
+            <a href="${profileUrl}" class="button" style="background-color: #6b7280;">Voir ma collection</a>
           </div>
 
           <div class="footer">

@@ -495,9 +495,9 @@ export class ReviewsService {
         LEFT JOIN ak_mangas b ON c.id_manga = b.id_manga
         LEFT JOIN ak_jeux_video j ON c.id_jeu = j.id_jeu
         WHERE c.statut = 0
-          AND EXTRACT(MONTH FROM (c.date_critique AT TIME ZONE 'UTC' AT TIME ZONE 'Europe/Paris')) = ${currentMonth}
-          AND EXTRACT(DAY FROM (c.date_critique AT TIME ZONE 'UTC' AT TIME ZONE 'Europe/Paris')) = ${currentDay}
-          AND EXTRACT(YEAR FROM (c.date_critique AT TIME ZONE 'UTC' AT TIME ZONE 'Europe/Paris')) < ${currentYear}
+          AND EXTRACT(MONTH FROM c.date_critique) = ${currentMonth}
+          AND EXTRACT(DAY FROM c.date_critique) = ${currentDay}
+          AND EXTRACT(YEAR FROM c.date_critique) < ${currentYear}
         ORDER BY c.popularite DESC, c.notation DESC, c.date_critique DESC
         LIMIT ${limit}
       `);

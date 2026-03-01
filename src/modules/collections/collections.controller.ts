@@ -28,7 +28,8 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { ImportMalDto } from './dto/import-mal.dto';
 import { AddJeuxVideoToCollectionDto } from './dto/add-jeuxvideo-to-collection.dto';
 import { UpdateJeuxVideoCollectionDto } from './dto/update-jeuxvideo-collection.dto';
-import { MalImportJobData } from './processors/import.processor';
+import { MalImportJobData, MalImportResult } from './processors/import.processor';
+import { CacheService } from '../../shared/services/cache.service';
 import type { Response } from 'express';
 import { VideoGameCollectionService } from './services/video-game-collection.service';
 import { CollectionStatisticsService } from './services/collection-statistics.service';
@@ -46,6 +47,7 @@ export class CollectionsController {
     private readonly collectionStatisticsService: CollectionStatisticsService,
     private readonly collectionImportService: CollectionImportService,
     private readonly collectionBrowseService: CollectionBrowseService,
+    private readonly cacheService: CacheService,
   ) { }
 
   @Post()
@@ -377,6 +379,20 @@ export class CollectionsController {
     }
 
     if (!job) {
+      // Try Redis cache fallback (result cached for 7 days after job cleanup)
+      const cached = await this.cacheService.get<MalImportResult>(`import_result:${jobId}`);
+      if (cached) {
+        return {
+          found: true,
+          jobId,
+          status: 'completed',
+          progress: 100,
+          processedCount: cached.total,
+          totalCount: cached.total,
+          result: cached,
+          finishedAt: null,
+        };
+      }
       return {
         found: false,
         status: 'not_found',

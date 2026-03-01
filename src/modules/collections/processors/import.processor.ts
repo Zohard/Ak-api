@@ -92,6 +92,9 @@ export class ImportProcessor extends WorkerHost {
                 details: result.details || [],
             };
 
+            // Cache result for 7 days so the result page works after job cleanup
+            await this.cacheService.set(`import_result:${job.id}`, jobResult, 7 * 24 * 3600);
+
             // Get list of failed items for the email
             const failedItems = (result.details || [])
                 .filter(d => d.outcome === 'not_found' || d.outcome === 'skipped')
@@ -101,6 +104,8 @@ export class ImportProcessor extends WorkerHost {
             const emailAlreadySent = await this.wasEmailSent(job.id);
             if (!emailAlreadySent) {
                 try {
+                    const frontendUrl = process.env.FRONTEND_URL || 'https://anime-kun.net';
+                    const resultUrl = `${frontendUrl}/import/result/${job.id}`;
                     await this.emailService.sendImportSummaryEmail(
                         userEmail,
                         username,
@@ -110,6 +115,7 @@ export class ImportProcessor extends WorkerHost {
                             notFound,
                             total: items.length,
                             failedItems,
+                            resultUrl,
                         }
                     );
                     await this.markEmailSent(job.id);
