@@ -358,6 +358,11 @@ export class MangasService extends BaseContentService<
       where.classementPopularite = { gt: 0 };
     }
 
+    // Exclude manga with no rating when sorting by rating
+    if (sortBy === 'moyenneNotes') {
+      where.moyenneNotes = { gt: 0 };
+    }
+
     // Build order by clause with secondary sort by idManga for stable pagination
     const orderBy: any = [
       { [sortBy || 'dateAjout']: sortOrder || 'desc' },
