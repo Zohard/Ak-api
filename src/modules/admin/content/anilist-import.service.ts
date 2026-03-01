@@ -44,6 +44,65 @@ export class AniListImportService {
   ) {}
 
   /**
+   * Normalize commentaire JSON into AniListCommentaireData regardless of storage format.
+   *
+   * Three possible formats are stored in commentaire:
+   *  1. AniListCommentaireData  { anilistId, originalData: { genres }, staff: [{name,role}], characters }
+   *  2. Raw AniList API data    { id, genres: [], staff: { edges: [{node:{name:{full}}, role}] }, characters }
+   *  3. scrapingResponse merged { merged: { genres: [], staff: [{name,role}] }, anilist: rawData }
+   */
+  private normalizeCommentaire(raw: any): AniListCommentaireData {
+    if (!raw || typeof raw !== 'object') return {};
+
+    // Format 1: already normalized (has originalData.genres or flat staff array of objects with name)
+    const isFormat1 = raw.originalData !== undefined || (Array.isArray(raw.staff) && raw.staff.length > 0 && typeof raw.staff[0]?.name === 'string');
+
+    if (isFormat1) return raw as AniListCommentaireData;
+
+    // Format 3: scrapingResponse — has a `merged` key with flat arrays
+    if (raw.merged) {
+      const merged = raw.merged;
+      const anilistRaw = raw.anilist || {};
+      return {
+        anilistId: anilistRaw.id,
+        originalData: { genres: merged.genres || anilistRaw.genres || [] },
+        staff: (merged.staff || []).map((s: any) => ({
+          name: s.name || s.node?.name?.full || '',
+          role: s.role || '',
+          primaryOccupations: s.primaryOccupations || [],
+        })),
+        characters: (merged.characters || []).map((c: any) => ({
+          name: c.name || '',
+          role: c.role || '',
+          voiceActors: (c.voice_actors || c.voiceActors || []).map((va: any) => ({
+            name: va.name || '',
+            language: va.language || va.languageV2 || '',
+          })),
+        })),
+      };
+    }
+
+    // Format 2: raw AniList API response — has top-level genres and staff.edges
+    return {
+      anilistId: raw.id,
+      originalData: { genres: raw.genres || [] },
+      staff: (raw.staff?.edges || []).map((edge: any) => ({
+        name: edge.node?.name?.full || edge.node?.name?.native || '',
+        role: edge.role || '',
+        primaryOccupations: edge.node?.primaryOccupations || [],
+      })),
+      characters: (raw.characters?.edges || []).map((edge: any) => ({
+        name: edge.node?.name?.full || '',
+        role: edge.role || '',
+        voiceActors: (edge.voiceActors || []).map((va: any) => ({
+          name: va.name?.full || va.name || '',
+          language: va.languageV2 || va.language || '',
+        })),
+      })),
+    };
+  }
+
+  /**
    * Import tags from AniList data stored in commentaire field
    */
   async importTags(animeId: number, username?: string): Promise<{ imported: number; skipped: number; details: string[] }> {
@@ -63,7 +122,7 @@ export class AniListImportService {
 
     let anilistData: AniListCommentaireData;
     try {
-      anilistData = JSON.parse(anime.commentaire);
+      anilistData = this.normalizeCommentaire(JSON.parse(anime.commentaire));
     } catch {
       throw new BadRequestException('Format de données AniList invalide');
     }
@@ -163,7 +222,7 @@ export class AniListImportService {
 
     let anilistData: AniListCommentaireData;
     try {
-      anilistData = JSON.parse(anime.commentaire);
+      anilistData = this.normalizeCommentaire(JSON.parse(anime.commentaire));
     } catch {
       throw new BadRequestException('Format de données AniList invalide');
     }
