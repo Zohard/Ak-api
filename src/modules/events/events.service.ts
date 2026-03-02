@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../../shared/services/prisma.service';
 import { CacheService } from '../../shared/services/cache.service';
+import { CaptchaService } from '../../shared/services/captcha.service';
 import { CreateEventDto, CreateCategoryDto, CreateNomineeDto, EventStatus } from './dto/create-event.dto';
 import { UpdateEventDto } from './dto/update-event.dto';
 import { VoteDto } from './dto/vote.dto';
@@ -10,6 +11,7 @@ export class EventsService {
   constructor(
     private prisma: PrismaService,
     private cacheService: CacheService,
+    private captchaService: CaptchaService,
   ) { }
 
   // Generate slug from title
@@ -353,8 +355,21 @@ export class EventsService {
     return { success: true };
   }
 
-  // Vote for a nominee
-  async vote(voteDto: VoteDto, userId: number) {
+  // Vote for a nominee (supports both authenticated and anonymous voters)
+  async vote(voteDto: VoteDto, userId?: number, ip?: string) {
+    const isAnonymous = !userId;
+
+    // Anonymous voters must provide an anonToken and pass reCAPTCHA
+    if (isAnonymous) {
+      if (!voteDto.anonToken) {
+        throw new BadRequestException('Token anonyme requis pour voter sans compte');
+      }
+      if (!voteDto.recaptchaToken) {
+        throw new BadRequestException('Vérification anti-robot requise');
+      }
+      await this.captchaService.verifyCaptcha(voteDto.recaptchaToken, ip);
+    }
+
     // Get the category and event
     const [category] = await this.prisma.$queryRaw<any[]>`
       SELECT c.*, e.status, e.voting_start, e.voting_end
@@ -389,24 +404,52 @@ export class EventsService {
       throw new NotFoundException('Nominé non trouvé dans cette catégorie');
     }
 
-    // Check if user already voted in this category
-    const [existingVote] = await this.prisma.$queryRaw<any[]>`
-      SELECT * FROM ak_event_votes WHERE category_id = ${voteDto.categoryId} AND user_id = ${userId}
-    `;
+    if (isAnonymous) {
+      // Check duplicate by anon_token
+      const [existingByToken] = await this.prisma.$queryRaw<any[]>`
+        SELECT id FROM ak_event_votes
+        WHERE category_id = ${voteDto.categoryId} AND anon_token = ${voteDto.anonToken}
+      `;
 
-    if (existingVote) {
-      // Update existing vote
-      await this.prisma.$queryRaw`
-        UPDATE ak_event_votes
-        SET nominee_id = ${voteDto.nomineeId}, voted_at = NOW()
-        WHERE category_id = ${voteDto.categoryId} AND user_id = ${userId}
-      `;
+      // Also check duplicate by IP to catch storage-clearing cheats
+      const [existingByIp] = ip ? await this.prisma.$queryRaw<any[]>`
+        SELECT id FROM ak_event_votes
+        WHERE category_id = ${voteDto.categoryId} AND ip_address = ${ip} AND user_id IS NULL
+      ` : [null];
+
+      if (existingByToken) {
+        // Allow updating the choice (same behavior as authenticated users)
+        await this.prisma.$queryRaw`
+          UPDATE ak_event_votes
+          SET nominee_id = ${voteDto.nomineeId}, voted_at = NOW()
+          WHERE category_id = ${voteDto.categoryId} AND anon_token = ${voteDto.anonToken}
+        `;
+      } else if (existingByIp) {
+        throw new ForbiddenException('Vous avez déjà voté dans cette catégorie');
+      } else {
+        await this.prisma.$queryRaw`
+          INSERT INTO ak_event_votes (nominee_id, category_id, user_id, anon_token, ip_address, voted_at)
+          VALUES (${voteDto.nomineeId}, ${voteDto.categoryId}, NULL, ${voteDto.anonToken}, ${ip || null}, NOW())
+        `;
+      }
     } else {
-      // Create new vote
-      await this.prisma.$queryRaw`
-        INSERT INTO ak_event_votes (nominee_id, category_id, user_id, voted_at)
-        VALUES (${voteDto.nomineeId}, ${voteDto.categoryId}, ${userId}, NOW())
+      // Authenticated voter
+      const [existingVote] = await this.prisma.$queryRaw<any[]>`
+        SELECT * FROM ak_event_votes WHERE category_id = ${voteDto.categoryId} AND user_id = ${userId}
       `;
+
+      if (existingVote) {
+        await this.prisma.$queryRaw`
+          UPDATE ak_event_votes
+          SET nominee_id = ${voteDto.nomineeId}, voted_at = NOW()
+          WHERE category_id = ${voteDto.categoryId} AND user_id = ${userId}
+        `;
+      } else {
+        await this.prisma.$queryRaw`
+          INSERT INTO ak_event_votes (nominee_id, category_id, user_id, anon_token, ip_address, voted_at)
+          VALUES (${voteDto.nomineeId}, ${voteDto.categoryId}, ${userId}, NULL, ${ip || null}, NOW())
+        `;
+      }
     }
 
     return { success: true, message: 'Vote enregistré' };

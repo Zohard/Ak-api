@@ -10,6 +10,7 @@ import {
   Request,
   Query,
   ParseIntPipe,
+  Ip,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -56,12 +57,13 @@ export class EventsController {
   // ============ USER ENDPOINTS (authenticated) ============
 
   @Post('vote')
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Voter pour un nominé' })
+  @UseGuards(OptionalJwtAuthGuard)
+  @ApiOperation({ summary: 'Voter pour un nominé (connecté ou anonyme)' })
   @ApiResponse({ status: 201, description: 'Vote enregistré' })
-  async vote(@Body() voteDto: VoteDto, @Request() req) {
-    return this.eventsService.vote(voteDto, req.user.id);
+  async vote(@Body() voteDto: VoteDto, @Request() req, @Ip() ip: string) {
+    const userId = req.user?.id;
+    const clientIp = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || ip;
+    return this.eventsService.vote(voteDto, userId, clientIp);
   }
 
   @Delete('vote/:categoryId')
