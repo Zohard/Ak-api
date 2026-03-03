@@ -3,6 +3,7 @@ import { PrismaService } from '../../shared/services/prisma.service';
 import { CacheService } from '../../shared/services/cache.service';
 import { CreateListDto } from './dto/create-list.dto';
 import { UpdateListDto } from './dto/update-list.dto';
+import { MEMBER_NAME_SELECT } from '../../shared/constants/prisma-select.constants';
 
 @Injectable()
 export class ListsService {
@@ -364,7 +365,7 @@ export class ListsService {
           { dateCreation: 'desc' }  // tiebreaker for same popularity
         ],
         take: limit,
-        include: { membre: { select: { idMember: true, memberName: true } } },
+        include: { membre: { select: MEMBER_NAME_SELECT } },
       });
       result = rows.map((r) => this.formatList(r));
     }

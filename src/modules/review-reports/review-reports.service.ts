@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { PrismaService } from '../../shared/services/prisma.service';
 import { CreateReviewReportDto } from './dto/create-review-report.dto';
 import { sanitizeForPostgres } from '../../shared/utils/text.util';
+import { MEMBER_BRIEF_SELECT, MEMBER_NAME_SELECT } from '../../shared/constants/prisma-select.constants';
 
 @Injectable()
 export class ReviewReportsService {
@@ -71,11 +72,7 @@ export class ReviewReportsService {
         take: limit,
         include: {
           reporter: {
-            select: {
-              idMember: true,
-              memberName: true,
-              avatar: true,
-            },
+            select: MEMBER_BRIEF_SELECT,
           },
           critique: {
             select: {
@@ -93,10 +90,7 @@ export class ReviewReportsService {
             },
           },
           moderator: {
-            select: {
-              idMember: true,
-              memberName: true,
-            },
+            select: MEMBER_NAME_SELECT,
           },
         },
       }),

@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../../shared/services/prisma.service';
 import { CacheService } from '../../../shared/services/cache.service';
 import { CollectionStatisticsService } from './collection-statistics.service';
+import { MEMBER_BRIEF_SELECT } from '../../../shared/constants/prisma-select.constants';
 
 @Injectable()
 export class CollectionBrowseService {
@@ -508,11 +509,7 @@ export class CollectionBrowseService {
                         type: true,
                         evaluation: true,
                         user: {
-                            select: {
-                                idMember: true,
-                                memberName: true,
-                                avatar: true,
-                            }
+                            select: MEMBER_BRIEF_SELECT,
                         }
                     },
                     orderBy: [
@@ -571,11 +568,7 @@ export class CollectionBrowseService {
                         type: true,
                         evaluation: true,
                         user: {
-                            select: {
-                                idMember: true,
-                                memberName: true,
-                                avatar: true,
-                            }
+                            select: MEMBER_BRIEF_SELECT,
                         }
                     },
                     orderBy: [
@@ -634,11 +627,7 @@ export class CollectionBrowseService {
                         type: true,
                         evaluation: true,
                         user: {
-                            select: {
-                                idMember: true,
-                                memberName: true,
-                                avatar: true,
-                            }
+                            select: MEMBER_BRIEF_SELECT,
                         }
                     },
                     orderBy: [

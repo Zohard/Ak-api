@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../shared/services/prisma.service';
 import { CacheService } from '../../shared/services/cache.service';
 import { JeuVideoQueryDto } from './dto/jeu-video-query.dto';
+import { unaccentILIKE } from '../../shared/utils/search-query.util';
 
 @Injectable()
 export class JeuxVideoService {
@@ -805,7 +806,7 @@ export class JeuxVideoService {
       SELECT id_jeu, titre, nice_url, image, annee, moyenne_notes
       FROM ak_jeux_video
       WHERE statut = 1
-      AND unaccent(titre) ILIKE unaccent($1)
+      AND ${unaccentILIKE('titre', '$1')}
       ${excludeClause}
       ORDER BY titre ASC
       LIMIT ${limit * 3}

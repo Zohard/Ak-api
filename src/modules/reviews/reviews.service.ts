@@ -14,6 +14,7 @@ import { CreateReviewDto } from './dto/create-review.dto';
 import { UpdateReviewDto } from './dto/update-review.dto';
 import { ReviewQueryDto } from './dto/review-query.dto';
 import { ModerateReviewDto } from './dto/moderate-review.dto';
+import { MEMBER_BRIEF_SELECT, ANIME_BRIEF_SELECT, MANGA_BRIEF_SELECT } from '../../shared/constants/prisma-select.constants';
 
 @Injectable()
 export class ReviewsService {
@@ -325,11 +326,7 @@ export class ReviewsService {
         orderBy,
         include: {
           membre: {
-            select: {
-              idMember: true,
-              memberName: true,
-              avatar: true,
-            },
+            select: MEMBER_BRIEF_SELECT,
           },
           anime: {
             select: {
@@ -1025,20 +1022,10 @@ export class ReviewsService {
         skip: (page - 1) * limit,
         include: {
           anime: {
-            select: {
-              idAnime: true,
-              titre: true,
-              image: true,
-              niceUrl: true,
-            },
+            select: ANIME_BRIEF_SELECT,
           },
           manga: {
-            select: {
-              idManga: true,
-              titre: true,
-              image: true,
-              niceUrl: true,
-            },
+            select: MANGA_BRIEF_SELECT,
           },
           jeuxVideo: {
             select: {

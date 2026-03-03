@@ -6,6 +6,7 @@ import { BusinessQueryDto } from './dto/business-query.dto';
 import { BusinessSearchDto } from './dto/business-search.dto';
 import { R2Service } from '../media/r2.service';
 import { decodeHTMLEntities } from '../../shared/utils/text.util';
+import { unaccentILIKE } from '../../shared/utils/search-query.util';
 import axios from 'axios';
 
 @Injectable()
@@ -388,12 +389,12 @@ export class BusinessService {
       SELECT id_business, denomination, type, origine, image, nice_url
       FROM ak_business
       WHERE statut = 1
-      AND (unaccent(denomination) ILIKE unaccent($3)
-           OR unaccent(COALESCE(autres_denominations, '')) ILIKE unaccent($3))
+      AND (${unaccentILIKE('denomination', '$3')}
+           OR ${unaccentILIKE("COALESCE(autres_denominations, '')", '$3')})
       ORDER BY
         (CASE
-          WHEN unaccent(denomination) ILIKE unaccent($2) THEN 0
-          WHEN unaccent(denomination) ILIKE unaccent($3) THEN 1
+          WHEN ${unaccentILIKE('denomination', '$2')} THEN 0
+          WHEN ${unaccentILIKE('denomination', '$3')} THEN 1
           ELSE 2
         END),
         denomination ASC, id_business ASC

@@ -21,6 +21,7 @@ import { ScrapeService } from '../scrape/scrape.service';
 import { Prisma } from '@prisma/client';
 import axios from 'axios';
 import { hasAdminAccess } from '../../shared/constants/rbac.constants';
+import { MEMBER_BRIEF_SELECT, MEMBER_NAME_SELECT } from '../../shared/constants/prisma-select.constants';
 
 @Injectable()
 export class MangasService extends BaseContentService<
@@ -205,10 +206,7 @@ export class MangasService extends BaseContentService<
           orderBy: { dateCritique: 'desc' },
           include: {
             membre: {
-              select: {
-                idMember: true,
-                memberName: true,
-              },
+              select: MEMBER_NAME_SELECT,
             },
           },
         },
@@ -377,10 +375,7 @@ export class MangasService extends BaseContentService<
         orderBy: { dateCritique: 'desc' },
         include: {
           membre: {
-            select: {
-              idMember: true,
-              memberName: true,
-            },
+            select: MEMBER_NAME_SELECT,
           },
         },
       };
@@ -502,11 +497,7 @@ export class MangasService extends BaseContentService<
         where: { statut: 0 }, // Only include published/visible reviews
         include: {
           membre: {
-            select: {
-              idMember: true,
-              memberName: true,
-              avatar: true,
-            },
+            select: MEMBER_BRIEF_SELECT,
           },
         },
         orderBy: { dateCritique: 'desc' },
@@ -720,10 +711,7 @@ export class MangasService extends BaseContentService<
         reviews: {
           include: {
             membre: {
-              select: {
-                idMember: true,
-                memberName: true,
-              },
+              select: MEMBER_NAME_SELECT,
             },
           },
           take: 3,

@@ -26,6 +26,7 @@ import { AnimeRankingsService } from './services/anime-rankings.service';
 import { AnimeExternalService } from './services/anime-external.service';
 import { AnimeCacheService } from './services/anime-cache.service';
 import { SeasonsService } from '../seasons/seasons.service';
+import { MEMBER_BRIEF_SELECT, MEMBER_NAME_SELECT } from '../../shared/constants/prisma-select.constants';
 
 @Injectable()
 export class AnimesService extends BaseContentService<
@@ -177,10 +178,7 @@ export class AnimesService extends BaseContentService<
             titre: true,
             notation: true,
             membre: {
-              select: {
-                idMember: true,
-                memberName: true,
-              },
+              select: MEMBER_NAME_SELECT,
             },
           },
           take: 3,
@@ -433,10 +431,7 @@ export class AnimesService extends BaseContentService<
           notation: true,
           dateCritique: true,
           membre: {
-            select: {
-              idMember: true,
-              memberName: true,
-            },
+            select: MEMBER_NAME_SELECT,
           },
         },
         take: 5,
@@ -541,11 +536,7 @@ export class AnimesService extends BaseContentService<
         where: { statut: 0 }, // Only include published/visible reviews
         include: {
           membre: {
-            select: {
-              idMember: true,
-              memberName: true,
-              avatar: true,
-            },
+            select: MEMBER_BRIEF_SELECT,
           },
         },
         orderBy: { dateCritique: 'desc' },
@@ -759,10 +750,7 @@ export class AnimesService extends BaseContentService<
         reviews: {
           include: {
             membre: {
-              select: {
-                idMember: true,
-                memberName: true,
-              },
+              select: MEMBER_NAME_SELECT,
             },
           },
           take: 3,

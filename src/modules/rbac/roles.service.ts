@@ -4,6 +4,7 @@ import { CreateRoleDto } from './dto/create-role.dto';
 import { UpdateRoleDto } from './dto/update-role.dto';
 import { AssignPermissionsDto } from './dto/assign-permissions.dto';
 import { AssignRoleDto } from './dto/assign-role.dto';
+import { MEMBER_BRIEF_SELECT, MEMBER_NAME_SELECT } from '../../shared/constants/prisma-select.constants';
 
 @Injectable()
 export class RolesService {
@@ -71,10 +72,7 @@ export class RolesService {
           include: {
             permission: true,
             grantedByUser: {
-              select: {
-                idMember: true,
-                memberName: true,
-              },
+              select: MEMBER_NAME_SELECT,
             },
           },
         },
@@ -90,10 +88,7 @@ export class RolesService {
               },
             },
             assignedByUser: {
-              select: {
-                idMember: true,
-                memberName: true,
-              },
+              select: MEMBER_NAME_SELECT,
             },
           },
         },
@@ -373,10 +368,7 @@ export class RolesService {
           },
         },
         assignedByUser: {
-          select: {
-            idMember: true,
-            memberName: true,
-          },
+          select: MEMBER_NAME_SELECT,
         },
       },
       orderBy: {
@@ -394,11 +386,7 @@ export class RolesService {
       skip: offset,
       include: {
         member: {
-          select: {
-            idMember: true,
-            memberName: true,
-            avatar: true,
-          },
+          select: MEMBER_BRIEF_SELECT,
         },
       },
       orderBy: {

@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from './prisma.service';
+import { unaccentILIKE } from '../utils/search-query.util';
 
 @Injectable()
 export abstract class BaseContentService<T, CreateDto, UpdateDto, QueryDto> {
@@ -170,8 +171,8 @@ export abstract class BaseContentService<T, CreateDto, UpdateDto, QueryDto> {
       SELECT *
       FROM ${table}
       WHERE statut = ${statusFilter}
-      AND (unaccent(titre) ILIKE unaccent($1)
-           OR unaccent(COALESCE(titre_orig, '')) ILIKE unaccent($1))
+      AND (${unaccentILIKE('titre', '$1')}
+           OR ${unaccentILIKE("COALESCE(titre_orig, '')", '$1')})
       ${excludeClause}
       ${formatExcludeClause}
       ORDER BY titre ASC
