@@ -95,6 +95,22 @@ export class MangaQueryDto {
   ficheComplete?: number;
 
   @ApiPropertyOptional({
+    description: 'Filtrer par statut de parution (Terminé, En cours, etc.)',
+    example: 'Terminé',
+  })
+  @IsOptional()
+  @IsString()
+  statutVol?: string;
+
+  @ApiPropertyOptional({
+    description: "Filtrer par éditeur",
+    example: 'Kana',
+  })
+  @IsOptional()
+  @IsString()
+  editeur?: string;
+
+  @ApiPropertyOptional({
     description: 'Filtrer par genre (un ou plusieurs, séparés par des virgules)',
     example: 'Action',
     examples: {

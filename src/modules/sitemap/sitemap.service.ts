@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../shared/services/prisma.service';
 import { CacheService } from '../../shared/services/cache.service';
 
-interface SitemapUrl {
+export interface SitemapUrl {
   loc: string;
   lastmod?: string;
   changefreq?: string;

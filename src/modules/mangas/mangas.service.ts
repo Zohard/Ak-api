@@ -226,6 +226,8 @@ export class MangasService extends BaseContentService<
       year,
       statut,
       genre,
+      statutVol,
+      editeur,
       sortBy = 'dateAjout',
       sortOrder = 'desc',
       includeReviews = false,
@@ -299,6 +301,27 @@ export class MangasService extends BaseContentService<
     where.statut = 1; //default published one
     if (statut !== undefined) {
       where.statut = statut;
+    }
+
+    if (statutVol) {
+      // e.g "Terminé", "En cours"
+      where.statutVol = statutVol;
+    }
+
+    if (editeur) {
+      // Check either the legacy editeur field or the business relations
+      where.OR = where.OR || [];
+      where.OR.push(
+        { editeur: { contains: editeur, mode: 'insensitive' } },
+        {
+          businessRelations: {
+            some: {
+              type: 'Editeur',
+              business: { denomination: { contains: editeur, mode: 'insensitive' } }
+            }
+          }
+        }
+      );
     }
 
     if (ficheComplete !== undefined) {
@@ -2471,6 +2494,8 @@ export class MangasService extends BaseContentService<
       auteur = '',
       annee = '',
       statut = '',
+      statutVol = '',
+      editeur = '',
       genre = [],
       sortBy = 'dateAjout',
       sortOrder = 'desc',
@@ -2478,7 +2503,7 @@ export class MangasService extends BaseContentService<
     } = query;
 
     const genreKey = Array.isArray(genre) ? genre.sort().join(',') : (genre as any || '');
-    return `${page}_${limit}_${search}_${auteur}_${annee}_${statut}_${genreKey}_${sortBy}_${sortOrder}_${includeReviews}`;
+    return `${page}_${limit}_${search}_${auteur}_${annee}_${statut}_${statutVol}_${editeur}_${genreKey}_${sortBy}_${sortOrder}_${includeReviews}`;
   }
 
   // Cache invalidation methods

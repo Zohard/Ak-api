@@ -90,7 +90,9 @@ async function bootstrap() {
     'http://localhost:3000', // Nuxt frontend dev
     'http://localhost:3001', // AI orchestrator dev
     'http://localhost:3003', // Frontend dev alternate port
-    configService.get('FRONTEND_URL'), // Production frontend
+    'https://www.anime-kun.net', // Production frontend (www)
+    'https://anime-kun.net', // Production frontend (non-www)
+    configService.get('FRONTEND_URL'), // Production frontend from env
     ...corsOriginEnv.split(',').map((o: string) => o.trim()).filter(Boolean), // Additional CORS origins (comma-separated)
     configService.get('AI_ORCHESTRATOR_URL'), // Production AI orchestrator
   ].filter(Boolean);

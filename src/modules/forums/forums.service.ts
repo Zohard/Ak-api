@@ -2021,7 +2021,7 @@ export class ForumsService {
 
       // Check if user owns this message (or is moderator)
       if (message.idMember !== userId && !isModerator) {
-        throw new Error('You do not have permission to edit this message');
+        throw new ForbiddenException('You do not have permission to edit this message');
       }
 
       // Check if topic is locked (moderators can bypass this)
@@ -2103,7 +2103,7 @@ export class ForumsService {
 
       // Check if user owns this message (or is moderator)
       if (message.idMember !== userId && !isModerator) {
-        throw new Error('You do not have permission to delete this message');
+        throw new ForbiddenException('You do not have permission to delete this message');
       }
 
       // Check if this is the first message of the topic
@@ -2345,7 +2345,7 @@ export class ForumsService {
       const canMoveTopic = userGroups.some(group => [1, 2, 3].includes(group));
 
       if (!canMoveTopic) {
-        throw new Error('You do not have permission to move topics');
+        throw new ForbiddenException('You do not have permission to move topics');
       }
 
       // Get the topic with its current board info
@@ -2476,7 +2476,7 @@ export class ForumsService {
       const canLockTopic = userGroups.some(group => [1, 2, 3].includes(group));
 
       if (!canLockTopic) {
-        throw new Error('You do not have permission to lock/unlock topics');
+        throw new ForbiddenException('You do not have permission to lock/unlock topics');
       }
 
       // Get the topic
@@ -2593,7 +2593,7 @@ export class ForumsService {
       const canViewReports = userGroups.some(group => [1, 2, 3].includes(group));
 
       if (!canViewReports) {
-        throw new Error('You do not have permission to view reports');
+        throw new ForbiddenException('You do not have permission to view reports');
       }
 
       // Count only open reports (closed = 0)
@@ -2615,7 +2615,7 @@ export class ForumsService {
       const canViewReports = userGroups.some(group => [1, 2, 3].includes(group));
 
       if (!canViewReports) {
-        throw new Error('You do not have permission to view reports');
+        throw new ForbiddenException('You do not have permission to view reports');
       }
 
       // Build where clause
@@ -2707,7 +2707,7 @@ export class ForumsService {
       const canViewReports = userGroups.some(group => [1, 2, 3].includes(group));
 
       if (!canViewReports) {
-        throw new Error('You do not have permission to view reports');
+        throw new ForbiddenException('You do not have permission to view reports');
       }
 
       // Get the report with all related data
@@ -2789,7 +2789,7 @@ export class ForumsService {
       const canCloseReports = userGroups.some(group => [1, 2, 3].includes(group));
 
       if (!canCloseReports) {
-        throw new Error('You do not have permission to close reports');
+        throw new ForbiddenException('You do not have permission to close reports');
       }
 
       // Get the report
