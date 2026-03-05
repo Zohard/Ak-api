@@ -154,21 +154,51 @@ export class AdminLoggingService {
    * Get formatted activities grouped by content
    * Optimized: Single query with JOINs instead of N+1 queries
    */
-  async getFormattedActivities(limit = 20, offset = 0): Promise<{ items: any[]; hasMore: boolean; total: number }> {
-    const cacheKey = `${limit}:${offset}`;
+  async getFormattedActivities(limit = 20, offset = 0, search?: string, contentType?: string): Promise<{ items: any[]; hasMore: boolean; total: number }> {
+    const cacheKey = `${limit}:${offset}:${search || ''}:${contentType || ''}`;
     if (activitiesCache && activitiesCache.key === cacheKey && Date.now() - activitiesCache.timestamp < ACTIVITIES_CACHE_TTL) {
       return activitiesCache.data;
     }
 
     try {
+      // Build WHERE conditions for filtering
+      const conditions: string[] = [];
+      const params: any[] = [];
+      let paramIndex = 1;
+
+      if (contentType && ['anime', 'manga', 'business', 'jeu_video'].includes(contentType)) {
+        conditions.push(`l.${contentType} > 0`);
+      }
+
+      if (search && search.trim()) {
+        const searchParam = `%${search.trim()}%`;
+        conditions.push(`(
+          a.titre ILIKE $${paramIndex} OR
+          m.titre ILIKE $${paramIndex} OR
+          b.denomination ILIKE $${paramIndex} OR
+          j.titre ILIKE $${paramIndex}
+        )`);
+        params.push(searchParam);
+        paramIndex++;
+      }
+
+      const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
       // Get total count for pagination
-      const countResult = await this.prisma.$queryRaw<any[]>`
-        SELECT COUNT(*)::int as total FROM ak_logs_admin
-      `;
+      const countResult = await this.prisma.$queryRawUnsafe<any[]>(`
+        SELECT COUNT(*)::int as total
+        FROM ak_logs_admin l
+        LEFT JOIN ak_animes a ON l.anime = a.id_anime AND l.anime > 0
+        LEFT JOIN ak_mangas m ON l.manga = m.id_manga AND l.manga > 0
+        LEFT JOIN ak_business b ON l.business = b.id_business AND l.business > 0
+        LEFT JOIN ak_jeux_video j ON l.jeu_video = j.id_jeu AND l.jeu_video > 0
+        ${whereClause}
+      `, ...params);
       const total = countResult[0]?.total || 0;
 
       // Single optimized query with LEFT JOINs to fetch titles
-      const logs = await this.prisma.$queryRaw<any[]>`
+      params.push(limit, offset);
+      const logs = await this.prisma.$queryRawUnsafe<any[]>(`
         SELECT
           l.id_log,
           l.anime,
@@ -189,10 +219,10 @@ export class AdminLoggingService {
         LEFT JOIN ak_mangas m ON l.manga = m.id_manga AND l.manga > 0
         LEFT JOIN ak_business b ON l.business = b.id_business AND l.business > 0
         LEFT JOIN ak_jeux_video j ON l.jeu_video = j.id_jeu AND l.jeu_video > 0
+        ${whereClause}
         ORDER BY l.last_mod DESC
-        LIMIT ${limit}
-        OFFSET ${offset}
-      `;
+        LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
+      `, ...params);
 
       // Format each log entry (no additional queries needed)
       const formattedLogs = logs.map((log) => {

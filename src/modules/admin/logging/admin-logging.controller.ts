@@ -46,6 +46,17 @@ export class AdminLoggingController {
     description: 'Number of items to skip (for pagination)',
     example: 0,
   })
+  @ApiQuery({
+    name: 'search',
+    required: false,
+    description: 'Search by content title',
+  })
+  @ApiQuery({
+    name: 'contentType',
+    required: false,
+    description: 'Filter by content type: anime, manga, business, jeu_video',
+    enum: ['anime', 'manga', 'business', 'jeu_video'],
+  })
   @ApiResponse({
     status: 200,
     description: 'Admin activities retrieved successfully',
@@ -53,10 +64,12 @@ export class AdminLoggingController {
   async getActivities(
     @Query('limit') limit?: string,
     @Query('offset') offset?: string,
+    @Query('search') search?: string,
+    @Query('contentType') contentType?: string,
   ) {
     const parsedLimit = limit ? parseInt(limit, 10) : 20;
     const parsedOffset = offset ? parseInt(offset, 10) : 0;
-    return this.adminLoggingService.getFormattedActivities(parsedLimit, parsedOffset);
+    return this.adminLoggingService.getFormattedActivities(parsedLimit, parsedOffset, search, contentType);
   }
 
   @Get('recent')
