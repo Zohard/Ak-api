@@ -495,7 +495,7 @@ export class ReviewsService {
           AND EXTRACT(MONTH FROM c.date_critique AT TIME ZONE 'Europe/Paris') = ${currentMonth}
           AND EXTRACT(DAY FROM c.date_critique AT TIME ZONE 'Europe/Paris') = ${currentDay}
           AND EXTRACT(YEAR FROM c.date_critique AT TIME ZONE 'Europe/Paris') < ${currentYear}
-        ORDER BY c.popularite DESC, c.notation DESC, c.date_critique DESC
+        ORDER BY c.date_critique DESC
         LIMIT ${limit}
       `);
 
