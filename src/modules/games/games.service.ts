@@ -793,20 +793,47 @@ export class GamesService {
 
     /**
      * Returns text hints based on attempt count.
-     * attempts >= 4 → year
-     * attempts >= 5 → year + format + studio
+     * attempts >= 1 → one tag
+     * attempts >= 4 → tag + year
+     * attempts >= 5 → tag + year + format + studio
      */
     async getHintScreenshot(attempts: number, forGameNumber?: number) {
-        const { anime } = await this.getDailyTargetScreenshot(forGameNumber);
+        const gn = forGameNumber ?? this.getGameNumber();
+        const { anime } = await this.getDailyTargetScreenshot(gn);
         const hints: any = {};
+
+        if (attempts >= 1) {
+            // Pick tags deterministically based on gameNumber
+            const tags = await this.prisma.$queryRaw<{ tag_name: string }[]>`
+                SELECT t.tag_name
+                FROM ak_tags t
+                INNER JOIN ak_tag2fiche tf ON t.id_tag = tf.id_tag
+                WHERE tf.id_fiche = ${anime.idAnime} AND tf.type = 'anime'
+                ORDER BY t.tag_name
+            `;
+            if (tags.length > 0) {
+                const tagIndex = gn % tags.length;
+                hints.tag = tags[tagIndex].tag_name;
+
+                if (attempts >= 3 && tags.length > 1) {
+                    const secondIndex = (gn + 1) % tags.length;
+                    // Avoid duplicate if only 2+ tags
+                    if (secondIndex !== tagIndex) {
+                        hints.tag2 = tags[secondIndex].tag_name;
+                    }
+                }
+            }
+        }
+
+        if (attempts >= 2) {
+            hints.format = anime.format ?? null;
+        }
 
         if (attempts >= 4) {
             hints.year = anime.annee ?? null;
         }
 
         if (attempts >= 5) {
-            hints.year = anime.annee ?? null;
-            hints.format = anime.format ?? null;
             hints.studio = anime.studio ?? null;
         }
 

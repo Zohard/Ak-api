@@ -8,17 +8,24 @@ import {
     Query,
     UseGuards,
     Req,
+    Res,
+    NotFoundException,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { Response } from 'express';
 import { GamesService } from './games.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { OptionalJwtAuthGuard } from '../../common/guards/optional-jwt-auth.guard';
 import { CurrentUser, CurrentUserData } from '../auth/decorators/current-user.decorator';
+import { R2Service } from '../media/r2.service';
 
 @ApiTags('Games')
 @Controller('games')
 export class GamesController {
-    constructor(private readonly gamesService: GamesService) { }
+    constructor(
+        private readonly gamesService: GamesService,
+        private readonly r2Service: R2Service,
+    ) { }
 
     /** Clamps a raw gameNumber query param to [0, today]. Returns undefined if invalid. */
     private parseGameNumber(raw: any): number | undefined {
@@ -122,13 +129,49 @@ export class GamesController {
     @ApiOperation({ summary: "Get today's screenshot game metadata" })
     async getDailyMetadataScreenshot(@Query('gameNumber') rawGn?: string) {
         const gameNumber = this.parseGameNumber(rawGn) ?? this.gamesService.getGameNumber();
-        const { screenshot } = await this.gamesService.getDailyTargetScreenshot(gameNumber);
 
         return {
             gameNumber,
             title: `AK Games Screenshot #${gameNumber}`,
-            screenshotUrl: screenshot.urlScreen,
+            // Image served via /games/screenshot/image to hide filename
+            screenshotUrl: null,
         };
+    }
+
+    @Get('screenshot/image')
+    @ApiOperation({ summary: 'Serve daily screenshot image (proxied to hide filename)' })
+    async serveDailyScreenshotImage(
+        @Query('gameNumber') rawGn: string,
+        @Res() res: Response,
+    ) {
+        const gameNumber = this.parseGameNumber(rawGn) ?? this.gamesService.getGameNumber();
+        const { screenshot } = await this.gamesService.getDailyTargetScreenshot(gameNumber);
+
+        if (!screenshot.urlScreen) {
+            throw new NotFoundException('Screenshot not found');
+        }
+
+        // Build the full R2 URL from the stored path
+        const fullUrl = this.r2Service.getImageUrl(
+            `images/animes/${screenshot.urlScreen}`,
+        );
+
+        try {
+            // Fetch from R2 and pipe to response
+            const upstream = await fetch(fullUrl);
+            if (!upstream.ok) throw new NotFoundException('Screenshot image not found');
+
+            const contentType = upstream.headers.get('content-type') || 'image/jpeg';
+            res.setHeader('Content-Type', contentType);
+            res.setHeader('Cache-Control', 'public, max-age=86400');
+            res.setHeader('Content-Disposition', `inline; filename="screenshot-${gameNumber}.jpg"`);
+
+            const buffer = Buffer.from(await upstream.arrayBuffer());
+            res.send(buffer);
+        } catch (error) {
+            if (error instanceof NotFoundException) throw error;
+            throw new NotFoundException('Failed to load screenshot image');
+        }
     }
 
     @Get('screenshot/state')

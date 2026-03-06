@@ -8,10 +8,11 @@ import { AdminModerationModule } from './moderation/admin-moderation.module';
 import { AdminStaffAkModule } from './writers/admin-staff-ak.module';
 import { AdminForumsModule } from './forums/admin-forums.module';
 import { ToolsModule } from './tools/tools.module';
+import { EditingPresenceModule } from './presence/editing-presence.module';
 import { PrismaService } from '../../shared/services/prisma.service';
 
 @Module({
-  imports: [AdminUsersModule, AdminContentModule, AdminModerationModule, AdminStaffAkModule, AdminForumsModule, ToolsModule],
+  imports: [AdminUsersModule, AdminContentModule, AdminModerationModule, AdminStaffAkModule, AdminForumsModule, ToolsModule, EditingPresenceModule],
   controllers: [AdminController],
   providers: [AdminService, PrismaService],
   exports: [
