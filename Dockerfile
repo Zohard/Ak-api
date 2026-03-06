@@ -1,39 +1,37 @@
-# Dockerfile for Railway - production build
-FROM node:20-alpine
+# ── Build stage ──────────────────────────────────────────────
+FROM node:20-alpine AS builder
 
-# Install build dependencies
 RUN apk add --no-cache python3 make g++
 
-# Set working directory
 WORKDIR /app
 
-# Set Node.js memory limit to 1GB
-ENV NODE_OPTIONS="--max-old-space-size=1024"
-
-# Copy package files and prisma schema
 COPY package*.json ./
 COPY prisma ./prisma/
 
-# Install ALL dependencies including devDependencies (needed for build)
 RUN npm ci
 
-# Copy all source code
 COPY . .
 
-# Build the application (generates Prisma client and compiles TypeScript)
 RUN npm run build
 
-# NOW set production environment (after build is done)
+# Prune dev dependencies after build
+RUN npm prune --production
+
+# ── Production stage ────────────────────────────────────────
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Limit Node.js heap to 512MB (sufficient for a NestJS API)
+ENV NODE_OPTIONS="--max-old-space-size=512"
 ENV NODE_ENV=production
 
-# Verify build succeeded - check where NestJS actually put main.js
-RUN ls -la dist/ && echo "Build successful!" && (ls -la dist/src/main.js)
+# Copy only what's needed to run
+COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/package.json ./package.json
+COPY --from=builder /app/prisma ./prisma
 
-# Remove dev dependencies to save space (optional, comment out if build fails)
-# RUN npm prune --production
-
-# Expose port
 EXPOSE $PORT
 
-# Use npm script which knows the correct path
-CMD ["npm", "run", "start:prod"]
+CMD ["node", "dist/src/main"]
