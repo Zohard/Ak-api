@@ -851,11 +851,37 @@ export class MangaVolumesService {
       take: limit,
     });
 
-    // Group by month for easier frontend display? Or return flat list?
-    // Let's return a flat list but with useful structure
+    // Resolve editeur from business relations (akBusinessToManga with type "Editeur")
+    const mangaIds = [...new Set(volumes.map(v => v.manga?.idManga).filter(Boolean))];
+    let editeurMap = new Map<number, string>();
+
+    if (mangaIds.length > 0) {
+      const editeurRelations = await this.prisma.akBusinessToManga.findMany({
+        where: {
+          idManga: { in: mangaIds },
+          type: 'Editeur',
+        },
+        include: {
+          business: { select: { denomination: true } },
+        },
+      });
+
+      for (const rel of editeurRelations) {
+        if (rel.idManga && rel.business?.denomination) {
+          const existing = editeurMap.get(rel.idManga);
+          const name = rel.business.denomination.trim();
+          editeurMap.set(rel.idManga, existing ? `${existing}, ${name}` : name);
+        }
+      }
+    }
+
     const result = volumes.map(v => ({
       ...v,
-      mangaTitle: v.manga?.titreFr || v.manga?.titre, // Prefer French title
+      mangaTitle: v.manga?.titreFr || v.manga?.titre,
+      manga: {
+        ...v.manga,
+        editeur: v.manga?.idManga ? (editeurMap.get(v.manga.idManga) || null) : null,
+      },
     }));
 
     // Set cache (2 hours = 7200s)
