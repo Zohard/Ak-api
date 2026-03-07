@@ -35,6 +35,17 @@ export class GamesController {
         return Math.min(n, this.gamesService.getGameNumber());
     }
 
+    // ─── Leaderboard ──────────────────────────────────────────────────────────
+
+    @Get('leaderboard')
+    @ApiOperation({ summary: 'Get the games leaderboard (top players, optionally filtered by game type)' })
+    async getLeaderboard(@Query('limit') limit?: string, @Query('type') type?: string) {
+        const parsedLimit = Math.min(Math.max(Number(limit) || 20, 1), 50);
+        const validTypes = ['anime', 'jeux', 'screenshot', 'manga'];
+        const parsedType = type && validTypes.includes(type) ? type : undefined;
+        return this.gamesService.getLeaderboard(parsedLimit, parsedType);
+    }
+
     // ─── Anime Guess Game ────────────────────────────────────────────────────
 
     @Get('anime/daily')

@@ -1078,5 +1078,99 @@ export class GamesService {
 
         return hints;
     }
+
+    // ─── Leaderboard ──────────────────────────────────────────────────────
+
+    private static readonly SCORE_TABLES: Record<string, string> = {
+        anime: 'ak_guess_game_scores',
+        jeux: 'ak_guess_game_scores_jeux',
+        screenshot: 'ak_guess_game_scores_screenshot',
+        manga: 'ak_guess_game_scores_manga',
+    };
+
+    async getLeaderboard(limit = 20, type?: string) {
+        // Points per win = 11 - attempts (10pts for 1 try, 1pt for 10 tries)
+        // Streak bonus: each consecutive win adds +2 cumulative bonus
+        // e.g. 3-win streak: game1 = base, game2 = base+2, game3 = base+4
+
+        let allScoresCte: string;
+        if (type && GamesService.SCORE_TABLES[type]) {
+            const table = GamesService.SCORE_TABLES[type];
+            allScoresCte = `SELECT user_id, game_number, is_won, attempts, '${type}' AS game_type FROM ${table}`;
+        } else {
+            allScoresCte = Object.entries(GamesService.SCORE_TABLES)
+                .map(([key, table]) => `SELECT user_id, game_number, is_won, attempts, '${key}' AS game_type FROM ${table}`)
+                .join('\n                UNION ALL\n                ');
+        }
+
+        const rows: any[] = await this.prisma.$queryRawUnsafe(`
+            WITH all_scores AS (
+                ${allScoresCte}
+            ),
+            wins_with_streaks AS (
+                SELECT *,
+                    game_number - ROW_NUMBER() OVER (
+                        PARTITION BY user_id, game_type ORDER BY game_number
+                    ) AS streak_group
+                FROM all_scores
+                WHERE is_won = true
+            ),
+            wins_with_position AS (
+                SELECT *,
+                    ROW_NUMBER() OVER (
+                        PARTITION BY user_id, game_type, streak_group ORDER BY game_number
+                    ) AS pos_in_streak
+                FROM wins_with_streaks
+            ),
+            user_points AS (
+                SELECT user_id,
+                    SUM((11 - attempts) + GREATEST(0, (pos_in_streak - 1)) * 2) AS total_points
+                FROM wins_with_position
+                GROUP BY user_id
+            ),
+            user_best_streak AS (
+                SELECT user_id, MAX(streak_len) AS best_streak
+                FROM (
+                    SELECT user_id, streak_group, game_type, COUNT(*) AS streak_len
+                    FROM wins_with_streaks
+                    GROUP BY user_id, streak_group, game_type
+                ) sub
+                GROUP BY user_id
+            ),
+            stats AS (
+                SELECT user_id,
+                    COUNT(*) AS total_games,
+                    SUM(CASE WHEN is_won THEN 1 ELSE 0 END) AS total_wins,
+                    ROUND(AVG(CASE WHEN is_won THEN attempts END), 1) AS avg_attempts
+                FROM all_scores
+                GROUP BY user_id
+                HAVING SUM(CASE WHEN is_won THEN 1 ELSE 0 END) > 0
+            )
+            SELECT
+                s.user_id, s.total_games, s.total_wins, s.avg_attempts,
+                COALESCE(p.total_points, 0) AS total_points,
+                COALESCE(bs.best_streak, 0) AS best_streak,
+                m.member_name, m.avatar
+            FROM stats s
+            JOIN smf_members m ON m.id_member = s.user_id
+            LEFT JOIN user_points p ON p.user_id = s.user_id
+            LEFT JOIN user_best_streak bs ON bs.user_id = s.user_id
+            ORDER BY COALESCE(p.total_points, 0) DESC, s.avg_attempts ASC
+            LIMIT $1
+        `, limit);
+
+        return rows.map((r, i) => ({
+            rank: i + 1,
+            userId: Number(r.user_id),
+            username: r.member_name,
+            avatar: r.avatar,
+            totalGames: Number(r.total_games),
+            totalWins: Number(r.total_wins),
+            totalPoints: Number(r.total_points),
+            avgAttempts: r.avg_attempts ? Number(r.avg_attempts) : null,
+            winRate: Math.round((Number(r.total_wins) / Number(r.total_games)) * 100),
+            bestStreak: Number(r.best_streak),
+        }));
+    }
 }
 
