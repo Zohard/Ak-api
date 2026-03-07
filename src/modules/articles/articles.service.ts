@@ -444,15 +444,6 @@ export class ArticlesService {
       throw new NotFoundException('Article not found');
     }
 
-    // Debug logging for article 3920
-    // Debug logging for article 3920
-    /* if (id === 3920) {
-      // Debug logging removed
-    } */
-
-    // Increment view count
-    await this.incrementViewCount(id);
-
     const result = this.transformPost(post, includeContent);
 
     // Only cache if not skipping cache (i.e., not an admin request)
