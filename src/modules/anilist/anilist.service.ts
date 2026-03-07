@@ -500,12 +500,11 @@ export class AniListService {
 
     return {
       titre: anilistAnime.title.romaji || anilistAnime.title.english || anilistAnime.title.native,
-      titreOrig: anilistAnime.title.native,
+      titreOrig: anilistAnime.title.romaji || anilistAnime.title.native,
       titreFr: anilistAnime.title.english,
       titresAlternatifs: [
-        anilistAnime.title.romaji,
-        anilistAnime.title.english,
         anilistAnime.title.native,
+        anilistAnime.title.english,
       ]
         .filter(Boolean)
         .filter((title, index, arr) => arr.indexOf(title) === index)
@@ -1092,11 +1091,10 @@ export class AniListService {
 
     return {
       titre: anilistManga.title.romaji || anilistManga.title.english || anilistManga.title.native,
-      titreOriginal: anilistManga.title.native,
+      titreOriginal: anilistManga.title.romaji || anilistManga.title.native,
       titreFrancais: anilistManga.title.english,
       titresAlternatifs: [
         anilistManga.title.native,
-        anilistManga.title.romaji,
         anilistManga.title.english,
       ]
         .filter(Boolean)
