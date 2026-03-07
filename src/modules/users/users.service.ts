@@ -1182,8 +1182,8 @@ export class UsersService {
           ? allGenres.map(g => `'${g.replace(/'/g, "''")}'`).join(',')
           : null;
 
-      const safeEditor = sourceGame.editeur
-        ? `'${sourceGame.editeur.replace(/'/g, "''")}'`
+      const safeEditor = sourceGame.editeur?.trim()
+        ? `'${sourceGame.editeur.trim().replace(/'/g, "''")}'`
         : null;
 
       const safeTitleWord = sourceGame.titre
@@ -1212,7 +1212,7 @@ export class UsersService {
       }
 
       const query = `
-      SELECT DISTINCT
+      SELECT
         jv.id_jeu AS id,
         jv.titre,
         jv.image,
@@ -1223,6 +1223,7 @@ export class UsersService {
         jv.annee,
         jv.plateforme,
         jv.editeur,
+        jv.nb_clics,
         (
           ${safeEditor ? `CASE WHEN jv.editeur = ${safeEditor} THEN 30 ELSE 0 END` : '0'}
           + ${safeTitleWord ? `CASE WHEN jv.titre ILIKE '%${safeTitleWord}%' THEN 20 ELSE 0 END` : '0'}
